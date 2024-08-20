@@ -4,10 +4,13 @@ Script to plot age-dependent HIV prevalence without interactions
 
 # Imports
 import starsim as ss
-import mighti_original as mi
 import pylab as pl
 import pandas as pd
 import numpy as np
+import sciris as sc
+
+beta = 0
+if beta==0: print('Warning: transmission turned off!')
 
 # Create the networks - sexual and maternal
 mf = ss.MFNet(
@@ -18,9 +21,9 @@ maternal = ss.MaternalNet()
 networks = [mf, maternal]
 
 # Create demographics
-fertility_rates = {'fertility_rate': pd.read_csv(mi.root / 'tests/test_data/nigeria_asfr.csv')}
+fertility_rates = {'fertility_rate': pd.read_csv(sc.thispath() / 'tests/test_data/nigeria_asfr.csv')}
 pregnancy = ss.Pregnancy(pars=fertility_rates)
-death_rates = {'death_rate': pd.read_csv(mi.root / 'tests/test_data/nigeria_deaths.csv'), 'units': 1}
+death_rates = {'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/nigeria_deaths.csv'), 'units': 1}
 death = ss.Deaths(death_rates)
 
 age_data = {
@@ -40,12 +43,15 @@ age_data = {
 }
 n_age_bins = len(age_data) - 1
 age_bins = list(age_data.keys())
+left_bins = age_bins[:-1]
+right_bins = age_bins[1:]
+left_right = list(zip(left_bins, right_bins))
 age_vals = list(age_data.values())
 
 # Define age-dependent initial prevalence function
-def age_dependent_prevalence(sim):
-    prevalence = np.zeros(sim.n_agents)
-    ages = sim.people.age.raw  # Initial ages of agents
+def age_dependent_prevalence(module=None, sim=None, size=None):
+    ages = sim.people.age[size]  # Initial ages of agents
+    prevalence = np.zeros(len(ages))
     
     for i in range(n_age_bins):
         left = age_bins[i]
@@ -53,10 +59,13 @@ def age_dependent_prevalence(sim):
         value = age_vals[i]
         prevalence[(ages >= left) & (ages < right)] = value
 
-    return ss.bernoulli(prevalence)
+    return prevalence
 
 # Initialize HIV with age-dependent initial prevalence
-hiv = ss.HIV()#init_prev=age_dependent_prevalence)
+hiv = ss.HIV(
+    init_prev = ss.bernoulli(age_dependent_prevalence),
+    beta = beta, # Overall transmission rate
+)
 
 # Run baseline HIV simulation without interactions
 print('Running baseline HIV simulation without interactions')
@@ -67,23 +76,19 @@ baseline_sim = ss.Sim(
     start=2021,
     end=2022
 )
-baseline_sim.initialize()
-
 baseline_sim.run()
 
 
-
 # Calculate and plot HIV prevalence by age group
-age_groups = [(15, 19), (20, 24), (25, 29), (30, 34), (35, 39), (40, 44), (45, 49), (50, 54), (55, 59), (60, 64), (65, 100)]
-age_group_labels = [f'{age[0]}-{age[1]}' for age in age_groups]
+age_group_labels = [f'{left}-{right-1}' for left,right in left_right]
 age_results = {label: np.zeros(len(baseline_sim.yearvec)) for label in age_group_labels}
 population_by_age_group = {label: np.zeros(len(baseline_sim.yearvec)) for label in age_group_labels}
 
 # Check initial prevalence
 initial_prevalence = {}
-for (start, end), label in zip(age_groups, age_group_labels):
+for (start, end), label in zip(left_right, age_group_labels):
     # Create a mask for agents in the current age group
-    age_mask = (baseline_sim.people.age >= start) & (baseline_sim.people.age <= end)
+    age_mask = (baseline_sim.people.age >= start) & (baseline_sim.people.age < end)
     # Count total population in this age group
     population_in_group = np.sum(age_mask)
     # Count infected population in this age group
@@ -102,9 +107,9 @@ for t in range(len(baseline_sim.yearvec)):
     ages = baseline_sim.people.age  # Get current ages of agents
     infected = baseline_sim.diseases['hiv'].infected  # Get infected status
     
-    for (start, end), label in zip(age_groups, age_group_labels):
+    for (start, end), label in zip(left_right, age_group_labels):
         # Create a mask for agents in the current age group
-        age_mask = (ages >= start) & (ages <= end)
+        age_mask = (ages >= start) & (ages < end)
         # Count total population in this age group
         population_by_age_group[label][t] = np.sum(age_mask)
         # Count infected population in this age group
