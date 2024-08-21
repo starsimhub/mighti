@@ -79,8 +79,9 @@ baseline_sim = ss.Sim(
     networks=networks,
     diseases=[hiv],
     start=2021,
-    end=2022,
+    end=2030,
     analyzers=[prevalence_analyzer],  # Add the analyzer here
+    copy_inputs=False,
 )
 baseline_sim.run()
 
