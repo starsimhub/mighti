@@ -87,7 +87,7 @@ baseline_sim.run()
 
 # Access and plot the prevalence data collected by the analyzer
 try:
-    prevalence_data = prevalence_analyzer.results['prevalence']
+    prevalence_data = prevalence_analyzer.results['prevalence'] * 100  # Multiply by 100 to convert to percentage
     fig_age, ax_age = pl.subplots(figsize=(12, 8))
     age_group_labels = [f'{left}-{right-1}' for left, right in zip(left_bins, right_bins)]
     for i, label in enumerate(age_group_labels):
@@ -96,7 +96,7 @@ try:
     ax_age.set_title('HIV Prevalence by Age Group')
     ax_age.set_xlabel('Year')
     ax_age.set_ylabel('Prevalence (%)')
-    ax_age.legend(title='Age Groups')
+    ax_age.legend(title='Age Groups', bbox_to_anchor=(1.05, 1), loc='upper left')  # Place legend outside
     ax_age.grid(True)
     pl.tight_layout()
     pl.show()
