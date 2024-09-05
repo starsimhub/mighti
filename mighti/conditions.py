@@ -35,7 +35,7 @@ class Depression(ss.Disease):
             dur_episode=ss.lognorm_ex(1),  # Duration of an episode
             incidence=ss.bernoulli(0.9),  # Incidence at each point in time
             p_death=ss.bernoulli(0.001),  # Risk of death from depression (e.g. by suicide)
-            init_prev=ss.bernoulli(0.0),  # Default initial prevalence (modified below for age-dependent prevalence)
+            init_prev=ss.bernoulli(0.2),  # Default initial prevalence (modified below for age-dependent prevalence)
         )
         self.update_pars(pars, **kwargs)
 
@@ -50,23 +50,16 @@ class Depression(ss.Disease):
         return
 
 
-    def set_initial_states(self, sim):
+    def init_post(self):
         """
         Set the initial states of the population based on the age-dependent initial prevalence.
         """
-        # Create an array to hold initial prevalence values for each person
-        initial_prevalence = np.zeros(len(sim.people))
+        initial_cases = self.pars.init_prev.filter()
+        self.set_prognoses(initial_cases)
         
-        # Loop through each individual and sample the initial prevalence
-        for i in range(len(sim.people)):
-            initial_prevalence[i] = self.pars['init_prev'].rvs()  # Sample individually
-        
-        # Set the initial 'affected' state based on the prevalence function
-        self.affected = np.random.random(len(sim.people)) < initial_prevalence  # Apply age-dependent prevalence
         print(f"Initial affected individuals: {np.sum(self.affected)}")  # Debug: Print number of initially affected individuals
-        return initial_prevalence
-
-
+        return initial_cases
+    
     def update_pre(self):
         sim = self.sim
         recovered = (self.affected & (self.ti_recovered <= sim.ti)).uids
@@ -88,6 +81,7 @@ class Depression(ss.Disease):
     def set_prognoses(self, uids):
         sim = self.sim
         p = self.pars
+        self.susceptible[uids] = False
         self.affected[uids] = True
 
         # Sample duration of episode
