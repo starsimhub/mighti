@@ -1,35 +1,45 @@
-"""
-Specify interactions between diseases, conditions, and risks
-"""
-
 import pandas as pd
 import starsim as ss
 import mighti as mi
 from collections import defaultdict
 
-# Specify all externally visible classes this file defines
-__all__ = [
-    'hiv_depression',
-    'read_interactions'
-]
+# Define your custom connectors or interactions as needed
+# class hiv_depression(ss.Connector):
+#     """ Simple connector to make people with depression more likely to contract HIV """
+#     def __init__(self, pars=None, **kwargs):
+#         super().__init__(label='HIV-Depression', requires=[ss.hiv, mi.Depression])
+#         self.default_pars(
+#             rel_sus_hiv_depression=2,  # People with depression are 2x more likely to acquire HIV
+#         )
+#         self.update_pars(pars, **kwargs)
+#         return
 
+#     def update(self):
+#         sim = self.sim
+#         # Apply the increased susceptibility to those with depression
+#         sim.diseases.hiv.rel_sus[sim.people.depression.affected] = self.pars.rel_sus_hiv_depression
+#         return
 
-# Add individual connectors
 class hiv_depression(ss.Connector):
     """ Simple connector to make people with depression more likely to contract HIV """
     def __init__(self, pars=None, **kwargs):
-        super().__init__(label='HIV-Depression', requires=[ss.HIV, mi.Depression])
+        super().__init__(label='HIV-Depression', requires=[ss.HIV, mi.Depression])  # Use ss.HIV class
         self.default_pars(
-            rel_sus_hiv_depression=2,  # People with depress are 2x more likely to acquire HIV
+            rel_sus_hiv_depression=2,  # People with depression are 2x more likely to acquire HIV
         )
         self.update_pars(pars, **kwargs)
         return
-
-    def update(self, sim):
-        """ Specify HIV-depression interactions """
+    
+    def update(self):
+        sim = self.sim
+        # print(f"Depression affected: {sim.people.depression.affected}")  # Check affected individuals
+        # print(f"Before update: {sim.diseases.hiv.rel_sus}")  # Check initial relative susceptibility
+    
+        # Apply the increased susceptibility to those with depression
         sim.diseases.hiv.rel_sus[sim.people.depression.affected] = self.pars.rel_sus_hiv_depression
+    
+        # print(f"After update: {sim.diseases.hiv.rel_sus}")  # Check updated susceptibility
         return
-
 
 # Functions to read in datafiles
 def read_interactions(datafile=None):
@@ -53,5 +63,4 @@ def read_interactions(datafile=None):
             rel_sus[interacting_cond][cond] = conddf.loc[0, interacting_cond]
 
     return rel_sus
-
 
