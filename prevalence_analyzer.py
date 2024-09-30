@@ -3,57 +3,64 @@ import numpy as np
 import sciris as sc
 
 class PrevalenceAnalyzer(ss.Analyzer):
-    """ Analyzer to calculate HIV and depression prevalence over time by age group """
+    """ Generalized analyzer to calculate disease prevalence over time by age group and sex """
 
-    def __init__(self, age_data_hiv, age_data_depression, *args, **kwargs):
+    def __init__(self, prevalence_data, diseases, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = 'prevalence_analyzer'
-        
-        # Age data for HIV
-        self.age_data_hiv = age_data_hiv
-        self.age_bins_hiv = list(age_data_hiv.keys())  # Age bins for HIV
-        self.age_groups_hiv = list(zip(self.age_bins_hiv[:-1], self.age_bins_hiv[1:]))  # Define HIV age groups
+        self.prevalence_data = prevalence_data
+        self.diseases = diseases  # List of disease names like ['HIV', 'depression', 'diabetes', ...]
 
-        # Age data for Depression
-        self.age_data_depression = age_data_depression
-        self.age_bins_depression = list(age_data_depression.keys())  # Age bins for depression
-        self.age_groups_depression = list(zip(self.age_bins_depression[:-1], self.age_bins_depression[1:]))  # Define depression age groups
+        # Initialize age bins for each disease
+        self.age_bins = {}
+        self.age_groups = {}
 
-        self.results = sc.odict()  # Use an ordered dictionary to store the results
+        # Iterate over each disease and assign age bins
+        for disease in self.diseases:
+            self.age_bins[disease] = list(prevalence_data[disease]['male'].keys())
+            self.age_bins[disease].sort()  # Ensure age bins are sorted
+            # Create age groups with "inf" for the last bin (80+)
+            self.age_groups[disease] = list(zip(self.age_bins[disease][:-1], self.age_bins[disease][1:])) + [(self.age_bins[disease][-1], float('inf'))]
+
+        self.results = sc.odict()
 
     def init_pre(self, sim):
         super().init_pre(sim)
         npts = sim.npts  # Number of time points in the simulation
 
-        # Initialize 2D arrays for both HIV and depression: time x age groups
-        self.results['hiv_prevalence'] = np.zeros((npts, len(self.age_groups_hiv)))
-        self.results['depression_prevalence'] = np.zeros((npts, len(self.age_groups_depression)))
+        # Initialize result arrays for each disease: time x age groups
+        for disease in self.diseases:
+            self.results[f'{disease}_prevalence_male'] = np.zeros((npts, len(self.age_groups[disease])))
+            self.results[f'{disease}_prevalence_female'] = np.zeros((npts, len(self.age_groups[disease])))
 
-        print(f"Initialized prevalence array with {npts} time points for both HIV and depression.")
+        print(f"Initialized prevalence array with {npts} time points for {self.diseases}.")
         return
 
     def apply(self, sim):
-        hiv = sim.diseases.hiv
-        depression = sim.diseases.depression
+        print(f"Applying analyzer at time step {sim.ti}")
         ages = sim.people.age
-        
-        # Calculate HIV prevalence by age group (based on HIV age bins)
-        hiv_prevalence_by_age_group = np.zeros(len(self.age_groups_hiv))
-        for i, (start, end) in enumerate(self.age_groups_hiv):
-            age_mask = (ages >= start) & (ages < end)
-            if np.sum(age_mask) > 0:
-                hiv_prevalence_by_age_group[i] = np.mean(hiv.infected[age_mask])
-        
-        # Store HIV prevalence results
-        self.results['hiv_prevalence'][sim.ti, :] = hiv_prevalence_by_age_group
-
-        # Calculate Depression prevalence by age group (based on depression age bins)
-        depression_prevalence_by_age_group = np.zeros(len(self.age_groups_depression))
-        for i, (start, end) in enumerate(self.age_groups_depression):
-            age_mask = (ages >= start) & (ages < end)
-            if np.sum(age_mask) > 0:
-                depression_prevalence_by_age_group[i] = np.mean(depression.affected[age_mask])
-        
-        # Store Depression prevalence results
-        self.results['depression_prevalence'][sim.ti, :] = depression_prevalence_by_age_group
+        females = sim.people.female
     
+        for disease in self.diseases:
+            disease_obj = getattr(sim.diseases, disease.lower())
+            if disease == 'HIV':
+                status_attr = 'infected'
+            else:
+                status_attr = 'affected'
+    
+            for sex, label in zip([0, 1], ['male', 'female']):
+                prevalence_by_age_group = np.zeros(len(self.age_groups[disease]))
+    
+                for i, (start, end) in enumerate(self.age_groups[disease]):
+                    if end == float('inf'):
+                        age_mask = (ages >= start) & (females == sex)
+                    else:
+                        age_mask = (ages >= start) & (ages < end) & (females == sex)
+    
+                    status_array = getattr(disease_obj, status_attr)
+                    if np.sum(age_mask) > 0:
+                        prevalence_by_age_group[i] = np.mean(status_array[age_mask])
+    
+                disease_key = f'{disease}_prevalence_{label}'
+                # print(f"Storing data for {disease_key} at time {sim.ti}")  # Add this to confirm data is stored
+                self.results[disease_key][sim.ti, :] = prevalence_by_age_group
