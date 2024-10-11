@@ -3,6 +3,12 @@ from .utils import *
 from .conditions import *
 from .interactions import *
 
+# Newly defined files
+# from .ncd_interactions import *  
+from .disease_definitions import *  
+from .prevalence_analyzer import *  
+
+
 # Set the root directory for the codebase
 import pathlib
 rootdir = pathlib.Path(__file__).parent

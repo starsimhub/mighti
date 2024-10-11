@@ -4,8 +4,7 @@ import mighti as mi  # For handling NCDs like depression, diabetes, etc.
 import pylab as pl
 import pandas as pd
 import sciris as sc
-from prevalence_analyzer import PrevalenceAnalyzer
-from disease_definitions import initialize_prevalence_data, age_sex_dependent_prevalence
+
 
 # from disease_definitions import (age_sex_dependent_prevalence_hiv, 
 #                                  age_sex_dependent_prevalence_depression,
@@ -15,8 +14,9 @@ ncds = ['Diabetes', 'Obesity', 'Hypertension']
 diseases = ['HIV'] + ncds  # List of diseases including HIV
 beta = 0.001  # Transmission probability for HIV
 n_agents = 50000
+inityear = 2007
 
-prevalence_data, age_bins = initialize_prevalence_data(diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv')
+prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv',inityear=inityear)
 
 # Create demographics
 fertility_rates = {'fertility_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_asfr.csv')}
@@ -34,15 +34,17 @@ networks = [mf, maternal]
 
 # Define a function for disease-specific prevalence
 def get_prevalence_function(disease):
-    return lambda module, sim, size: age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
+    return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
 
 
 # Initialize the diseases with the correct prevalence functions
 disease_objects = []
 for disease in ncds:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
-    if disease == 'Diabetes':
-        disease_obj = mi.Diabetes(init_prev=init_prev)
+    if disease == 'Type1Diabetes':
+        disease_obj = mi.Type1Diabetes(init_prev=init_prev)
+    elif disease == 'Type2Diabetes':
+        disease_obj = mi.Type2Diabetes(init_prev=init_prev)
     elif disease == 'Obesity':
         disease_obj = mi.Obesity(init_prev=init_prev)
     elif disease == 'Hypertension':
@@ -54,11 +56,12 @@ hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), bet
 disease_objects.append(hiv_disease)
 
 # Initialize the PrevalenceAnalyzer
-prevalence_analyzer = PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
+prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 
 # Define a dictionary that maps disease names to corresponding interaction functions
 interaction_functions = {
-    'Diabetes': mi.hiv_diabetes,
+    'Type1Diabetes': mi.hiv_type1diabetes,
+    'Type2Diabetes': mi.hiv_type2diabetes,
     'Obesity': mi.hiv_obesity,
     'Hypertension': mi.hiv_hypertension
 }
@@ -76,7 +79,7 @@ sim = ss.Sim(
     networks=networks,
     diseases=disease_objects,  # Pass the full list of diseases (HIV + NCDs)
     analyzers=[prevalence_analyzer],
-    start=1987,
+    start=inityear,
     end=2008,
     connectors=interactions,
     people=ppl,
