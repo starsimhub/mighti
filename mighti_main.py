@@ -1,21 +1,19 @@
-# Imports
 import starsim as ss
-import mighti as mi  # For handling NCDs like depression, diabetes, etc.
+import mighti as mi  
 import pylab as pl
 import pandas as pd
 import sciris as sc
-from prevalence_analyzer import PrevalenceAnalyzer
-from disease_definitions import initialize_prevalence_data, age_sex_dependent_prevalence
+
 
 # Define diseases
-# ncds = ['Diabetes' ,'Obesity', 'Hypertension']
-ncds = ['Type1Diabetes', 'Type2Diabetes','Obesity', 'Hypertension']
+ncds = ['Type2Diabetes', 'Obesity']  # List of NCDs being modeled
 diseases = ['HIV'] + ncds  # List of diseases including HIV
 beta = 0.001  # Transmission probability for HIV
-n_agents = 500000
-inityear = 2007#1987
+n_agents = 5000  # Number of agents in the simulation
+inityear = 2007  # Simulation start year
 
-prevalence_data, age_bins = initialize_prevalence_data(diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv', inityear = inityear)
+# Initialize prevalence data from a CSV file
+prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv', inityear=inityear)
 
 # Create demographics
 fertility_rates = {'fertility_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_asfr.csv')}
@@ -24,41 +22,23 @@ death_rates = {'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswati
 death = ss.Deaths(death_rates)
 ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age.csv'))
 
-
 # Create the networks - sexual and maternal
 mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
 networks = [mf, maternal]
 
-
 # Define a function for disease-specific prevalence
 def get_prevalence_function(disease):
-    return lambda module, sim, size: age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
+    return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
 
-
-# Initialize the diseases with the correct prevalence functions
-# disease_objects = []
-# for disease in ncds:
-#     init_prev = ss.bernoulli(get_prevalence_function(disease))
-#     if disease == 'Diabetes':
-#         disease_obj = mi.Diabetes(init_prev=init_prev)
-#     elif disease == 'Obesity':
-#         disease_obj = mi.Obesity(init_prev=init_prev)
-#     elif disease == 'Hypertension':
-#         disease_obj = mi.Hypertension(init_prev=init_prev)
-#     disease_objects.append(disease_obj)
-
+# Create disease objects
 disease_objects = []
 for disease in ncds:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
-    if disease == 'Type1Diabetes':
-        disease_obj = mi.Type1Diabetes(init_prev=init_prev)
-    elif disease == 'Type2Diabetes':
+    if disease == 'Type2Diabetes':
         disease_obj = mi.Type2Diabetes(init_prev=init_prev)
     elif disease == 'Obesity':
         disease_obj = mi.Obesity(init_prev=init_prev)
-    elif disease == 'Hypertension':
-        disease_obj = mi.Hypertension(init_prev=init_prev)
     disease_objects.append(disease_obj)
 
 # HIV-specific setup
@@ -66,42 +46,37 @@ hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), bet
 disease_objects.append(hiv_disease)
 
 # Initialize the PrevalenceAnalyzer
-prevalence_analyzer = PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
+prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 
-# Define a dictionary that maps disease names to corresponding interaction functions
+# Load existing HIV and NCD interactions
 interaction_functions = {
-    'Type1Diabetes': mi.hiv_type1diabetes,
     'Type2Diabetes': mi.hiv_type2diabetes,
     'Obesity': mi.hiv_obesity,
-    'Hypertension': mi.hiv_hypertension
 }
 
-# Initialize an empty list to store the interaction objects
+# Initialize interaction objects for HIV-NCD interactions
 interactions = []
-
-# Loop through NCDs and dynamically generate interactions by calling functions from the dictionary
 for disease in ncds:
     interaction_obj = interaction_functions[disease]()  # Call the corresponding function
     interactions.append(interaction_obj)
 
+# Initialize the simulation
 sim = ss.Sim(
     n_agents=n_agents,
     networks=networks,
     diseases=disease_objects,  # Pass the full list of diseases (HIV + NCDs)
     analyzers=[prevalence_analyzer],
-    start=2021,
-    end=2030,
-    connectors=interactions,
+    start=inityear,
+    end=2020,
+    connectors=interactions,  # Both HIV-NCD and NCD-NCD interactions
     people=ppl,
-    demographics=[pregnancy,death],
+    demographics=[pregnancy, death],
     copy_inputs=False
 )
 
+
 # Run the simulation
 sim.run()
-
-
-
 
 eswatini_hiv_data_2007 = {
     'male': {
@@ -156,21 +131,21 @@ eswatini_hiv_data = {
     '2021': eswatini_hiv_data_2021
 }
 
-diseases = ['HIV', 'Type1Diabetes','Type2Diabetes']
+diseases = ['HIV', 'Type2Diabetes','Obesity']
 
 
 # Retrieve the prevalence data for plotting
 try:
     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
     hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
-    diabetes_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
-    diabetes_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
-    diabetes_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
-    diabetes_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
+    # diabetes1_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
+    # diabetes1_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
+    diabetes2_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
+    diabetes2_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
     obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
     obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
-    hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
-    hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
+    # hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
+    # hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
 
     # Ensure age_bins is a list (fix for the previous error)
     age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
