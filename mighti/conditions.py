@@ -12,17 +12,17 @@ import mighti as mi
 
 __all__ = [
     'Type1Diabetes', 'Type2Diabetes', 'Obesity', 'Hypertension',
-    'Depression','Accident', 'Alzheimers', 'Assault', 'CerebrovascularDisease', 
-    'ChronicLiverDisease','ChronicLowerRespiratoryDisease', 'HeartDisease', 
+    'Depression','Accident', 'Alzheimers', 'Assault', 'CerebrovascularDisease',
+    'ChronicLiverDisease','ChronicLowerRespiratoryDisease', 'HeartDisease',
     'ChronicKidneyDisease','Flu','HPV',
-    'CervicalCancer','ColorectalCancer', 'BreastCancer', 'LungCancer', 'ProstateCancer', 'OtherCancer', 
+    'CervicalCancer','ColorectalCancer', 'BreastCancer', 'LungCancer', 'ProstateCancer', 'OtherCancer',
     'Parkinsons','Smoking', 'Alcohol', 'BRCA', 'ViralHepatitis', 'Poverty'
 ]
 
 
 
 class Type1Diabetes(ss.NCD):
-    
+
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         self.default_pars(
@@ -33,7 +33,7 @@ class Type1Diabetes(ss.NCD):
         )
         self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
         self.update_pars(pars, **kwargs)
-        
+
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
@@ -42,8 +42,8 @@ class Type1Diabetes(ss.NCD):
             ss.FloatArr('ti_dead'),
         )
         return
-    
-    
+
+
     def initialize(self, sim):
         """Initialize the disease, setting rel_sus for each agent."""
         super().initialize(sim)
@@ -86,7 +86,7 @@ class Type1Diabetes(ss.NCD):
     def init_results(self):
         sim = self.sim
         super().init_results()
-        
+
         if 'prevalence' not in self.results:
             self.results += [
                 ss.Result(self.name, 'prevalence', sim.npts, dtype=float),
@@ -95,9 +95,9 @@ class Type1Diabetes(ss.NCD):
             self.results += [
                 ss.Result(self.name, 'new_deaths', sim.npts, dtype=int),
             ]
-        
+
         return
-    
+
     def update_results(self):
         sim = self.sim
         super().update_results()
@@ -129,13 +129,13 @@ class Type2Diabetes(ss.NCD):
             ss.BoolArr('affected'),
             ss.BoolArr('reversed'),          # New state for diabetes remission
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('ti_reversed'),    
+            ss.FloatArr('ti_reversed'),
             ss.FloatArr('ti_dead'),
             # ss.FloatArr('beta_cell_function'),  # Tracks beta-cell function over time
             # ss.FloatArr('insulin_resistance'),  # Tracks insulin resistance progression
         )
         return
-    
+
     def initialize(self, sim):
         """Initialize the disease, setting rel_sus for each agent."""
         print(f"Calling initialize for {self.name}")  # Add this print to confirm
@@ -178,35 +178,35 @@ class Type2Diabetes(ss.NCD):
         # low_beta_function = self.affected & (self.beta_cell_function < 0.2)  # Threshold for beta-cell exhaustion
         # sim.people.request_death(low_beta_function.uids)
         return
-    
-    
+
+
     def make_new_cases(self, relative_risk=1.0):
         """Create new cases of Type2Diabetes, adjusted by relative risk."""
-        
+
         # Get susceptible individuals
         susceptible_uids = self.susceptible.uids
-        
+
         # Adjust incidence based on relative risk
         base_prob = self.pars.incidence_prob  # Use the stored probability
         adjusted_prob = base_prob * relative_risk  # Apply relative risk adjustment
-        
+
         # print(f"Adjusted probability: {adjusted_prob}")
-        
+
         # Create a bernoulli distribution with the adjusted probability and initialize it
         adjusted_incidence_dist = ss.bernoulli(adjusted_prob, strict=False)
         adjusted_incidence_dist.initialize()  # Explicitly initialize the distribution
-        
+
         # Filter based on the adjusted probability
         new_cases = adjusted_incidence_dist.rvs(len(susceptible_uids))  # Generate new cases
         new_cases = susceptible_uids[new_cases]  # Select new cases based on generated values
-        
+
         # print(f"New cases after applying relative risk {relative_risk}: {len(new_cases)}")
-        
+
         # Set prognoses for new cases
         self.set_prognoses(new_cases)
-        
+
         return new_cases
-    
+
 
     def set_prognoses(self, uids):
         sim = self.sim
@@ -253,7 +253,7 @@ class Type2Diabetes(ss.NCD):
 
 
 class Obesity(ss.NCD):
-    
+
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         self.default_pars(
@@ -261,22 +261,15 @@ class Obesity(ss.NCD):
             incidence=ss.bernoulli(0.15),
             init_prev=ss.bernoulli(0.25),
         )
-        self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
         self.update_pars(pars, **kwargs)
-        
+
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_recovered'),
+            ss.FloatArr('rel_sus'),
         )
-        return
-    
-    
-    def initialize(self, sim):
-        """Initialize the disease, setting rel_sus for each agent."""
-        super().initialize(sim)
-        self.rel_sus = np.ones(sim.n)  # Initialize rel_sus for each agent in the sim (default to 1.0)
         return
 
     def init_post(self):
@@ -307,7 +300,7 @@ class Obesity(ss.NCD):
     def init_results(self):
         sim = self.sim
         super().init_results()
-        
+
         # Check if the keys already exist in the results
         if 'prevalence' not in self.results:
             self.results += [
@@ -328,7 +321,7 @@ class Obesity(ss.NCD):
 
 
 class Hypertension(ss.NCD):
-    
+
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         self.default_pars(
@@ -339,7 +332,7 @@ class Hypertension(ss.NCD):
         )
         self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
         self.update_pars(pars, **kwargs)
-        
+
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
@@ -385,7 +378,7 @@ class Hypertension(ss.NCD):
     def init_results(self):
         sim = self.sim
         super().init_results()
-        
+
         # Check if the keys already exist in the results
         if 'prevalence' not in self.results:
             self.results += [
@@ -395,7 +388,7 @@ class Hypertension(ss.NCD):
             self.results += [
                 ss.Result(self.name, 'new_deaths', sim.npts, dtype=int),
             ]
-        
+
         return
 
     def update_results(self):
@@ -421,7 +414,7 @@ class Depression(ss.Disease):
         )
         self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
         self.update_pars(pars, **kwargs)
-        
+
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
@@ -439,10 +432,10 @@ class Depression(ss.Disease):
         """
         initial_cases = self.pars.init_prev.filter()
         self.set_prognoses(initial_cases)
-        
+
         # print(f"Initial affected individuals: {np.sum(self.affected)}")  # Debug: Print number of initially affected individuals
         return initial_cases
-    
+
     def update_pre(self):
         sim = self.sim
         recovered = (self.affected & (self.ti_recovered <= sim.ti)).uids
@@ -453,7 +446,7 @@ class Depression(ss.Disease):
         self.results.new_deaths[sim.ti] = len(deaths)  # Log deaths attributable to this module
         return
 
-    
+
     def make_new_cases(self):
         # Generate new depression cases among susceptible people
         new_cases = self.pars['incidence'].filter(self.susceptible.uids)  # Find new cases based on incidence rate
@@ -481,7 +474,7 @@ class Depression(ss.Disease):
     def init_results(self):
         sim = self.sim
         super().init_results()
-        
+
         # Check if the keys already exist in the results
         if 'prevalence' not in self.results:
             self.results += [
@@ -491,7 +484,7 @@ class Depression(ss.Disease):
             self.results += [
                 ss.Result(self.name, 'new_deaths', sim.npts, dtype=int),
             ]
-        
+
         return
 
     def update_results(self):
@@ -499,27 +492,27 @@ class Depression(ss.Disease):
         super().update_results()
         ti = sim.ti
         age_groups = sim.people.age  # Access people's ages
-        
+
         # Overall prevalence
         self.results.prevalence[ti] = np.count_nonzero(self.affected) / len(sim.people)
-        
+
         # Age group bins
         age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
-        
+
         # Prevalence by age group
         prevalence_by_age = np.zeros(len(age_bins) - 1)
-        
+
         # Loop through age groups and calculate prevalence
         for i, (left, right) in enumerate(zip(age_bins[:-1], age_bins[1:])):
             age_mask = (age_groups >= left) & (age_groups < right)
             if np.count_nonzero(age_mask) > 0:
                 prevalence_by_age[i] = np.count_nonzero(self.affected[age_mask]) / np.count_nonzero(age_mask)
-        
+
         #print(f"Prevalence by age group at time {ti}: {prevalence_by_age}")  # Debug print
         self.results.prevalence_by_age = prevalence_by_age  # Store prevalence by age group
         return
-    
-    
+
+
 
 
 # INDIVIDUAL CONDITIONS
