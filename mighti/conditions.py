@@ -31,7 +31,6 @@ class Type1Diabetes(ss.NCD):
             p_death=ss.bernoulli(0.0033),        # Higher mortality rate from Type 1
             init_prev=ss.bernoulli(0.01),      # Initial prevalence of Type 1 diabetes
         )
-        self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
         self.update_pars(pars, **kwargs)
         
         self.add_states(
@@ -40,8 +39,10 @@ class Type1Diabetes(ss.NCD):
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_recovered'),
             ss.FloatArr('ti_dead'),
+            ss.FloatArr('rel_sus'),
         )
         return
+<<<<<<< Updated upstream
     
     
     def initialize(self, sim):
@@ -49,6 +50,8 @@ class Type1Diabetes(ss.NCD):
         super().initialize(sim)
         self.rel_sus = np.ones(sim.n)  # Initialize rel_sus for each agent in the sim (default to 1.0)
         return
+=======
+>>>>>>> Stashed changes
 
     def init_post(self):
         initial_cases = self.pars.init_prev.filter()
@@ -109,8 +112,6 @@ class Type2Diabetes(ss.NCD):
 
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
-
         self.default_pars(
             dur_condition=ss.lognorm_ex(5),  # Longer duration reflecting chronic condition
             incidence_prob = 0.0315,
@@ -131,10 +132,12 @@ class Type2Diabetes(ss.NCD):
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_reversed'),    
             ss.FloatArr('ti_dead'),
+            ss.FloatArr('rel_sus'),
             # ss.FloatArr('beta_cell_function'),  # Tracks beta-cell function over time
             # ss.FloatArr('insulin_resistance'),  # Tracks insulin resistance progression
         )
         return
+<<<<<<< Updated upstream
     
     def initialize(self, sim):
         """Initialize the disease, setting rel_sus for each agent."""
@@ -145,6 +148,8 @@ class Type2Diabetes(ss.NCD):
         print(f"Initialized rel_sus for Type2Diabetes: {self.rel_sus}")  # Debugging statement
 
         return
+=======
+>>>>>>> Stashed changes
 
     def init_post(self):
         initial_cases = self.pars.init_prev.filter()
@@ -181,6 +186,7 @@ class Type2Diabetes(ss.NCD):
     
     
     def make_new_cases(self, relative_risk=1.0):
+<<<<<<< Updated upstream
         """Create new cases of Type2Diabetes, adjusted by relative risk."""
         
         # Get susceptible individuals
@@ -205,6 +211,50 @@ class Type2Diabetes(ss.NCD):
         # Set prognoses for new cases
         self.set_prognoses(new_cases)
         
+=======
+        """Create new cases of Type 2 Diabetes, adjusted by relative risk and susceptibility from multiple interactions."""
+    
+        sim = self.sim
+    
+        # Get susceptible individuals
+        susceptible_uids = self.susceptible.uids
+    
+        # Base incidence probability
+        base_prob = self.pars.incidence_prob  # Use the stored probability
+    
+        # Combine relative susceptibility from both HIV and other NCD interactions
+        rel_sus_hiv = self.rel_sus[susceptible_uids]  # HIV-related relative susceptibility
+        rel_sus_ncd = np.ones_like(rel_sus_hiv)  # Start with a neutral susceptibility (1.0)
+    
+        # Loop through other diseases in the simulation to apply NCD-NCD interactions
+        for condition, cond_obj in sim.diseases.items():
+            if condition == 'hiv':  # Special case for HIV
+                # Only apply to those in susceptible_uids who are infected with HIV
+                infected_uids = np.intersect1d(susceptible_uids, cond_obj.infected.uids)
+                rel_sus_ncd[np.isin(susceptible_uids, infected_uids)] *= cond_obj.rel_sus[infected_uids]
+            elif condition != 'type2diabetes':  # Skip self and apply only for NCDs
+                # Only apply to those in susceptible_uids who are affected by another NCD
+                affected_uids = np.intersect1d(susceptible_uids, cond_obj.affected.uids)
+                rel_sus_ncd[np.isin(susceptible_uids, affected_uids)] *= cond_obj.rel_sus[affected_uids]
+    
+        # Combine the HIV susceptibility with the NCD susceptibilities
+        combined_rel_sus = rel_sus_hiv * rel_sus_ncd
+    
+        # Adjust the incidence probability by the combined relative susceptibility
+        adjusted_prob = base_prob * combined_rel_sus
+    
+        # Apply the adjusted incidence probability to susceptible individuals
+        adjusted_incidence_dist = ss.bernoulli(adjusted_prob, strict=False)
+        adjusted_incidence_dist.initialize()
+    
+        # Determine new cases based on the adjusted probability
+        new_cases = adjusted_incidence_dist.rvs(len(susceptible_uids))  # Generate new cases
+        new_cases = susceptible_uids[new_cases]  # Select new cases based on generated values
+    
+        # Set prognoses for new cases
+        self.set_prognoses(new_cases)
+    
+>>>>>>> Stashed changes
         return new_cases
     
 
@@ -338,7 +388,6 @@ class Hypertension(ss.NCD):
             p_death=ss.bernoulli(0.001),
             init_prev=ss.bernoulli(0.18),
         )
-        self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
         self.update_pars(pars, **kwargs)
         
         self.add_states(
@@ -347,6 +396,7 @@ class Hypertension(ss.NCD):
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_recovered'),
             ss.FloatArr('ti_dead'),
+            ss.FloatArr('rel_sus'),
         )
         return
 
@@ -420,7 +470,6 @@ class Depression(ss.Disease):
             p_death=ss.bernoulli(0.001),  # Risk of death from depression (e.g. by suicide)
             init_prev=ss.bernoulli(0.2),  # Default initial prevalence (modified below for age-dependent prevalence)
         )
-        self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
         self.update_pars(pars, **kwargs)
         
         self.add_states(
@@ -429,6 +478,7 @@ class Depression(ss.Disease):
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_recovered'),
             ss.FloatArr('ti_dead'),
+            ss.FloatArr('rel_sus'),
         )
 
         return
@@ -574,6 +624,7 @@ class Flu(ss.SIS):
         self.update_pars(pars, **kwargs)
         self.add_states(
             ss.FloatArr('ti_dead'),
+            ss.FloatArr('rel_sus'),
         )
         self.pars.p_death = ss.bernoulli(self.make_p_death_fn)
 

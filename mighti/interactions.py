@@ -71,25 +71,14 @@ class hiv_type2diabetes(ss.Connector):
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Type2Diabetes', requires=[ss.HIV, mi.Type2Diabetes])
         self.default_pars(
-            rel_sus_hiv_type2diabetes=1.5,  # People with HIV are 1.5x more likely to acquire Type 2 Diabetes
+            rel_sus_hiv_type2diabetes=10,  # People with HIV are 1.5x more likely to acquire Type 2 Diabetes
         )
         self.update_pars(pars, **kwargs)
         return
 
-    # def update(self):
-    #     sim = self.sim
-    #     print(f"Type2Diabetes object: {sim.diseases.type2diabetes}")
-    #     print(f"Attributes of Type2Diabetes: {dir(sim.diseases.type2diabetes)}")
-    #     # Apply the increased susceptibility to those with HIV
-    #     sim.diseases.type2diabetes.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_type2diabetes
-    #     return
     def update(self):
         sim = self.sim
-        if sim.diseases.type2diabetes.rel_sus is None:
-            print("rel_sus is still None during update.")
-        else:
-            print(f"rel_sus is initialized with values: {sim.diseases.type2diabetes.rel_sus}")
-            sim.diseases.type2diabetes.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_type2diabetes
+        sim.diseases.type2diabetes.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_type2diabetes
         return
 
 
@@ -437,8 +426,11 @@ class GenericNCDConnector(ss.Connector):
         """
         Initialize the connector with the two interacting conditions and their relative risk.
         """
-        label = f'{condition1}-{condition2}'  # Create a unique label for each connector
-        # print(f"Creating connector with label: {label}")  # For debugging purposes
+        # Create a unique label by combining the condition names
+        label = f'{condition1}-{condition2}'  # Unique label for each connector
+        if label in [connector.label for connector in kwargs.get('connectors', [])]:
+            raise ValueError(f"Connector {label} already exists.")
+        
         super().__init__(label=label, requires=[getattr(mi, condition1), getattr(mi, condition2)])
         self.condition1 = condition1
         self.condition2 = condition2
@@ -449,8 +441,8 @@ class GenericNCDConnector(ss.Connector):
 
     def update(self):
         sim = self.sim
-        cond1_obj = getattr(sim.diseases, self.condition1.lower())  # Get the first disease object
-        
+        # Get the first disease object
+        cond1_obj = getattr(sim.diseases, self.condition1.lower())  
         # Apply the relative risk from condition1 to condition2's susceptible individuals
-        sim.diseases[self.condition2.lower()].rel_sus[cond1_obj.infected] = self.pars.rel_sus
+        sim.diseases[self.condition2.lower()].rel_sus[cond1_obj.affected] = self.pars.rel_sus
         return
