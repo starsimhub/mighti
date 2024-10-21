@@ -3,13 +3,14 @@ import mighti as mi
 import pylab as pl
 import pandas as pd
 import sciris as sc
+import numpy as np
 
 
 # Define diseases
 ncds = ['Type2Diabetes', 'Obesity']  # List of NCDs being modeled
 diseases = ['HIV'] + ncds  # List of diseases including HIV
 beta = 0.001  # Transmission probability for HIV
-n_agents = 5000  # Number of agents in the simulation
+n_agents = 50000  # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 
 # Initialize prevalence data from a CSV file
@@ -20,7 +21,7 @@ fertility_rates = {'fertility_rate': pd.read_csv(sc.thispath() / 'tests/test_dat
 pregnancy = ss.Pregnancy(pars=fertility_rates)
 death_rates = {'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_deaths.csv'), 'units': 1}
 death = ss.Deaths(death_rates)
-ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age.csv'))
+ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age_2007.csv'))
 
 # Create the networks - sexual and maternal
 mf = ss.MFNet(duration=1/24, acts=80)
@@ -67,7 +68,7 @@ sim = ss.Sim(
     diseases=disease_objects,  # Pass the full list of diseases (HIV + NCDs)
     analyzers=[prevalence_analyzer],
     start=inityear,
-    end=2020,
+    end=2024,
     connectors=interactions,  # Both HIV-NCD and NCD-NCD interactions
     people=ppl,
     demographics=[pregnancy, death],
@@ -131,19 +132,25 @@ eswatini_hiv_data = {
     '2021': eswatini_hiv_data_2021
 }
 
-diseases = ['HIV', 'Type2Diabetes','Obesity']
+diseases = ['HIV', 'Type2Diabetes']
 
 
 # Retrieve the prevalence data for plotting
 try:
     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
     hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
+    store_m = hiv_prevalence_data_male[0]
+    store_f = hiv_prevalence_data_female[0]
+
+    print(f"Simulated data for 2007 (male): {hiv_prevalence_data_male[0]}")
+    print(f"Simulated data for 2007 (female): {hiv_prevalence_data_female[0]}")
+
     # diabetes1_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
     # diabetes1_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
-    diabetes2_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
-    diabetes2_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
-    obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
-    obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
+    # diabetes2_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
+    # diabetes2_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
+    # obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
+    # obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
     # hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
     # hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
 
@@ -180,25 +187,26 @@ try:
         # Plot male prevalence for the disease
         for i, label in enumerate(age_group_labels):
             axs[disease_idx, 0].plot(sim.yearvec, male_data[:, i], label=label, color=age_bin_colors[label])
-        axs[disease_idx, 0].set_title(f'{disease} (Male)', fontsize=24) 
-        axs[disease_idx, 0].set_xlabel('Year', fontsize=20) 
-        axs[disease_idx, 0].set_ylabel('Prevalence (%)', fontsize=20)  
-        axs[disease_idx, 0].tick_params(axis='both', labelsize=18)  
-        axs[disease_idx, 0].grid(True)
+            axs[disease_idx, 0].set_title(f'{disease} (Male)', fontsize=24) 
+            axs[disease_idx, 0].set_xlabel('Year', fontsize=20) 
+            axs[disease_idx, 0].set_ylabel('Prevalence (%)', fontsize=20)  
+            axs[disease_idx, 0].tick_params(axis='both', labelsize=18)  
+            axs[disease_idx, 0].grid(True)
 
         # Plot female prevalence for the disease
         for i, label in enumerate(age_group_labels):
             axs[disease_idx, 1].plot(sim.yearvec, female_data[:, i], color=age_bin_colors[label])
-        axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24) 
-        axs[disease_idx, 1].set_xlabel('Year', fontsize=20)  
-        axs[disease_idx, 1].tick_params(axis='both', labelsize=18) 
-        axs[disease_idx, 1].grid(True)
+            axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24) 
+            axs[disease_idx, 1].set_xlabel('Year', fontsize=20)  
+            axs[disease_idx, 1].tick_params(axis='both', labelsize=18) 
+            axs[disease_idx, 1].grid(True)
 
         # Add real data points for HIV for the specific years
         if disease == 'HIV':
             for year, real_data in real_data_years.items():
                 real_male_data = real_data['male']
                 real_female_data = real_data['female']
+                
 
                 # Plot real data points for males
                 for age_bin in real_male_data:
@@ -225,7 +233,26 @@ try:
 except KeyError as e:
     print(f"KeyError: {e} - Check if the correct result keys are being used.")
 
+#config file
 
+
+# Real data (converted to array from dictionary)
+real_data_male_2007 = np.array(list(eswatini_hiv_data_2007['male'].values())) * 100
+
+# Get the order (ranking) of elements in ascending order
+store_m_order = np.argsort(store_m)  # Returns indices that would sort store_m
+real_data_order = np.argsort(real_data_male_2007)  # Returns indices that would sort real_data_male_2007
+
+# Print the orders
+print("Order of elements in store_m (ascending):", store_m_order)
+print("Order of elements in real_data_male_2007 (ascending):", real_data_order)
+
+# Optionally, reverse for descending order
+store_m_order_desc = np.argsort(-store_m)
+real_data_order_desc = np.argsort(-real_data_male_2007)
+
+print("Order of elements in store_m (descending):", store_m_order_desc)
+print("Order of elements in real_data_male_2007 (descending):", real_data_order_desc)
 
 
 
