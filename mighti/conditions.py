@@ -261,7 +261,7 @@ class Obesity(ss.NCD):
             incidence=ss.bernoulli(0.15),
             init_prev=ss.bernoulli(0.25),
         )
-        self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
+        # self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
         self.update_pars(pars, **kwargs)
         
         self.add_states(
@@ -269,6 +269,7 @@ class Obesity(ss.NCD):
             ss.BoolArr('affected'),
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_recovered'),
+            ss.FloatArr('rel_sus'),
         )
         return
     
@@ -276,7 +277,7 @@ class Obesity(ss.NCD):
     def initialize(self, sim):
         """Initialize the disease, setting rel_sus for each agent."""
         super().initialize(sim)
-        self.rel_sus = np.ones(sim.n)  # Initialize rel_sus for each agent in the sim (default to 1.0)
+        # self.rel_sus = np.ones(sim.n)  # Initialize rel_sus for each agent in the sim (default to 1.0)
         return
 
     def init_post(self):

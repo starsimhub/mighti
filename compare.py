@@ -1,54 +1,50 @@
-# Imports
 import starsim as ss
-import mighti as mi  # For handling NCDs like depression, diabetes, etc.
+import mighti as mi  
 import pylab as pl
 import pandas as pd
 import sciris as sc
 
-
-# from disease_definitions import (age_sex_dependent_prevalence_hiv, 
-#                                  age_sex_dependent_prevalence_depression,
-#                                  hiv_age_bins, prevalence_data)  # Include prevalence_data
 # Define diseases
-ncds = ['Diabetes', 'Obesity', 'Hypertension']
+ncds = ['Type2Diabetes', 'Obesity']  # List of NCDs being modeled
 diseases = ['HIV'] + ncds  # List of diseases including HIV
 beta = 0.001  # Transmission probability for HIV
-n_agents = 50000
-inityear = 2007
+n_agents = 500000  # Number of agents in the simulation
+inityear = 2007  # Simulation start year
 
-prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv',inityear=inityear)
+# Initialize prevalence data from a CSV file
+prevalence_data, age_bins = mi.initialize_prevalence_data(
+    diseases, 
+    csv_file_path='mighti/data/prevalence_data_eswatini.csv', 
+    inityear=inityear
+)
 
 # Create demographics
 fertility_rates = {'fertility_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_asfr.csv')}
 pregnancy = ss.Pregnancy(pars=fertility_rates)
-death_rates = {'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_deaths.csv'), 'units': 1}
-death = ss.Deaths(death_rates)
-ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age.csv'))
-
+death_rates = {
+    'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_deaths.csv'), 
+    'units': 1
+}
+death = ss.Deaths(pars=death_rates)
+ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age_2007.csv'))
 
 # Create the networks - sexual and maternal
 mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
 networks = [mf, maternal]
 
-
 # Define a function for disease-specific prevalence
 def get_prevalence_function(disease):
     return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
 
-
-# Initialize the diseases with the correct prevalence functions
+# Create disease objects
 disease_objects = []
 for disease in ncds:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
-    if disease == 'Type1Diabetes':
-        disease_obj = mi.Type1Diabetes(init_prev=init_prev)
-    elif disease == 'Type2Diabetes':
+    if disease == 'Type2Diabetes':
         disease_obj = mi.Type2Diabetes(init_prev=init_prev)
     elif disease == 'Obesity':
         disease_obj = mi.Obesity(init_prev=init_prev)
-    elif disease == 'Hypertension':
-        disease_obj = mi.Hypertension(init_prev=init_prev)
     disease_objects.append(disease_obj)
 
 # HIV-specific setup
@@ -58,41 +54,37 @@ disease_objects.append(hiv_disease)
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 
-# Define a dictionary that maps disease names to corresponding interaction functions
+# Load existing HIV and NCD interactions
 interaction_functions = {
-    'Type1Diabetes': mi.hiv_type1diabetes,
     'Type2Diabetes': mi.hiv_type2diabetes,
     'Obesity': mi.hiv_obesity,
-    'Hypertension': mi.hiv_hypertension
 }
 
-# Initialize an empty list to store the interaction objects
+# Initialize interaction objects for HIV-NCD interactions
 interactions = []
-
-# Loop through NCDs and dynamically generate interactions by calling functions from the dictionary
 for disease in ncds:
     interaction_obj = interaction_functions[disease]()  # Call the corresponding function
     interactions.append(interaction_obj)
 
+# Initialize the simulation
 sim = ss.Sim(
     n_agents=n_agents,
     networks=networks,
     diseases=disease_objects,  # Pass the full list of diseases (HIV + NCDs)
     analyzers=[prevalence_analyzer],
     start=inityear,
-    end=2008,
-    connectors=interactions,
+    end=2024,
     people=ppl,
-    demographics=[pregnancy,death],
+    demographics=[pregnancy, death],
+    use_aging=True,
     copy_inputs=False
 )
 
-# Run the simulation
+sim.pars['use_aging'] = True  # Enable aging in the simulation parameters
+
+
+
 sim.run()
-
-
-
-
 
 # Ensure all age bins are included, even if simulation doesn't produce data for them
 def fill_missing_bins(age_bins, simulated_data):
@@ -207,7 +199,7 @@ def generate_age_group_labels(age_bins):
 
 # Modified function to plot two comparisons between input and simulated data in one figure
 def plot_comparison_two_datasets(input_data_1, simulated_data_1, input_data_2, simulated_data_2, 
-                                 year, ylabel):
+                                  year, ylabel):
     # Create a figure with 2 subplots (1 row, 2 columns)
     fig, (ax1, ax2) = pl.subplots(1, 2, figsize=(14, 6), sharey=True)  # sharey=True to share y-axis
 
@@ -216,8 +208,8 @@ def plot_comparison_two_datasets(input_data_1, simulated_data_1, input_data_2, s
 
     # For the first subplot
     common_age_bins_1 = sorted(set(input_data_1.keys()).intersection(simulated_data_1.keys()))
-    input_values_1 = [input_data_1[age] * 100 for age in common_age_bins_1]  # Convert to percentages
-    simulated_values_1 = [simulated_data_1[age] for age in common_age_bins_1]  # Already in percentages
+    input_values_1 = [input_data_1[age] * 100 for age in common_age_bins_1] 
+    simulated_values_1 = [simulated_data_1[age]* 100 for age in common_age_bins_1]  
 
     bar_positions_input_1 = range(len(common_age_bins_1))
     bar_positions_simulated_1 = [x + bar_width for x in bar_positions_input_1]
@@ -239,8 +231,8 @@ def plot_comparison_two_datasets(input_data_1, simulated_data_1, input_data_2, s
 
     # For the second subplot (for females)
     common_age_bins_2 = sorted(set(input_data_2.keys()).intersection(simulated_data_2.keys()))
-    input_values_2 = [input_data_2[age] * 100 for age in common_age_bins_2]  # Convert to percentages
-    simulated_values_2 = [simulated_data_2[age] for age in common_age_bins_2]  # Already in percentages
+    input_values_2 = [input_data_2[age] * 100 for age in common_age_bins_2] 
+    simulated_values_2 = [simulated_data_2[age]* 100 for age in common_age_bins_2]  
 
     bar_positions_input_2 = range(len(common_age_bins_2))
     bar_positions_simulated_2 = [x + bar_width for x in bar_positions_input_2]
@@ -267,23 +259,20 @@ def plot_comparison_two_datasets(input_data_1, simulated_data_1, input_data_2, s
     
     
 
-year = 2007
+year = 2021
 
-hiv_data = eswatini_hiv_data_2007
+hiv_data = eswatini_hiv_data_2021
 
 
 # Extract HIV prevalence for male and female 
 year_index = get_year_index(sim, year)
-hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'][year_index, :] * 100
-hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'][year_index, :] * 100
+hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'][year_index, :]
+hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'][year_index, :] 
+
 
 # Create a dictionary with the simulated prevalence results for 2004
 simulated_hiv_prevalence_male = dict(zip(age_bins, hiv_prevalence_data_male))
 simulated_hiv_prevalence_female = dict(zip(age_bins, hiv_prevalence_data_female))
-
-# Use data of the initial prevalences
-# input_hiv_prevalence_male = prevalence_data['HIV']['male']
-# input_hiv_prevalence_female = prevalence_data['HIV']['female']
 
 
 # Use data ablove as the input data for comparison
@@ -327,3 +316,73 @@ simulated_hiv_prevalence_female_filled = fill_missing_age_bins(input_hiv_prevale
 plot_comparison_two_datasets(input_hiv_prevalence_male, simulated_hiv_prevalence_male_filled, 
                               input_hiv_prevalence_female, simulated_hiv_prevalence_female_filled, 
                               year, 'HIV')
+
+
+# import matplotlib.pyplot as plt
+# import numpy as np
+# import pandas as pd
+
+# # Define age range (0-100) to match the simulated data's bins
+# max_age = 100
+# age_range = np.arange(0, max_age + 1)  # 0 to 100 (inclusive)
+
+
+# # Function to calculate age distribution for single ages
+# def calculate_single_age_distribution(ages, max_age):
+#     counts, _ = np.histogram(ages, bins=np.arange(0, max_age + 2))
+#     return counts / counts.sum() * 100  # Convert to percentage
+
+# for analyzer in sim.get_analyzers():
+#     print(analyzer.name)
+
+# year_to_timestep = {2007: 0, 2023: 16}  # Map years to time step indexes
+
+# ages_2007 = prevalence_analyzer.results['population_age_distribution'][year_to_timestep[2007]]
+# ages_2023 = prevalence_analyzer.results['population_age_distribution'][year_to_timestep[2023]]
+
+# # Print or analyze the age distributions
+# print(f"Age distribution for 2007: {ages_2007}")
+# print(f"Age distribution for 2023: {ages_2023}")
+
+
+
+# # Calculate age distribution for the simulated data
+# simulated_age_dist_2007 = ages_2007/np.sum(ages_2007)*100
+# simulated_age_dist_2023 = ages_2023/np.sum(ages_2023)*100
+
+# # Load input data for 2007 and 2023 (replace with actual file paths)
+# # Assume these are DataFrames with columns 'age' and 'percentage'
+# input_age_data_2007 =pd.read_csv('tests/test_data/eswatini_age_2007.csv')
+# input_age_data_2023 = pd.read_csv('tests/test_data/eswatini_age_2023.csv')
+
+# # Ensure the input data is sorted by age
+# input_age_data_2007 = input_age_data_2007.sort_values('age')
+# input_age_data_2023 = input_age_data_2023.sort_values('age')
+
+# total_data2007 = np.sum(input_age_data_2007['value'])
+# total_data2023 = np.sum(input_age_data_2023['value'])
+
+# # Extract the age and percentage columns for input data
+# input_ages_2007 = input_age_data_2007['age'].values
+# input_percentages_2007 = input_age_data_2007['value']/total_data2007*100
+# input_ages_2023 = input_age_data_2023['age'].values
+# input_percentages_2023 = input_age_data_2023['value']/total_data2023*100
+
+
+# # Plot the distributions
+# plt.figure(figsize=(12, 6))
+# plt.plot(age_range, simulated_age_dist_2007, label='Simulated 2007', marker='o')
+# plt.plot(input_ages_2007, input_percentages_2007, label='Input Data 2007', marker='x')
+# plt.plot(age_range, simulated_age_dist_2023, label='Simulated 2023', marker='o')
+# plt.plot(input_ages_2023, input_percentages_2023, label='Input Data 2023', marker='x')
+
+# # Add labels and title
+# plt.xlabel('Age')
+# plt.ylabel('Percentage (%)')
+# plt.title('Single-Age Population Distribution Comparison (2007 & 2023)')
+# plt.grid(True)
+# plt.xticks(np.arange(0, max_age + 1, 5))  # Show every 5 years on the x-axis
+# plt.legend()
+# plt.tight_layout()
+# plt.show()
+
