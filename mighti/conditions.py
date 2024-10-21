@@ -42,16 +42,12 @@ class Type1Diabetes(ss.NCD):
             ss.FloatArr('rel_sus'),
         )
         return
-<<<<<<< Updated upstream
-    
     
     def initialize(self, sim):
         """Initialize the disease, setting rel_sus for each agent."""
         super().initialize(sim)
-        self.rel_sus = np.ones(sim.n)  # Initialize rel_sus for each agent in the sim (default to 1.0)
         return
-=======
->>>>>>> Stashed changes
+
 
     def init_post(self):
         initial_cases = self.pars.init_prev.filter()
@@ -137,19 +133,11 @@ class Type2Diabetes(ss.NCD):
             # ss.FloatArr('insulin_resistance'),  # Tracks insulin resistance progression
         )
         return
-<<<<<<< Updated upstream
     
     def initialize(self, sim):
-        """Initialize the disease, setting rel_sus for each agent."""
-        print(f"Calling initialize for {self.name}")  # Add this print to confirm
-
         super().initialize(sim)
-        self.rel_sus = np.ones(len(sim.people))  # Initialize rel_sus for each agent in the sim (default to 1.0)
-        print(f"Initialized rel_sus for Type2Diabetes: {self.rel_sus}")  # Debugging statement
-
         return
-=======
->>>>>>> Stashed changes
+
 
     def init_post(self):
         initial_cases = self.pars.init_prev.filter()
@@ -186,32 +174,6 @@ class Type2Diabetes(ss.NCD):
     
     
     def make_new_cases(self, relative_risk=1.0):
-<<<<<<< Updated upstream
-        """Create new cases of Type2Diabetes, adjusted by relative risk."""
-        
-        # Get susceptible individuals
-        susceptible_uids = self.susceptible.uids
-        
-        # Adjust incidence based on relative risk
-        base_prob = self.pars.incidence_prob  # Use the stored probability
-        adjusted_prob = base_prob * relative_risk  # Apply relative risk adjustment
-        
-        # print(f"Adjusted probability: {adjusted_prob}")
-        
-        # Create a bernoulli distribution with the adjusted probability and initialize it
-        adjusted_incidence_dist = ss.bernoulli(adjusted_prob, strict=False)
-        adjusted_incidence_dist.initialize()  # Explicitly initialize the distribution
-        
-        # Filter based on the adjusted probability
-        new_cases = adjusted_incidence_dist.rvs(len(susceptible_uids))  # Generate new cases
-        new_cases = susceptible_uids[new_cases]  # Select new cases based on generated values
-        
-        # print(f"New cases after applying relative risk {relative_risk}: {len(new_cases)}")
-        
-        # Set prognoses for new cases
-        self.set_prognoses(new_cases)
-        
-=======
         """Create new cases of Type 2 Diabetes, adjusted by relative risk and susceptibility from multiple interactions."""
     
         sim = self.sim
@@ -231,11 +193,11 @@ class Type2Diabetes(ss.NCD):
             if condition == 'hiv':  # Special case for HIV
                 # Only apply to those in susceptible_uids who are infected with HIV
                 infected_uids = np.intersect1d(susceptible_uids, cond_obj.infected.uids)
-                rel_sus_ncd[np.isin(susceptible_uids, infected_uids)] *= cond_obj.rel_sus[infected_uids]
+                rel_sus_ncd[np.isin(susceptible_uids, infected_uids)] *= cond_obj.rel_sus.raw[infected_uids]  # Use .raw
             elif condition != 'type2diabetes':  # Skip self and apply only for NCDs
                 # Only apply to those in susceptible_uids who are affected by another NCD
                 affected_uids = np.intersect1d(susceptible_uids, cond_obj.affected.uids)
-                rel_sus_ncd[np.isin(susceptible_uids, affected_uids)] *= cond_obj.rel_sus[affected_uids]
+                rel_sus_ncd[np.isin(susceptible_uids, affected_uids)] *= cond_obj.rel_sus.raw[affected_uids]  # Use .raw
     
         # Combine the HIV susceptibility with the NCD susceptibilities
         combined_rel_sus = rel_sus_hiv * rel_sus_ncd
@@ -254,7 +216,6 @@ class Type2Diabetes(ss.NCD):
         # Set prognoses for new cases
         self.set_prognoses(new_cases)
     
->>>>>>> Stashed changes
         return new_cases
     
 
