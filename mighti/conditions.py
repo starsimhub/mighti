@@ -441,7 +441,6 @@ class Depression(ss.Disease):
             ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
-
         return
 
 
