@@ -66,7 +66,8 @@ interaction_matrix = mi.read_interactions()
 ncd_connectors = []
 for condition1, interactions_dict in interaction_matrix.items():
     for condition2, rel_risk in interactions_dict.items():
-        ncd_connectors.append(mi.GenericNCDConnector(condition1, condition2, relative_risk=rel_risk))
+        name = f'{condition1}_{condition2}'
+        ncd_connectors.append(mi.GenericNCDConnector(condition1, condition2, relative_risk=rel_risk, name=name))
 
 # Combine both HIV-NCD and NCD-NCD interaction objects
 all_connectors = interactions + ncd_connectors  # Now both are lists
