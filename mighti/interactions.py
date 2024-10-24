@@ -6,11 +6,14 @@ from collections import defaultdict
 
 # Specify all externally visible classes this file defines
 __all__ = [
-    'hiv_hypertension','hiv_obesity','hiv_type1diabetes','hiv_type2diabetes','hiv_depression',
-    'hiv_accident', 'hiv_alzheimers', 'hiv_assault','hiv_cerebro', 'hiv_liver', 'hiv_resp', 
-    'hiv_heart', 'hiv_kidney', 'hiv_flu','hiv_hpv', 'hiv_parkinsons', 
-    'hiv_smoking', 'hiv_alcohol', 'hiv_brca',
-    'hiv_cervical','hiv_colorectal', 'hiv_breast', 'hiv_lung', 'hiv_prostate','hiv_other',
+    'hiv_hypertension','hiv_obesity','hiv_type1diabetes','hiv_type2diabetes',
+    'hiv_depression','hiv_accident', 'hiv_alzheimers', 'hiv_assault',
+    'hiv_cerebrovasculardisease', 'hiv_chronicliverdisease', 
+    'hiv_chroniclowerrespiratorydisease','hiv_heartdisease', 
+    'hiv_chronickidneydisease', 'hiv_flu','hiv_hpv', 'hiv_parkinsons', 
+    'hiv_smoking', 'hiv_alcohol', 'hiv_brca','hiv_viralhepatitis',
+    'hiv_cervicalcancer','hiv_colorectalcancer', 'hiv_breastcancer', 'hiv_lungcancer',
+    'hiv_prostatecancer','hiv_othercancer','hiv_poverty',
     'GenericNCDConnector','read_interactions'
 ]
 
@@ -143,7 +146,7 @@ class hiv_assault(ss.Connector):
         return
     
 
-class hiv_cerebro(ss.Connector):
+class hiv_cerebrovasculardisease(ss.Connector):
     """ Connector for people with HIV more likely to acquire Cerebrovascular diseases """
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Cerebrovascular', requires=[ss.HIV, mi.CerebrovascularDisease])
@@ -157,7 +160,7 @@ class hiv_cerebro(ss.Connector):
         return
 
 
-class hiv_liver(ss.Connector):
+class hiv_chronicliverdisease(ss.Connector):
     """ Connector for people with HIV more likely to acquire Chronic Liver Disease """
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Liver', requires=[ss.HIV, mi.ChronicLiverDisease])
@@ -171,7 +174,7 @@ class hiv_liver(ss.Connector):
         return
 
 
-class hiv_resp(ss.Connector):
+class hiv_chroniclowerrespiratorydisease(ss.Connector):
     """ Connector for people with HIV more likely to acquire Chronic Lower Respiratory Disease """
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Respiratory', requires=[ss.HIV, mi.ChronicLowerRespiratoryDisease])
@@ -185,21 +188,20 @@ class hiv_resp(ss.Connector):
         return
     
 
-class hiv_heart(ss.Connector):
+class hiv_heartdisease(ss.Connector):
     """ Connector for people with HIV more likely to acquire Heart Disease """
     def __init__(self, pars=None, **kwargs):
-        super().__init__(label='HIV-Heart', requires=[ss.HIV, mi.HeartDiseases])
+        super().__init__(label='HIV-Heart', requires=[ss.HIV, mi.HeartDisease])
         self.default_pars(rel_sus_hiv_heart=1.3)
         self.update_pars(pars, **kwargs)
         return
 
     def update(self):
         sim = self.sim
-        sim.diseases.heartdiseases.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_heart
+        sim.diseases.heartdisease.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_heart
         return
 
-
-class hiv_kidney(ss.Connector):
+class hiv_chronickidneydisease(ss.Connector):
     """ Connector for people with HIV more likely to acquire Chronic Kidney Disease """
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Kidney', requires=[ss.HIV, mi.ChronicKidneyDisease])
@@ -297,7 +299,7 @@ class hiv_brca(ss.Connector):
         return
     
     
-class hiv_cervical(ss.Connector):
+class hiv_cervicalcancer(ss.Connector):
     """ Connector for people with HIV more likely to acquire Cervical Cancer """
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Cervical', requires=[ss.HIV, mi.CervicalCancer])
@@ -313,7 +315,7 @@ class hiv_cervical(ss.Connector):
         return
 
     
-class hiv_colorectal(ss.Connector):
+class hiv_colorectalcancer(ss.Connector):
     """ Connector for people with HIV more likely to acquire Colorectal Cancer """
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Colorectal', requires=[ss.HIV, mi.ColorectalCancer])
@@ -329,7 +331,7 @@ class hiv_colorectal(ss.Connector):
         return
 
 
-class hiv_breast(ss.Connector):
+class hiv_breastcancer(ss.Connector):
     """ Connector for people with HIV more likely to acquire Breast Cancer """
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Breast', requires=[ss.HIV, mi.BreastCancer])
@@ -345,7 +347,7 @@ class hiv_breast(ss.Connector):
         return
 
 
-class hiv_lung(ss.Connector):
+class hiv_lungcancer(ss.Connector):
     """ Connector for people with HIV more likely to acquire Lung Cancer """
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Lung', requires=[ss.HIV, mi.LungCancer])
@@ -361,7 +363,7 @@ class hiv_lung(ss.Connector):
         return
 
 
-class hiv_prostate(ss.Connector):
+class hiv_prostatecancer(ss.Connector):
     """ Connector for people with HIV more likely to acquire Prostate Cancer """
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Prostate', requires=[ss.HIV, mi.ProstateCancer])
@@ -377,7 +379,7 @@ class hiv_prostate(ss.Connector):
         return
 
 
-class hiv_other(ss.Connector):
+class hiv_othercancer(ss.Connector):
     """ Connector for people with HIV more likely to acquire Other Cancers """
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Other', requires=[ss.HIV, mi.OtherCancer])
@@ -392,7 +394,36 @@ class hiv_other(ss.Connector):
         sim.diseases.othercancer.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_other
         return
 
-    
+class hiv_viralhepatitis(ss.Connector):
+    """ Connector for people with HIV more likely to acquire Other Cancers """
+    def __init__(self, pars=None, **kwargs):
+        super().__init__(label='HIV-Hepatitis', requires=[ss.HIV, mi.ViralHepatitis])
+        self.default_pars(
+            rel_sus_hiv_hepatitis=1.3  # People with HIV are 1.3x more likely to acquire Other Cancers
+        )
+        self.update_pars(pars, **kwargs)
+        return
+
+    def update(self):
+        sim = self.sim
+        sim.diseases.viralhepatitis.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_hepatitis
+        return
+
+class hiv_poverty(ss.Connector):
+    """ Connector for people with HIV more likely to acquire poverty """
+    def __init__(self, pars=None, **kwargs):
+        super().__init__(label='HIV-Poverty', requires=[ss.HIV, mi.Poverty])
+        self.default_pars(
+            rel_sus_hiv_poverty=1.3  # People with HIV are 1.3x more likely to acquire poverty
+        )
+        self.update_pars(pars, **kwargs)
+        return
+
+    def update(self):
+        sim = self.sim
+        sim.diseases.poverty.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_poverty
+        return
+
 # Functions to read in datafiles
 def read_interactions(datafile=None):
     """
@@ -422,15 +453,12 @@ class GenericNCDConnector(ss.Connector):
     A generic connector to model interactions between two diseases.
     This class adjusts susceptibility based on relative risk from the interaction matrix.
     """
+
     def __init__(self, condition1, condition2, relative_risk, pars=None, **kwargs):
         """
         Initialize the connector with the two interacting conditions and their relative risk.
         """
-        # Create a unique label by combining the condition names
-        label = f'{condition1}-{condition2}'  # Unique label for each connector
-        if label in [connector.label for connector in kwargs.get('connectors', [])]:
-            raise ValueError(f"Connector {label} already exists.")
-        
+        label = f'{condition1}-{condition2}'  # Create a unique label for each connector
         super().__init__(label=label, requires=[getattr(mi, condition1), getattr(mi, condition2)])
         self.condition1 = condition1
         self.condition2 = condition2
@@ -441,8 +469,17 @@ class GenericNCDConnector(ss.Connector):
 
     def update(self):
         sim = self.sim
-        # Get the first disease object
-        cond1_obj = getattr(sim.diseases, self.condition1.lower())  
+        cond1_obj = getattr(sim.diseases, self.condition1.lower())  # Get the first disease object
+        cond2_obj = getattr(sim.diseases, self.condition2.lower())  # Get the second disease object
+
+        # Determine if the disease uses 'infected' or 'affected' state
+        if hasattr(cond1_obj, 'affected'):
+            cond1_state = cond1_obj.affected
+        elif hasattr(cond1_obj, 'infected'):
+            cond1_state = cond1_obj.infected
+        else:
+            raise AttributeError(f"'{self.condition1}' has no 'affected' or 'infected' attribute")
+
         # Apply the relative risk from condition1 to condition2's susceptible individuals
-        sim.diseases[self.condition2.lower()].rel_sus[cond1_obj.affected] = self.pars.rel_sus
+        sim.diseases[self.condition2.lower()].rel_sus[cond1_state] = self.pars.rel_sus
         return

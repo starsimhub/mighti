@@ -7,7 +7,13 @@ import numpy as np
 
 
 # Define diseases
-ncds = ['Type2Diabetes','Type1Diabetes']#, 'Obesity']  # List of NCDs being modeled
+ncds = ['Type1Diabetes', 'Type2Diabetes', 'Obesity', 'Hypertension',
+    'Depression','Accident', 'Alzheimers', 'Assault', 'CerebrovascularDisease', 
+    'ChronicLiverDisease','ChronicLowerRespiratoryDisease', 'HeartDisease', 
+    'ChronicKidneyDisease','Flu','HPV',
+    'CervicalCancer','ColorectalCancer', 'BreastCancer', 'LungCancer', 'ProstateCancer', 'OtherCancer', 
+    'Parkinsons','Smoking', 'Alcohol', 'BRCA', 'ViralHepatitis', 'Poverty']
+
 diseases = ['HIV'] + ncds  # List of diseases including HIV
 beta = 0.001  # Transmission probability for HIV
 n_agents = 50000  # Number of agents in the simulation
@@ -36,27 +42,42 @@ def get_prevalence_function(disease):
 disease_objects = []
 for disease in ncds:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
-    if disease == 'Type2Diabetes':
-        disease_obj = mi.Type2Diabetes(init_prev=init_prev)
-    elif disease == 'Type1Diabetes':
-        disease_obj = mi.Type1Diabetes(init_prev=init_prev)       
-    elif disease == 'Obesity':
-        disease_obj = mi.Obesity(init_prev=init_prev)
+    # Dynamically create the disease object using getattr
+    disease_class = getattr(mi, disease)  # Access the disease class dynamically
+    disease_obj = disease_class(init_prev=init_prev)  # Instantiate the class
     disease_objects.append(disease_obj)
+
 
 # HIV-specific setup
 hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 disease_objects.append(hiv_disease)
 
+# Validate prevalence data for each disease
+def validate_prevalence_data(prevalence_data, diseases):
+    for disease in diseases:
+        if disease not in prevalence_data:
+            raise ValueError(f"Prevalence data missing for disease: {disease}")
+        if 'male' not in prevalence_data[disease] or 'female' not in prevalence_data[disease]:
+            raise ValueError(f"Male/Female data missing for disease: {disease}")
+        if not prevalence_data[disease]['male'] or not prevalence_data[disease]['female']:
+            raise ValueError(f"Age bins missing for disease: {disease}")
+        print(f"Prevalence data validated for disease: {disease}")
+
+# Validate the prevalence data
+validate_prevalence_data(prevalence_data, diseases)
+
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 
 # Load existing HIV and NCD interactions
-interaction_functions = {
-    'Type2Diabetes': mi.hiv_type2diabetes,
-    'Type1Diabetes': mi.hiv_type1diabetes,
-    # 'Obesity': mi.hiv_obesity,
-}
+# Automatically create interaction functions for each NCD dynamically
+interaction_functions = {}
+
+for disease in ncds:
+    interaction_func_name = f'hiv_{disease.lower()}'  # Assuming function names follow the 'hiv_<disease>' pattern
+    if hasattr(mi, interaction_func_name):  # Check if the function exists in mighti
+        interaction_func = getattr(mi, interaction_func_name)  # Dynamically get the interaction function
+        interaction_functions[disease] = interaction_func
 
 # Initialize interaction objects for HIV-NCD interactions
 interactions = []
