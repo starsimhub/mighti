@@ -62,7 +62,22 @@ class Type1Diabetes(ss.NCD):
         deaths = (self.ti_dead == sim.ti).uids
         sim.people.request_death(deaths)
         self.results.new_deaths[sim.ti] = len(deaths)
-        return
+        # Identify which individuals have died at the current timestep
+        deaths = (self.ti_dead == sim.ti).uids
+        
+        # Debugging print statement
+        print(f"UIDs of deaths: {deaths}, Type: {type(deaths)}")
+        
+        if deaths.size == 0:
+            print(f"No deaths at timestep {sim.ti}")
+            return  # If no deaths, skip processing further
+        
+        # Ensure deaths are in the correct format (convert to a list of integers if needed)
+        deaths = deaths.tolist() if isinstance(deaths, np.ndarray) else deaths
+        print(f"Converted UIDs of deaths: {deaths}, Type: {type(deaths)}")
+    
+        # Log the deaths (only if deaths are present)
+        self.log.add_data(deaths, died=True)
 
     def make_new_cases(self):
         new_cases = self.pars.incidence.filter(self.susceptible.uids)
@@ -166,57 +181,75 @@ class Type2Diabetes(ss.NCD):
         deaths = (self.ti_dead == sim.ti).uids
         sim.people.request_death(deaths)
         self.results.new_deaths[sim.ti] = len(deaths)
+        
+        deaths = (self.ti_dead == sim.ti).uids
+
+        # Debugging print statement
+        print(f"UIDs of deaths: {deaths}")
+        
+        # Check if deaths is a valid list or array
+        if isinstance(deaths, np.ndarray):
+            print(f"Deaths array shape: {deaths.shape}, type: {deaths.dtype}")
+        else:
+            print(f"Deaths type: {type(deaths)}")
+        
+        # Continue with logging
+        self.log.add_data(deaths, died=True)
 
         # Check if beta-cell function has dropped too low, causing death or severe progression
         # low_beta_function = self.affected & (self.beta_cell_function < 0.2)  # Threshold for beta-cell exhaustion
         # sim.people.request_death(low_beta_function.uids)
         return
     
-    
-    def make_new_cases(self, relative_risk=1.0):
-        """Create new cases of Type 2 Diabetes, adjusted by relative risk and susceptibility from multiple interactions."""
-    
-        sim = self.sim
-    
-        # Get susceptible individuals
-        susceptible_uids = self.susceptible.uids
-    
-        # Base incidence probability
-        base_prob = self.pars.incidence_prob  # Use the stored probability
-    
-        # Combine relative susceptibility from both HIV and other NCD interactions
-        rel_sus_hiv = self.rel_sus[susceptible_uids]  # HIV-related relative susceptibility
-        rel_sus_ncd = np.ones_like(rel_sus_hiv)  # Start with a neutral susceptibility (1.0)
-    
-        # Loop through other diseases in the simulation to apply NCD-NCD interactions
-        for condition, cond_obj in sim.diseases.items():
-            if condition == 'hiv':  # Special case for HIV
-                # Only apply to those in susceptible_uids who are infected with HIV
-                infected_uids = np.intersect1d(susceptible_uids, cond_obj.infected.uids)
-                rel_sus_ncd[np.isin(susceptible_uids, infected_uids)] *= cond_obj.rel_sus.raw[infected_uids]  # Use .raw
-            elif condition != 'type2diabetes':  # Skip self and apply only for NCDs
-                # Only apply to those in susceptible_uids who are affected by another NCD
-                affected_uids = np.intersect1d(susceptible_uids, cond_obj.affected.uids)
-                rel_sus_ncd[np.isin(susceptible_uids, affected_uids)] *= cond_obj.rel_sus.raw[affected_uids]  # Use .raw
-    
-        # Combine the HIV susceptibility with the NCD susceptibilities
-        combined_rel_sus = rel_sus_hiv * rel_sus_ncd
-    
-        # Adjust the incidence probability by the combined relative susceptibility
-        adjusted_prob = base_prob * combined_rel_sus
-    
-        # Apply the adjusted incidence probability to susceptible individuals
-        adjusted_incidence_dist = ss.bernoulli(adjusted_prob, strict=False)
-        adjusted_incidence_dist.initialize()
-    
-        # Determine new cases based on the adjusted probability
-        new_cases = adjusted_incidence_dist.rvs(len(susceptible_uids))  # Generate new cases
-        new_cases = susceptible_uids[new_cases]  # Select new cases based on generated values
-    
-        # Set prognoses for new cases
+    def make_new_cases(self):
+        new_cases = self.pars.incidence.filter(self.susceptible.uids)
         self.set_prognoses(new_cases)
-    
         return new_cases
+    
+    # def make_new_cases(self, relative_risk=1.0):
+    #     """Create new cases of Type 2 Diabetes, adjusted by relative risk and susceptibility from multiple interactions."""
+    
+    #     sim = self.sim
+    
+    #     # Get susceptible individuals
+    #     susceptible_uids = self.susceptible.uids
+    
+    #     # Base incidence probability
+    #     base_prob = self.pars.incidence_prob  # Use the stored probability
+    
+    #     # Combine relative susceptibility from both HIV and other NCD interactions
+    #     rel_sus_hiv = self.rel_sus[susceptible_uids]  # HIV-related relative susceptibility
+    #     rel_sus_ncd = np.ones_like(rel_sus_hiv)  # Start with a neutral susceptibility (1.0)
+    
+    #     # Loop through other diseases in the simulation to apply NCD-NCD interactions
+    #     for condition, cond_obj in sim.diseases.items():
+    #         if condition == 'hiv':  # Special case for HIV
+    #             # Only apply to those in susceptible_uids who are infected with HIV
+    #             infected_uids = np.intersect1d(susceptible_uids, cond_obj.infected.uids)
+    #             rel_sus_ncd[np.isin(susceptible_uids, infected_uids)] *= cond_obj.rel_sus.raw[infected_uids]  # Use .raw
+    #         elif condition != 'type2diabetes':  # Skip self and apply only for NCDs
+    #             # Only apply to those in susceptible_uids who are affected by another NCD
+    #             affected_uids = np.intersect1d(susceptible_uids, cond_obj.affected.uids)
+    #             rel_sus_ncd[np.isin(susceptible_uids, affected_uids)] *= cond_obj.rel_sus.raw[affected_uids]  # Use .raw
+    
+    #     # Combine the HIV susceptibility with the NCD susceptibilities
+    #     combined_rel_sus = rel_sus_hiv * rel_sus_ncd
+    
+    #     # Adjust the incidence probability by the combined relative susceptibility
+    #     adjusted_prob = base_prob * combined_rel_sus
+    
+    #     # Apply the adjusted incidence probability to susceptible individuals
+    #     adjusted_incidence_dist = ss.bernoulli(adjusted_prob, strict=False)
+    #     adjusted_incidence_dist.initialize()
+    
+    #     # Determine new cases based on the adjusted probability
+    #     new_cases = adjusted_incidence_dist.rvs(len(susceptible_uids))  # Generate new cases
+    #     new_cases = susceptible_uids[new_cases]  # Select new cases based on generated values
+    
+    #     # Set prognoses for new cases
+    #     self.set_prognoses(new_cases)
+    
+    #     return new_cases
     
 
     def set_prognoses(self, uids):
@@ -374,6 +407,20 @@ class Hypertension(ss.NCD):
         deaths = (self.ti_dead == sim.ti).uids
         sim.people.request_death(deaths)
         self.results.new_deaths[sim.ti] = len(deaths)
+        
+        deaths = (self.ti_dead == sim.ti).uids
+        
+        # Debugging print statement
+        print(f"UIDs of deaths: {deaths}")
+        
+        # Check if deaths is a valid list or array
+        if isinstance(deaths, np.ndarray):
+            print(f"Deaths array shape: {deaths.shape}, type: {deaths.dtype}")
+        else:
+            print(f"Deaths type: {type(deaths)}")
+        
+        # Continue with logging
+        self.log.add_data(deaths, died=True)
         return
 
     def make_new_cases(self):

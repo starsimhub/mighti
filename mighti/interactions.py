@@ -471,15 +471,24 @@ class GenericNCDConnector(ss.Connector):
         sim = self.sim
         cond1_obj = getattr(sim.diseases, self.condition1.lower())  # Get the first disease object
         cond2_obj = getattr(sim.diseases, self.condition2.lower())  # Get the second disease object
-
-        # Determine if the disease uses 'infected' or 'affected' state
-        if hasattr(cond1_obj, 'affected'):
-            cond1_state = cond1_obj.affected
-        elif hasattr(cond1_obj, 'infected'):
-            cond1_state = cond1_obj.infected
+    
+        # Determine if the second condition uses 'infected' or 'affected' and adjust accordingly
+        if hasattr(cond1_obj, 'infected'):
+            # If the first disease uses 'infected'
+            condition1_uids = cond1_obj.infected.uids
+        elif hasattr(cond1_obj, 'affected'):
+            # If the first disease uses 'affected'
+            condition1_uids = cond1_obj.affected.uids
         else:
-            raise AttributeError(f"'{self.condition1}' has no 'affected' or 'infected' attribute")
-
-        # Apply the relative risk from condition1 to condition2's susceptible individuals
-        sim.diseases[self.condition2.lower()].rel_sus[cond1_state] = self.pars.rel_sus
+            raise AttributeError(f"{self.condition1} does not have 'infected' or 'affected' attribute.")
+        
+        # Now, apply the susceptibility adjustment to condition2 based on condition1
+        if hasattr(cond2_obj, 'infected'):
+            # If the second disease uses 'infected'
+            sim.diseases[self.condition2.lower()].rel_sus[condition1_uids] = self.pars.rel_sus
+        elif hasattr(cond2_obj, 'affected'):
+            # If the second disease uses 'affected'
+            sim.diseases[self.condition2.lower()].rel_sus[condition1_uids] = self.pars.rel_sus
+        else:
+            raise AttributeError(f"{self.condition2} does not have 'infected' or 'affected' attribute.")
         return
