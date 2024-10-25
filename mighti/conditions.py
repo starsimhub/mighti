@@ -20,7 +20,52 @@ __all__ = [
 ]
 
 
+class BaseNCD(ss.NCD):
+    """Base class for NCDs with shared `make_new_cases` logic."""
 
+    def make_new_cases(self, relative_risk=1.0):
+        """Create new cases of NCDs, adjusted by relative risk and susceptibility from multiple interactions."""
+        
+        sim = self.sim
+        
+        # Get susceptible individuals
+        susceptible_uids = self.susceptible.uids
+
+        # Base incidence probability
+        base_prob = self.pars.incidence_prob  # Use the stored probability
+
+        # Combine relative susceptibility from both HIV, HPV, Flu, and other NCD interactions
+        rel_sus_infectious = self.rel_sus[susceptible_uids]  # Start with base relative susceptibility
+        rel_sus_ncd = np.ones_like(rel_sus_infectious)  # Start with neutral susceptibility (1.0)
+
+        # Loop through diseases to apply infectious disease and NCD interactions
+        for condition, cond_obj in sim.diseases.items():
+            if condition in ['hiv', 'hpv', 'flu']:  # Handle infectious diseases
+                infected_uids = np.intersect1d(susceptible_uids, cond_obj.infected.uids)
+                rel_sus_infectious[np.isin(susceptible_uids, infected_uids)] *= cond_obj.rel_sus.raw[infected_uids]  # Apply rel_sus
+            elif condition != self.name.lower():  # Skip self and apply only for NCDs
+                affected_uids = np.intersect1d(susceptible_uids, cond_obj.affected.uids)
+                rel_sus_ncd[np.isin(susceptible_uids, affected_uids)] *= cond_obj.rel_sus.raw[affected_uids]  # Apply rel_sus for NCDs
+
+        # Combine the susceptibility effects from infectious diseases and NCDs
+        combined_rel_sus = rel_sus_infectious * rel_sus_ncd
+
+        # Adjust the incidence probability by the combined relative susceptibility
+        adjusted_prob = base_prob * combined_rel_sus
+
+        # Apply the adjusted incidence probability to susceptible individuals
+        adjusted_incidence_dist = ss.bernoulli(adjusted_prob, strict=False)
+        adjusted_incidence_dist.initialize()
+
+        # Determine new cases based on the adjusted probability
+        new_cases = adjusted_incidence_dist.rvs(len(susceptible_uids))  # Generate new cases
+        new_cases = susceptible_uids[new_cases]  # Select new cases based on generated values
+
+        # Set prognoses for new cases
+        self.set_prognoses(new_cases)
+
+        return new_cases
+    
 class Type1Diabetes(ss.NCD):
     
     def __init__(self, pars=None, **kwargs):
@@ -79,11 +124,6 @@ class Type1Diabetes(ss.NCD):
         # Log the deaths (only if deaths are present)
         self.log.add_data(deaths, died=True)
 
-    def make_new_cases(self):
-        new_cases = self.pars.incidence.filter(self.susceptible.uids)
-        self.set_prognoses(new_cases)
-        return new_cases
-
     def set_prognoses(self, uids):
         sim = self.sim
         p = self.pars
@@ -119,19 +159,16 @@ class Type1Diabetes(ss.NCD):
         return
 
 
-class Type2Diabetes(ss.NCD):
-
+class Type2Diabetes(BaseNCD):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         self.default_pars(
             dur_condition=ss.lognorm_ex(5),  # Longer duration reflecting chronic condition
             incidence_prob = 0.0315,
             incidence=ss.bernoulli(0.0315),    # Higher incidence rate
-            p_death=ss.bernoulli(0.0017),     # Mortality risk (may increase over time)
+            p_death=ss.bernoulli(0.0017),     # Mortality risk
             init_prev=ss.bernoulli(0.2),     # Higher initial prevalence
-            # beta_cell_decline_rate=0.05,     # Rate of beta-cell function decline over time
-            # insulin_resistance_increase_rate=0.1,  # Rate of increasing insulin resistance
-            remission_rate=ss.bernoulli(0.0024),  # Probability of remission (reversing the condition)
+            remission_rate=ss.bernoulli(0.0024),  # Probability of remission
             max_disease_duration=20,         # Maximum duration before severe complications
         )
         self.update_pars(pars, **kwargs)
@@ -139,34 +176,23 @@ class Type2Diabetes(ss.NCD):
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
-            ss.BoolArr('reversed'),          # New state for diabetes remission
+            ss.BoolArr('reversed'),  # New state for diabetes remission
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('ti_reversed'),    
+            ss.FloatArr('ti_reversed'),
             ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
-            # ss.FloatArr('beta_cell_function'),  # Tracks beta-cell function over time
-            # ss.FloatArr('insulin_resistance'),  # Tracks insulin resistance progression
         )
         return
     
-    def initialize(self, sim):
-        super().initialize(sim)
-        return
-
-
     def init_post(self):
+        """Initialize disease after simulation starts."""
         initial_cases = self.pars.init_prev.filter()
         self.set_prognoses(initial_cases)
-        # Initialize beta-cell function and insulin resistance
-        # self.beta_cell_function[initial_cases] = 1.0  # Full function at the start
-        # self.insulin_resistance[initial_cases] = 0.0  # No resistance initially
         return initial_cases
 
     def update_pre(self):
+        """Updates before each simulation step, such as handling remission and death."""
         sim = self.sim
-        # Gradually increase insulin resistance and decrease beta-cell function
-        # self.insulin_resistance[self.affected] += self.pars.insulin_resistance_increase_rate * sim.dt
-        # self.beta_cell_function[self.affected] -= self.pars.beta_cell_decline_rate * sim.dt
 
         # Handle remission (reversal)
         going_into_remission = self.pars.remission_rate.filter(self.affected.uids)
@@ -174,7 +200,7 @@ class Type2Diabetes(ss.NCD):
         self.reversed[going_into_remission] = True
         self.ti_reversed[going_into_remission] = sim.ti
 
-        # Handle recovery, death, and beta-cell function exhaustion
+        # Handle recovery and deaths
         recovered = (self.reversed & (self.ti_reversed <= sim.ti)).uids
         self.reversed[recovered] = False
         self.susceptible[recovered] = True  # Recovered individuals become susceptible again
@@ -182,77 +208,10 @@ class Type2Diabetes(ss.NCD):
         sim.people.request_death(deaths)
         self.results.new_deaths[sim.ti] = len(deaths)
         
-        deaths = (self.ti_dead == sim.ti).uids
-
-        # Debugging print statement
-        print(f"UIDs of deaths: {deaths}")
-        
-        # Check if deaths is a valid list or array
-        if isinstance(deaths, np.ndarray):
-            print(f"Deaths array shape: {deaths.shape}, type: {deaths.dtype}")
-        else:
-            print(f"Deaths type: {type(deaths)}")
-        
-        # Continue with logging
-        self.log.add_data(deaths, died=True)
-
-        # Check if beta-cell function has dropped too low, causing death or severe progression
-        # low_beta_function = self.affected & (self.beta_cell_function < 0.2)  # Threshold for beta-cell exhaustion
-        # sim.people.request_death(low_beta_function.uids)
         return
-    
-    def make_new_cases(self):
-        new_cases = self.pars.incidence.filter(self.susceptible.uids)
-        self.set_prognoses(new_cases)
-        return new_cases
-    
-    # def make_new_cases(self, relative_risk=1.0):
-    #     """Create new cases of Type 2 Diabetes, adjusted by relative risk and susceptibility from multiple interactions."""
-    
-    #     sim = self.sim
-    
-    #     # Get susceptible individuals
-    #     susceptible_uids = self.susceptible.uids
-    
-    #     # Base incidence probability
-    #     base_prob = self.pars.incidence_prob  # Use the stored probability
-    
-    #     # Combine relative susceptibility from both HIV and other NCD interactions
-    #     rel_sus_hiv = self.rel_sus[susceptible_uids]  # HIV-related relative susceptibility
-    #     rel_sus_ncd = np.ones_like(rel_sus_hiv)  # Start with a neutral susceptibility (1.0)
-    
-    #     # Loop through other diseases in the simulation to apply NCD-NCD interactions
-    #     for condition, cond_obj in sim.diseases.items():
-    #         if condition == 'hiv':  # Special case for HIV
-    #             # Only apply to those in susceptible_uids who are infected with HIV
-    #             infected_uids = np.intersect1d(susceptible_uids, cond_obj.infected.uids)
-    #             rel_sus_ncd[np.isin(susceptible_uids, infected_uids)] *= cond_obj.rel_sus.raw[infected_uids]  # Use .raw
-    #         elif condition != 'type2diabetes':  # Skip self and apply only for NCDs
-    #             # Only apply to those in susceptible_uids who are affected by another NCD
-    #             affected_uids = np.intersect1d(susceptible_uids, cond_obj.affected.uids)
-    #             rel_sus_ncd[np.isin(susceptible_uids, affected_uids)] *= cond_obj.rel_sus.raw[affected_uids]  # Use .raw
-    
-    #     # Combine the HIV susceptibility with the NCD susceptibilities
-    #     combined_rel_sus = rel_sus_hiv * rel_sus_ncd
-    
-    #     # Adjust the incidence probability by the combined relative susceptibility
-    #     adjusted_prob = base_prob * combined_rel_sus
-    
-    #     # Apply the adjusted incidence probability to susceptible individuals
-    #     adjusted_incidence_dist = ss.bernoulli(adjusted_prob, strict=False)
-    #     adjusted_incidence_dist.initialize()
-    
-    #     # Determine new cases based on the adjusted probability
-    #     new_cases = adjusted_incidence_dist.rvs(len(susceptible_uids))  # Generate new cases
-    #     new_cases = susceptible_uids[new_cases]  # Select new cases based on generated values
-    
-    #     # Set prognoses for new cases
-    #     self.set_prognoses(new_cases)
-    
-    #     return new_cases
-    
 
     def set_prognoses(self, uids):
+        """Set the prognoses for new cases."""
         sim = self.sim
         p = self.pars
         self.susceptible[uids] = False
@@ -264,12 +223,10 @@ class Type2Diabetes(ss.NCD):
         self.ti_dead[dead_uids] = sim.ti + dur_condition[will_die] / sim.dt
         self.ti_reversed[rec_uids] = sim.ti + dur_condition[~will_die] / sim.dt
 
-        # Set initial insulin resistance and beta-cell function
-        # self.insulin_resistance[uids] = 0.0  # Start with no insulin resistance
-        # self.beta_cell_function[uids] = 1.0  # Full beta-cell function initially
         return
 
     def init_results(self):
+        """Initialize the results for Type2Diabetes."""
         sim = self.sim
         super().init_results()
 
@@ -288,26 +245,26 @@ class Type2Diabetes(ss.NCD):
         return
 
     def update_results(self):
+        """Update the results for each timestep."""
         sim = self.sim
         super().update_results()
         self.results.prevalence[sim.ti] = np.count_nonzero(self.affected) / len(sim.people)
         self.results.reversal_prevalence[sim.ti] = np.count_nonzero(self.reversed) / len(sim.people)
         return
-
-
+    
 
 class Obesity(ss.NCD):
     
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         self.default_pars(
-            dur_condition=ss.lognorm_ex(1),
-            incidence=ss.bernoulli(0.15),
-            init_prev=ss.bernoulli(0.25),
+            dur_condition=ss.lognorm_ex(1),       # Duration of obesity condition
+            incidence=ss.bernoulli(0.15),         # Incidence rate of obesity
+            init_prev=ss.bernoulli(0.25),         # Initial prevalence of obesity
         )
-        # self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
         self.update_pars(pars, **kwargs)
         
+        # States specific to obesity
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
@@ -317,73 +274,73 @@ class Obesity(ss.NCD):
         )
         return
     
-    
     def initialize(self, sim):
         """Initialize the disease, setting rel_sus for each agent."""
         super().initialize(sim)
-        # self.rel_sus = np.ones(sim.n)  # Initialize rel_sus for each agent in the sim (default to 1.0)
+        # Set initial relative susceptibility for interactions, defaulting to 1 (neutral)
+        self.rel_sus[:] = 1.0  
         return
 
     def init_post(self):
-        initial_cases = self.pars.init_prev.filter()
-        self.set_prognoses(initial_cases)
+        """Initialize agents affected by obesity at the start of the simulation."""
+        initial_cases = self.pars.init_prev.filter()   # Filter agents based on initial prevalence
+        self.set_prognoses(initial_cases)              # Set prognoses for these initial cases
         return initial_cases
 
     def update_pre(self):
+        """Update states at each timestep, managing recovery."""
         sim = self.sim
+
+        # Process recoveries based on recovery time
         recovered = (self.affected & (self.ti_recovered <= sim.ti)).uids
         self.affected[recovered] = False
-        self.susceptible[recovered] = True
+        self.susceptible[recovered] = True  # Recovered agents become susceptible again
         return
 
-    def make_new_cases(self):
-        new_cases = self.pars.incidence.filter(self.susceptible.uids)
-        self.set_prognoses(new_cases)
-        return new_cases
-
     def set_prognoses(self, uids):
+        """Set prognoses for newly affected agents."""
         sim = self.sim
-        self.susceptible[uids] = False
+        self.susceptible[uids] = False  # Mark agents as affected
         self.affected[uids] = True
+
+        # Set recovery times for the affected agents
         dur_condition = self.pars.dur_condition.rvs(uids)
         self.ti_recovered[uids] = sim.ti + dur_condition / sim.dt
         return
 
     def init_results(self):
+        """Initialize results arrays for tracking prevalence and incidence."""
         sim = self.sim
         super().init_results()
         
-        # Check if the keys already exist in the results
+        # Prevalence tracking
         if 'prevalence' not in self.results:
             self.results += [
                 ss.Result(self.name, 'prevalence', sim.npts, dtype=float),
             ]
-        if 'new_deaths' not in self.results:
-            self.results += [
-                ss.Result(self.name, 'new_deaths', sim.npts, dtype=int),
-            ]
-
         return
 
     def update_results(self):
+        """Update results each timestep to track prevalence."""
         sim = self.sim
         super().update_results()
+        # Calculate prevalence as the ratio of affected individuals to the population size
         self.results.prevalence[sim.ti] = np.count_nonzero(self.affected) / len(sim.people)
         return
-
 
 class Hypertension(ss.NCD):
     
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         self.default_pars(
-            dur_condition=ss.lognorm_ex(1),
-            incidence=ss.bernoulli(0.12),
-            p_death=ss.bernoulli(0.001),
-            init_prev=ss.bernoulli(0.18),
+            dur_condition=ss.lognorm_ex(1),      # Duration of hypertension condition
+            incidence=ss.bernoulli(0.12),        # Incidence rate of hypertension
+            p_death=ss.bernoulli(0.001),         # Mortality risk due to hypertension
+            init_prev=ss.bernoulli(0.18),        # Initial prevalence of hypertension
         )
         self.update_pars(pars, **kwargs)
         
+        # Define states for hypertension
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
@@ -395,61 +352,71 @@ class Hypertension(ss.NCD):
         return
 
     def init_post(self):
+        """Initialize agents affected by hypertension at the start of the simulation."""
         initial_cases = self.pars.init_prev.filter()
         self.set_prognoses(initial_cases)
         return initial_cases
 
     def update_pre(self):
+        """Update states at each timestep, managing recovery and death."""
         sim = self.sim
+
+        # Process recoveries based on recovery time
         recovered = (self.affected & (self.ti_recovered <= sim.ti)).uids
         self.affected[recovered] = False
-        self.susceptible[recovered] = True
+        self.susceptible[recovered] = True  # Recovered agents become susceptible again
+
+        # Process deaths based on death time
         deaths = (self.ti_dead == sim.ti).uids
         sim.people.request_death(deaths)
         self.results.new_deaths[sim.ti] = len(deaths)
+
+        # Debugging for death events
+        if len(deaths) > 0:
+            print(f"UIDs of deaths this timestep: {deaths}, Count: {len(deaths)}")
         
-        deaths = (self.ti_dead == sim.ti).uids
-        
-        # Debugging print statement
-        print(f"UIDs of deaths: {deaths}")
-        
-        # Check if deaths is a valid list or array
-        if isinstance(deaths, np.ndarray):
-            print(f"Deaths array shape: {deaths.shape}, type: {deaths.dtype}")
-        else:
-            print(f"Deaths type: {type(deaths)}")
-        
-        # Continue with logging
-        self.log.add_data(deaths, died=True)
+        # Continue with logging (commented out if not needed for now)
+        # self.log.add_data(deaths, died=True)
+
         return
 
     def make_new_cases(self):
+        """Create new cases of hypertension among susceptible individuals."""
         new_cases = self.pars.incidence.filter(self.susceptible.uids)
         self.set_prognoses(new_cases)
         return new_cases
 
     def set_prognoses(self, uids):
+        """Set prognoses for newly affected individuals."""
         sim = self.sim
         p = self.pars
+
+        # Update states for the new cases
         self.susceptible[uids] = False
         self.affected[uids] = True
         dur_condition = p.dur_condition.rvs(uids)
+        
+        # Determine recovery or death for each new case
         will_die = p.p_death.rvs(uids)
         dead_uids = uids[will_die]
         rec_uids = uids[~will_die]
+
+        # Assign recovery or death time based on condition duration
         self.ti_dead[dead_uids] = sim.ti + dur_condition[will_die] / sim.dt
         self.ti_recovered[rec_uids] = sim.ti + dur_condition[~will_die] / sim.dt
         return
 
     def init_results(self):
+        """Initialize results arrays for tracking prevalence and deaths."""
         sim = self.sim
         super().init_results()
         
-        # Check if the keys already exist in the results
+        # Initialize prevalence tracking
         if 'prevalence' not in self.results:
             self.results += [
                 ss.Result(self.name, 'prevalence', sim.npts, dtype=float),
             ]
+        # Initialize new deaths tracking
         if 'new_deaths' not in self.results:
             self.results += [
                 ss.Result(self.name, 'new_deaths', sim.npts, dtype=int),
@@ -458,8 +425,11 @@ class Hypertension(ss.NCD):
         return
 
     def update_results(self):
+        """Update prevalence and death results at each timestep."""
         sim = self.sim
         super().update_results()
+        
+        # Calculate prevalence as the fraction of affected individuals
         self.results.prevalence[sim.ti] = np.count_nonzero(self.affected) / len(sim.people)
         return
 

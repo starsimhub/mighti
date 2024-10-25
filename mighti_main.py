@@ -69,7 +69,6 @@ validate_prevalence_data(prevalence_data, diseases)
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 
-# Load existing HIV and NCD interactions
 # Automatically create interaction functions for each NCD dynamically
 interaction_functions = {}
 
@@ -145,7 +144,7 @@ eswatini_hiv_data = {
     '2021': eswatini_hiv_data_2021
 }
 
-diseases = ['HIV', 'Type2Diabetes']
+diseases = ['HIV', 'Type2Diabetes', 'Type1Diabetes', 'Obesity', 'Hypertension']
 
 
 # Retrieve the prevalence data for plotting
@@ -158,14 +157,14 @@ try:
     print(f"Simulated data for 2007 (male): {hiv_prevalence_data_male[0]}")
     print(f"Simulated data for 2007 (female): {hiv_prevalence_data_female[0]}")
 
-    # diabetes1_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
-    # diabetes1_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
+    diabetes1_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
+    diabetes1_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
     diabetes2_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
     diabetes2_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
-    # obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
-    # obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
-    # hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
-    # hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
+    obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
+    obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
+    hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
+    hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
 
     # Ensure age_bins is a list (fix for the previous error)
     age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
