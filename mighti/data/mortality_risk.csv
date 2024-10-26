@@ -1,0 +1,289 @@
+﻿Condition,Age,Sex,Rate,Category
+Accident ,15,male,0.002,Instant
+Accident ,25,male,0.003,Instant
+Accident ,35,male,0.003,Instant
+Accident ,45,male,0.003,Instant
+Accident ,55,male,0.004,Instant
+Accident ,65,male,0.005,Instant
+Accident ,75,male,0.008,Instant
+Accident ,85,male,0.027,Instant
+Accident ,15,female,0.001,Instant
+Accident ,25,female,0.001,Instant
+Accident ,35,female,0.001,Instant
+Accident ,45,female,0.002,Instant
+Accident ,55,female,0.002,Instant
+Accident ,65,female,0.002,Instant
+Accident ,75,female,0.004,Instant
+Accident ,85,female,0.017,Instant
+Alzheimer'sDisease ,15,male,0,LongTerm
+Alzheimer'sDisease ,25,male,0,LongTerm
+Alzheimer'sDisease ,35,male,0,LongTerm
+Alzheimer'sDisease ,45,male,0.013,LongTerm
+Alzheimer'sDisease ,55,male,0.004,LongTerm
+Alzheimer'sDisease ,65,male,0.006,LongTerm
+Alzheimer'sDisease ,75,male,0.034,LongTerm
+Alzheimer'sDisease ,85,male,0.024,LongTerm
+Alzheimer'sDisease ,15,female,0,LongTerm
+Alzheimer'sDisease ,25,female,0,LongTerm
+Alzheimer'sDisease ,35,female,0,LongTerm
+Alzheimer'sDisease ,45,female,0.014,LongTerm
+Alzheimer'sDisease ,55,female,0.004,LongTerm
+Alzheimer'sDisease ,65,female,0.007,LongTerm
+Alzheimer'sDisease ,75,female,0.036,LongTerm
+Alzheimer'sDisease ,85,female,0.034,LongTerm
+Assault,15,male,0.0012,Instant
+Assault,25,male,0.0013,Instant
+Assault,35,male,0.0013,Instant
+Assault,45,male,0.0011,Instant
+Assault,55,male,0.0015,Instant
+Assault,65,male,0.0029,Instant
+Assault,75,male,0.0042,Instant
+Assault,85,male,0.0067,Instant
+Assault,15,female,0.0003,Instant
+Assault,25,female,0.0004,Instant
+Assault,35,female,0.0006,Instant
+Assault,45,female,0.0007,Instant
+Assault,55,female,0.0011,Instant
+Assault,65,female,0.0031,Instant
+Assault,75,female,0.005,Instant
+Assault,85,female,0.0059,Instant
+CerebrovascularDisease,15,male,0.041,Instant
+CerebrovascularDisease,25,male,0.041,Instant
+CerebrovascularDisease,35,male,0.041,Instant
+CerebrovascularDisease,45,male,0.041,Instant
+CerebrovascularDisease,55,male,0.041,Instant
+CerebrovascularDisease,65,male,0.041,Instant
+CerebrovascularDisease,75,male,0.041,Instant
+CerebrovascularDisease,85,male,0.041,Instant
+CerebrovascularDisease,15,female,0.041,Instant
+CerebrovascularDisease,25,female,0.041,Instant
+CerebrovascularDisease,35,female,0.041,Instant
+CerebrovascularDisease,45,female,0.041,Instant
+CerebrovascularDisease,55,female,0.041,Instant
+CerebrovascularDisease,65,female,0.041,Instant
+CerebrovascularDisease,75,female,0.041,Instant
+CerebrovascularDisease,85,female,0.041,Instant
+Flu,15,male,0.00009,Instant
+Flu,25,male,0.00009,Instant
+Flu,35,male,0.00009,Instant
+Flu,45,male,0.00143,Instant
+Flu,55,male,0.00134,Instant
+Flu,65,male,0.011,Instant
+Flu,75,male,0.0117,Instant
+Flu,85,male,0.01278,Instant
+Flu,15,female,0.00009,Instant
+Flu,25,female,0.00009,Instant
+Flu,35,female,0.00009,Instant
+Flu,45,female,0.00143,Instant
+Flu,55,female,0.00134,Instant
+Flu,65,female,0.011,Instant
+Flu,75,female,0.0117,Instant
+Flu,85,female,0.01278,Instant
+CervicalCancer,15,male,NA,LongTerm
+CervicalCancer,25,male,NA,LongTerm
+CervicalCancer,35,male,NA,LongTerm
+CervicalCancer,45,male,NA,LongTerm
+CervicalCancer,55,male,NA,LongTerm
+CervicalCancer,65,male,NA,LongTerm
+CervicalCancer,75,male,NA,LongTerm
+CervicalCancer,85,male,NA,LongTerm
+CervicalCancer,15,female,0.062,LongTerm
+CervicalCancer,25,female,0.062,LongTerm
+CervicalCancer,35,female,0.062,LongTerm
+CervicalCancer,45,female,0.062,LongTerm
+CervicalCancer,55,female,0.062,LongTerm
+CervicalCancer,65,female,0.062,LongTerm
+CervicalCancer,75,female,0.062,LongTerm
+CervicalCancer,85,female,0.062,LongTerm
+ColorectalCancer,15,male,0.07,Instant
+ColorectalCancer,25,male,0.07,Instant
+ColorectalCancer,35,male,0.07,Instant
+ColorectalCancer,45,male,0.07,Instant
+ColorectalCancer,55,male,0.07,Instant
+ColorectalCancer,65,male,0.07,Instant
+ColorectalCancer,75,male,0.07,Instant
+ColorectalCancer,85,male,0.07,Instant
+ColorectalCancer,15,female,0.07,Instant
+ColorectalCancer,25,female,0.07,Instant
+ColorectalCancer,35,female,0.07,Instant
+ColorectalCancer,45,female,0.07,Instant
+ColorectalCancer,55,female,0.07,Instant
+ColorectalCancer,65,female,0.07,Instant
+ColorectalCancer,75,female,0.07,Instant
+ColorectalCancer,85,female,0.07,Instant
+BreastCancer,15,male,0.052,Instant
+BreastCancer,25,male,0.052,Instant
+BreastCancer,35,male,0.052,Instant
+BreastCancer,45,male,0.052,Instant
+BreastCancer,55,male,0.052,Instant
+BreastCancer,65,male,0.052,Instant
+BreastCancer,75,male,0.052,Instant
+BreastCancer,85,male,0.052,Instant
+BreastCancer,15,female,0.022,Instant
+BreastCancer,25,female,0.022,Instant
+BreastCancer,35,female,0.022,Instant
+BreastCancer,45,female,0.022,Instant
+BreastCancer,55,female,0.022,Instant
+BreastCancer,65,female,0.022,Instant
+BreastCancer,75,female,0.022,Instant
+BreastCancer,85,female,0.022,Instant
+ViralHepatitis,15,male,0.05004,LongTerm
+ViralHepatitis,25,male,0.00447,LongTerm
+ViralHepatitis,35,male,0.02447,LongTerm
+ViralHepatitis,45,male,0.02287,LongTerm
+ViralHepatitis,55,male,0.02637,LongTerm
+ViralHepatitis,65,male,0.02871,LongTerm
+ViralHepatitis,75,male,0.03463,LongTerm
+ViralHepatitis,85,male,0.05088,LongTerm
+ViralHepatitis,15,female,0.05001,LongTerm
+ViralHepatitis,25,female,0.00447,LongTerm
+ViralHepatitis,35,female,0.02447,LongTerm
+ViralHepatitis,45,female,0.02287,LongTerm
+ViralHepatitis,55,female,0.02637,LongTerm
+ViralHepatitis,65,female,0.02871,LongTerm
+ViralHepatitis,75,female,0.03463,LongTerm
+ViralHepatitis,85,female,0.05088,LongTerm
+ChronicLowerRespiratoryDisease,15,male,0.00017,LongTerm
+ChronicLowerRespiratoryDisease,25,male,0.00049,LongTerm
+ChronicLowerRespiratoryDisease,35,male,0.00055,LongTerm
+ChronicLowerRespiratoryDisease,45,male,0.00099,LongTerm
+ChronicLowerRespiratoryDisease,55,male,0.00452,LongTerm
+ChronicLowerRespiratoryDisease,65,male,0.01079,LongTerm
+ChronicLowerRespiratoryDisease,75,male,0.02865,LongTerm
+ChronicLowerRespiratoryDisease,85,male,0.05419,LongTerm
+ChronicLowerRespiratoryDisease,15,female,0.00008,LongTerm
+ChronicLowerRespiratoryDisease,25,female,0.00017,LongTerm
+ChronicLowerRespiratoryDisease,35,female,0.00061,LongTerm
+ChronicLowerRespiratoryDisease,45,female,0.00105,LongTerm
+ChronicLowerRespiratoryDisease,55,female,0.00368,LongTerm
+ChronicLowerRespiratoryDisease,65,female,0.00872,LongTerm
+ChronicLowerRespiratoryDisease,75,female,0.01919,LongTerm
+ChronicLowerRespiratoryDisease,85,female,0.03611,LongTerm
+Type2Diabetes,15,male,0.00028,Instant
+Type2Diabetes,25,male,0.00118,Instant
+Type2Diabetes,35,male,0.00343,Instant
+Type2Diabetes,45,male,0.0013,Instant
+Type2Diabetes,55,male,0.00333,Instant
+Type2Diabetes,65,male,0.0038,Instant
+Type2Diabetes,75,male,0.00799,Instant
+Type2Diabetes,85,male,0.01546,Instant
+Type2Diabetes,15,female,0.00018,Instant
+Type2Diabetes,25,female,0.00086,Instant
+Type2Diabetes,35,female,0.00206,Instant
+Type2Diabetes,45,female,0.00089,Instant
+Type2Diabetes,55,female,0.00242,Instant
+Type2Diabetes,65,female,0.003,Instant
+Type2Diabetes,75,female,0.0074,Instant
+Type2Diabetes,85,female,0.01546,Instant
+HeartDisease,15,male,0.0008,LongTerm
+HeartDisease,25,male,0.0032,LongTerm
+HeartDisease,35,male,0.00646,LongTerm
+HeartDisease,45,male,0.0091,LongTerm
+HeartDisease,55,male,0.01064,LongTerm
+HeartDisease,65,male,0.01355,LongTerm
+HeartDisease,75,male,0.03013,LongTerm
+HeartDisease,85,male,0.08469,LongTerm
+HeartDisease,15,female,0.00044,LongTerm
+HeartDisease,25,female,0.0013,LongTerm
+HeartDisease,35,female,0.00257,LongTerm
+HeartDisease,45,female,0.00397,LongTerm
+HeartDisease,55,female,0.00566,LongTerm
+HeartDisease,65,female,0.01057,LongTerm
+HeartDisease,75,female,0.0413,LongTerm
+HeartDisease,85,female,0.09286,LongTerm
+Hypertension,15,male,0.006,LongTerm
+Hypertension,25,male,0.006,LongTerm
+Hypertension,35,male,0.01,LongTerm
+Hypertension,45,male,0.014,LongTerm
+Hypertension,55,male,0.017,LongTerm
+Hypertension,65,male,0.03,LongTerm
+Hypertension,75,male,0.054,LongTerm
+Hypertension,85,male,0.116,LongTerm
+Hypertension,15,female,0.006,LongTerm
+Hypertension,25,female,0.006,LongTerm
+Hypertension,35,female,0.01,LongTerm
+Hypertension,45,female,0.014,LongTerm
+Hypertension,55,female,0.017,LongTerm
+Hypertension,65,female,0.03,LongTerm
+Hypertension,75,female,0.054,LongTerm
+Hypertension,85,female,0.116,LongTerm
+LungCancer,15,male,0.166,LongTerm
+LungCancer,25,male,0.166,LongTerm
+LungCancer,35,male,0.166,LongTerm
+LungCancer,45,male,0.166,LongTerm
+LungCancer,55,male,0.166,LongTerm
+LungCancer,65,male,0.166,LongTerm
+LungCancer,75,male,0.166,LongTerm
+LungCancer,85,male,0.166,LongTerm
+LungCancer,15,female,0.166,LongTerm
+LungCancer,25,female,0.166,LongTerm
+LungCancer,35,female,0.166,LongTerm
+LungCancer,45,female,0.166,LongTerm
+LungCancer,55,female,0.166,LongTerm
+LungCancer,65,female,0.166,LongTerm
+LungCancer,75,female,0.166,LongTerm
+LungCancer,85,female,0.166,LongTerm
+ProstateCancer,15,male,0.0022,LongTerm
+ProstateCancer,25,male,0.0022,LongTerm
+ProstateCancer,35,male,0.0022,LongTerm
+ProstateCancer,45,male,0.0022,LongTerm
+ProstateCancer,55,male,0.0029,LongTerm
+ProstateCancer,65,male,0.0051,LongTerm
+ProstateCancer,75,male,0.0077,LongTerm
+ProstateCancer,85,male,0.0087,LongTerm
+ProstateCancer,15,female,NA,LongTerm
+ProstateCancer,25,female,NA,LongTerm
+ProstateCancer,35,female,NA,LongTerm
+ProstateCancer,45,female,NA,LongTerm
+ProstateCancer,55,female,NA,LongTerm
+ProstateCancer,65,female,NA,LongTerm
+ProstateCancer,75,female,NA,LongTerm
+ProstateCancer,85,female,NA,LongTerm
+OtherCancer,15,male,0.075,LongTerm
+OtherCancer,25,male,0.075,LongTerm
+OtherCancer,35,male,0.075,LongTerm
+OtherCancer,45,male,0.075,LongTerm
+OtherCancer,55,male,0.075,LongTerm
+OtherCancer,65,male,0.075,LongTerm
+OtherCancer,75,male,0.075,LongTerm
+OtherCancer,85,male,0.075,LongTerm
+OtherCancer,15,female,0.061,LongTerm
+OtherCancer,25,female,0.061,LongTerm
+OtherCancer,35,female,0.061,LongTerm
+OtherCancer,45,female,0.061,LongTerm
+OtherCancer,55,female,0.061,LongTerm
+OtherCancer,65,female,0.061,LongTerm
+OtherCancer,75,female,0.061,LongTerm
+OtherCancer,85,female,0.061,LongTerm
+MaternalMortality,15,male,NA,Instant
+MaternalMortality,25,male,NA,Instant
+MaternalMortality,35,male,NA,Instant
+MaternalMortality,45,male,NA,Instant
+MaternalMortality,55,male,NA,Instant
+MaternalMortality,65,male,NA,Instant
+MaternalMortality,75,male,NA,Instant
+MaternalMortality,85,male,NA,Instant
+MaternalMortality,15,female,0.0001,Instant
+MaternalMortality,25,female,0.00001,Instant
+MaternalMortality,35,female,0.00004,Instant
+MaternalMortality,45,female,0.00055,Instant
+MaternalMortality,55,female,0.00055,Instant
+MaternalMortality,65,female,0.00055,Instant
+MaternalMortality,75,female,0.00055,Instant
+MaternalMortality,85,female,0.00055,Instant
+Parkinsons,15,male,0.019,LongTerm
+Parkinsons,25,male,0.019,LongTerm
+Parkinsons,35,male,0.002,LongTerm
+Parkinsons,45,male,0.002,LongTerm
+Parkinsons,55,male,0.008,LongTerm
+Parkinsons,65,male,0.024,LongTerm
+Parkinsons,75,male,0.098,LongTerm
+Parkinsons,85,male,0.125,LongTerm
+Parkinsons,15,female,0.019,LongTerm
+Parkinsons,25,female,0.019,LongTerm
+Parkinsons,35,female,0.001,LongTerm
+Parkinsons,45,female,0.003,LongTerm
+Parkinsons,55,female,0.006,LongTerm
+Parkinsons,65,female,0.012,LongTerm
+Parkinsons,75,female,0.05,LongTerm
+Parkinsons,85,female,0.076,LongTerm

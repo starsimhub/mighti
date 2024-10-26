@@ -1,6 +1,7 @@
 import numpy as np
 import starsim as ss
 import mighti as mi
+import pandas as pd
 
 # CONDITIONS
 # This is an umbrella term for any health condition. Some conditions can lead directly
@@ -19,6 +20,26 @@ __all__ = [
     'Parkinsons','Smoking', 'Alcohol', 'BRCA', 'ViralHepatitis', 'Poverty'
 ]
 
+
+mortality_data = pd.read_csv('mighti/data/mortality_risk.csv')
+# Convert the Age column to a string to maintain consistency
+mortality_data['Age'] = mortality_data['Age'].astype(str)
+
+# Create a dictionary to store rates by condition, age, sex, and category
+mortality_rates = {}
+for _, row in mortality_data.iterrows():
+    condition, age, sex, rate, category = row
+    mortality_rates.setdefault(condition.strip(), {}).setdefault(age, {}).setdefault(sex, {})[category] = rate
+
+
+# Helper function for retrieving mortality rates
+def get_mortality_rate(condition, age, sex, category, mortality_data):
+    try:
+        return mortality_data[condition][age][sex][category]
+    except KeyError:
+        return 0  # Default to 0 if no data is available
+    
+    
 
 class BaseNCD(ss.NCD):
     """Base class for NCDs with shared `make_new_cases` logic."""
@@ -65,6 +86,7 @@ class BaseNCD(ss.NCD):
         self.set_prognoses(new_cases)
 
         return new_cases
+
     
 class Type1Diabetes(ss.NCD):
     
@@ -334,9 +356,9 @@ class Hypertension(ss.NCD):
         super().__init__()
         self.default_pars(
             dur_condition=ss.lognorm_ex(1),      # Duration of hypertension condition
-            incidence=ss.bernoulli(0.12),        # Incidence rate of hypertension
+            incidence=ss.bernoulli(0.276),        # Incidence rate of hypertension
             p_death=ss.bernoulli(0.001),         # Mortality risk due to hypertension
-            init_prev=ss.bernoulli(0.18),        # Initial prevalence of hypertension
+            init_prev=ss.bernoulli(0.5),        # Initial prevalence of hypertension
         )
         self.update_pars(pars, **kwargs)
         
@@ -370,13 +392,6 @@ class Hypertension(ss.NCD):
         deaths = (self.ti_dead == sim.ti).uids
         sim.people.request_death(deaths)
         self.results.new_deaths[sim.ti] = len(deaths)
-
-        # Debugging for death events
-        if len(deaths) > 0:
-            print(f"UIDs of deaths this timestep: {deaths}, Count: {len(deaths)}")
-        
-        # Continue with logging (commented out if not needed for now)
-        # self.log.add_data(deaths, died=True)
 
         return
 
@@ -421,7 +436,6 @@ class Hypertension(ss.NCD):
             self.results += [
                 ss.Result(self.name, 'new_deaths', sim.npts, dtype=int),
             ]
-        
         return
 
     def update_results(self):
