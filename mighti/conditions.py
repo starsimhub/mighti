@@ -1,7 +1,6 @@
 import numpy as np
 import starsim as ss
-import mighti as mi
-import pandas as pd
+
 
 # CONDITIONS
 # This is an umbrella term for any health condition. Some conditions can lead directly
@@ -21,23 +20,6 @@ __all__ = [
 ]
 
 
-mortality_data = pd.read_csv('mighti/data/mortality_risk.csv')
-# Convert the Age column to a string to maintain consistency
-mortality_data['Age'] = mortality_data['Age'].astype(str)
-
-# Create a dictionary to store rates by condition, age, sex, and category
-mortality_rates = {}
-for _, row in mortality_data.iterrows():
-    condition, age, sex, rate, category = row
-    mortality_rates.setdefault(condition.strip(), {}).setdefault(age, {}).setdefault(sex, {})[category] = rate
-
-
-# Helper function for retrieving mortality rates
-def get_mortality_rate(condition, age, sex, category, mortality_data):
-    try:
-        return mortality_data[condition][age][sex][category]
-    except KeyError:
-        return 0  # Default to 0 if no data is available
     
     
 
@@ -95,8 +77,8 @@ class Type1Diabetes(ss.NCD):
         self.default_pars(
             dur_condition=ss.lognorm_ex(1),  # Shorter duration before serious complications
             incidence=ss.bernoulli(0.000015),      # Lower incidence of Type 1 diabetes
-            p_death=ss.bernoulli(0.0033),        # Higher mortality rate from Type 1
-            init_prev=ss.bernoulli(0.01),      # Initial prevalence of Type 1 diabetes
+            p_death=ss.bernoulli(0.00432),        # (Validated)
+            init_prev=ss.bernoulli(0.0033),       # (Validated)
         )
         self.update_pars(pars, **kwargs)
         
@@ -188,8 +170,8 @@ class Type2Diabetes(BaseNCD):
             dur_condition=ss.lognorm_ex(5),  # Longer duration reflecting chronic condition
             incidence_prob = 0.0315,
             incidence=ss.bernoulli(0.0315),    # Higher incidence rate
-            p_death=ss.bernoulli(0.0017),     # Mortality risk
-            init_prev=ss.bernoulli(0.2),     # Higher initial prevalence
+            p_death=ss.bernoulli(0.00462),     # (Validated)
+            init_prev=ss.bernoulli(0.2),       # (Validated)
             remission_rate=ss.bernoulli(0.0024),  # Probability of remission
             max_disease_duration=20,         # Maximum duration before severe complications
         )
@@ -282,7 +264,7 @@ class Obesity(ss.NCD):
         self.default_pars(
             dur_condition=ss.lognorm_ex(1),       # Duration of obesity condition
             incidence=ss.bernoulli(0.15),         # Incidence rate of obesity
-            init_prev=ss.bernoulli(0.25),         # Initial prevalence of obesity
+            init_prev=ss.bernoulli(0.1221),       # (Validated)
         )
         self.update_pars(pars, **kwargs)
         
@@ -355,10 +337,10 @@ class Hypertension(ss.NCD):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         self.default_pars(
-            dur_condition=ss.lognorm_ex(1),      # Duration of hypertension condition
-            incidence=ss.bernoulli(0.276),        # Incidence rate of hypertension
-            p_death=ss.bernoulli(0.001),         # Mortality risk due to hypertension
-            init_prev=ss.bernoulli(0.5),        # Initial prevalence of hypertension
+            dur_condition=ss.lognorm_ex(1),            # Duration of hypertension condition
+            incidence=ss.bernoulli(0.276),             # Incidence rate of hypertension (Validated)
+            p_death=ss.bernoulli(0.031625),            # Mortality risk due to hypertension (Validated)
+            init_prev=ss.bernoulli(0.530333),          # (Validated)
         )
         self.update_pars(pars, **kwargs)
         
@@ -457,7 +439,7 @@ class Depression(ss.Disease):
             # Initial conditions
             dur_episode=ss.lognorm_ex(1),  # Duration of an episode
             incidence=ss.bernoulli(0.9),  # Incidence at each point in time
-            p_death=ss.bernoulli(0.001),  # Risk of death from depression (e.g. by suicide)
+            p_death=ss.bernoulli(0.001),  # Risk of death from depression (e.g. by suicide) 
             init_prev=ss.bernoulli(0.2),  # Default initial prevalence (modified below for age-dependent prevalence)
         )
         self.update_pars(pars, **kwargs)
@@ -478,6 +460,7 @@ class Flu(ss.SIS):
         super().__init__()
         self.default_pars(
             init_prev=ss.bernoulli(0.1),  # Example initial prevalence
+            p_death=ss.bernoulli(0.004815),             # (Validated)
         )
         self.update_pars(pars, **kwargs)
 
@@ -485,6 +468,7 @@ class Flu(ss.SIS):
             ss.BoolArr('susceptible'),
             ss.BoolArr('infected'),
             ss.FloatArr('ti_infected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),  # Add relative susceptibility
         )
     # """
@@ -553,7 +537,6 @@ class Flu(ss.SIS):
     #     return
 
 
-### Defining only minimal
 class HPV(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
@@ -573,140 +556,184 @@ class CervicalCancer(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         self.default_pars(
-            init_prev=ss.bernoulli(0.05),
+            init_prev=ss.bernoulli(0.05),                # (Validated)      
+            p_death=ss.bernoulli(0.062),             # (Validated)
         )
         self.update_pars(pars, **kwargs)
-
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
             ss.FloatArr('ti_affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class ColorectalCancer(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.03))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.001095501),            # (Validated)
+            p_death=ss.bernoulli(0.07),          # (Validated)
+        )
         self.update_pars(pars, **kwargs)
         self.add_states(
-            ss.BoolArr('susceptible'), 
-            ss.BoolArr('affected'), 
+            ss.BoolArr('susceptible'),
+            ss.BoolArr('affected'),
             ss.FloatArr('ti_affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class BreastCancer(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.02))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.02),
+            p_death=ss.bernoulli(0.037),              # (Validated)
+        )
         self.update_pars(pars, **kwargs)
         self.add_states(
-            ss.BoolArr('susceptible'), 
-            ss.BoolArr('affected'), 
+            ss.BoolArr('susceptible'),
+            ss.BoolArr('affected'),
             ss.FloatArr('ti_affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class LungCancer(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.04))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.04),
+            p_death=ss.bernoulli(0.166),                # (Validated)
+        )
         self.update_pars(pars, **kwargs)
         self.add_states(
-            ss.BoolArr('susceptible'), 
-            ss.BoolArr('affected'), 
+            ss.BoolArr('susceptible'),
+            ss.BoolArr('affected'),
             ss.FloatArr('ti_affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class ProstateCancer(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.01))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.01),
+            p_death=ss.bernoulli(0.004815),                 # (Validated)
+        )
         self.update_pars(pars, **kwargs)
         self.add_states(
-            ss.BoolArr('susceptible'), 
-            ss.BoolArr('affected'), 
+            ss.BoolArr('susceptible'),
+            ss.BoolArr('affected'),
             ss.FloatArr('ti_affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class OtherCancer(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.02))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.02),
+            p_death=ss.bernoulli(0.068),                 # (Validated)
+        )
         self.update_pars(pars, **kwargs)
         self.add_states(
-            ss.BoolArr('susceptible'), 
-            ss.BoolArr('affected'), 
+            ss.BoolArr('susceptible'),
+            ss.BoolArr('affected'),
             ss.FloatArr('ti_affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class Parkinsons(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.01))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.01),
+            p_death=ss.bernoulli(0.0301875),                 # (Validated)
+        )
         self.update_pars(pars, **kwargs)
         self.add_states(
             ss.BoolArr('susceptible'), 
             ss.BoolArr('affected'), 
             ss.FloatArr('ti_affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class Smoking(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.3))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.3),
+            p_death=ss.bernoulli(0.01)       # Mortality placeholder
+        )
         self.update_pars(pars, **kwargs)
         self.add_states(
             ss.BoolArr('susceptible'), 
             ss.BoolArr('affected'), 
             ss.FloatArr('ti_affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class BRCA(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.005))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.005),
+            p_death=ss.bernoulli(0.015),       # Placeholder for mortality
+        )
         self.update_pars(pars, **kwargs)
         self.add_states(
             ss.BoolArr('susceptible'), 
             ss.BoolArr('affected'), 
             ss.FloatArr('ti_affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class Alcohol(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.15))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.15),
+            p_death=ss.bernoulli(0.005),       # Placeholder for mortality
+        )
         self.update_pars(pars, **kwargs)
         self.add_states(
             ss.BoolArr('susceptible'), 
             ss.BoolArr('affected'), 
             ss.FloatArr('ti_affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
+
 class ViralHepatitis(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.02))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.02),
+            p_death=ss.bernoulli(0.030303125),       # (Validated)
+        )
         self.update_pars(pars, **kwargs)
         self.add_states(
             ss.BoolArr('susceptible'), 
             ss.BoolArr('affected'), 
             ss.FloatArr('ti_affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class Poverty(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.4))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.4),
+        )
         self.update_pars(pars, **kwargs)
         self.add_states(
             ss.BoolArr('susceptible'), 
@@ -714,99 +741,126 @@ class Poverty(ss.Disease):
             ss.FloatArr('ti_affected'),
             ss.FloatArr('rel_sus'),
         )
-        
+
 class Accident(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.02))  
+        self.default_pars(
+            init_prev=ss.bernoulli(0.02),
+            instant_death=ss.bernoulli(0.0053125),  # (Validated)
+        )
         self.update_pars(pars, **kwargs)
-
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),  
         )
 
 class Alzheimers(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.01))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.01),
+            p_death=ss.bernoulli(0.011),       # (Validated)
+        )
         self.update_pars(pars, **kwargs)
-
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class Assault(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.005))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.005),
+            p_death=ss.bernoulli(0.00233125),        # (Validated)
+        )
         self.update_pars(pars, **kwargs)
-
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class CerebrovascularDisease(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.02))
-        self.update_pars(pars, **kwargs)
-
-        self.add_states(
-            ss.BoolArr('susceptible'),
-            ss.BoolArr('affected'),
-            ss.FloatArr('rel_sus'),
+        self.default_pars(
+            init_prev=ss.bernoulli(0.02),
+            p_death=ss.bernoulli(0.041),            # (Validated)
         )
-
-class ChronicLiverDisease(ss.Disease):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.02))
         self.update_pars(pars, **kwargs)
-
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
-            ss.FloatArr('rel_sus'),
-        )
-
-class ChronicLowerRespiratoryDisease(ss.Disease):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.03))
-        self.update_pars(pars, **kwargs)
-
-        self.add_states(
-            ss.BoolArr('susceptible'),
-            ss.BoolArr('affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class HeartDisease(ss.NCD):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.05))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.05),
+            p_death=ss.bernoulli(0.0198275),         # (Validated)
+        )
+        self.update_pars(pars, **kwargs)
+        self.add_states(
+            ss.BoolArr('susceptible'),
+            ss.BoolArr('affected'),
+            ss.FloatArr('ti_dead'),
+            ss.FloatArr('rel_sus'),
+        )
+
+class ChronicLiverDisease(ss.Disease):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__()
+        self.default_pars(
+            init_prev=ss.bernoulli(0.02),
+            p_death=ss.bernoulli(0.006),         # Placeholder for general mortality rate
+        )
         self.update_pars(pars, **kwargs)
 
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
+            ss.FloatArr('ti_dead'),
+            ss.FloatArr('rel_sus'),
+        )
+
+class ChronicLowerRespiratoryDisease(ss.Disease):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__()
+        self.default_pars(
+            init_prev=ss.bernoulli(0.03),
+            p_death=ss.bernoulli(0.0106225),       # (Validated)
+        )
+        self.update_pars(pars, **kwargs)
+
+        self.add_states(
+            ss.BoolArr('susceptible'),
+            ss.BoolArr('affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
 
 class ChronicKidneyDisease(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(init_prev=ss.bernoulli(0.03))
+        self.default_pars(
+            init_prev=ss.bernoulli(0.03),
+            p_death=ss.bernoulli(0.007),         # General mortality placeholder
+        )
         self.update_pars(pars, **kwargs)
 
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
+            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus'),
         )
