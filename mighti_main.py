@@ -60,6 +60,17 @@ for disease in ncds:
     interaction_obj = interaction_functions[disease]()  # Call the corresponding function
     interactions.append(interaction_obj)
 
+
+# Define interventions with costs, coverage, and target populations
+interventions = {
+    "HIV Treatment": {"cost": 500, "coverage": 0.8, "target": "hiv_infected"},
+    "Diabetes Management": {"cost": 200, "coverage": 0.6, "target": "type2diabetes_affected"}
+}
+
+# Add the cost analyzer
+cost_analyzer = mi.CostAnalyzer(interventions=interventions)
+
+
 # Initialize the simulation
 sim = ss.Sim(
     n_agents=n_agents,
@@ -227,7 +238,18 @@ except KeyError as e:
 
 
 
+# Define utilities (example QALY/DALY weights)
+utilities = {
+    "HIV": {"qaly": 0.8},
+    "Type2Diabetes": {"qaly": 0.7},
+}
 
+# Run post-simulation analysis
+cea = mi.CostEffectivenessAnalyzer(interventions=interventions, utilities=utilities)
+cea.calculate_costs(sim)
+cea.calculate_outcomes(sim)
+cea.calculate_icer(baseline_cost=1000, baseline_qaly=50)  # Example baseline
+cea.summarize_results()
 
 # # Plots without dots for data
 # try:
