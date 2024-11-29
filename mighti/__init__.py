@@ -7,6 +7,8 @@ from .interactions import *
 # from .ncd_interactions import *  
 from .disease_definitions import *  
 from .prevalence_analyzer import *  
+from .cost_analyzer import *
+from .cost_effectiveness import *
 
 
 # Set the root directory for the codebase
