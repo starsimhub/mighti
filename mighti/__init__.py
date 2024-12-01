@@ -9,6 +9,7 @@ from .disease_definitions import *
 from .prevalence_analyzer import *  
 from .cost_analyzer import *
 from .cost_effectiveness import *
+from .visualization import *
 
 
 # Set the root directory for the codebase

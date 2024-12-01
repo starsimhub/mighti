@@ -1,94 +1,97 @@
 import numpy as np
 
 class CostEffectivenessAnalyzer:
-    def __init__(self, interventions, utilities):
+    def __init__(self, interventions, qols):
         """
         Initialize the cost-effectiveness analyzer.
-        :param interventions: Dict containing cost and coverage for each intervention.
-        :param utilities: Dict containing utility weights (e.g., QALY, DALY).
+        :param interventions: Dict containing cost, coverage, and QOL improvement for each intervention.
+        :param qols: Dict containing baseline QOL for each disease.
         """
         self.interventions = interventions
-        self.utilities = utilities
+        self.qols = qols
         self.results = {
-            "total_costs": {},
-            "health_outcomes": {},
-            "icer": {}
+            "costs": {"total_costs": 0},
+            "utilities": {"total_qalys": 0},
+            "icer": {},
+            "increments": {}
         }
 
-    def calculate_costs(self, sim):
+    def calculate_costs_and_utilities(self, sim):
         """
-        Calculate total intervention costs during the simulation.
-        :param sim: The simulation object containing time-series data.
+        Calculate total costs and utilities for each intervention.
+        :param sim: The simulation object containing disease and intervention data.
         """
-        total_cost = 0
-        for intervention, data in self.interventions.items():
-            coverage = data['coverage']  # Proportion of population covered
-            unit_cost = data['cost']  # Cost per person
-            target_condition = data['target']  # E.g., 'hiv_infected' or 'type2diabetes_affected'
-    
-            # Split the target into condition and state (e.g., 'hiv_infected' -> 'hiv', 'infected')
-            condition, state = target_condition.split('_')
-            
-            # Access the disease object and the corresponding state
-            if hasattr(sim.diseases, condition):
-                disease_obj = getattr(sim.diseases, condition)
-                if hasattr(disease_obj, state):
-                    state_uids = getattr(disease_obj, state).uids  # Get UIDs of the target state
-                    step_cost = len(state_uids) * unit_cost * coverage
-                    total_cost += step_cost
-                else:
-                    raise AttributeError(f"State '{state}' not found for disease '{condition}'.")
-            else:
-                raise AttributeError(f"Disease '{condition}' not found in the simulation.")
-            
-        self.results["total_costs"] = total_cost
-        return total_cost
-
-    def calculate_outcomes(self, sim):
-        """
-        Calculate the health outcomes (e.g., QALYs) for each condition.
-        :param sim: The simulation object containing time-series data.
-        """
+        total_costs = 0
         total_qalys = 0
-        health_outcomes = {}  # Dictionary to store QALYs for each condition
-        
-        for condition, utility_data in self.utilities.items():
-            # Dynamically determine whether to use 'infected' or 'affected'
-            disease_obj = getattr(sim.diseases, condition.lower())
-            if hasattr(disease_obj, 'affected'):
-                state_array = disease_obj.affected  # For NCDs
-            elif hasattr(disease_obj, 'infected'):
-                state_array = disease_obj.infected  # For infectious diseases
-            else:
-                raise AttributeError(f"Neither 'affected' nor 'infected' found for disease '{condition}'.")
-            
-            # Calculate prevalence and QALYs
-            prevalence = state_array.sum() / len(sim.people)
-            qaly = utility_data['qaly'] * prevalence
-            
-            total_qalys += qaly
-            health_outcomes[condition] = qaly  # Store QALY for each condition
-        
-        # Save results
-        self.results["health_outcomes"] = {"total_qalys": total_qalys, **health_outcomes}
-        return total_qalys
+        costs = {}
+        utilities = {}
 
-    def calculate_icer(self, baseline_cost, baseline_qaly):
+        for disease, data in self.interventions.items():
+            # Extract intervention parameters
+            cost_per_person = data["cost"]
+            coverage = data["coverage"]
+            qaly_improvement = data["qaly_improvement"]  # QALY improvement due to the intervention
+            baseline_qol = self.qols[disease]  # Baseline QOL for the condition
+
+            # Access the disease object
+            disease_obj = getattr(sim.diseases, disease.lower())
+            if hasattr(disease_obj, "affected"):
+                state_array = disease_obj.affected
+            elif hasattr(disease_obj, "infected"):
+                state_array = disease_obj.infected
+            else:
+                raise AttributeError(f"No valid state found for disease: {disease}")
+
+            # Calculate prevalence, costs, and QALYs
+            prevalence = state_array.sum() / len(sim.people)  # Proportion of population affected
+            num_affected = len(state_array.uids)  # Total number of affected individuals
+
+            # Calculate intervention cost and QALY gain
+            intervention_cost = cost_per_person * coverage * num_affected
+            qaly_gain = prevalence * (baseline_qol + qaly_improvement)  # Adjusted QALYs due to intervention
+
+            # Store individual intervention results
+            costs[disease] = intervention_cost
+            utilities[disease] = qaly_gain
+
+            # Update totals
+            total_costs += intervention_cost
+            total_qalys += qaly_gain
+
+        # Save results
+        self.results["costs"] = {"total_costs": total_costs, **costs}
+        self.results["utilities"] = {"total_qalys": total_qalys, **utilities}
+        return total_costs, total_qalys
+
+    def calculate_increments(self, baseline_results):
         """
-        Calculate Incremental Cost-Effectiveness Ratio (ICER).
-        :param baseline_cost: Cost of baseline intervention.
-        :param baseline_qaly: QALY of baseline intervention.
+        Calculate incremental costs and QALYs relative to the baseline results.
+        :param baseline_results: Dictionary of results from the baseline scenario.
         """
-        incremental_cost = self.results["total_costs"] - baseline_cost
-        incremental_qaly = self.results["health_outcomes"]["total_qalys"] - baseline_qaly
+        baseline_cost = baseline_results["costs"]["total_costs"]
+        baseline_qaly = baseline_results["utilities"]["total_qalys"]
+
+        scenario_cost = self.results["costs"]["total_costs"]
+        scenario_qaly = self.results["utilities"]["total_qalys"]
+
+        # Calculate increments
+        incremental_cost = scenario_cost - baseline_cost
+        incremental_qaly = scenario_qaly - baseline_qaly
+
+        # Store increments and ICER
+        self.results["increments"] = {
+            "incremental_cost": incremental_cost,
+            "incremental_qaly": incremental_qaly,
+        }
         self.results["icer"] = incremental_cost / incremental_qaly if incremental_qaly != 0 else np.inf
-        return self.results["icer"]
+        return self.results["increments"]
 
     def summarize_results(self):
         """
         Summarize and print the results for cost-effectiveness analysis.
         """
-        print("Total Costs:", self.results["total_costs"])
-        print("Health Outcomes (QALY/DALY):", self.results["health_outcomes"])
+        print("Costs:", self.results["costs"])
+        print("Utilities (QALYs):", self.results["utilities"])
         print("ICER:", self.results["icer"])
+        print("Increments:", self.results["increments"])
         return self.results
