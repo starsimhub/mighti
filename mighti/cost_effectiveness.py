@@ -43,12 +43,11 @@ class CostEffectivenessAnalyzer:
                 raise AttributeError(f"No valid state found for disease: {disease}")
 
             # Calculate prevalence, costs, and QALYs
-            prevalence = state_array.sum() / len(sim.people)  # Proportion of population affected
-            num_affected = len(state_array.uids)  # Total number of affected individuals
-
-            # Calculate intervention cost and QALY gain
+            num_affected = state_array.sum()  # Total number of affected individuals
             intervention_cost = cost_per_person * coverage * num_affected
-            qaly_gain = prevalence * (baseline_qol + qaly_improvement)  # Adjusted QALYs due to intervention
+            qaly_gain = num_affected * (baseline_qol + qaly_improvement)  # Adjusted QALYs due to intervention
+            qaly_gain = num_affected *  qaly_improvement  # Adjusted QALYs due to intervention
+        
 
             # Store individual intervention results
             costs[disease] = intervention_cost
