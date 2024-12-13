@@ -140,7 +140,7 @@ def plot_icer_scatter(scenario_results, baseline_results):
         incremental_qaly = scenario_qaly - baseline_qaly
 
         # Calculate ICER
-        icer = incremental_cost / incremental_qaly if incremental_qaly > 0 else np.inf
+        icer = incremental_cost / incremental_qaly
         icers.append(icer)
         costs.append(scenario_cost)
         qalys.append(scenario_qaly)
