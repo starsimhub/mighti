@@ -25,15 +25,11 @@ class Type1Diabetes(ss.NCD):
 
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(
-            dur_condition=ss.lognorm_ex(1),  # Shorter duration before serious complications
-            incidence=ss.bernoulli(0.000015),      # Lower incidence of Type 1 diabetes
-            p_death=ss.bernoulli(0.0033),        # Higher mortality rate from Type 1
-            init_prev=ss.bernoulli(0.01),      # Initial prevalence of Type 1 diabetes
-        )
         self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
+        params = mi.load_disease_parameters('Type1Diabetes', 'path/to/disease_parameters.csv')
+        self.default_pars(**params)
         self.update_pars(pars, **kwargs)
-
+        
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),

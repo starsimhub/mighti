@@ -1,5 +1,32 @@
 import numpy as np
 import pandas as pd
+import starsim as ss
+
+# Function to load condition parameters from a CSV file
+def load_disease_parameters(disease_name, csv_file_path):
+    """
+    Load disease-specific parameters from a CSV file.
+
+    Args:
+        disease_name (str): The name of the disease (case-insensitive).
+        csv_file_path (str): Path to the CSV file containing disease parameters.
+
+    Returns:
+        dict: A dictionary containing the disease parameters.
+    """
+    df = pd.read_csv(csv_file_path)
+    row = df[df['condition'].str.lower() == disease_name.lower()]
+    if row.empty:
+        raise ValueError(f"No parameters found for disease: {disease_name}")
+
+    # Extract parameters and convert to appropriate types
+    disease_params = {
+        'dur_condition': eval(f"ss.{row.iloc[0]['dur_condition']}"),
+        'incidence': ss.bernoulli(float(row.iloc[0]['incidence'])),
+        'p_death': ss.bernoulli(float(row.iloc[0]['p_death'])),
+        'init_prev': ss.bernoulli(float(row.iloc[0]['init_prev']))
+    }
+    return disease_params
 
 # Function to initialize prevalence data and age bins
 def initialize_prevalence_data(diseases, csv_file_path, inityear):
