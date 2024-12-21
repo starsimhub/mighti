@@ -55,7 +55,7 @@ class Type1Diabetes(ss.NCD):
         deaths = (self.ti_dead == self.ti).uids
         self.sim.people.request_death(deaths)
         self.results.new_deaths[self.ti] = len(deaths)
-        self.log.add_data(deaths, died=True)
+        # self.log.add_data(deaths, died=True)
         return
 
     def step(self):
@@ -136,7 +136,7 @@ class Type2Diabetes(ss.NCD):
         deaths = (self.ti_dead == self.ti).uids
         self.sim.people.request_death(deaths)
         self.results.new_deaths[self.ti] = len(deaths)
-        self.log.add_data(deaths, died=True)
+        # self.log.add_data(deaths, died=True)
 
     def step(self):
         new_cases = self.pars.incidence.filter(self.susceptible.uids)
@@ -300,7 +300,7 @@ class Hypertension(ss.NCD):
         deaths = (self.ti_dead == self.ti).uids
         self.sim.people.request_death(deaths)
         self.results.new_deaths[self.ti] = len(deaths)
-        self.log.add_data(deaths, died=True)
+        # self.log.add_data(deaths, died=True)
         return
 
     def step(self):

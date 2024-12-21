@@ -103,7 +103,7 @@ class PrevalenceAnalyzer(ss.Analyzer):
             # Set 'infected' for HIV, HPV, and Flu; 'affected' for all other diseases
             status_attr = 'infected' if disease in ['HIV', 'HPV', 'Flu'] else 'affected'
             
-            status_array = getattr(disease_obj, status_attr).raw  # Use .raw to extract the underlying data
+            status_array = getattr(disease_obj, status_attr)
     
             for sex, label in zip([0, 1], ['male', 'female']):
                 prevalence_by_age_group = np.zeros(len(self.age_groups[disease]))
@@ -112,7 +112,7 @@ class PrevalenceAnalyzer(ss.Analyzer):
                     age_mask = (ages >= start) if end == float('inf') else (ages >= start) & (ages < end)
                     
                     # Filter out relevant status values using the mask
-                    status_for_age_group = status_array[alive_uids][age_mask]
+                    status_for_age_group = status_array[:][age_mask]
                     if status_for_age_group.size > 0:
                         prevalence_by_age_group[i] = np.mean(status_for_age_group)
     
