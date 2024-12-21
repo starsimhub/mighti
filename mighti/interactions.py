@@ -21,10 +21,11 @@ __all__ = [
 class HIVConnector(ss.Connector):
     """ Base class for connectors that increase susceptibility due to HIV """
     def __init__(self, label, requires, susceptibility_key, default_susceptibility, pars=None, **kwargs):
-        super().__init__(name=label, requires=requires)
+        super().__init__(label=label)
         self.define_pars(**{susceptibility_key: default_susceptibility})
         self.update_pars(pars, **kwargs)
         self.susceptibility_key = susceptibility_key
+        self.requires = requires
 
     def step(self):
         sim = self.sim

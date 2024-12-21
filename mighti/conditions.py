@@ -76,14 +76,6 @@ class Type1Diabetes(ss.NCD):
         self.ti_recovered[rec_uids] = self.ti + dur_condition[~will_die] / self.t.dt
         return
 
-    def init_results(self):
-        super().init_results()
-        self.define_results(
-            ss.Result('prevalence', dtype=float),
-            ss.Result('new_deaths', dtype=int),
-        )
-        return
-
     def update_results(self):
         super().update_results()
         self.results.prevalence[self.ti] = np.count_nonzero(self.affected) / len(self.sim.people)
@@ -213,8 +205,6 @@ class Type2Diabetes(ss.NCD):
     def init_results(self):
         super().init_results()
         self.define_results(
-            ss.Result('prevalence', dtype=float),
-            ss.Result('new_deaths', dtype=int),
             ss.Result('reversal_prevalence', dtype=float),
         )
         return
@@ -268,14 +258,6 @@ class Obesity(ss.NCD):
         self.affected[uids] = True
         dur_condition = self.pars.dur_condition.rvs(uids)
         self.ti_recovered[uids] = self.ti + dur_condition / self.t.dt
-        return
-
-    def init_results(self):
-        super().init_results()
-        self.define_results(
-            ss.Result('prevalence', dtype=float),
-            ss.Result('new_deaths', dtype=int),
-        )
         return
 
     def update_results(self):
@@ -337,14 +319,6 @@ class Hypertension(ss.NCD):
         rec_uids = uids[~will_die]
         self.ti_dead[dead_uids] = self.ti + dur_condition[will_die] / self.t.dt
         self.ti_recovered[rec_uids] = self.ti + dur_condition[~will_die] / self.t.dt
-        return
-
-    def init_results(self):
-        super().init_results()
-        self.define_results(
-            ss.Result('prevalence', dtype=float),
-            ss.Result('new_deaths', dtype=int),
-        )
         return
 
     def update_results(self):
