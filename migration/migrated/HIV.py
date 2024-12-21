@@ -45,17 +45,17 @@ class HIV(ss.Disease):
         age_bins = list(age_data.keys())
         ages = sim.people.age[size]  # Initial ages of agents
         prevalence = np.zeros(len(ages))
-    
+
         print(f"Ages for agents (first 20): {ages[:20]}")  # Debug print
-    
+
         for i in range(n_age_bins):
             left = age_bins[i]
             right = age_bins[i + 1]
             value = age_data[left]
             prevalence[(ages >= left) & (ages < right)] = value
-    
+
         print(f"Prevalence initialized (first 20): {prevalence[:20]}")  # Debug print
-    
+
         return prevalence
 
     def init_post(self):

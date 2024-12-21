@@ -6,7 +6,9 @@ class CostAnalyzer(ss.Analyzer):
     def __init__(self, interventions=None):
         """
         Initialize the cost analyzer.
-        :param interventions: Dict of interventions with cost and target populations.
+        
+        Args:
+            interventions (dict): Dictionary of interventions with cost and target populations.
         """
         super().__init__()
         self.interventions = interventions if interventions else {}
