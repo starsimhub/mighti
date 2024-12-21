@@ -19,9 +19,9 @@ CLASSIFIERS = [
     "Programming Language :: Python",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Development Status :: 5 - Production/Stable",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 
 setup(
@@ -37,7 +37,7 @@ setup(
     include_package_data=True,
     install_requires=[
         'numpy',
-        'starsim',
+        'starsim>=2.0',
         'scipy',
         'pandas>=2.0.0',
         'sciris>=3.0.0',
