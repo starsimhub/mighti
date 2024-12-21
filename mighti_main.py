@@ -3,13 +3,20 @@ import mighti as mi
 import pylab as pl
 import pandas as pd
 import sciris as sc
+import numpy as np
 
 
 # Define diseases
-ncds = ['Type2Diabetes', 'Obesity']  # List of NCDs being modeled
+ncds = ['Type1Diabetes', 'Type2Diabetes', 'Obesity', 'Hypertension',
+    'Depression','Accident', 'Alzheimers', 'Assault', 'CerebrovascularDisease', 
+    'ChronicLiverDisease','ChronicLowerRespiratoryDisease', 'HeartDisease', 
+    'ChronicKidneyDisease','Flu','HPV',
+    'CervicalCancer','ColorectalCancer', 'BreastCancer', 'LungCancer', 'ProstateCancer', 'OtherCancer', 
+    'Parkinsons','Smoking', 'Alcohol', 'BRCA', 'ViralHepatitis', 'Poverty']
+
 diseases = ['HIV'] + ncds  # List of diseases including HIV
 beta = 0.001  # Transmission probability for HIV
-n_agents = 5000  # Number of agents in the simulation
+n_agents = 50000  # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 
 # Initialize prevalence data from a CSV file
@@ -20,7 +27,7 @@ fertility_rates = {'fertility_rate': pd.read_csv(sc.thispath() / 'tests/test_dat
 pregnancy = ss.Pregnancy(pars=fertility_rates)
 death_rates = {'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_deaths.csv'), 'units': 1}
 death = ss.Deaths(death_rates)
-ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age.csv'))
+ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age_2007.csv'))
 
 # Create the networks - sexual and maternal
 mf = ss.MFNet(duration=1/24, acts=80)
@@ -35,30 +42,59 @@ def get_prevalence_function(disease):
 disease_objects = []
 for disease in ncds:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
-    if disease == 'Type2Diabetes':
-        disease_obj = mi.Type2Diabetes(init_prev=init_prev)
-    elif disease == 'Obesity':
-        disease_obj = mi.Obesity(init_prev=init_prev)
+    # Dynamically create the disease object using getattr
+    disease_class = getattr(mi, disease)  # Access the disease class dynamically
+    disease_obj = disease_class(init_prev=init_prev)  # Instantiate the class
     disease_objects.append(disease_obj)
+
 
 # HIV-specific setup
 hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 disease_objects.append(hiv_disease)
 
+# Validate prevalence data for each disease
+def validate_prevalence_data(prevalence_data, diseases):
+    for disease in diseases:
+        if disease not in prevalence_data:
+            raise ValueError(f"Prevalence data missing for disease: {disease}")
+        if 'male' not in prevalence_data[disease] or 'female' not in prevalence_data[disease]:
+            raise ValueError(f"Male/Female data missing for disease: {disease}")
+        if not prevalence_data[disease]['male'] or not prevalence_data[disease]['female']:
+            raise ValueError(f"Age bins missing for disease: {disease}")
+        print(f"Prevalence data validated for disease: {disease}")
+
+# Validate the prevalence data
+validate_prevalence_data(prevalence_data, diseases)
+
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 
 # Load existing HIV and NCD interactions
-interaction_functions = {
-    'Type2Diabetes': mi.hiv_type2diabetes,
-    'Obesity': mi.hiv_obesity,
-}
+# Automatically create interaction functions for each NCD dynamically
+interaction_functions = {}
+
+for disease in ncds:
+    interaction_func_name = f'hiv_{disease.lower()}'  # Assuming function names follow the 'hiv_<disease>' pattern
+    if hasattr(mi, interaction_func_name):  # Check if the function exists in mighti
+        interaction_func = getattr(mi, interaction_func_name)  # Dynamically get the interaction function
+        interaction_functions[disease] = interaction_func
 
 # Initialize interaction objects for HIV-NCD interactions
 interactions = []
 for disease in ncds:
     interaction_obj = interaction_functions[disease]()  # Call the corresponding function
     interactions.append(interaction_obj)
+
+# NCD-NCD interactions from the interaction matrix
+interaction_matrix = mi.read_interactions()
+ncd_connectors = []
+for condition1, interactions_dict in interaction_matrix.items():
+    for condition2, rel_risk in interactions_dict.items():
+        name = f'{condition1}_{condition2}'
+        ncd_connectors.append(mi.GenericNCDConnector(condition1, condition2, relative_risk=rel_risk, name=name))
+
+# Combine both HIV-NCD and NCD-NCD interaction objects
+all_connectors = interactions + ncd_connectors  # Now both are lists
 
 # Initialize the simulation
 sim = ss.Sim(
@@ -67,8 +103,8 @@ sim = ss.Sim(
     diseases=disease_objects,  # Pass the full list of diseases (HIV + NCDs)
     analyzers=[prevalence_analyzer],
     start=inityear,
-    end=2020,
-    connectors=interactions,  # Both HIV-NCD and NCD-NCD interactions
+    end=2024,
+    connectors=all_connectors,  
     people=ppl,
     demographics=[pregnancy, death],
     copy_inputs=False
@@ -78,48 +114,26 @@ sim = ss.Sim(
 # Run the simulation
 sim.run()
 
+df = pd.read_csv('mighti/data/prevalence_data_eswatini.csv')
+
 eswatini_hiv_data_2007 = {
-    'male': {
-        0:0, 15: 0.018569463, 20: 0.123878438, 25: 0.277081792, 30: 0.437388675, 35: 0.446666475, 40: 0.408951061, 45: 0.279480401,
-        50: 0.274580983, 55: 0.203923873484658, 60: 0.170053298709714, 65: 0.159627035, 70: 0.102792944, 75: 0.089528285, 80: 0.054545808
-    },
-    'female': {
-        0:0, 15: 0.100228343, 20: 0.383694318, 25: 0.491161255, 30: 0.4503177, 35: 0.375698852, 40: 0.276657489, 45: 0.215261524,
-        50: 0.186609436, 55: 0.145316219, 60: 0.089981987, 65: 0.088771152, 70: 0.071297853, 75: 0.052671538, 80: 0.020405424
-    }
+    'male': dict(zip(df[df['Year'] == 2007]['Age'], df[df['Year'] == 2007]['HIV_male'])),
+    'female': dict(zip(df[df['Year'] == 2007]['Age'], df[df['Year'] == 2007]['HIV_female']))
 }
 
 eswatini_hiv_data_2011 = {
-    'male': {
-        0:0, 15: 0.008153899, 20: 0.066462848, 25: 0.212564961, 30: 0.365625757, 35: 0.469877829, 40: 0.454610745, 45: 0.424535086,
-        50: 0.417092794, 55: 0.309763542, 60: 0.258313612, 65: 0.242475955, 70: 0.156144084, 75 : 0.135994861, 80: 0.082855933
-    },
-    'female': {
-        0:0, 15: 0.143296247, 20: 0.314870622, 25: 0.467469388, 30: 0.537866378, 35: 0.491198813, 40: 0.397114544, 45: 0.316176211,
-        50: 0.274092013, 55: 0.21344052, 60: 0.132165578, 65: 0.130387103, 70: 0.104722314, 75: 0.077363976, 80: 0.029971495
-    }
+    'male': dict(zip(df[df['Year'] == 2011]['Age'], df[df['Year'] == 2011]['HIV_male'])),
+    'female': dict(zip(df[df['Year'] == 2011]['Age'], df[df['Year'] == 2011]['HIV_female']))
 }
 
 eswatini_hiv_data_2017 = {
-    'male': {
-        0:0, 15: 0.039203323, 20: 0.042302217, 25: 0.132586775, 30: 0.281448958, 35: 0.419039192, 40: 0.432948219, 45: 0.487936995, 
-        50: 0.418901763, 55: 0.3178861, 60: 0.319024067, 65: 0.187721072, 70: 0.16612866, 75:0.096966056, 80:0.068853558
-    },
-    'female': {
-        0:0, 15: 0.071699336, 20: 0.208942316, 25: 0.374644094, 30: 0.506826329, 35: 0.542306801, 40: 0.51927347, 45: 0.423031977,
-        50: 0.361306241, 55: 0.295168377, 60: 0.222713574, 65: 0.103696162, 70: 0.089371202, 75: 0.068701597, 80: 0.007520089
-    }
+    'male': dict(zip(df[df['Year'] == 2017]['Age'], df[df['Year'] == 2017]['HIV_male'])),
+    'female': dict(zip(df[df['Year'] == 2017]['Age'], df[df['Year'] == 2017]['HIV_female']))
 }
 
 eswatini_hiv_data_2021 = {
-    'male': {
-        0:0, 15: 0.030000309, 20: 0.038736453, 25: 0.054007305, 30: 0.191607831, 35: 0.269162468, 40: 0.385042512, 45: 0.500416774,
-        50: 0.491644241, 55: 0.365130888, 60: 0.304484761, 65: 0.28581627, 70: 0.184053384, 75: 0.160302675, 80: 0.097665658
-    },
-    'female': {
-        0:0, 15: 0.055804134, 20: 0.171564278, 25: 0.302792519, 30: 0.424996426, 35: 0.524670263, 40: 0.571575379, 45: 0.501290462,
-        50: 0.434566888, 55: 0.338405273, 60: 0.209545631, 65: 0.206725899, 70: 0.166034939, 75: 0.122658891, 80: 0.047519148
-    }
+    'male': dict(zip(df[df['Year'] == 2021]['Age'], df[df['Year'] == 2021]['HIV_male'])),
+    'female': dict(zip(df[df['Year'] == 2021]['Age'], df[df['Year'] == 2021]['HIV_female']))
 }
 
 
@@ -131,19 +145,25 @@ eswatini_hiv_data = {
     '2021': eswatini_hiv_data_2021
 }
 
-diseases = ['HIV', 'Type2Diabetes','Obesity']
+diseases = ['HIV', 'Type2Diabetes']
 
 
 # Retrieve the prevalence data for plotting
 try:
     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
     hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
+    store_m = hiv_prevalence_data_male[0]
+    store_f = hiv_prevalence_data_female[0]
+
+    print(f"Simulated data for 2007 (male): {hiv_prevalence_data_male[0]}")
+    print(f"Simulated data for 2007 (female): {hiv_prevalence_data_female[0]}")
+
     # diabetes1_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
     # diabetes1_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
     diabetes2_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
     diabetes2_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
-    obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
-    obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
+    # obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
+    # obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
     # hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
     # hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
 
@@ -180,25 +200,26 @@ try:
         # Plot male prevalence for the disease
         for i, label in enumerate(age_group_labels):
             axs[disease_idx, 0].plot(sim.yearvec, male_data[:, i], label=label, color=age_bin_colors[label])
-        axs[disease_idx, 0].set_title(f'{disease} (Male)', fontsize=24) 
-        axs[disease_idx, 0].set_xlabel('Year', fontsize=20) 
-        axs[disease_idx, 0].set_ylabel('Prevalence (%)', fontsize=20)  
-        axs[disease_idx, 0].tick_params(axis='both', labelsize=18)  
-        axs[disease_idx, 0].grid(True)
+            axs[disease_idx, 0].set_title(f'{disease} (Male)', fontsize=24) 
+            axs[disease_idx, 0].set_xlabel('Year', fontsize=20) 
+            axs[disease_idx, 0].set_ylabel('Prevalence (%)', fontsize=20)  
+            axs[disease_idx, 0].tick_params(axis='both', labelsize=18)  
+            axs[disease_idx, 0].grid(True)
 
         # Plot female prevalence for the disease
         for i, label in enumerate(age_group_labels):
             axs[disease_idx, 1].plot(sim.yearvec, female_data[:, i], color=age_bin_colors[label])
-        axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24) 
-        axs[disease_idx, 1].set_xlabel('Year', fontsize=20)  
-        axs[disease_idx, 1].tick_params(axis='both', labelsize=18) 
-        axs[disease_idx, 1].grid(True)
+            axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24) 
+            axs[disease_idx, 1].set_xlabel('Year', fontsize=20)  
+            axs[disease_idx, 1].tick_params(axis='both', labelsize=18) 
+            axs[disease_idx, 1].grid(True)
 
         # Add real data points for HIV for the specific years
         if disease == 'HIV':
             for year, real_data in real_data_years.items():
                 real_male_data = real_data['male']
                 real_female_data = real_data['female']
+                
 
                 # Plot real data points for males
                 for age_bin in real_male_data:
@@ -225,7 +246,26 @@ try:
 except KeyError as e:
     print(f"KeyError: {e} - Check if the correct result keys are being used.")
 
+#config file
 
+
+# Real data (converted to array from dictionary)
+real_data_male_2007 = np.array(list(eswatini_hiv_data_2007['male'].values())) * 100
+
+# Get the order (ranking) of elements in ascending order
+store_m_order = np.argsort(store_m)  # Returns indices that would sort store_m
+real_data_order = np.argsort(real_data_male_2007)  # Returns indices that would sort real_data_male_2007
+
+# Print the orders
+print("Order of elements in store_m (ascending):", store_m_order)
+print("Order of elements in real_data_male_2007 (ascending):", real_data_order)
+
+# Optionally, reverse for descending order
+store_m_order_desc = np.argsort(-store_m)
+real_data_order_desc = np.argsort(-real_data_male_2007)
+
+print("Order of elements in store_m (descending):", store_m_order_desc)
+print("Order of elements in real_data_male_2007 (descending):", real_data_order_desc)
 
 
 
