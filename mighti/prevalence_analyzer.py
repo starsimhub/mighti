@@ -24,11 +24,11 @@ class PrevalenceAnalyzer(ss.Analyzer):
             # Create age groups with "inf" for the last bin (80+)
             self.age_groups[disease] = list(zip(self.age_bins[disease][:-1], self.age_bins[disease][1:])) + [(self.age_bins[disease][-1], float('inf'))]
 
-        self.results = sc.odict()
+        self.results = sc.objdict()
 
     def init_pre(self, sim):
         super().init_pre(sim)
-        npts = sim.npts  # Number of time points in the simulation
+        npts = len(sim.t)  # Number of time points in the simulation
 
         # Initialize result arrays for each disease: time x age groups
         for disease in self.diseases:
@@ -83,14 +83,14 @@ class PrevalenceAnalyzer(ss.Analyzer):
     #             self.results[disease_key][sim.ti, :] = prevalence_by_age_group   
                 
         
-    def apply(self, sim):
+    def step(self):
+        sim = self.sim  # Access the sim object from the Analyzer base class
         # Print the age of a specific agent for debugging
         # print(f'Age of agent 100: {sim.people.age[100]}, alive={sim.people.alive[100]}')
     
         # Extract ages of agents alive at this time step
-        alive_uids = np.where(sim.people.alive.raw)[0]
-        ages = sim.people.age.raw[alive_uids]
-    
+        ages = sim.people.age[:]
+
         # Store single-age population distribution at each time step
         age_distribution = np.histogram(ages, bins=np.arange(0, 102, 1))  # Single-year resolution from 0 to 101
         self.results['population_age_distribution'][sim.ti, :] = age_distribution[0]
