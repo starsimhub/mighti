@@ -18,9 +18,9 @@ prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, csv_file_pat
 # Create demographics
 fertility_rates = {'fertility_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_asfr.csv')}
 pregnancy = ss.Pregnancy(pars=fertility_rates)
-death_rates = {'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_deaths.csv'), 'units': 1}
+death_rates = {'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_deaths.csv'), 'rate_units': 1}
 death = ss.Deaths(death_rates)
-ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age.csv'))
+ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age_2007.csv'))
 
 # Create the networks - sexual and maternal
 mf = ss.MFNet(duration=1/24, acts=80)
@@ -60,6 +60,18 @@ for disease in ncds:
     interaction_obj = interaction_functions[disease]()  # Call the corresponding function
     interactions.append(interaction_obj)
 
+
+# Define interventions with costs, coverage, and target populations
+interventions = {
+    "HIV": {"cost": 500, "coverage": 0.8, "target": "hiv"},
+    "Type2Diabetes": {"cost": 200, "coverage": 1, "target": "type2diabetes"},
+    "Obesity": {"cost": 200, "coverage": 1, "target": "obesity"}
+}
+
+# Add the cost analyzer
+cost_analyzer = mi.CostAnalyzer(interventions=interventions)
+
+
 # Initialize the simulation
 sim = ss.Sim(
     n_agents=n_agents,
@@ -67,7 +79,7 @@ sim = ss.Sim(
     diseases=disease_objects,  # Pass the full list of diseases (HIV + NCDs)
     analyzers=[prevalence_analyzer],
     start=inityear,
-    end=2020,
+    stop=2020,
     connectors=interactions,  # Both HIV-NCD and NCD-NCD interactions
     people=ppl,
     demographics=[pregnancy, death],
@@ -131,101 +143,146 @@ eswatini_hiv_data = {
     '2021': eswatini_hiv_data_2021
 }
 
-diseases = ['HIV', 'Type2Diabetes','Obesity']
+diseases = ['hiv', 'type2diabetes', 'obesity']
+
+# Define baseline QOL for each disease
+qols = {
+    "hiv": 0.7,
+    "type2diabetes": 0.6,
+    "obesity": 0.8
+}
+
+# Define interventions (with QOL improvement)
+interventions = {
+    "hiv": {"cost": 500, "coverage": 0.8, "qaly_improvement": 0.1},
+    "type2diabetes": {"cost": 200, "coverage": 0.6, "qaly_improvement": 0.15},
+    "obesity": {"cost": 300, "coverage": 0.7, "qaly_improvement": 0.05}
+}
+
+# Initialize the CostEffectivenessAnalyzer for baseline scenario
+baseline_cea = mi.CostEffectivenessAnalyzer(interventions=interventions, qols=qols)
+
+# Calculate costs and utilities for the baseline scenario
+baseline_cea.calculate_costs_and_utilities(sim)
+
+# Summarize baseline results
+baseline_results = baseline_cea.summarize_results()
+
+# Initialize a dictionary to store scenario results
+scenario_results = {}
+
+# Run a cost-effectiveness analysis for each disease-specific intervention
+for disease in diseases:
+    if disease in interventions:  # Ensure the disease has a corresponding intervention
+        interventions_scenario = {disease: interventions[disease]}  # Use only the specific intervention
+        
+        # Initialize a CEA for the scenario
+        cea_scenario = mi.CostEffectivenessAnalyzer(interventions=interventions_scenario, qols=qols)
+        
+        # Perform the cost and utility calculations
+        cea_scenario.calculate_costs_and_utilities(sim)
+        cea_scenario.calculate_increments(baseline_results)
+        
+        # Store results for this scenario
+        scenario_results[disease] = cea_scenario.results
+    else:
+        print(f"No matching intervention found for disease: {disease}")
+
+# Plot the ICER scatter plot for all scenarios compared to the baseline
+mi.plot_icer_scatter(scenario_results, baseline_results)
 
 
-# Retrieve the prevalence data for plotting
-try:
-    hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
-    hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
-    # diabetes1_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
-    # diabetes1_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
-    diabetes2_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
-    diabetes2_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
-    obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
-    obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
-    # hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
-    # hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
 
-    # Ensure age_bins is a list (fix for the previous error)
-    age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
-    age_bins_list = list(age_bins)  # Convert to a list if it's not already
+# # Retrieve the prevalence data for plotting
+# try:
+#     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
+#     hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
+#     # diabetes1_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
+#     # diabetes1_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
+#     diabetes2_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
+#     diabetes2_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
+#     obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
+#     obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
+#     # hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
+#     # hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
+
+#     # Ensure age_bins is a list (fix for the previous error)
+#     age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
+#     age_bins_list = list(age_bins)  # Convert to a list if it's not already
     
-    # Create subplots for each disease, dynamically based on the number of diseases
-    n_diseases = len(diseases)
-    fig, axs = pl.subplots(n_diseases, 2, figsize=(18, n_diseases * 6), sharey='row')
+#     # Create subplots for each disease, dynamically based on the number of diseases
+#     n_diseases = len(diseases)
+#     fig, axs = pl.subplots(n_diseases, 2, figsize=(18, n_diseases * 6), sharey='row')
 
-    # Create age group labels and color map for age bins (generalized)
-    age_group_labels = [f'{left}-{right-1}' for left, right in zip(age_bins_list[:-1], age_bins_list[1:])]  
-    if age_bins_list[-1] == 80:
-        age_group_labels.append('80+')
+#     # Create age group labels and color map for age bins (generalized)
+#     age_group_labels = [f'{left}-{right-1}' for left, right in zip(age_bins_list[:-1], age_bins_list[1:])]  
+#     if age_bins_list[-1] == 80:
+#         age_group_labels.append('80+')
     
-    cmap = pl.get_cmap('tab20', len(age_group_labels))  # Color map for distinct age groups
-    age_bin_colors = {label: cmap(i) for i, label in enumerate(age_group_labels)}
+#     cmap = pl.get_cmap('tab20', len(age_group_labels))  # Color map for distinct age groups
+#     age_bin_colors = {label: cmap(i) for i, label in enumerate(age_group_labels)}
 
-    # Real data points for the years
-    real_data_years = {
-        2007: eswatini_hiv_data_2007,
-        2011: eswatini_hiv_data_2011,
-        2017: eswatini_hiv_data_2017,
-        2021: eswatini_hiv_data_2021,
-    }
+#     # Real data points for the years
+#     real_data_years = {
+#         2007: eswatini_hiv_data_2007,
+#         2011: eswatini_hiv_data_2011,
+#         2017: eswatini_hiv_data_2017,
+#         2021: eswatini_hiv_data_2021,
+#     }
 
-    # Loop through each disease and plot its prevalence for males and females
-    for disease_idx, disease in enumerate(diseases):
-        # Access the male and female prevalence data for each disease
-        male_data = prevalence_analyzer.results[f'{disease}_prevalence_male'] * 100
-        female_data = prevalence_analyzer.results[f'{disease}_prevalence_female'] * 100
+#     # Loop through each disease and plot its prevalence for males and females
+#     for disease_idx, disease in enumerate(diseases):
+#         # Access the male and female prevalence data for each disease
+#         male_data = prevalence_analyzer.results[f'{disease}_prevalence_male'] * 100
+#         female_data = prevalence_analyzer.results[f'{disease}_prevalence_female'] * 100
 
-        # Plot male prevalence for the disease
-        for i, label in enumerate(age_group_labels):
-            axs[disease_idx, 0].plot(sim.yearvec, male_data[:, i], label=label, color=age_bin_colors[label])
-        axs[disease_idx, 0].set_title(f'{disease} (Male)', fontsize=24) 
-        axs[disease_idx, 0].set_xlabel('Year', fontsize=20) 
-        axs[disease_idx, 0].set_ylabel('Prevalence (%)', fontsize=20)  
-        axs[disease_idx, 0].tick_params(axis='both', labelsize=18)  
-        axs[disease_idx, 0].grid(True)
+#         # Plot male prevalence for the disease
+#         for i, label in enumerate(age_group_labels):
+#             axs[disease_idx, 0].plot(sim.yearvec, male_data[:, i], label=label, color=age_bin_colors[label])
+#         axs[disease_idx, 0].set_title(f'{disease} (Male)', fontsize=24) 
+#         axs[disease_idx, 0].set_xlabel('Year', fontsize=20) 
+#         axs[disease_idx, 0].set_ylabel('Prevalence (%)', fontsize=20)  
+#         axs[disease_idx, 0].tick_params(axis='both', labelsize=18)  
+#         axs[disease_idx, 0].grid(True)
 
-        # Plot female prevalence for the disease
-        for i, label in enumerate(age_group_labels):
-            axs[disease_idx, 1].plot(sim.yearvec, female_data[:, i], color=age_bin_colors[label])
-        axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24) 
-        axs[disease_idx, 1].set_xlabel('Year', fontsize=20)  
-        axs[disease_idx, 1].tick_params(axis='both', labelsize=18) 
-        axs[disease_idx, 1].grid(True)
+#         # Plot female prevalence for the disease
+#         for i, label in enumerate(age_group_labels):
+#             axs[disease_idx, 1].plot(sim.yearvec, female_data[:, i], color=age_bin_colors[label])
+#         axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24) 
+#         axs[disease_idx, 1].set_xlabel('Year', fontsize=20)  
+#         axs[disease_idx, 1].tick_params(axis='both', labelsize=18) 
+#         axs[disease_idx, 1].grid(True)
 
-        # Add real data points for HIV for the specific years
-        if disease == 'HIV':
-            for year, real_data in real_data_years.items():
-                real_male_data = real_data['male']
-                real_female_data = real_data['female']
+#         # Add real data points for HIV for the specific years
+#         if disease == 'HIV':
+#             for year, real_data in real_data_years.items():
+#                 real_male_data = real_data['male']
+#                 real_female_data = real_data['female']
 
-                # Plot real data points for males
-                for age_bin in real_male_data:
-                    age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
-                    if age_label in age_bin_colors:  # Check if the age label exists
-                        axs[disease_idx, 0].scatter(year, real_male_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, zorder=5)
+#                 # Plot real data points for males
+#                 for age_bin in real_male_data:
+#                     age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
+#                     if age_label in age_bin_colors:  # Check if the age label exists
+#                         axs[disease_idx, 0].scatter(year, real_male_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, zorder=5)
 
-                # Plot real data points for females
-                for age_bin in real_female_data:
-                    age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
-                    if age_label in age_bin_colors:  # Check if the age label exists
-                        axs[disease_idx, 1].scatter(year, real_female_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, zorder=5)
+#                 # Plot real data points for females
+#                 for age_bin in real_female_data:
+#                     age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
+#                     if age_label in age_bin_colors:  # Check if the age label exists
+#                         axs[disease_idx, 1].scatter(year, real_female_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, zorder=5)
 
-    # Add a single common legend with two rows
-    handles, labels = axs[0, 0].get_legend_handles_labels()  # Get labels from one axis
+#     # Add a single common legend with two rows
+#     handles, labels = axs[0, 0].get_legend_handles_labels()  # Get labels from one axis
     
-    # Adjust ncol to ensure the legend is split into two rows
-    fig.legend(handles, labels, title='Age Groups', loc='lower center', bbox_to_anchor=(0.5, -0.05), ncol=len(age_group_labels) // 2, fontsize=12)
+#     # Adjust ncol to ensure the legend is split into two rows
+#     fig.legend(handles, labels, title='Age Groups', loc='lower center', bbox_to_anchor=(0.5, -0.05), ncol=len(age_group_labels) // 2, fontsize=12)
     
-    # Adjust layout and show the plot
-    pl.tight_layout(rect=[0, 0.05, 1, 1])  # Leave space for the legend at the bottom
-    pl.show()
+#     # Adjust layout and show the plot
+#     pl.tight_layout(rect=[0, 0.05, 1, 1])  # Leave space for the legend at the bottom
+#     pl.show()
 
-except KeyError as e:
-    print(f"KeyError: {e} - Check if the correct result keys are being used.")
-
-
+# except KeyError as e:
+#     print(f"KeyError: {e} - Check if the correct result keys are being used.")
 
 
 

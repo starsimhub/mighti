@@ -8,15 +8,15 @@ class HIV(ss.Disease):
     def __init__(self, pars=None, **kwargs):
         # Parameters
         super().__init__()
-        self.default_pars(
-            beta=0.001,  # Overall transmission rate
+        self.define_pars(
+            beta=ss.beta(0.001),  # Overall transmission rate
             init_prev=ss.bernoulli(self.age_dependent_prevalence),  # Age-dependent initial prevalence
         )
         self.update_pars(pars, **kwargs)
 
-        self.add_states(
-            ss.BoolArr('susceptible'),
-            ss.BoolArr('infected'),
+        self.define_states(
+            ss.State('susceptible', default=True),
+            ss.State('infected'),
             ss.FloatArr('ti_infected'),
             ss.FloatArr('ti_on_art'),
             ss.FloatArr('ti_dead'),
@@ -44,18 +44,22 @@ class HIV(ss.Disease):
         age_bins = list(age_data.keys())
         ages = sim.people.age[size]  # Initial ages of agents
         prevalence = np.zeros(len(ages))
-    
+
         print(f"Ages for agents (first 20): {ages[:20]}")  # Debug print
-    
+
         for i in range(n_age_bins):
             left = age_bins[i]
             right = age_bins[i + 1]
             value = age_data[left]
             prevalence[(ages >= left) & (ages < right)] = value
-    
+
         print(f"Prevalence initialized (first 20): {prevalence[:20]}")  # Debug print
-    
+
         return prevalence
+
+    def init_post(self):
+        super().init_post()
+        self.set_initial_states()
 
     def set_initial_states(self):
         initial_cases = self.pars['init_prev'].filter()
@@ -69,20 +73,18 @@ class HIV(ss.Disease):
         return initial_cases
 
     def init_results(self):
-        sim = self.sim
         super().init_results()
-        self.results += [
-            ss.Result(self.name, 'prevalence', sim.npts, dtype=float),
-            ss.Result(self.name, 'new_infections', sim.npts, dtype=int),
-            ss.Result(self.name, 'cum_infections', sim.npts, dtype=int),
-        ]
+        self.define_results(
+            ss.Result('prevalence', dtype=float, label='Prevalence'),
+            ss.Result('new_infections', dtype=int, label='New infections'),
+            ss.Result('cum_infections', dtype=int, label='Cumulative infections'),
+        )
         return
 
     def update_results(self):
-        sim = self.sim
         super().update_results()
-        ti = sim.ti
-        self.results.prevalence[ti] = np.count_nonzero(self.infected) / len(sim.people)
+        ti = self.ti
+        self.results.prevalence[ti] = np.count_nonzero(self.infected) / len(self.sim.people)
         self.results.new_infections[ti] = np.count_nonzero(self.ti_infected == ti)
         self.results.cum_infections[ti] = np.sum(self.results.new_infections[:ti+1])
         return
