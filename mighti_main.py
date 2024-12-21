@@ -18,9 +18,9 @@ prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, csv_file_pat
 # Create demographics
 fertility_rates = {'fertility_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_asfr.csv')}
 pregnancy = ss.Pregnancy(pars=fertility_rates)
-death_rates = {'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_deaths.csv'), 'units': 1}
+death_rates = {'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_deaths.csv'), 'rate_units': 1}
 death = ss.Deaths(death_rates)
-ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age.csv'))
+ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age_2007.csv'))
 
 # Create the networks - sexual and maternal
 mf = ss.MFNet(duration=1/24, acts=80)
