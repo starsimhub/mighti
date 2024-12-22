@@ -1,5 +1,40 @@
 import numpy as np
 import pandas as pd
+import starsim as ss
+
+
+def load_disease_parameters(disease_name, csv_file_path):
+    """
+    Load disease-specific parameters from a CSV file.
+
+    Args:
+        disease_name (str): The name of the disease (case-insensitive).
+        csv_file_path (str): Path to the CSV file containing disease parameters.
+
+    Returns:
+        dict: A dictionary containing the disease parameters.
+    """
+    df = pd.read_csv(csv_file_path)
+    row = df[df['condition'].str.lower() == disease_name.lower()]
+    
+    # Assign default values if the data is missing in the CSV file
+    if row.empty:
+        print(f"Warning: No parameters found for disease: {disease_name}. Assigning default values.")
+        return {
+            'dur_condition': ss.lognorm_ex(1),  # Default duration
+            'incidence': ss.bernoulli(0),      # Default incidence (no new cases)
+            'p_death': ss.bernoulli(0),       # Default mortality rate (no deaths)
+            'init_prev': ss.bernoulli(0)      # Default prevalence (no existing cases)
+        }
+
+    # Extract parameters and convert to appropriate types
+    disease_params = {
+        'dur_condition': ss.lognorm_ex(float(row.iloc[0].get('dur_condition', 1))),  # Default to 1
+        'incidence': ss.bernoulli(float(row.iloc[0].get('incidence', 0))),          # Default to 0
+        'p_death': ss.bernoulli(float(row.iloc[0].get('p_death', 0))),              # Default to 0
+        'init_prev': ss.bernoulli(float(row.iloc[0].get('init_prev', 0)))           # Default to 0
+    }
+    return disease_params
 
 # Function to initialize prevalence data and age bins
 def initialize_prevalence_data(diseases, csv_file_path, inityear):
