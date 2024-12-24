@@ -19,17 +19,24 @@ __all__ = [
     'CervicalCancer','ColorectalCancer', 'BreastCancer', 'LungCancer', 'ProstateCancer', 'OtherCancer',
 ]
 
+
+
 class Type1Diabetes(ss.NCD):
 
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(
-            dur_condition=ss.lognorm_ex(1),  # Shorter duration before serious complications
-            incidence=ss.bernoulli(0.000015),      # Lower incidence of Type 1 diabetes
-            p_death=ss.bernoulli(0.0033),        # Higher mortality rate from Type 1
-            init_prev=ss.bernoulli(0.01),      # Initial prevalence of Type 1 diabetes
-        )
         self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
+
+        # Load parameters from the CSV
+        params = mi.load_disease_parameters('Type1Diabetes', 'mighti/data/parameters_eswatini.csv')
+        self.default_pars(**params)
+        
+        # self.default_pars(
+        #     dur_condition=ss.lognorm_ex(1),  # Shorter duration before serious complications
+        #     incidence=ss.bernoulli(0.000015),      # Lower incidence of Type 1 diabetes
+        #     p_death=ss.bernoulli(0.0033),        # Higher mortality rate from Type 1
+        #     init_prev=ss.bernoulli(0.01),      # Initial prevalence of Type 1 diabetes
+        # )
         self.update_pars(pars, **kwargs)
 
         self.add_states(
@@ -42,10 +49,18 @@ class Type1Diabetes(ss.NCD):
         return
 
 
+    # def initialize(self, sim):
+    #     """Initialize the disease, setting rel_sus for each agent."""
+    #     super().initialize(sim)
+    #     self.rel_sus = np.ones(len(sim.people))  # Initialize rel_sus for each agent in the sim (default to 1.0)
+    #     return
+    
     def initialize(self, sim):
         """Initialize the disease, setting rel_sus for each agent."""
-        super().initialize(sim)
-        self.rel_sus = np.ones(sim.n)  # Initialize rel_sus for each agent in the sim (default to 1.0)
+        self.sim = sim  # Link the disease to the simulation
+        if self.rel_sus is None:
+            self.rel_sus = np.ones(len(sim.people))  # Initialize rel_sus to an array of ones
+        print(f"Type1Diabetes rel_sus initialized: {self.rel_sus}")
         return
 
     def init_post(self):
@@ -137,11 +152,11 @@ class Type2Diabetes(ss.NCD):
     def initialize(self, sim):
         """Initialize the disease, setting rel_sus for each agent."""
         print(f"Calling initialize for {self.name}")  # Add this print to confirm
+        self.sim = sim  # Link the disease to the simulation
 
-        super().initialize(sim)
+        # super().initialize(sim)
         self.rel_sus = np.ones(len(sim.people))  # Initialize rel_sus for each agent in the sim (default to 1.0)
         print(f"Initialized rel_sus for Type2Diabetes: {self.rel_sus}")  # Debugging statement
-
         return
 
     def init_post(self):
@@ -254,11 +269,17 @@ class Obesity(ss.NCD):
 
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.default_pars(
-            dur_condition=ss.lognorm_ex(1),
-            incidence=ss.bernoulli(0.15),
-            init_prev=ss.bernoulli(0.25),
-        )
+        self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
+
+        # Load parameters from the CSV
+        params = mi.load_disease_parameters('Obesity', 'mighti/data/parameters_eswatini.csv')
+        self.default_pars(**params)
+
+        # self.default_pars(
+        #     dur_condition=ss.lognorm_ex(1),
+        #     incidence=ss.bernoulli(1),
+        #     init_prev=ss.bernoulli(0.1221),
+        # )
         self.update_pars(pars, **kwargs)
 
         self.add_states(
@@ -269,7 +290,17 @@ class Obesity(ss.NCD):
             ss.FloatArr('rel_sus'),
         )
         return
+    
+    def initialize(self, sim):
+        """Initialize the disease, setting rel_sus for each agent."""
+        print(f"Calling initialize for {self.name}")  # Add this print to confirm
+        self.sim = sim  # Link the disease to the simulation
 
+        # super().initialize(sim)
+        self.rel_sus = np.ones(len(sim.people))  # Initialize rel_sus for each agent in the sim (default to 1.0)
+        print(f"Initialized rel_sus for Type2Diabetes: {self.rel_sus}")  # Debugging statement
+        return
+    
     def init_post(self):
         initial_cases = self.pars.init_prev.filter()
         self.set_prognoses(initial_cases)
@@ -657,72 +688,6 @@ class Alzheimers(ss.Disease):
         sim = self.sim
         super().update_results()
         self.results.prevalence[sim.ti] = np.count_nonzero(self.affected) / len(sim.people)
-        return
-
-
-class Flu(ss.SIS):
-    """
-    Example influenza model. Modifies the SIS model by adding a probability of dying.
-    Death probabilities are based on age.
-    """
-    def __init__(self, pars=None, **kwargs):
-        super().__init__()
-        self.default_pars(
-            p_death=0,  # Placeholder - see make_p_death_fn
-            dur_inf=ss.lognorm_ex(10),
-            beta=0.05,
-            init_prev=ss.bernoulli(0.01),
-            waning=0.05,
-            imm_boost=1.0,
-        )
-        self.update_pars(pars, **kwargs)
-        self.add_states(
-            ss.FloatArr('ti_dead'),
-        )
-        self.pars.p_death = ss.bernoulli(self.make_p_death_fn)
-
-        return
-
-    @staticmethod
-    def make_p_death_fn(self, sim, uids):
-        """ Take in the module, sim, and uids, and return the death probability for each UID based on their age """
-        return mi.make_p_death_fn(name='flu', sim=sim, uids=uids)
-
-    def update_pre(self, sim):
-
-        # Process people who recover and become susceptible again
-        recovered = (self.infected & (self.ti_recovered <= sim.ti)).uids
-        self.infected[recovered] = False
-        self.susceptible[recovered] = True
-        self.update_immunity(sim)
-
-        # Trigger deaths
-        deaths = (self.ti_dead <= sim.ti).uids
-        if len(deaths):
-            sim.people.request_death(sim, deaths)
-
-        return
-
-    def set_prognoses(self, sim, uids, source_uids=None):
-        """ Set prognoses """
-        self.susceptible[uids] = False
-        self.infected[uids] = True
-        self.ti_infected[uids] = sim.ti
-        self.immunity[uids] += self.pars.imm_boost
-
-        p = self.pars
-
-        # Sample duration of infection, being careful to only sample from the
-        # distribution once per timestep.
-        dur_inf = p.dur_inf.rvs(uids)
-
-        # Determine who dies and who recovers and when
-        will_die = p.p_death.rvs(uids)
-        dead_uids = uids[will_die]
-        rec_uids = uids[~will_die]
-        self.ti_dead[dead_uids] = sim.ti + dur_inf[will_die] / sim.dt # Consider rand round, but not CRN safe
-        self.ti_recovered[rec_uids] = sim.ti + dur_inf[~will_die] / sim.dt
-
         return
 
 

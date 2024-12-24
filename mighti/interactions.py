@@ -129,6 +129,8 @@ class hiv_obesity(ss.Connector):
             rel_sus_hiv_obesity=1.2,  # People with HIV are 1.2x more likely to acquire Obesity
         )
         self.update_pars(pars, **kwargs)
+        print(f"Parameter rel_sus_hiv_obesity: {self.pars.rel_sus_hiv_obesity}")
+
         return
 
     def update(self):
@@ -149,6 +151,8 @@ class hiv_type1diabetes(ss.Connector):
             rel_sus_hiv_type1diabetes=1.5,  # People with HIV are 1.5x more likely to acquire Type 1 Diabetes
         )
         self.update_pars(pars, **kwargs)
+
+        print(f"Parameter rel_sus_hiv_type1diabetes: {self.pars.rel_sus_hiv_type1diabetes}")
         return
 
     def update(self):
@@ -156,7 +160,7 @@ class hiv_type1diabetes(ss.Connector):
         # Apply the increased susceptibility to those with HIV
         sim.diseases.type1diabetes.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_type1diabetes
         return
-    
+
     
 class hiv_type2diabetes(ss.Connector):
     """ Simple connector to make people with HIV more likely to contract Type 2 Diabetes """

@@ -12,11 +12,8 @@ import pandas as pd
     # 'CervicalCancer','ColorectalCancer', 'BreastCancer', 'LungCancer', 'ProstateCancer', 'OtherCancer',
     # 'Parkinsons','Smoking', 'Alcohol', 'BRCA', 'ViralHepatitis', 'Poverty'
 
-
-# ncds = ['Type2Diabetes', 'Obesity']  # List of NCDs being modeled
-
 ncds = [
-     'Type2Diabetes','Obesity', #'Hypertension', #'Type1Diabetes',
+      'Type2Diabetes','Obesity', 'Type1Diabetes',#'Hypertension', #
     # 'Depression','Alzheimers', 'Parkinsons','PTSD','HIVAssociatedDementia',
     # 'CerebrovascularDisease','ChronicLiverDisease','Asthma', 'IschemicHeartDisease',
     # 'TrafficAccident','DomesticViolence','TobaccoUse', 'AlcoholUseDisorder', 
@@ -25,46 +22,68 @@ ncds = [
     # 'CervicalCancer','ColorectalCancer', 'BreastCancer', 'LungCancer', 'ProstateCancer', 'OtherCancer',
 ]
 
-# Define diseases
-# ncds = ['Type2Diabetes', 'Obesity']  # List of NCDs being modeled
-diseases = ['HIV'] + ncds  # List of diseases including HIV
+diseases = ['HIV'] + ncds
 beta = 0.001  # Transmission probability for HIV
 n_agents = 5000  # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 
-# Initialize prevalence data from a CSV file
-prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv', inityear=inityear)
+
+# -------------------------
+# Prevalence Data
+# -------------------------
+
+prevalence_data, age_bins = mi.initialize_prevalence_data(
+    diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv', inityear=inityear
+)
 
 years = [2007, 2011, 2017, 2021]
 eswatini_hiv_data = {}
 for year in years:
-    hiv_prevalence_data, _ = mi.initialize_prevalence_data(['HIV'], csv_file_path='mighti/data/prevalence_data_eswatini.csv', inityear=year)
+    hiv_prevalence_data, _ = mi.initialize_prevalence_data(
+        ['HIV'], csv_file_path='mighti/data/prevalence_data_eswatini.csv', inityear=year
+    )
     eswatini_hiv_data[year] = hiv_prevalence_data['HIV']
 
 
+# -------------------------
 # Demographics
+# -------------------------
+
 fertility_rates = {'fertility_rate': pd.read_csv('tests/test_data/eswatini_asfr.csv')}
 pregnancy = ss.Pregnancy(pars=fertility_rates)
+
 death_rates = {'death_rate': pd.read_csv('tests/test_data/eswatini_deaths.csv'), 'units': 1}
 death = ss.Deaths(death_rates)
+
 ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age.csv'))
 
-# Create the networks - sexual and maternal
+
+# -------------------------
+# Networks
+# -------------------------
+
 mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
 networks = [mf, maternal]
 
-# Define a function for disease-specific prevalence
+
+# -------------------------
+# Disease Objects
+# -------------------------
+
 def get_prevalence_function(disease):
-    return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
+    """Get prevalence function for each disease."""
+    return lambda module, sim, size: mi.age_sex_dependent_prevalence(
+        disease, prevalence_data, age_bins, sim, size
+    )
 
 
-# Disease objects
+# Initialize NCDs
 disease_objects = []
 for disease in ncds:
     if disease not in prevalence_data:
-       print(f"Warning: Prevalence data for {disease} is missing. Skipping disease.")
-       continue 
+        print(f"Warning: Prevalence data for {disease} is missing. Skipping disease.")
+        continue
     try:
         disease_class = getattr(mi, disease)
         init_prev = ss.bernoulli(get_prevalence_function(disease))
@@ -75,14 +94,32 @@ for disease in ncds:
         print(f"Error: Disease class {disease} is not found in the mighti module. Skipping this disease.")
         continue
 
-# HIV-specific setup
+
+# Initialize HIV Separately
+class CustomHIV(ss.HIV):
+    def initialize(self, sim):
+        self.sim = sim
+        print("Custom initialize for HIV using set_initial_states.")
+        self.set_initial_states()
+
 hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 disease_objects.append(hiv_disease)
 
-# Initialize the PrevalenceAnalyzer
+# hiv_disease = CustomHIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
+# disease_objects.append(hiv_disease)
+
+
+# -------------------------
+# Prevalence Analyzer
+# -------------------------
+
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 
-# Interaction functions
+
+# -------------------------
+# Interactions
+# -------------------------
+
 interaction_functions = {}
 for disease in ncds:
     func_name = f"hiv_{disease.lower()}"
@@ -95,14 +132,21 @@ for disease in ncds:
 # Initialize interaction objects for HIV-NCD interactions
 interactions = []
 for disease in ncds:
-    interaction_obj = interaction_functions[disease]()  # Call the corresponding function
-    interactions.append(interaction_obj)
+    if disease in interaction_functions:
+        interaction_obj = interaction_functions[disease]()  # Call the corresponding function
+        interactions.append(interaction_obj)
+    else:
+        print(f"Warning: Interaction object for {disease} could not be created.")
 
-# Initialize the simulation
+
+# -------------------------
+# Initialize Simulation
+# -------------------------
+
 sim = ss.Sim(
     n_agents=n_agents,
     networks=networks,
-    diseases=disease_objects,  # Pass the full list of diseases (HIV + NCDs)
+    diseases=disease_objects,  # Full list of diseases (HIV + NCDs)
     analyzers=[prevalence_analyzer],
     start=inityear,
     end=2020,
@@ -113,7 +157,11 @@ sim = ss.Sim(
 )
 
 
-# Run the simulation
+# -------------------------
+# Run Simulation
+# -------------------------
+
+print("Starting Simulation...")
 sim.run()
 
 

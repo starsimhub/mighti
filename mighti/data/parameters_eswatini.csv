@@ -1,0 +1,29 @@
+﻿condition,p_death,incidence,dur_condition,init_prev,rel_sus
+TrafficAccident ,0.0053125,,,,
+CervicalCancer,0.062,,3.196039604,0.27,6.07
+ColorectalCancer,0.07,,2.875746714,0.109550118,1
+BreastCancer,0.037,,6.894117647,,1.08
+Asthma,0.0106225,,7.014243323,,
+Type2Diabetes,0.004315,,15.02897096,13.51,1.95
+Hypertension,0.031625,,,0.530333333,0.93
+LungCancer,0.166,,1.000511509,,
+ProstateCancer,0.00415,,4.285714286,,
+Type1Diabetes,,,27.39704329,0.325872572,1
+ChronicLiverDisease,,,25.82340064,,
+ChronicKidneyDisease,,,38.85424719,17.6,1.58
+TobaccoUse,,,,,
+AlcoholUseDisorder,,,2.054070935,,
+COPD,,,13.12023761,,
+Alzheimer'sDisease ,0.011,,5.731077471,,
+Parkinsons,0.0301875,,6.694255112,,
+HIVAssociatedDementia,,,,,
+Obesity,,,,0.1221,1.83
+Depression,,,0.832486206,,
+HPVVaccination,,,,,
+PTSD,,,,,
+Hyperlipidemia,,,,,
+DomesticViolence,,,,,
+CerebrovascularDisease,0.041,,9.709105655,,
+Flu,0.004815,,,,
+ViralHepatitis,0.030303125,,,,
+IschemicHeartDisease,,,6.91139678,,
