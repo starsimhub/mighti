@@ -13,7 +13,7 @@ import pandas as pd
     # 'Parkinsons','Smoking', 'Alcohol', 'BRCA', 'ViralHepatitis', 'Poverty'
 
 ncds = [
-      'Type2Diabetes','Obesity', 'Type1Diabetes',#'Hypertension', #
+      'Type2Diabetes','Obesity', #'Hypertension',#'Type1Diabetes',# #
     # 'Depression','Alzheimers', 'Parkinsons','PTSD','HIVAssociatedDementia',
     # 'CerebrovascularDisease','ChronicLiverDisease','Asthma', 'IschemicHeartDisease',
     # 'TrafficAccident','DomesticViolence','TobaccoUse', 'AlcoholUseDisorder', 
@@ -95,18 +95,10 @@ for disease in ncds:
         continue
 
 
-# Initialize HIV Separately
-class CustomHIV(ss.HIV):
-    def initialize(self, sim):
-        self.sim = sim
-        print("Custom initialize for HIV using set_initial_states.")
-        self.set_initial_states()
 
 hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 disease_objects.append(hiv_disease)
 
-# hiv_disease = CustomHIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
-# disease_objects.append(hiv_disease)
 
 
 # -------------------------
