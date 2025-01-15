@@ -19,6 +19,17 @@ prevalence_data, age_bins = mi.initialize_prevalence_data(
     diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv', inityear=inityear
 )
 
+years = [2007, 2011, 2017, 2021]
+eswatini_hiv_data = {}
+for year in years:
+    hiv_prevalence_data, _ = mi.initialize_prevalence_data(
+        diseases= ['HIV'], 
+        csv_file_path='mighti/data/prevalence_data_eswatini.csv', 
+        inityear=year
+    )
+    eswatini_hiv_data[year] = hiv_prevalence_data['HIV']  # Store data for the specific year
+
+
 # -------------------------
 # Demographics
 # -------------------------
@@ -35,38 +46,41 @@ mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
 networks = [mf, maternal]
 
-# -------------------------
-# Disease Objects
-# -------------------------
+# Define a function for disease-specific prevalence
 def get_prevalence_function(disease):
-    """Get prevalence function for Type2Diabetes and HIV."""
-    if disease == "Type2Diabetes":
-        return lambda module, sim, size: mi.age_sex_dependent_prevalence(
-            "Type2Diabetes", prevalence_data, age_bins, sim, size
-        )
-    elif disease == "HIV":
-        return lambda module, sim, size: mi.age_sex_dependent_prevalence(
-            "HIV", prevalence_data, age_bins, sim, size
-        )
-    else:
-        raise ValueError(f"Prevalence function not defined for disease: {disease}")
+    return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
 
 # Create disease objects
-init_prev_type2diabetes = ss.bernoulli(get_prevalence_function("Type2Diabetes"))
-type2diabetes = mi.Type2Diabetes(init_prev=init_prev_type2diabetes)
+disease_objects = []
+for disease in ncds:
+    init_prev = ss.bernoulli(get_prevalence_function(disease))
+    if disease == 'Type2Diabetes':
+        disease_obj = mi.Type2Diabetes(init_prev=init_prev)
+    elif disease == 'Obesity':
+        disease_obj = mi.Obesity(init_prev=init_prev)
+    disease_objects.append(disease_obj)
+    
+# HIV-specific setup
+hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
+disease_objects.append(hiv_disease)
 
-init_prev_hiv = ss.bernoulli(get_prevalence_function("HIV"))
-hiv = ss.HIV(init_prev=init_prev_hiv, beta=beta)
+# Initialize the PrevalenceAnalyzer
+prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 
-# List of disease objects
-disease_objects = [type2diabetes, hiv]
+# # Load existing HIV and NCD interactions
+# interaction_functions = {
+#     'Type2Diabetes': mi.hiv_type2diabetes,
+#     'Obesity': mi.hiv_obesity,
+# }
 
-# -------------------------
-# Prevalence Analyzer
-# -------------------------
-prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=["Type2Diabetes", "HIV"])
 
-# -------------------------
+# # Initialize interaction objects for HIV-NCD interactions
+# interactions = []
+# for disease in ncds:
+#     interaction_obj = interaction_functions[disease]()  # Call the corresponding function
+#     interactions.append(interaction_obj)
+    
+#-----------
 # Simulation Without Interactions
 # -------------------------
 sim_no_interactions = ss.Sim(
