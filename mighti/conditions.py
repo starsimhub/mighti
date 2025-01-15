@@ -10,6 +10,7 @@ class Type2Diabetes(ss.NCD):
             dur_condition=ss.lognorm_ex(5),  # Longer duration reflecting chronic condition
             incidence_prob = 0.0315,
             incidence=ss.bernoulli(0.0315),    # Higher incidence rate
+            p_death=ss.bernoulli(0.0017),     # Mortality risk (may increase over time)
             init_prev=ss.bernoulli(0.2),     # Higher initial prevalence
             # beta_cell_decline_rate=0.05,     # Rate of beta-cell function decline over time
             # insulin_resistance_increase_rate=0.1,  # Rate of increasing insulin resistance
