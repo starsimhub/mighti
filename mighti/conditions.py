@@ -1,70 +1,177 @@
 import numpy as np
 import starsim as ss
-
 class Type2Diabetes(ss.NCD):
+
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
 
-        # Define default parameters
         self.default_pars(
-            dur_condition=ss.lognorm_ex(15.02897096),
-            incidence_prob=0.0315,
-            incidence=ss.bernoulli(0.0315),
-            p_death=ss.bernoulli(0.004315),
-            init_prev=ss.bernoulli(0.1351),
-            remission_rate=ss.bernoulli(0.0024),
-            max_disease_duration=20,
+            dur_condition=ss.lognorm_ex(5),  # Longer duration reflecting chronic condition
+            incidence_prob = 0.0315,
+            incidence=ss.bernoulli(0.0315),    # Higher incidence rate
+            init_prev=ss.bernoulli(0.2),     # Higher initial prevalence
+            # beta_cell_decline_rate=0.05,     # Rate of beta-cell function decline over time
+            # insulin_resistance_increase_rate=0.1,  # Rate of increasing insulin resistance
+            remission_rate=ss.bernoulli(0.0024),  # Probability of remission (reversing the condition)
+            max_disease_duration=20,         # Maximum duration before severe complications
         )
-
-        # Update parameters, including init_prev
         self.update_pars(pars, **kwargs)
 
         self.add_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
-            ss.BoolArr('reversed'),
+            ss.BoolArr('reversed'),          # New state for diabetes remission
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_reversed'),
             ss.FloatArr('ti_dead'),
+            # ss.FloatArr('beta_cell_function'),  # Tracks beta-cell function over time
+            # ss.FloatArr('insulin_resistance'),  # Tracks insulin resistance progression
         )
         return
-
+    
     def initialize(self, sim):
         """Initialize the disease, setting rel_sus for each agent."""
-        super().initialize(sim)  # Call the parent initialize
-        self.sim = sim  # Link the disease to the simulation
-    
-        # Ensure rel_sus is initialized
-        if not hasattr(self, 'rel_sus') or self.rel_sus is None:
-            self.rel_sus = np.ones(len(sim.people))  # Default to 1.0 for all individuals
-            print(f"Initialized rel_sus for {self.name}: {self.rel_sus[:10]}")
+        super().initialize(sim)  # Call the parent initialize method
+        
+        # Ensure rel_sus is initialized as an array of ones for all agents
+        if self.rel_sus is None or len(self.rel_sus) != len(sim.people):
+            self.rel_sus = np.ones(len(sim.people))  # Default susceptibility is 1 for all individuals
+            print(f"Initialized rel_sus for Type2Diabetes with default values.")
+        else:
+            print(f"rel_sus already initialized: {self.rel_sus}")
+        
         return
-
+            
+        return
+    
     def init_post(self):
-        """Handle initial cases based on init_prev."""
-        print(f"init_prev parameter: {self.pars.init_prev}")
         initial_cases = self.pars.init_prev.filter()
-        print(f"Initial cases computed: {np.sum(initial_cases)} out of {len(self.sim.people)}")
-        if np.sum(initial_cases) == 0:
-            print("Warning: No initial cases were assigned for Type2Diabetes.")
         self.set_prognoses(initial_cases)
         return initial_cases
+
+    def update_pre(self):
+        sim = self.sim
+       
+        # Handle remission (reversal)
+        going_into_remission = self.pars.remission_rate.filter(self.affected.uids)
+        self.affected[going_into_remission] = False
+        self.reversed[going_into_remission] = True
+        self.ti_reversed[going_into_remission] = sim.ti
+
+        # Handle recovery, death, and beta-cell function exhaustion
+        recovered = (self.reversed & (self.ti_reversed <= sim.ti)).uids
+        self.reversed[recovered] = False
+        self.susceptible[recovered] = True  # Recovered individuals become susceptible again
+        deaths = (self.ti_dead == sim.ti).uids
+        sim.people.request_death(deaths)
+        self.results.new_deaths[sim.ti] = len(deaths)
+
+        return
+
+
+    def update(self):
+        sim = self.sim
+        
+        # Debugging to ensure rel_sus is initialized
+        if sim.diseases.type2diabetes.rel_sus is None:
+            print("rel_sus is still None during update.")
+            sim.diseases.type2diabetes.rel_sus = np.ones(len(sim.people))  # Fallback initialization
+        else:
+            print(f"Before update: rel_sus values: {np.unique(sim.diseases.type2diabetes.rel_sus)}")
+        
+        # Apply the increased susceptibility to those with HIV
+        sim.diseases.type2diabetes.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_type2diabetes
+        
+        print(f"After update: rel_sus values for HIV-infected: {sim.diseases.type2diabetes.rel_sus[sim.people.hiv.infected]}")
+        return
     
+    def make_new_cases(self, relative_risk=1.0):
+        """Create new cases of Type2Diabetes, adjusted by relative risk."""
+        susceptible_uids = self.susceptible.uids
+        base_prob = self.pars.incidence_prob
+        
+        # Ensure rel_sus is initialized
+        if self.rel_sus is None or len(self.rel_sus) != len(self.sim.people):
+            self.rel_sus = np.ones(len(self.sim.people))
+            print(f"Reinitialized rel_sus for Type2Diabetes in make_new_cases.")
+        
+        adjusted_prob = base_prob * self.rel_sus[susceptible_uids] * relative_risk
+        
+        # Debugging output
+        print(f"Adjusted incidence probabilities: {adjusted_prob}")
+        print(f"Susceptible UIDs: {susceptible_uids}, Count: {len(susceptible_uids)}")
+        
+        # Create and initialize the distribution
+        adjusted_incidence_dist = ss.bernoulli(adjusted_prob, strict=False)
+        adjusted_incidence_dist.slots = np.arange(len(susceptible_uids))  # Use relative indices as slots
+        adjusted_incidence_dist.initialize()  # Explicitly initialize the distribution
+        
+        # Debugging the slots
+        print(f"Adjusted incidence distribution slots: {adjusted_incidence_dist.slots}")
+        
+        # Filter the relative indices
+        relative_indices = np.arange(len(susceptible_uids))  # Indices relative to the slots
+        print(f"Relative indices for filtering: {relative_indices}")
+        
+        # Generate new cases using the relative indices
+        new_cases = susceptible_uids[adjusted_incidence_dist.rvs(len(relative_indices))]
+        print(f"New cases identified: {len(new_cases)}")
+        
+        # Set prognoses for the new cases
+        self.set_prognoses(new_cases)
+        return new_cases
+
+    def set_prognoses(self, uids):
+        sim = self.sim
+        p = self.pars
+        self.susceptible[uids] = False
+        self.affected[uids] = True
+        dur_condition = p.dur_condition.rvs(uids)
+        will_die = p.p_death.rvs(uids)
+        dead_uids = uids[will_die]
+        rec_uids = uids[~will_die]
+        self.ti_dead[dead_uids] = sim.ti + dur_condition[will_die] / sim.dt
+        self.ti_reversed[rec_uids] = sim.ti + dur_condition[~will_die] / sim.dt
+
+        return
+
+    def init_results(self):
+        sim = self.sim
+        super().init_results()
+
+        if 'prevalence' not in self.results:
+            self.results += [
+                ss.Result(self.name, 'prevalence', sim.npts, dtype=float),
+            ]
+        if 'new_deaths' not in self.results:
+            self.results += [
+                ss.Result(self.name, 'new_deaths', sim.npts, dtype=int),
+            ]
+        if 'reversal_prevalence' not in self.results:
+            self.results += [
+                ss.Result(self.name, 'reversal_prevalence', sim.npts, dtype=float),
+            ]
+        return
+    
+    def update_results(self):
+        sim = self.sim
+        super().update_results()
+        self.results.prevalence[sim.ti] = np.count_nonzero(self.affected) / len(sim.people)
+        self.results.reversal_prevalence[sim.ti] = np.count_nonzero(self.reversed) / len(sim.people)
+        return
+
+
+
 class Obesity(ss.NCD):
+
     def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
-
-        # Load parameters from the CSV or define them directly
         self.default_pars(
-            dur_condition=ss.lognorm_ex(5),
-            incidence_prob=0.0122,
-            incidence=ss.bernoulli(0.0122),
-            init_prev=ss.bernoulli(0.1221),
+            dur_condition=ss.lognorm_ex(1),
+            incidence=ss.bernoulli(0.15),
+            init_prev=ss.bernoulli(0.25),
         )
-
-        # Update parameters, including init_prev
         self.update_pars(pars, **kwargs)
 
         self.add_states(
@@ -76,18 +183,141 @@ class Obesity(ss.NCD):
         )
         return
 
-    def initialize(self, sim):
-        """Initialize the disease."""
-        self.sim = sim
-        if not hasattr(self, 'rel_sus') or self.rel_sus is None:
-            self.rel_sus = np.ones(len(sim.people))  # Initialize rel_sus to default
-        return
-
     def init_post(self):
-        """Handle initial cases based on init_prev."""
         initial_cases = self.pars.init_prev.filter()
         self.set_prognoses(initial_cases)
         return initial_cases
+
+    def update_pre(self):
+        sim = self.sim
+        recovered = (self.affected & (self.ti_recovered <= sim.ti)).uids
+        self.affected[recovered] = False
+        self.susceptible[recovered] = True
+        return
+
+    def make_new_cases(self):
+        new_cases = self.pars.incidence.filter(self.susceptible.uids)
+        self.set_prognoses(new_cases)
+        return new_cases
+
+    def set_prognoses(self, uids):
+        sim = self.sim
+        self.susceptible[uids] = False
+        self.affected[uids] = True
+        dur_condition = self.pars.dur_condition.rvs(uids)
+        self.ti_recovered[uids] = sim.ti + dur_condition / sim.dt
+        return
+
+    def init_results(self):
+        sim = self.sim
+        super().init_results()
+
+        # Check if the keys already exist in the results
+        if 'prevalence' not in self.results:
+            self.results += [
+                ss.Result(self.name, 'prevalence', sim.npts, dtype=float),
+            ]
+        if 'new_deaths' not in self.results:
+            self.results += [
+                ss.Result(self.name, 'new_deaths', sim.npts, dtype=int),
+            ]
+
+        return
+
+    def update_results(self):
+        sim = self.sim
+        super().update_results()
+        self.results.prevalence[sim.ti] = np.count_nonzero(self.affected) / len(sim.people)
+        return
+
+
+# class Type2Diabetes(ss.NCD):
+#     def __init__(self, pars=None, **kwargs):
+#         super().__init__()
+#         self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
+
+#         # Define default parameters
+#         self.default_pars(
+#             dur_condition=ss.lognorm_ex(15.02897096),
+#             incidence_prob=0.0315,
+#             incidence=ss.bernoulli(0.0315),
+#             p_death=ss.bernoulli(0.004315),
+#             init_prev=ss.bernoulli(0.1351),
+#             remission_rate=ss.bernoulli(0.0024),
+#             max_disease_duration=20,
+#         )
+
+#         # Update parameters, including init_prev
+#         self.update_pars(pars, **kwargs)
+
+#         self.add_states(
+#             ss.BoolArr('susceptible'),
+#             ss.BoolArr('affected'),
+#             ss.BoolArr('reversed'),
+#             ss.FloatArr('ti_affected'),
+#             ss.FloatArr('ti_reversed'),
+#             ss.FloatArr('ti_dead'),
+#         )
+#         return
+
+#     def initialize(self, sim):
+#         """Initialize the disease, setting rel_sus for each agent."""
+#         super().initialize(sim)  # Call the parent initialize
+#         self.sim = sim  # Link the disease to the simulation
+    
+#         # Ensure rel_sus is initialized
+#         if not hasattr(self, 'rel_sus') or self.rel_sus is None:
+#             self.rel_sus = np.ones(len(sim.people))  # Default to 1.0 for all individuals
+#             print(f"Initialized rel_sus for {self.name}: {self.rel_sus[:10]}")
+#         return
+
+#     def init_post(self):
+#         """Handle initial cases based on init_prev."""
+#         print(f"init_prev parameter: {self.pars.init_prev}")
+#         initial_cases = self.pars.init_prev.filter()
+#         print(f"Initial cases computed: {np.sum(initial_cases)} out of {len(self.sim.people)}")
+#         if np.sum(initial_cases) == 0:
+#             print("Warning: No initial cases were assigned for Type2Diabetes.")
+#         self.set_prognoses(initial_cases)
+#         return initial_cases
+    
+# class Obesity(ss.NCD):
+#     def __init__(self, pars=None, **kwargs):
+#         super().__init__()
+#         self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
+
+#         # Load parameters from the CSV or define them directly
+#         self.default_pars(
+#             dur_condition=ss.lognorm_ex(5),
+#             incidence_prob=0.0122,
+#             incidence=ss.bernoulli(0.0122),
+#             init_prev=ss.bernoulli(0.1221),
+#         )
+
+#         # Update parameters, including init_prev
+#         self.update_pars(pars, **kwargs)
+
+#         self.add_states(
+#             ss.BoolArr('susceptible'),
+#             ss.BoolArr('affected'),
+#             ss.FloatArr('ti_affected'),
+#             ss.FloatArr('ti_recovered'),
+#             ss.FloatArr('rel_sus'),
+#         )
+#         return
+
+#     def initialize(self, sim):
+#         """Initialize the disease."""
+#         self.sim = sim
+#         if not hasattr(self, 'rel_sus') or self.rel_sus is None:
+#             self.rel_sus = np.ones(len(sim.people))  # Initialize rel_sus to default
+#         return
+
+#     def init_post(self):
+#         """Handle initial cases based on init_prev."""
+#         initial_cases = self.pars.init_prev.filter()
+#         self.set_prognoses(initial_cases)
+#         return initial_cases
 
 
 

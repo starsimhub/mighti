@@ -6,55 +6,63 @@ __all__ = [
     'hiv_obesity', 'hiv_type2diabetes'
 ]
 
+
 class hiv_obesity(ss.Connector):
-    """ Connector to increase susceptibility for HIV and Obesity """
+    """ Simple connector to make people with HIV more likely to contract Obesity """
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Obesity', requires=[ss.HIV, mi.Obesity])
-        self.default_pars(rel_sus_hiv_obesity=1.2)
+        self.default_pars(
+            rel_sus_hiv_obesity=10,  # People with HIV are 1.2x more likely to acquire Obesity
+        )
         self.update_pars(pars, **kwargs)
         return
 
     def update(self):
         sim = self.sim
-        if not hasattr(sim.diseases.obesity, 'rel_sus') or sim.diseases.obesity.rel_sus is None:
-            sim.diseases.obesity.rel_sus = np.ones(len(sim.people))
+        # Apply the increased susceptibility to those with HIV
         sim.diseases.obesity.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_obesity
         return
 
 class hiv_type2diabetes(ss.Connector):
-    """Connector to make people with HIV more likely to contract Type 2 Diabetes."""
+    """ Simple connector to make people with HIV more likely to contract Type 2 Diabetes """
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Type2Diabetes', requires=[ss.HIV, mi.Type2Diabetes])
-        self.default_pars(rel_sus_hiv_type2diabetes=1.61)
+        self.default_pars(
+            rel_sus_hiv_type2diabetes=10,  # People with HIV are 10x more likely to acquire Type 2 Diabetes
+        )
         self.update_pars(pars, **kwargs)
-        return
 
     def update(self):
         sim = self.sim
-        current_population_size = len(sim.people)
-    
-        # Check if rel_sus exists and matches population size
-        if not hasattr(sim.diseases.type2diabetes, 'rel_sus') or sim.diseases.type2diabetes.rel_sus is None:
-            print(f"rel_sus is None for {sim.diseases.type2diabetes.name}. Initializing.")
-            sim.diseases.type2diabetes.rel_sus = np.ones(current_population_size)
-        elif len(sim.diseases.type2diabetes.rel_sus) != current_population_size:
-            print(f"Resizing rel_sus for {sim.diseases.type2diabetes.name} to match population size.")
-            # Handle resizing for both increases and decreases in population size
-            if len(sim.diseases.type2diabetes.rel_sus) < current_population_size:
-                # Increase size and initialize new entries
-                new_rel_sus = np.ones(current_population_size)
-                new_rel_sus[:len(sim.diseases.type2diabetes.rel_sus)] = sim.diseases.type2diabetes.rel_sus
-            else:
-                # Decrease size
-                new_rel_sus = sim.diseases.type2diabetes.rel_sus[:current_population_size]
-            sim.diseases.type2diabetes.rel_sus = new_rel_sus
-    
-        # Update `rel_sus` for HIV-infected individuals
-        hiv_infected = sim.people.hiv.infected
-        sim.diseases.type2diabetes.rel_sus[hiv_infected] = self.pars.rel_sus_hiv_type2diabetes
-    
-        print(f"Updated rel_sus for Type2Diabetes: {sim.diseases.type2diabetes.rel_sus[hiv_infected]}")
 
+        # Log current time step
+        print(f"Running update for HIV-Type2Diabetes at time step {sim.ti}")
+
+        # Ensure rel_sus is initialized and reset to default (1.0)
+        if sim.diseases.type2diabetes.rel_sus is None or len(sim.diseases.type2diabetes.rel_sus) != len(sim.people):
+            print("Reinitializing rel_sus for Type2Diabetes.")
+            sim.diseases.type2diabetes.rel_sus = np.ones(len(sim.people))  # Initialize to 1.0
+        else:
+            sim.diseases.type2diabetes.rel_sus[:] = 1.0  # Reset to default
+
+        # Apply increased susceptibility for HIV-infected individuals
+        hiv_infected = sim.people.hiv.infected
+        before_update = np.unique(sim.diseases.type2diabetes.rel_sus)
+        sim.diseases.type2diabetes.rel_sus[hiv_infected] = self.pars.rel_sus_hiv_type2diabetes
+        after_update = np.unique(sim.diseases.type2diabetes.rel_sus)
+
+        # Debugging output
+        print(f"rel_sus values before update: {before_update}")
+        print(f"Updated rel_sus for HIV-positive individuals: {sim.diseases.type2diabetes.rel_sus[hiv_infected]}")
+        print(f"rel_sus values after update: {after_update}")
+    # def update(self):
+    #     sim = self.sim
+    #     if sim.diseases.type2diabetes.rel_sus is None:
+    #         print("rel_sus is still None during update.")
+    #     else:
+    #         print(f"rel_sus is initialized with values: {sim.diseases.type2diabetes.rel_sus}")
+    #         sim.diseases.type2diabetes.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_type2diabetes
+    #     return
 # import starsim as ss
 # import mighti as mi
 # import pandas as pd
