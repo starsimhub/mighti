@@ -39,7 +39,7 @@ class Type1Diabetes(ss.NCD):
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_recovered'),
             ss.FloatArr('ti_dead'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
         return
 
@@ -104,7 +104,7 @@ class Type2Diabetes(ss.NCD):
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_reversed'),
             ss.FloatArr('ti_dead'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
             # ss.FloatArr('beta_cell_function'),  # Tracks beta-cell function over time
             # ss.FloatArr('insulin_resistance'),  # Tracks insulin resistance progression
         )
@@ -232,7 +232,7 @@ class Obesity(ss.NCD):
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_recovered'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
         return
 
@@ -284,7 +284,7 @@ class Hypertension(ss.NCD):
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_recovered'),
             ss.FloatArr('ti_dead'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
         return
 
@@ -347,7 +347,7 @@ class Depression(ss.Disease):
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_recovered'),
             ss.FloatArr('ti_dead'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
         return
 
@@ -364,7 +364,7 @@ class Flu(ss.SIS):
             ss.State('susceptible'),
             ss.State('infected'),
             ss.FloatArr('ti_infected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
     # """
     # Example influenza model. Modifies the SIS model by adding a probability of dying.
@@ -383,7 +383,7 @@ class Flu(ss.SIS):
     #     self.update_pars(pars, **kwargs)
     #     self.add_states(
     #         ss.FloatArr('ti_dead'),
-    #         ss.FloatArr('rel_sus'),
+    #         ss.FloatArr('rel_sus', default=1.0),
     #     )
     #     self.pars.p_death = ss.bernoulli(self.make_p_death_fn)
 
@@ -445,7 +445,7 @@ class HPV(ss.Disease):
             ss.State('susceptible'),
             ss.State('infected'),
             ss.FloatArr('ti_infected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -461,7 +461,7 @@ class CervicalCancer(ss.Disease):
             ss.State('susceptible'),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -474,7 +474,7 @@ class ColorectalCancer(ss.Disease):
             ss.State('susceptible'),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -487,7 +487,7 @@ class BreastCancer(ss.Disease):
             ss.State('susceptible'),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -500,7 +500,7 @@ class LungCancer(ss.Disease):
             ss.State('susceptible'),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -513,7 +513,7 @@ class ProstateCancer(ss.Disease):
             ss.State('susceptible'),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -526,7 +526,7 @@ class OtherCancer(ss.Disease):
             ss.State('susceptible'),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -539,7 +539,7 @@ class Parkinsons(ss.Disease):
             ss.State('susceptible'),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -552,7 +552,7 @@ class Smoking(ss.Disease):
             ss.State('susceptible'),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -565,7 +565,7 @@ class BRCA(ss.Disease):
             ss.State('susceptible'),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -578,7 +578,7 @@ class Alcohol(ss.Disease):
             ss.State('susceptible'),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -591,7 +591,7 @@ class ViralHepatitis(ss.Disease):
             ss.State('susceptible'),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -604,7 +604,7 @@ class Poverty(ss.Disease):
             ss.State('susceptible'),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -617,7 +617,7 @@ class Accident(ss.Disease):
         self.define_states(
             ss.State('susceptible'),
             ss.State('affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -630,7 +630,7 @@ class Alzheimers(ss.Disease):
         self.define_states(
             ss.State('susceptible'),
             ss.State('affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -643,7 +643,7 @@ class Assault(ss.Disease):
         self.define_states(
             ss.State('susceptible'),
             ss.State('affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -656,7 +656,7 @@ class CerebrovascularDisease(ss.Disease):
         self.define_states(
             ss.State('susceptible'),
             ss.State('affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -669,7 +669,7 @@ class ChronicLiverDisease(ss.Disease):
         self.define_states(
             ss.State('susceptible'),
             ss.State('affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -682,7 +682,7 @@ class ChronicLowerRespiratoryDisease(ss.Disease):
         self.define_states(
             ss.State('susceptible'),
             ss.State('affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -695,7 +695,7 @@ class HeartDisease(ss.NCD):
         self.define_states(
             ss.State('susceptible'),
             ss.State('affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
 
@@ -708,5 +708,5 @@ class ChronicKidneyDisease(ss.Disease):
         self.define_states(
             ss.State('susceptible'),
             ss.State('affected'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
