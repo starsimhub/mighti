@@ -4,14 +4,16 @@ import pandas as pd
 import pylab as pl
 import numpy as np
 from copy import deepcopy
+import matplotlib.pyplot as plt
+
 
 # Define diseases
 ncds = ['Type2Diabetes']
 diseases = ['HIV'] + ncds
-beta = 0.0001
+beta = 0.0005
 n_agents = 50000
 inityear = 2021
-endyear = 2030
+endyear = 2050
 
 # -------------------------
 # Prevalence Data
@@ -66,7 +68,8 @@ hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), bet
 disease_objects.append(hiv_disease)
 
 # Initialize the PrevalenceAnalyzer
-prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
+prevalence_analyzer_with = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
+prevalence_analyzer_without = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 
 # Load existing HIV and NCD interactions
 interaction_functions = {
@@ -75,87 +78,13 @@ interaction_functions = {
 }
 
 
-interactions = [interaction_functions[disease]() for disease in ncds]
-    
-    # Explicit initialization for debugging
-# for disease in disease_objects:
-#     if hasattr(disease, 'rel_sus') and disease.rel_sus is None:
-#         disease.rel_sus = np.ones(len(ppl))
-#         print(f"Manually initialized rel_sus for {disease.name}")
-    
-# #-----------
-# # Simulation Without Interactions
-# # -------------------------
-# sim_no_interactions = ss.Sim(
-#     n_agents=n_agents,
-#     networks=deepcopy(networks),
-#     diseases=deepcopy(disease_objects),
-#     analyzers=[prevalence_analyzer],
-#     start=inityear,
-#     end=endyear,
-#     people=deepcopy(ppl),
-#     demographics=[pregnancy, death],
-#     copy_inputs=False
-# )
+interactions = [
+    mi.hiv_type2diabetes(pars={"rel_sus_hiv_type2diabetes": 10})
+]
 
-# print("Running Simulation Without Interactions...")
-# sim_no_interactions.run()
+for interaction in interactions:
+    print(interaction)  # Should print the interaction object
 
-# # Extract Results
-# mortality_no_interactions = sim_no_interactions.results['new_deaths']
-# prevalence_results = prevalence_analyzer.results
-
-# # -------------------------
-# # Debugging Prevalence
-# # -------------------------
-# def extract_prevalence_by_gender(prevalence_analyzer, disease_name):
-#     """Extract prevalence for a specific disease by gender."""
-#     try:
-#         prevalence_male = prevalence_analyzer.results[f'{disease_name}_prevalence_male'] * 100
-#         prevalence_female = prevalence_analyzer.results[f'{disease_name}_prevalence_female'] * 100
-#         return prevalence_male, prevalence_female
-#     except KeyError as e:
-#         print(f"Prevalence data not found for {disease_name}: {e}")
-#         return None, None
-
-# # Plot Results
-# diseases_to_plot = ['HIV', 'Type2Diabetes']
-# fig, axs = pl.subplots(len(diseases_to_plot), 2, figsize=(15, len(diseases_to_plot) * 6))
-
-# for i, disease_name in enumerate(diseases_to_plot):
-#     prevalence_male, prevalence_female = extract_prevalence_by_gender(prevalence_analyzer, disease_name)
-
-#     # Plot Prevalence
-#     if prevalence_male is not None and prevalence_female is not None:
-#         axs[i, 0].plot(sim_no_interactions.yearvec, prevalence_male.mean(axis=1), label='Male', linestyle='-')
-#         axs[i, 0].plot(sim_no_interactions.yearvec, prevalence_female.mean(axis=1), label='Female', linestyle='--')
-#         axs[i, 0].set_title(f'Prevalence of {disease_name}', fontsize=16)
-#         axs[i, 0].set_xlabel('Year', fontsize=14)
-#         axs[i, 0].set_ylabel('Prevalence (%)', fontsize=14)
-#         axs[i, 0].legend()
-#         axs[i, 0].grid(True)
-
-#     # Plot Mortality
-#     axs[i, 1].plot(sim_no_interactions.yearvec, mortality_no_interactions, label=f'{disease_name} Mortality')
-#     axs[i, 1].set_title(f'Mortality of {disease_name}', fontsize=16)
-#     axs[i, 1].set_xlabel('Year', fontsize=14)
-#     axs[i, 1].set_ylabel('Mortality Count', fontsize=14)
-#     axs[i, 1].grid(True)
-
-# pl.tight_layout()
-# pl.show()
-        
-
-# -------------------------
-# Interactions
-# -------------------------
-
-# # Define interaction objects explicitly
-# interactions = [
-#     mi.hiv_type2diabetes(pars={"rel_sus_hiv_type2diabetes": 10}),
-#     # Uncomment if needed:
-#     # mi.hiv_obesity(pars={"rel_sus_hiv_obesity": 10}),
-# ]
 # -------------------------
 # Simulation With Interactions
 # -------------------------
@@ -165,20 +94,13 @@ pregnancy_with_interactions = ss.Pregnancy(pars=fertility_rates)
 death_with_interactions = ss.Deaths(death_rates)
 
 disease_objects_with_interactions = deepcopy(disease_objects)
-# for disease in ncds:
-#     disease_class = getattr(mi, disease)
-#     init_prev = ss.bernoulli(get_prevalence_function(disease))
-#     disease_obj = disease_class(init_prev=init_prev)
-#     disease_objects_with_interactions.append(disease_obj)
 
-# hiv_disease_with_interactions = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
-# disease_objects_with_interactions.append(hiv_disease_with_interactions)
 
 sim_with_interactions = ss.Sim(
     n_agents=n_agents,
     networks=networks_with_interactions,
     diseases=disease_objects_with_interactions,
-    analyzers=[prevalence_analyzer],
+    analyzers=[prevalence_analyzer_with],
     start=inityear,
     end=endyear,
     connectors=interactions,
@@ -188,8 +110,9 @@ sim_with_interactions = ss.Sim(
 )
 
 
-print("Running Simulation With Interactions...")
+# print(f"rel_sus for Type2Diabetes before simulation: {disease_objects_with_interactions[0].rel_sus[:10]}")
 sim_with_interactions.run()
+# print(f"rel_sus for Type2Diabetes after simulation: {disease_objects_with_interactions[0].rel_sus[:10]}")
 
 mortality_with_interactions = sim_with_interactions.results['new_deaths']  # New deaths per time step
 cumulative_mortality_with_interactions = sim_with_interactions.results['cum_deaths']  # Cumulative deaths
@@ -208,7 +131,7 @@ sim_no_interactions = ss.Sim(
     n_agents=n_agents,
     networks=networks_no_interactions,
     diseases=disease_objects_no_interactions,
-    analyzers=[prevalence_analyzer],
+    analyzers=[prevalence_analyzer_without],
     start=inityear,
     end=endyear,
     people=ppl_no_interactions,
@@ -223,33 +146,6 @@ mortality_no_interactions = sim_no_interactions.results['new_deaths']  # New dea
 cumulative_mortality_no_interactions = sim_no_interactions.results['cum_deaths']  # Cumulative deaths
 
 
-
-
-# # # -------------------------
-# # # Simulation With Interactions
-# # # -------------------------
-# # ppl_with_interactions = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age.csv'))
-# # networks_with_interactions = [deepcopy(net) for net in networks]
-# # pregnancy_with_interactions = ss.Pregnancy(pars=fertility_rates)
-# # death_with_interactions = ss.Deaths(death_rates)
-
-# # disease_objects_with_interactions = deepcopy(disease_objects)
-
-# # sim_with_interactions = ss.Sim(
-# #     n_agents=n_agents,
-# #     networks=networks_with_interactions,
-# #     diseases=disease_objects_with_interactions,
-# #     analyzers=[prevalence_analyzer],
-# #     start=inityear,
-# #     end=endyear,
-# #     connectors=interactions,  # Include interactions
-# #     people=ppl_with_interactions,
-# #     demographics=[pregnancy_with_interactions, death_with_interactions],
-# #     copy_inputs=False
-# # )
-
-# # print("Running Simulation With Interactions...")
-# # sim_with_interactions.run()
 
 
 
@@ -278,42 +174,170 @@ def extract_prevalence_by_gender(prevalence_analyzer, disease_name):
     except KeyError as e:
         print(f"Prevalence data not found for {disease_name}: {e}")
         return None, None
-
+    
+def extract_prevalence_by_hiv_status(prevalence_analyzer, disease_name):
+    """Extract prevalence for a specific disease stratified by HIV status and gender."""
+    try:
+        prevalence_hivpos_male = prevalence_analyzer.results[f'{disease_name}_prevalence_hivpos_male'] * 100
+        prevalence_hivneg_male = prevalence_analyzer.results[f'{disease_name}_prevalence_hivneg_male'] * 100
+        prevalence_hivpos_female = prevalence_analyzer.results[f'{disease_name}_prevalence_hivpos_female'] * 100
+        prevalence_hivneg_female = prevalence_analyzer.results[f'{disease_name}_prevalence_hivneg_female'] * 100
+        return prevalence_hivpos_male, prevalence_hivneg_male, prevalence_hivpos_female, prevalence_hivneg_female
+    except KeyError as e:
+        print(f"Prevalence data not found for {disease_name}: {e}")
+        return None, None, None, None
+    
+    
 # -------------------------
 # Plotting Mortality and Prevalence
 # -------------------------
-diseases_to_plot = ['HIV', 'Type2Diabetes']  # Add 'Obesity' if needed
-fig, axs = pl.subplots(len(diseases_to_plot), 2, figsize=(15, len(diseases_to_plot) * 6))
+# diseases_to_plot = ['HIV', 'Type2Diabetes']  # Add 'Obesity' if needed
+# fig, axs = pl.subplots(len(diseases_to_plot), 2, figsize=(15, len(diseases_to_plot) * 6))
 
-for i, disease_name in enumerate(diseases_to_plot):
-    # Extract mortality
-    mortality_with = extract_mortality(sim_with_interactions, disease_name)
-    mortality_without = extract_mortality(sim_no_interactions, disease_name)
+# for i, disease_name in enumerate(diseases_to_plot):
+#     # Extract mortality
+#     mortality_with = extract_mortality(sim_with_interactions, disease_name)
+#     mortality_without = extract_mortality(sim_no_interactions, disease_name)
 
-    # Extract prevalence by gender
-    prevalence_with_male, prevalence_with_female = extract_prevalence_by_gender(prevalence_analyzer, disease_name)
-    prevalence_without_male, prevalence_without_female = extract_prevalence_by_gender(prevalence_analyzer, disease_name)
+#     # Extract prevalence by gender
+#     prevalence_with_male, prevalence_with_female = extract_prevalence_by_gender(prevalence_analyzer_with, disease_name)
+#     prevalence_without_male, prevalence_without_female = extract_prevalence_by_gender(prevalence_analyzer_without, disease_name)
 
-    # Plot mortality
-    axs[i, 0].plot(sim_with_interactions.yearvec, mortality_with, label='With Interactions', linestyle='-')
-    axs[i, 0].plot(sim_no_interactions.yearvec, mortality_without, label='Without Interactions', linestyle='--')
-    axs[i, 0].set_title(f'Mortality Comparison: {disease_name}', fontsize=16)
-    axs[i, 0].set_xlabel('Year', fontsize=14)
-    axs[i, 0].set_ylabel('Mortality Count', fontsize=14)
-    axs[i, 0].legend()
-    axs[i, 0].grid(True)
+#     # Plot mortality
+#     axs[i, 0].plot(sim_with_interactions.yearvec, mortality_with, label='With Interactions', linestyle='-')
+#     axs[i, 0].plot(sim_no_interactions.yearvec, mortality_without, label='Without Interactions', linestyle='--')
+#     axs[i, 0].set_title(f'Mortality Comparison: {disease_name}', fontsize=16)
+#     axs[i, 0].set_xlabel('Year', fontsize=14)
+#     axs[i, 0].set_ylabel('Mortality Count', fontsize=14)
+#     axs[i, 0].legend()
+#     axs[i, 0].grid(True)
 
-    # Plot prevalence
-    if prevalence_with_male is not None and prevalence_without_male is not None:
-        axs[i, 1].plot(sim_with_interactions.yearvec, prevalence_with_male.mean(axis=1), label='Male (With Interactions)', linestyle='-')
-        axs[i, 1].plot(sim_no_interactions.yearvec, prevalence_without_male.mean(axis=1), label='Male (Without Interactions)', linestyle='--')
-        axs[i, 1].plot(sim_with_interactions.yearvec, prevalence_with_female.mean(axis=1), label='Female (With Interactions)', linestyle='-')
-        axs[i, 1].plot(sim_no_interactions.yearvec, prevalence_without_female.mean(axis=1), label='Female (Without Interactions)', linestyle='--')
-        axs[i, 1].set_title(f'Prevalence Comparison: {disease_name}', fontsize=16)
-        axs[i, 1].set_xlabel('Year', fontsize=14)
-        axs[i, 1].set_ylabel('Prevalence (%)', fontsize=14)
-        axs[i, 1].legend()
-        axs[i, 1].grid(True)
+#     # Plot prevalence
+#     if prevalence_with_male is not None and prevalence_without_male is not None:
+#         axs[i, 1].plot(sim_with_interactions.yearvec, prevalence_with_male.mean(axis=1), label='Male (With Interactions)', linestyle='-')
+#         axs[i, 1].plot(sim_no_interactions.yearvec, prevalence_without_male.mean(axis=1), label='Male (Without Interactions)', linestyle='--')
+#         axs[i, 1].plot(sim_with_interactions.yearvec, prevalence_with_female.mean(axis=1), label='Female (With Interactions)', linestyle='-')
+#         axs[i, 1].plot(sim_no_interactions.yearvec, prevalence_without_female.mean(axis=1), label='Female (Without Interactions)', linestyle='--')
+#         axs[i, 1].set_title(f'Prevalence Comparison: {disease_name}', fontsize=16)
+#         axs[i, 1].set_xlabel('Year', fontsize=14)
+#         axs[i, 1].set_ylabel('Prevalence (%)', fontsize=14)
+#         axs[i, 1].legend()
+#         axs[i, 1].grid(True)
 
-pl.tight_layout()
-pl.show()
+# pl.tight_layout()
+# pl.show()
+
+
+# pl.figure(figsize=(10,5))
+# pl.plot(sim_with_interactions.yearvec, mortality_with_interactions, label='With Interactions', linestyle='-', color='red')
+# pl.plot(sim_no_interactions.yearvec, mortality_no_interactions, label='Without Interactions', linestyle='--', color='blue')
+# pl.legend()
+# pl.title("Mortality Comparison")
+# pl.show()
+
+
+# # Debugging: Print values
+# print("Checking extracted values:")
+# print("With Interactions (HIV+ Male):", t2d_with_hiv_pos_male)
+# print("With Interactions (HIV+ Female):", t2d_with_hiv_pos_female)
+# print("With Interactions (HIV- Male):", t2d_with_hiv_neg_male)
+# print("With Interactions (HIV- Female):", t2d_with_hiv_neg_female)
+# print("Without Interactions (HIV+ Male):", t2d_without_hiv_pos_male)
+# print("Without Interactions (HIV+ Female):", t2d_without_hiv_pos_female)
+# print("Without Interactions (HIV- Male):", t2d_without_hiv_neg_male)
+# print("Without Interactions (HIV- Female):", t2d_without_hiv_neg_female)
+
+
+# # Check for exact equality
+# hiv_same = np.array_equal(hiv_prevalence_with, hiv_prevalence_without)
+# t2d_same = np.array_equal(t2d_prevalence_with, t2d_prevalence_without)
+
+# # Compute absolute differences
+# hiv_diff = np.abs(hiv_prevalence_with - hiv_prevalence_without)
+# t2d_diff = np.abs(t2d_prevalence_with - t2d_prevalence_without)
+
+# # Print results
+# print(f"HIV prevalence identical: {hiv_same}")
+# print(f"Type 2 Diabetes prevalence identical: {t2d_same}")
+
+# # Display max difference
+# print(f"Max HIV prevalence difference: {np.max(hiv_diff)}")
+# print(f"Max T2D prevalence difference: {np.max(t2d_diff)}")
+
+
+
+# Function to extract prevalence by sex
+def extract_prevalence_by_sex(prevalence_analyzer, disease_name):
+    """Extract prevalence data by sex."""
+    try:
+        prevalence_male = prevalence_analyzer.results[f'{disease_name}_prevalence_male']
+        prevalence_female = prevalence_analyzer.results[f'{disease_name}_prevalence_female']
+        return prevalence_male, prevalence_female
+    except KeyError as e:
+        print(f"Prevalence data not found for {disease_name}: {e}")
+        return None, None
+
+# Extract prevalence data
+hiv_prevalence_male, hiv_prevalence_female = extract_prevalence_by_sex(prevalence_analyzer_with, 'HIV')
+t2d_prevalence_male, t2d_prevalence_female = extract_prevalence_by_sex(prevalence_analyzer_with, 'Type2Diabetes')
+
+# Extract age-grouped prevalence data
+hiv_prevalence_by_age = prevalence_analyzer_with.results['HIV_prevalence_male']
+t2d_prevalence_by_age = prevalence_analyzer_with.results['Type2Diabetes_prevalence_male']
+
+# Ensure year vector is properly aligned
+years = sim_with_interactions.yearvec
+
+# -------------------------
+# 1. Plot HIV Prevalence Over Time (Male & Female)
+# -------------------------
+plt.figure(figsize=(10, 5))
+plt.plot(years, hiv_prevalence_male.mean(axis=1) * 100, label='HIV Male', linestyle='-', color='blue')
+plt.plot(years, hiv_prevalence_female.mean(axis=1) * 100, label='HIV Female', linestyle='--', color='red')
+plt.xlabel("Year")
+plt.ylabel("HIV Prevalence (%)")
+plt.title("HIV Prevalence Over Time (By Sex)")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# -------------------------
+# 2. Plot T2D Prevalence Over Time (Male & Female)
+# -------------------------
+plt.figure(figsize=(10, 5))
+plt.plot(years, t2d_prevalence_male.mean(axis=1) * 100, label='T2D Male', linestyle='-', color='blue')
+plt.plot(years, t2d_prevalence_female.mean(axis=1) * 100, label='T2D Female', linestyle='--', color='red')
+plt.xlabel("Year")
+plt.ylabel("T2D Prevalence (%)")
+plt.title("Type 2 Diabetes Prevalence Over Time (By Sex)")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# -------------------------
+# 3. Plot HIV Prevalence By Age Group
+# -------------------------
+plt.figure(figsize=(10, 5))
+for i, age_bin in enumerate(prevalence_analyzer_with.age_bins['HIV']):
+    plt.plot(years, hiv_prevalence_by_age[:, i] * 100, label=f'Age {age_bin}')
+
+plt.xlabel("Year")
+plt.ylabel("HIV Prevalence (%)")
+plt.title("HIV Prevalence Over Time (By Age Group)")
+plt.legend(title="Age Group", loc='upper left', bbox_to_anchor=(1, 1))
+plt.grid(True)
+plt.show()
+
+# -------------------------
+# 4. Plot T2D Prevalence By Age Group
+# -------------------------
+plt.figure(figsize=(10, 5))
+for i, age_bin in enumerate(prevalence_analyzer_with.age_bins['Type2Diabetes']):
+    plt.plot(years, t2d_prevalence_by_age[:, i] * 100, label=f'Age {age_bin}')
+
+plt.xlabel("Year")
+plt.ylabel("T2D Prevalence (%)")
+plt.title("Type 2 Diabetes Prevalence Over Time (By Age Group)")
+plt.legend(title="Age Group", loc='upper left', bbox_to_anchor=(1, 1))
+plt.grid(True)
+plt.show()

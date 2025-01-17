@@ -2,65 +2,140 @@ import starsim as ss
 import numpy as np
 import sciris as sc
 
+
 class PrevalenceAnalyzer(ss.Analyzer):
-    """ Generalized analyzer to calculate disease prevalence over time by age group and sex """
+    """ Generalized analyzer to calculate disease prevalence over time by age group, sex, and HIV status. """
 
     def __init__(self, prevalence_data, diseases, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = 'prevalence_analyzer'
         self.prevalence_data = prevalence_data
-        self.diseases = diseases  # List of disease names like ['HIV', 'depression', 'diabetes', ...]
+        self.diseases = diseases  # List of disease names like ['HIV', 'Type2Diabetes']
 
-        # Initialize age bins for each disease
         self.age_bins = {}
         self.age_groups = {}
 
-        # Iterate over each disease and assign age bins
         for disease in self.diseases:
             self.age_bins[disease] = list(prevalence_data[disease]['male'].keys())
-            self.age_bins[disease].sort()  # Ensure age bins are sorted
-            # Create age groups with "inf" for the last bin (80+)
+            self.age_bins[disease].sort()
             self.age_groups[disease] = list(zip(self.age_bins[disease][:-1], self.age_bins[disease][1:])) + [(self.age_bins[disease][-1], float('inf'))]
 
         self.results = sc.odict()
 
     def init_pre(self, sim):
         super().init_pre(sim)
-        npts = sim.npts  # Number of time points in the simulation
+        npts = sim.npts
 
-        # Initialize result arrays for each disease: time x age groups
         for disease in self.diseases:
             self.results[f'{disease}_prevalence_male'] = np.zeros((npts, len(self.age_groups[disease])))
             self.results[f'{disease}_prevalence_female'] = np.zeros((npts, len(self.age_groups[disease])))
+            
+            # Track Type 2 Diabetes among HIV+ and HIV-
+            if disease == 'Type2Diabetes':
+                self.results[f'{disease}_prevalence_hivpos_male'] = np.zeros((npts, len(self.age_groups[disease])))
+                self.results[f'{disease}_prevalence_hivneg_male'] = np.zeros((npts, len(self.age_groups[disease])))
+                self.results[f'{disease}_prevalence_hivpos_female'] = np.zeros((npts, len(self.age_groups[disease])))
+                self.results[f'{disease}_prevalence_hivneg_female'] = np.zeros((npts, len(self.age_groups[disease])))
 
-        print(f"Initialized prevalence array with {npts} time points for {self.diseases}.")
         return
 
     def apply(self, sim):
-        print(f"Applying analyzer at time step {sim.ti}")
         ages = sim.people.age
         females = sim.people.female
-    
+        hiv_status = sim.diseases.hiv.infected  # Boolean array: True if HIV+, False if HIV-
+        
         for disease in self.diseases:
             disease_obj = getattr(sim.diseases, disease.lower())
-            if disease == 'HIV':
-                status_attr = 'infected'
-            else:
-                status_attr = 'affected'
-    
+            status_attr = 'infected' if disease == 'HIV' else 'affected'
+            
             for sex, label in zip([0, 1], ['male', 'female']):
                 prevalence_by_age_group = np.zeros(len(self.age_groups[disease]))
-    
+                if disease == 'Type2Diabetes':
+                    prevalence_hivpos_by_age_group = np.zeros(len(self.age_groups[disease]))
+                    prevalence_hivneg_by_age_group = np.zeros(len(self.age_groups[disease]))
+
                 for i, (start, end) in enumerate(self.age_groups[disease]):
                     if end == float('inf'):
                         age_mask = (ages >= start) & (females == sex)
                     else:
                         age_mask = (ages >= start) & (ages < end) & (females == sex)
-    
+
                     status_array = getattr(disease_obj, status_attr)
                     if np.sum(age_mask) > 0:
                         prevalence_by_age_group[i] = np.mean(status_array[age_mask])
+
+                    if disease == 'Type2Diabetes':
+                        # Separate T2D prevalence for HIV+ and HIV- individuals
+                        prevalence_hivpos_by_age_group[i] = np.mean(status_array[age_mask & hiv_status]) if np.sum(age_mask & hiv_status) > 0 else 0
+                        prevalence_hivneg_by_age_group[i] = np.mean(status_array[age_mask & ~hiv_status]) if np.sum(age_mask & ~hiv_status) > 0 else 0
+
+                self.results[f'{disease}_prevalence_{label}'][sim.ti, :] = prevalence_by_age_group
+
+                if disease == 'Type2Diabetes':
+                    self.results[f'{disease}_prevalence_hivpos_{label}'][sim.ti, :] = prevalence_hivpos_by_age_group
+                    self.results[f'{disease}_prevalence_hivneg_{label}'][sim.ti, :] = prevalence_hivneg_by_age_group
+
+
+
+# class PrevalenceAnalyzer(ss.Analyzer):
+#     """ Generalized analyzer to calculate disease prevalence over time by age group and sex """
+
+#     def __init__(self, prevalence_data, diseases, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         self.name = 'prevalence_analyzer'
+#         self.prevalence_data = prevalence_data
+#         self.diseases = diseases  # List of disease names like ['HIV', 'depression', 'diabetes', ...]
+
+#         # Initialize age bins for each disease
+#         self.age_bins = {}
+#         self.age_groups = {}
+
+#         # Iterate over each disease and assign age bins
+#         for disease in self.diseases:
+#             self.age_bins[disease] = list(prevalence_data[disease]['male'].keys())
+#             self.age_bins[disease].sort()  # Ensure age bins are sorted
+#             # Create age groups with "inf" for the last bin (80+)
+#             self.age_groups[disease] = list(zip(self.age_bins[disease][:-1], self.age_bins[disease][1:])) + [(self.age_bins[disease][-1], float('inf'))]
+
+#         self.results = sc.odict()
+
+#     def init_pre(self, sim):
+#         super().init_pre(sim)
+#         npts = sim.npts  # Number of time points in the simulation
+
+#         # Initialize result arrays for each disease: time x age groups
+#         for disease in self.diseases:
+#             self.results[f'{disease}_prevalence_male'] = np.zeros((npts, len(self.age_groups[disease])))
+#             self.results[f'{disease}_prevalence_female'] = np.zeros((npts, len(self.age_groups[disease])))
+
+#         print(f"Initialized prevalence array with {npts} time points for {self.diseases}.")
+#         return
+
+#     def apply(self, sim):
+#         print(f"Applying analyzer at time step {sim.ti}")
+#         ages = sim.people.age
+#         females = sim.people.female
     
-                disease_key = f'{disease}_prevalence_{label}'
-                # print(f"Storing data for {disease_key} at time {sim.ti}")  # Add this to confirm data is stored
-                self.results[disease_key][sim.ti, :] = prevalence_by_age_group
+#         for disease in self.diseases:
+#             disease_obj = getattr(sim.diseases, disease.lower())
+#             if disease == 'HIV':
+#                 status_attr = 'infected'
+#             else:
+#                 status_attr = 'affected'
+    
+#             for sex, label in zip([0, 1], ['male', 'female']):
+#                 prevalence_by_age_group = np.zeros(len(self.age_groups[disease]))
+    
+#                 for i, (start, end) in enumerate(self.age_groups[disease]):
+#                     if end == float('inf'):
+#                         age_mask = (ages >= start) & (females == sex)
+#                     else:
+#                         age_mask = (ages >= start) & (ages < end) & (females == sex)
+    
+#                     status_array = getattr(disease_obj, status_attr)
+#                     if np.sum(age_mask) > 0:
+#                         prevalence_by_age_group[i] = np.mean(status_array[age_mask])
+    
+#                 disease_key = f'{disease}_prevalence_{label}'
+#                 # print(f"Storing data for {disease_key} at time {sim.ti}")  # Add this to confirm data is stored
+#                 self.results[disease_key][sim.ti, :] = prevalence_by_age_group

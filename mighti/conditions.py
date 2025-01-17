@@ -38,10 +38,9 @@ class Type2Diabetes(ss.NCD):
         # Ensure rel_sus is initialized as an array of ones for all agents
         if self.rel_sus is None or len(self.rel_sus) != len(sim.people):
             self.rel_sus = np.ones(len(sim.people))  # Default susceptibility is 1 for all individuals
-            print(f"Initialized rel_sus for Type2Diabetes with default values.")
+            print("Initialized rel_sus for Type2Diabetes with default values.")
         else:
-            print(f"rel_sus already initialized: {self.rel_sus}")
-        
+            print(f"rel_sus already initialized: {np.unique(self.rel_sus)}")            
         return
             
         return
@@ -86,39 +85,61 @@ class Type2Diabetes(ss.NCD):
         
         print(f"After update: rel_sus values for HIV-infected: {sim.diseases.type2diabetes.rel_sus[sim.people.hiv.infected]}")
         return
-    
+
     def make_new_cases(self, relative_risk=1.0):
         """Create new cases of Type2Diabetes, adjusted by relative risk."""
         susceptible_uids = self.susceptible.uids
         base_prob = self.pars.incidence_prob
-        
+    
         # Ensure rel_sus is initialized
         if self.rel_sus is None or len(self.rel_sus) != len(self.sim.people):
             self.rel_sus = np.ones(len(self.sim.people))
-            print(f"Reinitialized rel_sus for Type2Diabetes in make_new_cases.")
-        
-        adjusted_prob = base_prob * self.rel_sus[susceptible_uids] * relative_risk
-        
+            print("Reinitialized rel_sus for Type2Diabetes in make_new_cases.")
+    
+        # Fetch updated rel_sus dynamically before computing adjusted probability
+        updated_rel_sus = self.sim.diseases.type2diabetes.rel_sus
+        adjusted_prob = base_prob * updated_rel_sus[susceptible_uids] * relative_risk
+    
+        # Ensure `adjusted_prob` is correctly formatted
+        if not isinstance(adjusted_prob, np.ndarray) or adjusted_prob.shape != (len(susceptible_uids),):
+            raise ValueError(f"adjusted_prob has incorrect shape: {adjusted_prob.shape}, expected ({len(susceptible_uids)},)")
+    
+        # Debugging: Separate HIV+ and HIV- adjusted probabilities
+        hiv_positive = self.sim.people.hiv.infected[susceptible_uids]
+        hiv_negative = ~hiv_positive
+        print(f"HIV+ Adjusted Probabilities: {adjusted_prob[hiv_positive]}")
+        print(f"HIV- Adjusted Probabilities: {adjusted_prob[hiv_negative]}")
+    
         # Debugging output
         print(f"Adjusted incidence probabilities: {adjusted_prob}")
         print(f"Susceptible UIDs: {susceptible_uids}, Count: {len(susceptible_uids)}")
-        
+    
+        print(f"Final adjusted_prob values used in Bernoulli: {adjusted_prob}")
         # Create and initialize the distribution
         adjusted_incidence_dist = ss.bernoulli(adjusted_prob, strict=False)
+        # adjusted_incidence_dist = ss.bernoulli(np.clip(adjusted_prob, 0, 1), strict=False)
         adjusted_incidence_dist.slots = np.arange(len(susceptible_uids))  # Use relative indices as slots
-        adjusted_incidence_dist.initialize()  # Explicitly initialize the distribution
-        
-        # Debugging the slots
+        adjusted_incidence_dist.initialize()  # Ensure the distribution is properly initialized
+    
+        # Debugging: Print slots
         print(f"Adjusted incidence distribution slots: {adjusted_incidence_dist.slots}")
-        
-        # Filter the relative indices
-        relative_indices = np.arange(len(susceptible_uids))  # Indices relative to the slots
-        print(f"Relative indices for filtering: {relative_indices}")
-        
-        # Generate new cases using the relative indices
-        new_cases = susceptible_uids[adjusted_incidence_dist.rvs(len(relative_indices))]
+    
+        print(f"Before applying rvs: Susceptible count = {len(susceptible_uids)}")
+        # Generate new cases
+        new_cases = susceptible_uids[adjusted_incidence_dist.rvs(len(susceptible_uids))]
+
+        print(f"rvs output: {adjusted_incidence_dist.rvs(len(susceptible_uids))}")
+
         print(f"New cases identified: {len(new_cases)}")
         
+        test_outcome = adjusted_incidence_dist.rvs(len(susceptible_uids))
+        print(f"rvs() output distribution: {np.unique(test_outcome, return_counts=True)}")
+        
+        test_dist = ss.bernoulli(np.array([0.0315, 0.0315, 0.315, 0.315]), strict=False)
+        test_dist.initialize()
+        test_draws = test_dist.rvs(4)
+        print(f"Test draws for 3.15% and 31.5%: {test_draws}")
+        print(f"rvs() output distribution after fix: {np.unique(test_draws, return_counts=True)}")
         # Set prognoses for the new cases
         self.set_prognoses(new_cases)
         return new_cases
@@ -126,7 +147,9 @@ class Type2Diabetes(ss.NCD):
     def set_prognoses(self, uids):
         sim = self.sim
         p = self.pars
+        print(f"Susceptible before: {np.count_nonzero(self.susceptible)}")
         self.susceptible[uids] = False
+        print(f"Susceptible after: {np.count_nonzero(self.susceptible)}")
         self.affected[uids] = True
         dur_condition = p.dur_condition.rvs(uids)
         will_die = p.p_death.rvs(uids)

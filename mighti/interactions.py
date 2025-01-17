@@ -28,7 +28,7 @@ class hiv_type2diabetes(ss.Connector):
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Type2Diabetes', requires=[ss.HIV, mi.Type2Diabetes])
         self.default_pars(
-            rel_sus_hiv_type2diabetes=10,  # People with HIV are 10x more likely to acquire Type 2 Diabetes
+            rel_sus_hiv_type2diabetes=30,  # People with HIV are 10x more likely to acquire Type 2 Diabetes
         )
         self.update_pars(pars, **kwargs)
 
