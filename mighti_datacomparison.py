@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 # Define diseases
 ncds = ['Type2Diabetes']
 diseases = ['HIV'] + ncds
-beta = 0.0001
-n_agents = 50000
+beta = 0.0005
+n_agents = 500000
 inityear = 2007
 endyear = 2030
 
@@ -125,40 +125,6 @@ sim_with_interactions = ss.Sim(
 # print(f"rel_sus for Type2Diabetes before simulation: {disease_objects_with_interactions[0].rel_sus[:10]}")
 sim_with_interactions.run()
 # print(f"rel_sus for Type2Diabetes after simulation: {disease_objects_with_interactions[0].rel_sus[:10]}")
-
-mortality_with_interactions = sim_with_interactions.results['new_deaths']  # New deaths per time step
-cumulative_mortality_with_interactions = sim_with_interactions.results['cum_deaths']  # Cumulative deaths
-
-# -------------------------
-# Simulation Without Interactions
-# -------------------------
-ppl_no_interactions = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age.csv'))
-networks_no_interactions = [deepcopy(net) for net in networks]
-pregnancy_no_interactions = ss.Pregnancy(pars=fertility_rates)
-death_no_interactions = ss.Deaths(death_rates)
-
-disease_objects_no_interactions = deepcopy(disease_objects)
-
-sim_no_interactions = ss.Sim(
-    n_agents=n_agents,
-    networks=networks_no_interactions,
-    diseases=disease_objects_no_interactions,
-    analyzers=[prevalence_analyzer_without],
-    start=inityear,
-    end=endyear,
-    people=ppl_no_interactions,
-    demographics=[pregnancy_no_interactions, death_no_interactions],
-    copy_inputs=False
-)
-
-print("Running Simulation Without Interactions...")
-sim_no_interactions.run()
-
-mortality_no_interactions = sim_no_interactions.results['new_deaths']  # New deaths per time step
-cumulative_mortality_no_interactions = sim_no_interactions.results['cum_deaths']  # Cumulative deaths
-
-
-
 
  # Retrieve the prevalence data for plotting
 try:
