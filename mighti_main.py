@@ -23,7 +23,7 @@ ncds = [
 ]
 
 diseases = ['HIV'] + ncds
-beta = 0.001  # Transmission probability for HIV
+beta = 0.0005
 n_agents = 5000  # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 
@@ -141,7 +141,7 @@ sim = ss.Sim(
     diseases=disease_objects,  # Full list of diseases (HIV + NCDs)
     analyzers=[prevalence_analyzer],
     start=inityear,
-    end=2020,
+    end=2050,
     connectors=interactions,  # Both HIV-NCD and NCD-NCD interactions
     people=ppl,
     demographics=[pregnancy, death],
@@ -157,17 +157,16 @@ print("Starting Simulation...")
 sim.run()
 
 
-
 # Retrieve the prevalence data for plotting
 try:
     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
     hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
     # diabetes1_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
     # diabetes1_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
-    diabetes2_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
-    diabetes2_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
-    obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
-    obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
+    # diabetes2_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
+    # diabetes2_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
+    # obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
+    # obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
     # hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
     # hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
 

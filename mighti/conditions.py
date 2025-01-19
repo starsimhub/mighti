@@ -1,5 +1,6 @@
 import numpy as np
 import starsim as ss
+
 class Type2Diabetes(ss.NCD):
 
     def __init__(self, pars=None, **kwargs):
@@ -7,15 +8,13 @@ class Type2Diabetes(ss.NCD):
         self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
 
         self.default_pars(
-            dur_condition=ss.lognorm_ex(5),  # Longer duration reflecting chronic condition
-            incidence_prob = 0.0315,
-            incidence=ss.bernoulli(0.0315),    # Higher incidence rate
-            p_death=ss.bernoulli(0.0017),     # Mortality risk (may increase over time)
-            init_prev=ss.bernoulli(0.2),     # Higher initial prevalence
-            # beta_cell_decline_rate=0.05,     # Rate of beta-cell function decline over time
-            # insulin_resistance_increase_rate=0.1,  # Rate of increasing insulin resistance
-            remission_rate=ss.bernoulli(0.0024),  # Probability of remission (reversing the condition)
-            max_disease_duration=20,         # Maximum duration before severe complications
+            dur_condition=ss.lognorm_ex(15.02897096),  
+            incidence_prob = 0.059,
+            incidence=ss.bernoulli(0.059),    
+            p_death=ss.bernoulli(0.004315),     
+            init_prev=ss.bernoulli(0.1351),    
+            remission_rate=ss.bernoulli(0.0024), 
+            max_disease_duration=20,        
         )
         self.update_pars(pars, **kwargs)
 
@@ -26,8 +25,6 @@ class Type2Diabetes(ss.NCD):
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_reversed'),
             ss.FloatArr('ti_dead'),
-            # ss.FloatArr('beta_cell_function'),  # Tracks beta-cell function over time
-            # ss.FloatArr('insulin_resistance'),  # Tracks insulin resistance progression
         )
         return
     

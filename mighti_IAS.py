@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 # Define diseases
 ncds = ['Type2Diabetes']
 diseases = ['HIV'] + ncds
-beta = 0.0005
+beta = 0.0001
 n_agents = 50000
-inityear = 2021
-endyear = 2050
+inityear = 2007
+endyear = 2030
 
 # -------------------------
 # Prevalence Data
@@ -32,7 +32,15 @@ for year in years:
     )
     eswatini_hiv_data[year] = hiv_prevalence_data['HIV']  # Store data for the specific year
 
-
+# eswatini_t2d_data = {}
+# for year in years:
+#     t2d_prevalence_data, _ = mi.initialize_prevalence_data(
+#         diseases= ['Type2Diabetes'], 
+#         csv_file_path='mighti/data/prevalence_data_eswatini.csv', 
+#         inityear=year
+#     )
+#     eswatini_t2d_data[year] = t2d_prevalence_data['Type2Diabetes']
+    
 # -------------------------
 # Demographics
 # -------------------------
@@ -51,16 +59,33 @@ networks = [mf, maternal]
 
 # Define a function for disease-specific prevalence
 def get_prevalence_function(disease):
-    return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
+    def prevalence_lambda(module, sim, size):
+        """ Extract prevalence for the given disease, ensuring it returns a numeric probability. """
+        if sim is None:
+            raise ValueError(f"Simulation object is None when computing prevalence for {disease}")
+        
+        prev = mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
+        
+        if isinstance(prev, np.ndarray):  # If it's an array, take the mean
+            return np.mean(prev)
+        return float(prev)  # Ensure a float is returned
+
+    return prevalence_lambda
 
 # Create disease objects
 disease_objects = []
 for disease in ncds:
-    init_prev = ss.bernoulli(get_prevalence_function(disease))
+    prevalence_function = get_prevalence_function(disease)
+    
+    # Use `strict=False` to avoid initialization errors
+    init_prev = ss.bernoulli(prevalence_function, strict=False)
+
+    # Initialize later, within the simulation context
     if disease == 'Type2Diabetes':
         disease_obj = mi.Type2Diabetes(init_prev=init_prev)
     elif disease == 'Obesity':
         disease_obj = mi.Obesity(init_prev=init_prev)
+
     disease_objects.append(disease_obj)
     
 # HIV-specific setup
@@ -165,16 +190,6 @@ def extract_mortality(sim, disease_name):
 # -------------------------
 # Extract Prevalence Data by Gender
 # -------------------------
-def extract_prevalence_by_gender(prevalence_analyzer, disease_name):
-    """Extract prevalence for a specific disease by gender."""
-    try:
-        prevalence_male = prevalence_analyzer.results[f'{disease_name}_prevalence_male'] * 100
-        prevalence_female = prevalence_analyzer.results[f'{disease_name}_prevalence_female'] * 100
-        return prevalence_male, prevalence_female
-    except KeyError as e:
-        print(f"Prevalence data not found for {disease_name}: {e}")
-        return None, None
-    
 def extract_prevalence_by_hiv_status(prevalence_analyzer, disease_name):
     """Extract prevalence for a specific disease stratified by HIV status and gender."""
     try:
@@ -187,84 +202,6 @@ def extract_prevalence_by_hiv_status(prevalence_analyzer, disease_name):
         print(f"Prevalence data not found for {disease_name}: {e}")
         return None, None, None, None
     
-    
-# -------------------------
-# Plotting Mortality and Prevalence
-# -------------------------
-# diseases_to_plot = ['HIV', 'Type2Diabetes']  # Add 'Obesity' if needed
-# fig, axs = pl.subplots(len(diseases_to_plot), 2, figsize=(15, len(diseases_to_plot) * 6))
-
-# for i, disease_name in enumerate(diseases_to_plot):
-#     # Extract mortality
-#     mortality_with = extract_mortality(sim_with_interactions, disease_name)
-#     mortality_without = extract_mortality(sim_no_interactions, disease_name)
-
-#     # Extract prevalence by gender
-#     prevalence_with_male, prevalence_with_female = extract_prevalence_by_gender(prevalence_analyzer_with, disease_name)
-#     prevalence_without_male, prevalence_without_female = extract_prevalence_by_gender(prevalence_analyzer_without, disease_name)
-
-#     # Plot mortality
-#     axs[i, 0].plot(sim_with_interactions.yearvec, mortality_with, label='With Interactions', linestyle='-')
-#     axs[i, 0].plot(sim_no_interactions.yearvec, mortality_without, label='Without Interactions', linestyle='--')
-#     axs[i, 0].set_title(f'Mortality Comparison: {disease_name}', fontsize=16)
-#     axs[i, 0].set_xlabel('Year', fontsize=14)
-#     axs[i, 0].set_ylabel('Mortality Count', fontsize=14)
-#     axs[i, 0].legend()
-#     axs[i, 0].grid(True)
-
-#     # Plot prevalence
-#     if prevalence_with_male is not None and prevalence_without_male is not None:
-#         axs[i, 1].plot(sim_with_interactions.yearvec, prevalence_with_male.mean(axis=1), label='Male (With Interactions)', linestyle='-')
-#         axs[i, 1].plot(sim_no_interactions.yearvec, prevalence_without_male.mean(axis=1), label='Male (Without Interactions)', linestyle='--')
-#         axs[i, 1].plot(sim_with_interactions.yearvec, prevalence_with_female.mean(axis=1), label='Female (With Interactions)', linestyle='-')
-#         axs[i, 1].plot(sim_no_interactions.yearvec, prevalence_without_female.mean(axis=1), label='Female (Without Interactions)', linestyle='--')
-#         axs[i, 1].set_title(f'Prevalence Comparison: {disease_name}', fontsize=16)
-#         axs[i, 1].set_xlabel('Year', fontsize=14)
-#         axs[i, 1].set_ylabel('Prevalence (%)', fontsize=14)
-#         axs[i, 1].legend()
-#         axs[i, 1].grid(True)
-
-# pl.tight_layout()
-# pl.show()
-
-
-# pl.figure(figsize=(10,5))
-# pl.plot(sim_with_interactions.yearvec, mortality_with_interactions, label='With Interactions', linestyle='-', color='red')
-# pl.plot(sim_no_interactions.yearvec, mortality_no_interactions, label='Without Interactions', linestyle='--', color='blue')
-# pl.legend()
-# pl.title("Mortality Comparison")
-# pl.show()
-
-
-# # Debugging: Print values
-# print("Checking extracted values:")
-# print("With Interactions (HIV+ Male):", t2d_with_hiv_pos_male)
-# print("With Interactions (HIV+ Female):", t2d_with_hiv_pos_female)
-# print("With Interactions (HIV- Male):", t2d_with_hiv_neg_male)
-# print("With Interactions (HIV- Female):", t2d_with_hiv_neg_female)
-# print("Without Interactions (HIV+ Male):", t2d_without_hiv_pos_male)
-# print("Without Interactions (HIV+ Female):", t2d_without_hiv_pos_female)
-# print("Without Interactions (HIV- Male):", t2d_without_hiv_neg_male)
-# print("Without Interactions (HIV- Female):", t2d_without_hiv_neg_female)
-
-
-# # Check for exact equality
-# hiv_same = np.array_equal(hiv_prevalence_with, hiv_prevalence_without)
-# t2d_same = np.array_equal(t2d_prevalence_with, t2d_prevalence_without)
-
-# # Compute absolute differences
-# hiv_diff = np.abs(hiv_prevalence_with - hiv_prevalence_without)
-# t2d_diff = np.abs(t2d_prevalence_with - t2d_prevalence_without)
-
-# # Print results
-# print(f"HIV prevalence identical: {hiv_same}")
-# print(f"Type 2 Diabetes prevalence identical: {t2d_same}")
-
-# # Display max difference
-# print(f"Max HIV prevalence difference: {np.max(hiv_diff)}")
-# print(f"Max T2D prevalence difference: {np.max(t2d_diff)}")
-
-
 
 # Function to extract prevalence by sex
 def extract_prevalence_by_sex(prevalence_analyzer, disease_name):
@@ -277,67 +214,143 @@ def extract_prevalence_by_sex(prevalence_analyzer, disease_name):
         print(f"Prevalence data not found for {disease_name}: {e}")
         return None, None
 
-# Extract prevalence data
-hiv_prevalence_male, hiv_prevalence_female = extract_prevalence_by_sex(prevalence_analyzer_with, 'HIV')
-t2d_prevalence_male, t2d_prevalence_female = extract_prevalence_by_sex(prevalence_analyzer_with, 'Type2Diabetes')
 
-# Extract age-grouped prevalence data
-hiv_prevalence_by_age = prevalence_analyzer_with.results['HIV_prevalence_male']
-t2d_prevalence_by_age = prevalence_analyzer_with.results['Type2Diabetes_prevalence_male']
 
-# Ensure year vector is properly aligned
-years = sim_with_interactions.yearvec
 
-# -------------------------
-# 1. Plot HIV Prevalence Over Time (Male & Female)
-# -------------------------
-plt.figure(figsize=(10, 5))
-plt.plot(years, hiv_prevalence_male.mean(axis=1) * 100, label='HIV Male', linestyle='-', color='blue')
-plt.plot(years, hiv_prevalence_female.mean(axis=1) * 100, label='HIV Female', linestyle='--', color='red')
-plt.xlabel("Year")
-plt.ylabel("HIV Prevalence (%)")
-plt.title("HIV Prevalence Over Time (By Sex)")
-plt.legend()
-plt.grid(True)
-plt.show()
+# Retrieve the prevalence data for plotting
+try:
+    hiv_prevalence_data_male = prevalence_analyzer_with.results['HIV_prevalence_male'] * 100
+    hiv_prevalence_data_female = prevalence_analyzer_with.results['HIV_prevalence_female'] * 100
+    t2d_prevalence_data_male = prevalence_analyzer_with.results['Type2Diabetes_prevalence_male'] * 100
+    t2d_prevalence_data_female = prevalence_analyzer_with.results['Type2Diabetes_prevalence_female'] * 100
 
-# -------------------------
-# 2. Plot T2D Prevalence Over Time (Male & Female)
-# -------------------------
-plt.figure(figsize=(10, 5))
-plt.plot(years, t2d_prevalence_male.mean(axis=1) * 100, label='T2D Male', linestyle='-', color='blue')
-plt.plot(years, t2d_prevalence_female.mean(axis=1) * 100, label='T2D Female', linestyle='--', color='red')
-plt.xlabel("Year")
-plt.ylabel("T2D Prevalence (%)")
-plt.title("Type 2 Diabetes Prevalence Over Time (By Sex)")
-plt.legend()
-plt.grid(True)
-plt.show()
+    # Ensure age_bins is properly formatted
+    age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
+    age_group_labels = [f'{left}-{right-1}' for left, right in zip(age_bins[:-1], age_bins[1:])]
+    age_group_labels.append('80+') if age_bins[-1] == 80 else None
 
-# -------------------------
-# 3. Plot HIV Prevalence By Age Group
-# -------------------------
-plt.figure(figsize=(10, 5))
-for i, age_bin in enumerate(prevalence_analyzer_with.age_bins['HIV']):
-    plt.plot(years, hiv_prevalence_by_age[:, i] * 100, label=f'Age {age_bin}')
+    cmap = pl.get_cmap('tab20', len(age_group_labels))  # Assign colors for age bins
+    age_bin_colors = {label: cmap(i) for i, label in enumerate(age_group_labels)}
 
-plt.xlabel("Year")
-plt.ylabel("HIV Prevalence (%)")
-plt.title("HIV Prevalence Over Time (By Age Group)")
-plt.legend(title="Age Group", loc='upper left', bbox_to_anchor=(1, 1))
-plt.grid(True)
-plt.show()
+    # Known real data years
+    real_years = [2007, 2011, 2017, 2021]
 
-# -------------------------
-# 4. Plot T2D Prevalence By Age Group
-# -------------------------
-plt.figure(figsize=(10, 5))
-for i, age_bin in enumerate(prevalence_analyzer_with.age_bins['Type2Diabetes']):
-    plt.plot(years, t2d_prevalence_by_age[:, i] * 100, label=f'Age {age_bin}')
+    # Initialize the plot
+    n_diseases = len(diseases)
+    fig, axs = pl.subplots(n_diseases, 2, figsize=(18, n_diseases * 6), sharey='row')
 
-plt.xlabel("Year")
-plt.ylabel("T2D Prevalence (%)")
-plt.title("Type 2 Diabetes Prevalence Over Time (By Age Group)")
-plt.legend(title="Age Group", loc='upper left', bbox_to_anchor=(1, 1))
-plt.grid(True)
-plt.show()
+    # Iterate through diseases to plot both estimated and real data
+    for disease_idx, disease in enumerate(diseases):
+        male_data = prevalence_analyzer_with.results[f'{disease}_prevalence_male'] * 100
+        female_data = prevalence_analyzer_with.results[f'{disease}_prevalence_female'] * 100
+
+        # Plot estimated trends for each age group
+        for i, label in enumerate(age_group_labels):
+            axs[disease_idx, 0].plot(sim_with_interactions.yearvec, male_data[:, i], label=label, color=age_bin_colors[label], alpha=0.8)
+            axs[disease_idx, 1].plot(sim_with_interactions.yearvec, female_data[:, i], color=age_bin_colors[label], alpha=0.8)
+
+        # Plot real observed data (HIV and T2D)
+        for year in real_years:
+            # HIV Real Data
+            if disease == 'HIV' and year in eswatini_hiv_data:
+                real_male_data = eswatini_hiv_data[year]['male']
+                real_female_data = eswatini_hiv_data[year]['female']
+
+                for age_bin in real_male_data:
+                    age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
+                    if age_label in age_bin_colors:
+                        axs[disease_idx, 0].scatter(year, real_male_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, edgecolors='black', zorder=5)
+
+                for age_bin in real_female_data:
+                    age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
+                    if age_label in age_bin_colors:
+                        axs[disease_idx, 1].scatter(year, real_female_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, edgecolors='black', zorder=5)
+
+            # Type 2 Diabetes (T2D) Real Data
+            if disease == 'Type2Diabetes' and year in eswatini_t2d_data:
+                real_male_data = eswatini_t2d_data[year]['male']
+                real_female_data = eswatini_t2d_data[year]['female']
+
+                for age_bin in real_male_data:
+                    age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
+                    if age_label in age_bin_colors:
+                        axs[disease_idx, 0].scatter(year, real_male_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, edgecolors='black', marker='s', zorder=5)
+
+                for age_bin in real_female_data:
+                    age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
+                    if age_label in age_bin_colors:
+                        axs[disease_idx, 1].scatter(year, real_female_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, edgecolors='black', marker='s', zorder=5)
+
+        # Formatting the plots
+        axs[disease_idx, 0].set_title(f'{disease} (Male)', fontsize=22)
+        axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=22)
+        axs[disease_idx, 0].set_xlabel('Year', fontsize=18)
+        axs[disease_idx, 1].set_xlabel('Year', fontsize=18)
+        axs[disease_idx, 0].set_ylabel('Prevalence (%)', fontsize=18)
+        axs[disease_idx, 0].grid(True)
+        axs[disease_idx, 1].grid(True)
+
+    # Add a common legend
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, title='Age Groups', loc='lower center', bbox_to_anchor=(0.5, -0.08), ncol=len(age_group_labels) // 2, fontsize=12)
+
+    # Adjust layout and show
+    pl.tight_layout(rect=[0, 0.05, 1, 1])
+    pl.show()
+
+except KeyError as e:
+    print(f"KeyError: {e} - Check if the correct result keys are being used.")
+
+# # -------------------------
+# # 1. Plot HIV Prevalence Over Time (Male & Female)
+# # -------------------------
+# plt.figure(figsize=(10, 5))
+# plt.plot(years, hiv_prevalence_male.mean(axis=1) * 100, label='HIV Male', linestyle='-', color='blue')
+# plt.plot(years, hiv_prevalence_female.mean(axis=1) * 100, label='HIV Female', linestyle='--', color='red')
+# plt.xlabel("Year")
+# plt.ylabel("HIV Prevalence (%)")
+# plt.title("HIV Prevalence Over Time (By Sex)")
+# plt.legend()
+# plt.grid(True)
+# plt.show()
+
+# # -------------------------
+# # 2. Plot T2D Prevalence Over Time (Male & Female)
+# # -------------------------
+# plt.figure(figsize=(10, 5))
+# plt.plot(years, t2d_prevalence_male.mean(axis=1) * 100, label='T2D Male', linestyle='-', color='blue')
+# plt.plot(years, t2d_prevalence_female.mean(axis=1) * 100, label='T2D Female', linestyle='--', color='red')
+# plt.xlabel("Year")
+# plt.ylabel("T2D Prevalence (%)")
+# plt.title("Type 2 Diabetes Prevalence Over Time (By Sex)")
+# plt.legend()
+# plt.grid(True)
+# plt.show()
+
+# # -------------------------
+# # 3. Plot HIV Prevalence By Age Group
+# # -------------------------
+# plt.figure(figsize=(10, 5))
+# for i, age_bin in enumerate(prevalence_analyzer_with.age_bins['HIV']):
+#     plt.plot(years, hiv_prevalence_by_age[:, i] * 100, label=f'Age {age_bin}')
+
+# plt.xlabel("Year")
+# plt.ylabel("HIV Prevalence (%)")
+# plt.title("HIV Prevalence Over Time (By Age Group)")
+# plt.legend(title="Age Group", loc='upper left', bbox_to_anchor=(1, 1))
+# plt.grid(True)
+# plt.show()
+
+# # -------------------------
+# # 4. Plot T2D Prevalence By Age Group
+# # -------------------------
+# plt.figure(figsize=(10, 5))
+# for i, age_bin in enumerate(prevalence_analyzer_with.age_bins['Type2Diabetes']):
+#     plt.plot(years, t2d_prevalence_by_age[:, i] * 100, label=f'Age {age_bin}')
+
+# plt.xlabel("Year")
+# plt.ylabel("T2D Prevalence (%)")
+# plt.title("Type 2 Diabetes Prevalence Over Time (By Age Group)")
+# plt.legend(title="Age Group", loc='upper left', bbox_to_anchor=(1, 1))
+# plt.grid(True)
+# plt.show()
