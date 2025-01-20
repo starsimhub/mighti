@@ -1,6 +1,7 @@
 import numpy as np
 import starsim as ss
 
+
 class Type2Diabetes(ss.NCD):
 
     def __init__(self, pars=None, **kwargs):
@@ -9,11 +10,11 @@ class Type2Diabetes(ss.NCD):
 
         self.default_pars(
             dur_condition=ss.lognorm_ex(15.02897096),  
-            incidence_prob = 0.059,
+            incidence_prob=0.059,  # Base incidence probability
             incidence=ss.bernoulli(0.059),    
             p_death=ss.bernoulli(0.004315),     
             init_prev=ss.bernoulli(0.1351),    
-            remission_rate=ss.bernoulli(0.0024), 
+            remission_rate=ss.bernoulli(0.00024), 
             max_disease_duration=20,        
         )
         self.update_pars(pars, **kwargs)
@@ -29,135 +30,114 @@ class Type2Diabetes(ss.NCD):
         return
     
     def initialize(self, sim):
-        """Initialize the disease, setting rel_sus for each agent."""
-        super().initialize(sim)  # Call the parent initialize method
-        
-        # Ensure rel_sus is initialized as an array of ones for all agents
+        """Initialize the disease, ensuring `rel_sus` and `susceptible` are properly assigned."""
+        super().initialize(sim)  # Call parent initialize method
+
+        # Ensure rel_sus is initialized for all individuals
         if self.rel_sus is None or len(self.rel_sus) != len(sim.people):
             self.rel_sus = np.ones(len(sim.people))  # Default susceptibility is 1 for all individuals
             print("Initialized rel_sus for Type2Diabetes with default values.")
-        else:
-            print(f"rel_sus already initialized: {np.unique(self.rel_sus)}")            
+
+        # Initialize susceptible state correctly
+        self.susceptible[:] = True
+        self.susceptible[self.affected.uids] = False  # Ensure affected individuals are not susceptible
+
         return
             
-        return
-    
     def init_post(self):
+        """Assign initial cases based on prevalence data."""
         initial_cases = self.pars.init_prev.filter()
         self.set_prognoses(initial_cases)
         return initial_cases
 
     def update_pre(self):
+        """Handle remission (reversal) and death."""
         sim = self.sim
-       
+
         # Handle remission (reversal)
         going_into_remission = self.pars.remission_rate.filter(self.affected.uids)
         self.affected[going_into_remission] = False
         self.reversed[going_into_remission] = True
         self.ti_reversed[going_into_remission] = sim.ti
 
-        # Handle recovery, death, and beta-cell function exhaustion
+        # Handle recovery and death
         recovered = (self.reversed & (self.ti_reversed <= sim.ti)).uids
         self.reversed[recovered] = False
         self.susceptible[recovered] = True  # Recovered individuals become susceptible again
+
         deaths = (self.ti_dead == sim.ti).uids
         sim.people.request_death(deaths)
         self.results.new_deaths[sim.ti] = len(deaths)
 
         return
 
-
     def update(self):
+        """Update susceptibility based on HIV status."""
         sim = self.sim
-        
-        # Debugging to ensure rel_sus is initialized
-        if sim.diseases.type2diabetes.rel_sus is None:
-            print("rel_sus is still None during update.")
-            sim.diseases.type2diabetes.rel_sus = np.ones(len(sim.people))  # Fallback initialization
+
+        # Ensure `rel_sus` is initialized
+        if self.rel_sus is None or len(self.rel_sus) != len(sim.people):
+            print("Reinitializing rel_sus for Type2Diabetes.")
+            self.rel_sus = np.ones(len(sim.people))  # Initialize to 1.0
         else:
-            print(f"Before update: rel_sus values: {np.unique(sim.diseases.type2diabetes.rel_sus)}")
-        
+            self.rel_sus[:] = 1.0  # Reset to default
+
         # Apply the increased susceptibility to those with HIV
-        sim.diseases.type2diabetes.rel_sus[sim.people.hiv.infected] = self.pars.rel_sus_hiv_type2diabetes
-        
-        print(f"After update: rel_sus values for HIV-infected: {sim.diseases.type2diabetes.rel_sus[sim.people.hiv.infected]}")
+        hiv_infected = sim.people.hiv.infected
+        self.rel_sus[hiv_infected] = self.pars.rel_sus_hiv_type2diabetes
+
         return
 
     def make_new_cases(self, relative_risk=1.0):
         """Create new cases of Type2Diabetes, adjusted by relative risk."""
         susceptible_uids = self.susceptible.uids
         base_prob = self.pars.incidence_prob
-    
-        # Ensure rel_sus is initialized
+
+        # Ensure `rel_sus` is correctly initialized
         if self.rel_sus is None or len(self.rel_sus) != len(self.sim.people):
             self.rel_sus = np.ones(len(self.sim.people))
             print("Reinitialized rel_sus for Type2Diabetes in make_new_cases.")
-    
-        # Fetch updated rel_sus dynamically before computing adjusted probability
-        updated_rel_sus = self.sim.diseases.type2diabetes.rel_sus
-        adjusted_prob = base_prob * updated_rel_sus[susceptible_uids] * relative_risk
-    
-        # Ensure `adjusted_prob` is correctly formatted
-        if not isinstance(adjusted_prob, np.ndarray) or adjusted_prob.shape != (len(susceptible_uids),):
-            raise ValueError(f"adjusted_prob has incorrect shape: {adjusted_prob.shape}, expected ({len(susceptible_uids)},)")
-    
-        # Debugging: Separate HIV+ and HIV- adjusted probabilities
-        hiv_positive = self.sim.people.hiv.infected[susceptible_uids]
-        hiv_negative = ~hiv_positive
-        print(f"HIV+ Adjusted Probabilities: {adjusted_prob[hiv_positive]}")
-        print(f"HIV- Adjusted Probabilities: {adjusted_prob[hiv_negative]}")
-    
-        # Debugging output
-        print(f"Adjusted incidence probabilities: {adjusted_prob}")
-        print(f"Susceptible UIDs: {susceptible_uids}, Count: {len(susceptible_uids)}")
-    
-        print(f"Final adjusted_prob values used in Bernoulli: {adjusted_prob}")
-        # Create and initialize the distribution
-        adjusted_incidence_dist = ss.bernoulli(adjusted_prob, strict=False)
-        # adjusted_incidence_dist = ss.bernoulli(np.clip(adjusted_prob, 0, 1), strict=False)
-        adjusted_incidence_dist.slots = np.arange(len(susceptible_uids))  # Use relative indices as slots
-        adjusted_incidence_dist.initialize()  # Ensure the distribution is properly initialized
-    
-        # Debugging: Print slots
-        print(f"Adjusted incidence distribution slots: {adjusted_incidence_dist.slots}")
-    
-        print(f"Before applying rvs: Susceptible count = {len(susceptible_uids)}")
-        # Generate new cases
-        new_cases = susceptible_uids[adjusted_incidence_dist.rvs(len(susceptible_uids))]
 
-        print(f"rvs output: {adjusted_incidence_dist.rvs(len(susceptible_uids))}")
+        # Compute adjusted probability
+        updated_rel_sus = self.sim.diseases.type2diabetes.rel_sus
+        adjusted_prob = np.clip(base_prob * updated_rel_sus[susceptible_uids] * relative_risk, 0, 1)
+
+        # Debugging
+        print(f"Adjusted incidence probabilities (first 10): {adjusted_prob[:10]}")
+
+        # Generate new cases
+        new_cases = susceptible_uids[ss.bernoulli(adjusted_prob, strict=False).rvs(len(susceptible_uids))]
 
         print(f"New cases identified: {len(new_cases)}")
         
-        test_outcome = adjusted_incidence_dist.rvs(len(susceptible_uids))
-        print(f"rvs() output distribution: {np.unique(test_outcome, return_counts=True)}")
-        
-        test_dist = ss.bernoulli(np.array([0.0315, 0.0315, 0.315, 0.315]), strict=False)
-        test_dist.initialize()
-        test_draws = test_dist.rvs(4)
-        print(f"Test draws for 3.15% and 31.5%: {test_draws}")
-        print(f"rvs() output distribution after fix: {np.unique(test_draws, return_counts=True)}")
         # Set prognoses for the new cases
         self.set_prognoses(new_cases)
         return new_cases
 
     def set_prognoses(self, uids):
+        """Assign disease progression states."""
         sim = self.sim
         p = self.pars
+
+        # Ensure correct susceptible state before setting prognoses
         print(f"Susceptible before: {np.count_nonzero(self.susceptible)}")
         self.susceptible[uids] = False
         print(f"Susceptible after: {np.count_nonzero(self.susceptible)}")
+
         self.affected[uids] = True
         dur_condition = p.dur_condition.rvs(uids)
+
         will_die = p.p_death.rvs(uids)
         dead_uids = uids[will_die]
         rec_uids = uids[~will_die]
+
         self.ti_dead[dead_uids] = sim.ti + dur_condition[will_die] / sim.dt
         self.ti_reversed[rec_uids] = sim.ti + dur_condition[~will_die] / sim.dt
 
         return
 
     def init_results(self):
+        """Initialize results tracking."""
         sim = self.sim
         super().init_results()
 
@@ -176,6 +156,7 @@ class Type2Diabetes(ss.NCD):
         return
     
     def update_results(self):
+        """Update prevalence and reversal prevalence results."""
         sim = self.sim
         super().update_results()
         self.results.prevalence[sim.ti] = np.count_nonzero(self.affected) / len(sim.people)
