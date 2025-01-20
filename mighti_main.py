@@ -3,6 +3,8 @@ import mighti as mi
 import pylab as pl
 import pandas as pd
 import sciris as sc
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 # Define diseases
@@ -285,74 +287,135 @@ try:
 
 except KeyError as e:
     print(f"KeyError: {e} - Check if the correct result keys are being used.")
-
-
-
-# # Plots without dots for data
-# try:
-#     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
-#     hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
-#     diabetes_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
-#     diabetes_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
-#     diabetes_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
-#     diabetes_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
-#     obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
-#     obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
-#     hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
-#     hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
-
-#     # Ensure age_bins is a list (fix for the previous error)
-#     age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
-#     age_bins_list = list(age_bins)  # Convert to a list if it's not already
     
-#     # Create subplots for each disease, dynamically based on the number of diseases
-#     n_diseases = len(diseases)
-#     fig, axs = pl.subplots(n_diseases, 2, figsize=(18, n_diseases * 6), sharey='row')
-
-#     # Create age group labels and color map for age bins (generalized)
-#     # Ensure age_bins_list contains integers
-#     age_bins_list = [int(age_bin) for age_bin in age_bins_list]  # Convert age bins to integers
     
-#     # Now you can perform operations like subtraction
-#     age_group_labels = [f'{left}-{right-1}' for left, right in zip(age_bins_list[:-1], age_bins_list[1:])]  
     
-#     if age_bins_list[-1] == 80:
-#         age_group_labels.append('80+')
-#     cmap = pl.get_cmap('tab20', len(age_group_labels))  # Color map for distinct age groups
-#     age_bin_colors = {label: cmap(i) for i, label in enumerate(age_group_labels)}
+# -------------------------
+# Debugging: Check Population & Births
+# -------------------------
+print("\n--- Debugging Births & Pregnancies ---")
+print("Available result keys:", sim.results.keys())
 
-#       # Loop through each disease and plot its prevalence for males and females
-#     for disease_idx, disease in enumerate(diseases):
-#         # Access the male and female prevalence data for each disease
-#         male_data = prevalence_analyzer.results[f'{disease}_prevalence_male'] * 100
-#         female_data = prevalence_analyzer.results[f'{disease}_prevalence_female'] * 100
+if 'pregnancy.births' in sim.results:
+    print("Births over time:", sim.results['pregnancy.births'])
+else:
+    print("Birth data not found! Check pregnancy module.")
 
-#         # Plot male prevalence for the disease
-#         for i, label in enumerate(age_group_labels):
-#             axs[disease_idx, 0].plot(sim.yearvec, male_data[:, i], label=label, color=age_bin_colors[label])
-#         axs[disease_idx, 0].set_title(f'{disease} (Male)', fontsize=24) 
-#         axs[disease_idx, 0].set_xlabel('Year', fontsize=20) 
-#         axs[disease_idx, 0].set_ylabel('Prevalence (%)', fontsize=20)  
-#         axs[disease_idx, 0].tick_params(axis='both', labelsize=18)  
-#         axs[disease_idx, 0].grid(True)
+print("Deaths over time:", sim.results['new_deaths'])
 
-#         # Plot female prevalence for the disease
-#         for i, label in enumerate(age_group_labels):
-#             axs[disease_idx, 1].plot(sim.yearvec, female_data[:, i], color=age_bin_colors[label])
-#         axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24) 
-#         axs[disease_idx, 1].set_xlabel('Year', fontsize=20)  
-#         axs[disease_idx, 0].tick_params(axis='both', labelsize=18) 
-#         axs[disease_idx, 1].grid(True)
+# Checking population changes
+print(f"Initial Population: {n_agents}")
+print(f"Final Population: {sim.results['n_alive'][-1]}")
 
-#     # Add a single common legend with two rows
-#     handles, labels = axs[0, 0].get_legend_handles_labels()  # Get labels from one axis
+# -------------------------
+# Plot Population Trends
+# -------------------------
+age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
+age_labels = [f"{left}-{right-1}" for left, right in zip(age_bins[:-1], age_bins[1:])]
+
+def categorize_by_age(ages, age_bins):
+    return np.digitize(ages, age_bins) - 1
+
+pop_counts = {
+    "male": np.zeros((len(sim.yearvec), len(age_bins) - 1)),
+    "female": np.zeros((len(sim.yearvec), len(age_bins) - 1))
+}
+
+for ti, year in enumerate(sim.yearvec):
+    ages = sim.people.age
+    sexes = sim.people.male  
+    age_groups = categorize_by_age(ages, age_bins)
     
-#     # Adjust ncol to ensure the legend is split into two rows
-#     fig.legend(handles, labels, title='Age Groups', loc='lower center', bbox_to_anchor=(0.5, -0.05), ncol=len(age_group_labels) // 2, fontsize=12)
+    for i, age_label in enumerate(age_labels):
+        pop_counts["male"][ti, i] = np.sum((age_groups == i) & (sexes == 0))
+        pop_counts["female"][ti, i] = np.sum((age_groups == i) & (sexes == 1))
+
+fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+for i, label in enumerate(age_labels):
+    axs[0].plot(sim.yearvec, pop_counts["male"][:, i], label=label)
+axs[0].set_title("Population Over Time (Male)")
+axs[0].set_xlabel("Year")
+axs[0].set_ylabel("Number of Agents")
+axs[0].legend(title="Age Group", loc='upper left', bbox_to_anchor=(1, 1))
+axs[0].grid(True)
+
+for i, label in enumerate(age_labels):
+    axs[1].plot(sim.yearvec, pop_counts["female"][:, i], label=label)
+axs[1].set_title("Population Over Time (Female)")
+axs[1].set_xlabel("Year")
+axs[1].legend(title="Age Group", loc='upper left', bbox_to_anchor=(1, 1))
+axs[1].grid(True)
+
+plt.tight_layout()
+plt.show()    
+
+
+
+# # # Plots without dots for data
+# # try:
+# #     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
+# #     hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
+# #     diabetes_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
+# #     diabetes_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
+# #     diabetes_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
+# #     diabetes_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
+# #     obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
+# #     obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
+# #     hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
+# #     hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
+
+# #     # Ensure age_bins is a list (fix for the previous error)
+# #     age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
+# #     age_bins_list = list(age_bins)  # Convert to a list if it's not already
     
-#     # Adjust layout and show the plot
-#     pl.tight_layout(rect=[0, 0.05, 1, 1])  # Leave space for the legend at the bottom
-#     pl.show()
+# #     # Create subplots for each disease, dynamically based on the number of diseases
+# #     n_diseases = len(diseases)
+# #     fig, axs = pl.subplots(n_diseases, 2, figsize=(18, n_diseases * 6), sharey='row')
+
+# #     # Create age group labels and color map for age bins (generalized)
+# #     # Ensure age_bins_list contains integers
+# #     age_bins_list = [int(age_bin) for age_bin in age_bins_list]  # Convert age bins to integers
     
-# except KeyError as e:
-#     print(f"KeyError: {e} - Check if the correct result keys are being used.")
+# #     # Now you can perform operations like subtraction
+# #     age_group_labels = [f'{left}-{right-1}' for left, right in zip(age_bins_list[:-1], age_bins_list[1:])]  
+    
+# #     if age_bins_list[-1] == 80:
+# #         age_group_labels.append('80+')
+# #     cmap = pl.get_cmap('tab20', len(age_group_labels))  # Color map for distinct age groups
+# #     age_bin_colors = {label: cmap(i) for i, label in enumerate(age_group_labels)}
+
+# #       # Loop through each disease and plot its prevalence for males and females
+# #     for disease_idx, disease in enumerate(diseases):
+# #         # Access the male and female prevalence data for each disease
+# #         male_data = prevalence_analyzer.results[f'{disease}_prevalence_male'] * 100
+# #         female_data = prevalence_analyzer.results[f'{disease}_prevalence_female'] * 100
+
+# #         # Plot male prevalence for the disease
+# #         for i, label in enumerate(age_group_labels):
+# #             axs[disease_idx, 0].plot(sim.yearvec, male_data[:, i], label=label, color=age_bin_colors[label])
+# #         axs[disease_idx, 0].set_title(f'{disease} (Male)', fontsize=24) 
+# #         axs[disease_idx, 0].set_xlabel('Year', fontsize=20) 
+# #         axs[disease_idx, 0].set_ylabel('Prevalence (%)', fontsize=20)  
+# #         axs[disease_idx, 0].tick_params(axis='both', labelsize=18)  
+# #         axs[disease_idx, 0].grid(True)
+
+# #         # Plot female prevalence for the disease
+# #         for i, label in enumerate(age_group_labels):
+# #             axs[disease_idx, 1].plot(sim.yearvec, female_data[:, i], color=age_bin_colors[label])
+# #         axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24) 
+# #         axs[disease_idx, 1].set_xlabel('Year', fontsize=20)  
+# #         axs[disease_idx, 0].tick_params(axis='both', labelsize=18) 
+# #         axs[disease_idx, 1].grid(True)
+
+# #     # Add a single common legend with two rows
+# #     handles, labels = axs[0, 0].get_legend_handles_labels()  # Get labels from one axis
+    
+# #     # Adjust ncol to ensure the legend is split into two rows
+# #     fig.legend(handles, labels, title='Age Groups', loc='lower center', bbox_to_anchor=(0.5, -0.05), ncol=len(age_group_labels) // 2, fontsize=12)
+    
+# #     # Adjust layout and show the plot
+# #     pl.tight_layout(rect=[0, 0.05, 1, 1])  # Leave space for the legend at the bottom
+# #     pl.show()
+    
+# # except KeyError as e:
+# #     print(f"KeyError: {e} - Check if the correct result keys are being used.")
