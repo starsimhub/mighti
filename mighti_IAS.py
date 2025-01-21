@@ -1,5 +1,5 @@
 import starsim as ss
-import mighti as mi  
+import mighti as mi
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,7 +10,7 @@ from copy import deepcopy
 # -------------------------
 n_agents = 50000
 inityear = 2007
-endyear = 2030
+endyear = 2015
 ncds = ['Type2Diabetes']
 diseases = ['HIV'] + ncds
 beta = 0.0001
@@ -22,6 +22,26 @@ prevalence_data, age_bins = mi.initialize_prevalence_data(
     diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv', inityear=inityear
 )
 
+years = [2007, 2011, 2017, 2021]
+eswatini_hiv_data = {}
+for year in years:
+    hiv_prevalence_data, _ = mi.initialize_prevalence_data(
+        diseases= ['HIV'], 
+        csv_file_path='mighti/data/prevalence_data_eswatini.csv', 
+        inityear=year
+    )
+    eswatini_hiv_data[year] = hiv_prevalence_data['HIV']  # Store data for the specific year
+    
+eswatini_t2d_data = {}
+for year in years:
+    t2d_prevalence_data, _ = mi.initialize_prevalence_data(
+        diseases= ['Type2Diabetes'], 
+        csv_file_path='mighti/data/prevalence_data_eswatini.csv', 
+        inityear=year
+    )
+    eswatini_t2d_data[year] = t2d_prevalence_data['Type2Diabetes']
+    
+    
 # -------------------------
 # Demographics (Pregnancy & Deaths)
 # -------------------------
@@ -64,7 +84,7 @@ disease_objects.append(hiv_disease)
 # Simulation With Interactions
 # -------------------------
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
-interactions = [mi.hiv_type2diabetes(pars={"rel_sus_hiv_type2diabetes": 5})]
+interactions = [mi.hiv_type2diabetes(pars={"rel_sus_hiv_type2diabetes": 1})]
 
 sim = ss.Sim(
     n_agents=n_agents,
@@ -79,98 +99,66 @@ sim = ss.Sim(
     copy_inputs=False
 )
 
-print("Running Simulation With Interactions...")
+# print("Available sim attributes:", dir(sim))
+# print(f"Contents of sim.modules: {sim.modules}")
+# print(f"Diseases stored in sim.pars: {sim.pars['diseases']}")
+# print(f"Contents of sim.pars: {sim.pars.keys()}")
+
+# Manually initialize only non-Starsim diseases
+for disease in sim.pars['diseases']:
+    print(f"Initializing disease: {disease.name}")
+    
+    if hasattr(disease, "initialize"):  # Only call initialize if it exists
+        disease.initialize(sim)
+    else:
+        print(f"Skipping initialize() for {disease.name}, as it is a built-in Starsim disease.")
+
+
+
 sim.run()
 
-# Force storing pregnancy results in sim.results
-sim.results['new_births'] = sim.results['pregnancy.births']
-
-# Debugging Births
-print("\n--- Updated Birth Data ---")
-if 'new_births' in sim.results:
-    print("Births successfully stored in sim.results!")
-    print("Births over time:", sim.results['new_births'])
-else:
-    print("ERROR: Birth data is still missing!")
     
-# -------------------------
-# -------------------------
-# Debugging: Check Births & Pregnancy
-# -------------------------
-print("\n--- Debugging Births & Pregnancies ---")
-print("Available result keys:", sim.results.keys())
+# # -------------------------
+# # Debugging Births & Pregnancies
+# # -------------------------
+# print("\n--- Debugging Births & Pregnancies ---")
+# if 'pregnancy' in sim.results:
+#     print("Pregnancy module is active.")
+#     print("Pregnancy births recorded:", sim.results['pregnancy']['births'])
+# else:
+#     print("Pregnancy module not active in results.")
 
-# Check pregnancy states
-if 'pregnancy' in sim.results:
-    print("Pregnancy module is active.")
-else:
-    print("⚠️ WARNING: Pregnancy module is missing from results!")
+# # -------------------------
+# # Debugging Aging & Population Over Time
+# # -------------------------
+# print("\n--- Debugging Aging & Population Over Time ---")
+# if hasattr(ppl, 'age'):
+#     print("Age data found in ppl.age:", ppl.age[:10])  # First 10 ages
+# else:
+#     print("Population object 'ppl' does not have age attribute.")
 
-# Check if pregnancies are happening
-pregnancy_data = sim.results.get('pregnancy', None)
-if pregnancy_data:
-    print("Pregnancy Data:", pregnancy_data)
-    print("Total Pregnancies:", np.sum(pregnancy_data))
-else:
-    print("⚠️ No pregnancy data found!")
+# print("Available sim.results keys:", sim.results.keys())
 
-# Check if 'births' is missing
-if 'pregnancy.births' not in sim.results.keys():
-    print("⚠️ WARNING: Births not recorded in sim.results!")
-    # Manually estimate births if missing
-    try:
-        estimated_births = np.diff(sim.results['n_alive']) + sim.results['new_deaths']
-        print("Estimated Births (from population change):", estimated_births)
-    except Exception as e:
-        print("Error calculating births:", e)
+# print("Population over time (n_alive):", sim.results['n_alive'])
 
-# -------------------------
-# Plot Population Trends
-# -------------------------
-age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
-age_labels = [f"{left}-{right-1}" for left, right in zip(age_bins[:-1], age_bins[1:])]
+# # -------------------------
+# # Debugging Aging (Manual Check)
+# # -------------------------
+# # Check initial age distribution
+# initial_ages = ppl.age.copy()
+# print("Initial ages (first 10):", initial_ages[:10])
 
-def categorize_by_age(ages, age_bins):
-    return np.digitize(ages, age_bins) - 1
 
-pop_counts = {
-    "male": np.zeros((len(sim.yearvec), len(age_bins) - 1)),
-    "female": np.zeros((len(sim.yearvec), len(age_bins) - 1))
-}
 
-for ti, year in enumerate(sim.yearvec):
-    ages = sim.people.age
-    sexes = sim.people.male  
-    age_groups = categorize_by_age(ages, age_bins)
-    
-    for i, age_label in enumerate(age_labels):
-        pop_counts["male"][ti, i] = np.sum((age_groups == i) & (sexes == 0))
-        pop_counts["female"][ti, i] = np.sum((age_groups == i) & (sexes == 1))
+# print("Susceptible before:", sim.results['type2diabetes']['n_susceptible'][sim.ti - 1])
+# print("Susceptible after:", sim.results['type2diabetes']['n_susceptible'][sim.ti])
 
-fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
-for i, label in enumerate(age_labels):
-    axs[0].plot(sim.yearvec, pop_counts["male"][:, i], label=label)
-axs[0].set_title("Population Over Time (Male)")
-axs[0].set_xlabel("Year")
-axs[0].set_ylabel("Number of Agents")
-axs[0].legend(title="Age Group", loc='upper left', bbox_to_anchor=(1, 1))
-axs[0].grid(True)
-
-for i, label in enumerate(age_labels):
-    axs[1].plot(sim.yearvec, pop_counts["female"][:, i], label=label)
-axs[1].set_title("Population Over Time (Female)")
-axs[1].set_xlabel("Year")
-axs[1].legend(title="Age Group", loc='upper left', bbox_to_anchor=(1, 1))
-axs[1].grid(True)
-
-plt.tight_layout()
-plt.show()
-#  # Retrieve the prevalence data for plotting
+#   # Retrieve the prevalence data for plotting
 # try:
-#     hiv_prevalence_data_male = prevalence_analyzer_with.results['HIV_prevalence_male'] * 100
-#     hiv_prevalence_data_female = prevalence_analyzer_with.results['HIV_prevalence_female'] * 100
-#     t2d_prevalence_data_male = prevalence_analyzer_with.results['Type2Diabetes_prevalence_male'] * 100
-#     t2d_prevalence_data_female = prevalence_analyzer_with.results['Type2Diabetes_prevalence_female'] * 100
+#     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
+#     hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
+#     t2d_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
+#     t2d_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
 
 #     # Define age bins
 #     age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
@@ -199,15 +187,15 @@ plt.show()
 #     prevalence_filtered = {
 #         'HIV': {
 #             'male': {'young': filter_prevalence_by_age_group(hiv_prevalence_data_male, age_bins, young_age_bins),
-#                      'old': filter_prevalence_by_age_group(hiv_prevalence_data_male, age_bins, old_age_bins)},
+#                       'old': filter_prevalence_by_age_group(hiv_prevalence_data_male, age_bins, old_age_bins)},
 #             'female': {'young': filter_prevalence_by_age_group(hiv_prevalence_data_female, age_bins, young_age_bins),
-#                        'old': filter_prevalence_by_age_group(hiv_prevalence_data_female, age_bins, old_age_bins)}
+#                         'old': filter_prevalence_by_age_group(hiv_prevalence_data_female, age_bins, old_age_bins)}
 #         },
 #         'Type2Diabetes': {
 #             'male': {'young': filter_prevalence_by_age_group(t2d_prevalence_data_male, age_bins, young_age_bins),
-#                      'old': filter_prevalence_by_age_group(t2d_prevalence_data_male, age_bins, old_age_bins)},
+#                       'old': filter_prevalence_by_age_group(t2d_prevalence_data_male, age_bins, old_age_bins)},
 #             'female': {'young': filter_prevalence_by_age_group(t2d_prevalence_data_female, age_bins, young_age_bins),
-#                        'old': filter_prevalence_by_age_group(t2d_prevalence_data_female, age_bins, old_age_bins)}
+#                         'old': filter_prevalence_by_age_group(t2d_prevalence_data_female, age_bins, old_age_bins)}
 #         }
 #     }
     
@@ -235,7 +223,7 @@ plt.show()
 #                 # Plot simulated prevalence trends
 #                 handles = []
 #                 for i, label in enumerate(age_labels):
-#                     line, = ax.plot(sim_with_interactions.yearvec, prevalence_data[:, i], label=f'Estimated {label}', color=cmap(i))
+#                     line, = ax.plot(sim.yearvec, prevalence_data[:, i], label=f'Estimated {label}', color=cmap(i))
 #                     handles.append(line)
     
 #                 # Store handles for **one** shared legend per row (young & old)

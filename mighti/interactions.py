@@ -12,7 +12,7 @@ class hiv_obesity(ss.Connector):
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Obesity', requires=[ss.HIV, mi.Obesity])
         self.default_pars(
-            rel_sus_hiv_obesity=10,  # People with HIV are 1.2x more likely to acquire Obesity
+            rel_sus_hiv_obesity=1,  # People with HIV are 1.2x more likely to acquire Obesity
         )
         self.update_pars(pars, **kwargs)
         return
@@ -28,7 +28,7 @@ class hiv_type2diabetes(ss.Connector):
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Type2Diabetes', requires=[ss.HIV, mi.Type2Diabetes])
         self.default_pars(
-            rel_sus_hiv_type2diabetes=5,  # People with HIV are 10x more likely to acquire Type 2 Diabetes
+            rel_sus_hiv_type2diabetes=1,  # People with HIV are 10x more likely to acquire Type 2 Diabetes
         )
         self.update_pars(pars, **kwargs)
 
@@ -36,11 +36,11 @@ class hiv_type2diabetes(ss.Connector):
         sim = self.sim
 
         # Log current time step
-        print(f"Running update for HIV-Type2Diabetes at time step {sim.ti}")
+        # print(f"Running update for HIV-Type2Diabetes at time step {sim.ti}")
 
         # Ensure rel_sus is initialized and reset to default (1.0)
         if sim.diseases.type2diabetes.rel_sus is None or len(sim.diseases.type2diabetes.rel_sus) != len(sim.people):
-            print("Reinitializing rel_sus for Type2Diabetes.")
+            # print("Reinitializing rel_sus for Type2Diabetes.")
             sim.diseases.type2diabetes.rel_sus = np.ones(len(sim.people))  # Initialize to 1.0
         else:
             sim.diseases.type2diabetes.rel_sus[:] = 1.0  # Reset to default
@@ -52,10 +52,10 @@ class hiv_type2diabetes(ss.Connector):
         after_update = np.unique(sim.diseases.type2diabetes.rel_sus)
 
         # Debugging output
-        print(f"rel_sus values before update: {before_update}")
-        print(f"Updated rel_sus for HIV-positive individuals: {sim.diseases.type2diabetes.rel_sus[hiv_infected]}")
-        print(f"rel_sus values after update: {after_update}")
-    # def update(self):
+    #     print(f"rel_sus values before update: {before_update}")
+    #     print(f"Updated rel_sus for HIV-positive individuals: {sim.diseases.type2diabetes.rel_sus[hiv_infected]}")
+    #     print(f"rel_sus values after update: {after_update}")
+    # # def update(self):
     #     sim = self.sim
     #     if sim.diseases.type2diabetes.rel_sus is None:
     #         print("rel_sus is still None during update.")
