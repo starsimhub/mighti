@@ -139,7 +139,6 @@ class Type2Diabetes(ss.NCD):
         self.results.reversal_prevalence[self.ti] = np.count_nonzero(self.reversed) / len(self.sim.people)
         return
 
-
 class Obesity(ss.NCD):
 
     def __init__(self, pars=None, **kwargs):
