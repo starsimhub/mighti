@@ -84,24 +84,24 @@ def get_prevalence_function(disease):
 
 # Create disease objects
 disease_objects = []
-# for disease in ncds:
-#     init_prev = ss.bernoulli(get_prevalence_function(disease))
-#     if disease == 'Type2Diabetes':
-#         disease_obj = mi.Type2Diabetes(init_prev=init_prev)
-#     elif disease == 'Obesity':
-#         disease_obj = mi.Obesity(init_prev=init_prev)
-#     disease_objects.append(disease_obj)
-
-disease_objects = []
 for disease in ncds:
-    init_prev = ss.bernoulli(0.1351)  # Ensure correct initialization
+    init_prev = ss.bernoulli(get_prevalence_function(disease))
     if disease == 'Type2Diabetes':
-        disease_obj = mi.Type2Diabetes()
-        disease_obj.update_pars(pars={'init_prev': init_prev})  
+        disease_obj = mi.Type2Diabetes(init_prev=init_prev)
     elif disease == 'Obesity':
-        disease_obj = mi.Obesity()
-        disease_obj.update_pars(pars={'init_prev': init_prev}) 
+        disease_obj = mi.Obesity(init_prev=init_prev)
     disease_objects.append(disease_obj)
+
+# disease_objects = []
+# for disease in ncds:
+#     init_prev = ss.bernoulli(0.1351)  # Ensure correct initialization
+#     if disease == 'Type2Diabetes':
+#         disease_obj = mi.Type2Diabetes()
+#         disease_obj.update_pars(pars={'init_prev': init_prev})  
+#     elif disease == 'Obesity':
+#         disease_obj = mi.Obesity()
+#         disease_obj.update_pars(pars={'init_prev': init_prev}) 
+#     disease_objects.append(disease_obj)
 # HIV-specific setup
 hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 disease_objects.append(hiv_disease)
@@ -314,110 +314,110 @@ print("Susceptible after:", sim.results['type2diabetes'].get('n_susceptible', 'N
 # # Plot Prevalence Over Time
 # # -------------------------
 
-# plt.plot(sim.results['timevec'], sim.results['type2diabetes']['prevalence'], label='T2D Prevalence', color='blue')
-# plt.xlabel("Year")
-# plt.ylabel("Prevalence (%)")
-# plt.legend()
-# plt.grid()
-# plt.show()
+plt.plot(sim.results['timevec'], sim.results['type2diabetes']['prevalence'], label='T2D Prevalence', color='blue')
+plt.xlabel("Year")
+plt.ylabel("Prevalence (%)")
+plt.legend()
+plt.grid()
+plt.show()
 
-# # Define age bins and labels
-# age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
-# age_group_labels = [f'{left}-{right-1}' for left, right in zip(age_bins[:-1], age_bins[1:])]
-# age_group_labels.append('80+') if age_bins[-1] == 80 else None
+# Define age bins and labels
+age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
+age_group_labels = [f'{left}-{right-1}' for left, right in zip(age_bins[:-1], age_bins[1:])]
+age_group_labels.append('80+') if age_bins[-1] == 80 else None
 
-# # Define Young & Old Age Groups (7 bins each, ignoring 80+)
-# young_age_bins = age_bins[1:8]  # First 7 age groups
-# old_age_bins = age_bins[8:15]  # Next 7 age groups (ignoring 80+)
+# Define Young & Old Age Groups (7 bins each, ignoring 80+)
+young_age_bins = age_bins[1:8]  # First 7 age groups
+old_age_bins = age_bins[8:15]  # Next 7 age groups (ignoring 80+)
 
-# # Function to filter prevalence data by selected age bins
-# def filter_prevalence_by_age_group(prevalence_data, age_bins, selected_bins):
-#     indices = [i for i, age in enumerate(age_bins[1:]) if age in selected_bins]
-#     if len(indices) != len(selected_bins):
-#         print(f"Warning: Expected {len(selected_bins)} bins, but found {len(indices)} in selection.")
+# Function to filter prevalence data by selected age bins
+def filter_prevalence_by_age_group(prevalence_data, age_bins, selected_bins):
+    indices = [i for i, age in enumerate(age_bins[1:]) if age in selected_bins]
+    if len(indices) != len(selected_bins):
+        print(f"Warning: Expected {len(selected_bins)} bins, but found {len(indices)} in selection.")
     
-#     filtered_data = prevalence_data[:, indices] if len(indices) == len(selected_bins) else np.full((prevalence_data.shape[0], len(selected_bins)), np.nan)
-#     return filtered_data
+    filtered_data = prevalence_data[:, indices] if len(indices) == len(selected_bins) else np.full((prevalence_data.shape[0], len(selected_bins)), np.nan)
+    return filtered_data
 
-# # Retrieve prevalence data for plotting
-# try:
-#     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
-#     hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
-#     t2d_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
-#     t2d_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
+# Retrieve prevalence data for plotting
+try:
+    hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
+    hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
+    t2d_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
+    t2d_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
 
-#     # Filter prevalence data for young and old groups
-#     prevalence_filtered = {
-#         'HIV': {
-#             'male': {'young': filter_prevalence_by_age_group(hiv_prevalence_data_male, age_bins, young_age_bins),
-#                       'old': filter_prevalence_by_age_group(hiv_prevalence_data_male, age_bins, old_age_bins)},
-#             'female': {'young': filter_prevalence_by_age_group(hiv_prevalence_data_female, age_bins, young_age_bins),
-#                         'old': filter_prevalence_by_age_group(hiv_prevalence_data_female, age_bins, old_age_bins)}
-#         },
-#         'Type2Diabetes': {
-#             'male': {'young': filter_prevalence_by_age_group(t2d_prevalence_data_male, age_bins, young_age_bins),
-#                       'old': filter_prevalence_by_age_group(t2d_prevalence_data_male, age_bins, old_age_bins)},
-#             'female': {'young': filter_prevalence_by_age_group(t2d_prevalence_data_female, age_bins, young_age_bins),
-#                         'old': filter_prevalence_by_age_group(t2d_prevalence_data_female, age_bins, old_age_bins)}
-#         }
-#     }
+    # Filter prevalence data for young and old groups
+    prevalence_filtered = {
+        'HIV': {
+            'male': {'young': filter_prevalence_by_age_group(hiv_prevalence_data_male, age_bins, young_age_bins),
+                      'old': filter_prevalence_by_age_group(hiv_prevalence_data_male, age_bins, old_age_bins)},
+            'female': {'young': filter_prevalence_by_age_group(hiv_prevalence_data_female, age_bins, young_age_bins),
+                        'old': filter_prevalence_by_age_group(hiv_prevalence_data_female, age_bins, old_age_bins)}
+        },
+        'Type2Diabetes': {
+            'male': {'young': filter_prevalence_by_age_group(t2d_prevalence_data_male, age_bins, young_age_bins),
+                      'old': filter_prevalence_by_age_group(t2d_prevalence_data_male, age_bins, old_age_bins)},
+            'female': {'young': filter_prevalence_by_age_group(t2d_prevalence_data_female, age_bins, young_age_bins),
+                        'old': filter_prevalence_by_age_group(t2d_prevalence_data_female, age_bins, old_age_bins)}
+        }
+    }
 
-#     # Function to plot prevalence trends for young/old groups
-#     def plot_prevalence_side_by_side(disease, real_data, selected_age_bins):
-#         fig, axs = plt.subplots(2, 2, figsize=(14, 10), sharex=True, sharey=True)
+    # Function to plot prevalence trends for young/old groups
+    def plot_prevalence_side_by_side(disease, real_data, selected_age_bins):
+        fig, axs = plt.subplots(2, 2, figsize=(14, 10), sharex=True, sharey=True)
 
-#         age_group_order = ['young', 'old']  # Young (Top), Old (Bottom)
-#         sex_order = ['male', 'female']  # Male (Left), Female (Right)
+        age_group_order = ['young', 'old']  # Young (Top), Old (Bottom)
+        sex_order = ['male', 'female']  # Male (Left), Female (Right)
         
-#         young_handles, young_labels = [], []
-#         old_handles, old_labels = [], []
+        young_handles, young_labels = [], []
+        old_handles, old_labels = [], []
 
-#         for row, age_group in enumerate(age_group_order):  # Young = Row 0, Old = Row 1
-#             for col, sex in enumerate(sex_order):  # Male = Col 0, Female = Col 1
-#                 ax = axs[row, col]
-#                 prevalence_data = prevalence_filtered[disease][sex][age_group]
+        for row, age_group in enumerate(age_group_order):  # Young = Row 0, Old = Row 1
+            for col, sex in enumerate(sex_order):  # Male = Col 0, Female = Col 1
+                ax = axs[row, col]
+                prevalence_data = prevalence_filtered[disease][sex][age_group]
 
-#                 num_age_bins = len(selected_age_bins[row])  # 7 bins for both young and old
-#                 age_labels = [f"{age}-{age+4}" for age in selected_age_bins[row]]
-#                 cmap = plt.get_cmap('tab10', num_age_bins)
+                num_age_bins = len(selected_age_bins[row])  # 7 bins for both young and old
+                age_labels = [f"{age}-{age+4}" for age in selected_age_bins[row]]
+                cmap = plt.get_cmap('tab10', num_age_bins)
 
-#                 # Plot simulated prevalence trends
-#                 handles = []
-#                 for i, label in enumerate(age_labels):
-#                     line, = ax.plot(sim.results['timevec'], prevalence_data[:, i], label=f'Estimated {label}', color=cmap(i))
-#                     handles.append(line)
+                # Plot simulated prevalence trends
+                handles = []
+                for i, label in enumerate(age_labels):
+                    line, = ax.plot(sim.results['timevec'], prevalence_data[:, i], label=f'Estimated {label}', color=cmap(i))
+                    handles.append(line)
 
-#                 # Store handles for **one** shared legend per row (young & old)
-#                 if row == 0 and col == 0:
-#                     young_handles = handles
-#                     young_labels = age_labels
-#                 if row == 1 and col == 0:
-#                     old_handles = handles
-#                     old_labels = age_labels
+                # Store handles for **one** shared legend per row (young & old)
+                if row == 0 and col == 0:
+                    young_handles = handles
+                    young_labels = age_labels
+                if row == 1 and col == 0:
+                    old_handles = handles
+                    old_labels = age_labels
 
-#                 # Overlay real data points
-#                 for year in years:
-#                     if year in real_data:
-#                         real_values = real_data[year][sex]
-#                         for age_bin in real_values:
-#                             if age_bin in selected_age_bins[row]:  # Ensure valid bin
-#                                 bin_idx = selected_age_bins[row].index(age_bin)
-#                                 ax.scatter(year, real_values[age_bin] * 100, color=cmap(bin_idx), s=100, edgecolors='black', zorder=5)
+                # Overlay real data points
+                for year in years:
+                    if year in real_data:
+                        real_values = real_data[year][sex]
+                        for age_bin in real_values:
+                            if age_bin in selected_age_bins[row]:  # Ensure valid bin
+                                bin_idx = selected_age_bins[row].index(age_bin)
+                                ax.scatter(year, real_values[age_bin] * 100, color=cmap(bin_idx), s=100, edgecolors='black', zorder=5)
 
-#                 ax.set_title(f"{disease} ({sex.capitalize()}, {age_group.capitalize()})")
-#                 ax.grid(True)
+                ax.set_title(f"{disease} ({sex.capitalize()}, {age_group.capitalize()})")
+                ax.grid(True)
 
-#         # Place young legend on the right of the first row & old legend on the right of the second row
-#         legend_young = fig.legend(young_handles, young_labels, title="Young Age Groups", loc="center right", bbox_to_anchor=(1.05, 0.75), fontsize=10)
-#         legend_old = fig.legend(old_handles, old_labels, title="Old Age Groups", loc="center right", bbox_to_anchor=(1.05, 0.25), fontsize=10)
+        # Place young legend on the right of the first row & old legend on the right of the second row
+        legend_young = fig.legend(young_handles, young_labels, title="Young Age Groups", loc="center right", bbox_to_anchor=(1.05, 0.75), fontsize=10)
+        legend_old = fig.legend(old_handles, old_labels, title="Old Age Groups", loc="center right", bbox_to_anchor=(1.05, 0.25), fontsize=10)
 
-#         plt.tight_layout(rect=[0, 0, 0.9, 1])  # Adjust to fit legends
-#         plt.show()
+        plt.tight_layout(rect=[0, 0, 0.9, 1])  # Adjust to fit legends
+        plt.show()
 
-#     # Generate plots for each disease
-#     for disease in ['HIV', 'Type2Diabetes']:
-#         real_data_source = eswatini_hiv_data if disease == 'HIV' else eswatini_t2d_data
-#         plot_prevalence_side_by_side(disease, real_data_source, [young_age_bins, old_age_bins])
+    # Generate plots for each disease
+    for disease in ['HIV', 'Type2Diabetes']:
+        real_data_source = eswatini_hiv_data if disease == 'HIV' else eswatini_t2d_data
+        plot_prevalence_side_by_side(disease, real_data_source, [young_age_bins, old_age_bins])
 
-# except KeyError as e:
-#     print(f"KeyError: {e} - Check if the correct result keys are being used.")
+except KeyError as e:
+    print(f"KeyError: {e} - Check if the correct result keys are being used.")
