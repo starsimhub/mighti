@@ -2,8 +2,6 @@ import starsim as ss
 import numpy as np
 import sciris as sc
 
-
-
 class PrevalenceAnalyzer(ss.Analyzer):
     """ Generalized analyzer to calculate disease prevalence over time by age group and sex """
 
@@ -26,61 +24,69 @@ class PrevalenceAnalyzer(ss.Analyzer):
 
         self.results = sc.objdict()
 
+    # def init_pre(self, sim):
+    #     super().init_pre(sim)
+    #     npts = len(sim.t)  # Number of time points in the simulation
+
+    #     # Initialize result arrays for each disease: time x age groups
+    #     for disease in self.diseases:
+    #         self.results[f'{disease}_prevalence_male'] = np.zeros((npts, len(self.age_groups[disease])))
+    #         self.results[f'{disease}_prevalence_female'] = np.zeros((npts, len(self.age_groups[disease])))
+
+    #     # Initialize array to store population age distribution for each year (single-age resolution)
+    #     self.results['population_age_distribution'] = np.zeros((npts, 101))  # 0 to 100 years (single-year resolution)
+
+    #     print(f"Initialized prevalence array with {npts} time points for {self.diseases}.")
+    #     return
+    
     def init_pre(self, sim):
+        """ Initialize prevalence tracking and debug initial susceptible counts. """
         super().init_pre(sim)
         npts = len(sim.t)  # Number of time points in the simulation
-
+    
         # Initialize result arrays for each disease: time x age groups
         for disease in self.diseases:
             self.results[f'{disease}_prevalence_male'] = np.zeros((npts, len(self.age_groups[disease])))
             self.results[f'{disease}_prevalence_female'] = np.zeros((npts, len(self.age_groups[disease])))
-
-        # Initialize array to store population age distribution for each year (single-age resolution)
+    
         self.results['population_age_distribution'] = np.zeros((npts, 101))  # 0 to 100 years (single-year resolution)
 
         print(f"Initialized prevalence array with {npts} time points for {self.diseases}.")
+        
+        print("\n--- Debugging Initial Prevalence in `PrevalenceAnalyzer` ---")
+        
+        # Debugging Simulation Object
+        print(f"Sim Attributes Available: {dir(sim)}")  # Print available attributes of sim
+        if hasattr(sim, 'people'):
+            print("`sim.people` exists.")
+            print(f"Total Agents (len(sim.people)): {len(sim.people)}")
+        else:
+            print("`sim.people` does not exist! Something is wrong with initialization.")
+        
+        for disease in self.diseases:
+            disease_obj = getattr(sim.diseases, disease.lower(), None)
+            if disease_obj:
+                if hasattr(disease_obj, 'affected'):
+                    n_affected = np.sum(disease_obj.affected.raw)  # Count affected individuals
+                else:
+                    n_affected = "N/A"
+    
+                if hasattr(disease_obj, 'infected'):
+                    n_infected = np.sum(disease_obj.infected.raw)  # Count infected individuals
+                else:
+                    n_infected = "N/A"
+    
+                if hasattr(disease_obj, 'susceptible'):
+                    n_susceptible = np.sum(disease_obj.susceptible.raw)  # Count susceptible individuals
+                else:
+                    n_susceptible = "N/A"
+    
+                print(f"\n {disease}:")
+                print(f"  - Affected Count: {n_affected}")
+                print(f"  - Infected Count: {n_infected}")
+                print(f"  - Susceptible Count: {n_susceptible}")
+    
         return
-    
-    # def apply(self, sim):
-    #     # Extract ages of agents alive at this time step
-    #     alive_uids = np.where(sim.people.alive.raw)[0]
-    #     ages = sim.people.age.raw[alive_uids]
-    
-    #     # Store single-age population distribution at each time step
-    #     age_distribution = np.histogram(ages, bins=np.arange(0, 102, 1))  # Single-year resolution from 0 to 101
-    #     self.results['population_age_distribution'][sim.ti, :] = age_distribution[0]
-    
-    #     # Iterate over the diseases to compute prevalence
-    #     for disease in self.diseases:
-    #         disease_obj = getattr(sim.diseases, disease.lower())
-    
-    #         # Determine the correct status attribute based on the disease type
-    #         if hasattr(disease_obj, 'infected'):
-    #             status_attr = 'infected'
-    #         elif hasattr(disease_obj, 'affected'):
-    #             status_attr = 'affected'
-    #         else:
-    #             continue  # Skip diseases that don't have infected or affected states
-            
-    #         status_array = getattr(disease_obj, status_attr).raw  # Use .raw to extract the underlying data
-    
-    #         # Loop through female and non-female (male) for prevalence calculation
-    #         for is_female, label in zip([True, False], ['female', 'male']):
-    #             sex_mask = (sim.people.female.raw[alive_uids] == is_female)  # Binary female mask
-    #             prevalence_by_age_group = np.zeros(len(self.age_groups[disease]))
-    
-    #             for i, (start, end) in enumerate(self.age_groups[disease]):
-    #                 age_mask = (ages >= start) if end == float('inf') else (ages >= start) & (ages < end)
-    #                 combined_mask = sex_mask & age_mask
-    
-    #                 # Filter the status array based on the combined age and sex mask
-    #                 status_for_age_group = status_array[alive_uids][combined_mask]
-    #                 if status_for_age_group.size > 0:
-    #                     prevalence_by_age_group[i] = np.mean(status_for_age_group)
-    
-    #             # Store the prevalence results
-    #             disease_key = f'{disease}_prevalence_{label}'
-    #             self.results[disease_key][sim.ti, :] = prevalence_by_age_group   
                 
         
     def step(self):

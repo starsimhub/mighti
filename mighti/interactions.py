@@ -35,6 +35,11 @@ class HIVConnector(ss.Connector):
         disease_obj.rel_sus[hiv_infected_uids] = self.pars[self.susceptibility_key]
         return
 
+class hiv_type2diabetes(HIVConnector):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__('HIV-Type2Diabetes', [ss.HIV, mi.Type2Diabetes], 'rel_sus_hiv_type2diabetes', 1.95, pars, **kwargs)
+
+
 class hiv_hypertension(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Hypertension', [ss.HIV, mi.Hypertension], 'rel_sus_hiv_hypertension', 1.3, pars, **kwargs)
@@ -47,9 +52,6 @@ class hiv_type1diabetes(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Type1Diabetes', [ss.HIV, mi.Type1Diabetes], 'rel_sus_hiv_type1diabetes', 1.5, pars, **kwargs)
 
-class hiv_type2diabetes(HIVConnector):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Type2Diabetes', [ss.HIV, mi.Type2Diabetes], 'rel_sus_hiv_type2diabetes', 1.5, pars, **kwargs)
 
 class hiv_depression(HIVConnector):
     def __init__(self, pars=None, **kwargs):
