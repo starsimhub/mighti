@@ -2,7 +2,7 @@ import numpy as np
 import starsim as ss
 
 __all__ = [
-    'Type2Diabetes', 'Obesity', 
+    'Type2Diabetes', 'Obesity',
 ]
 
 
@@ -12,19 +12,19 @@ class Type2Diabetes(ss.NCD):
         super().__init__()
         self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
 
-        self.default_pars(
-            dur_condition=ss.lognorm_ex(15.02897096),  
+        self.define_pars(
+            dur_condition=ss.lognorm_ex(15.02897096),
             incidence_prob=0.059,  # Base incidence probability
-            incidence=ss.bernoulli(0.059),    
-            p_death=ss.bernoulli(0.004315),     
-            init_prev=ss.bernoulli(0.01),    
-            # init_prev=ss.bernoulli(0.1351),    
-            remission_rate=ss.bernoulli(0.00024), 
-            max_disease_duration=20,        
+            incidence=ss.bernoulli(0.059),
+            p_death=ss.bernoulli(0.004315),
+            init_prev=ss.bernoulli(0.01),
+            # init_prev=ss.bernoulli(0.1351),
+            remission_rate=ss.bernoulli(0.00024),
+            max_disease_duration=20,
         )
         self.update_pars(pars, **kwargs)
 
-        self.add_states(
+        self.define_states(
             ss.BoolArr('susceptible'),
             ss.BoolArr('affected'),
             ss.BoolArr('reversed'),          # New state for diabetes remission
@@ -33,41 +33,41 @@ class Type2Diabetes(ss.NCD):
             ss.FloatArr('ti_dead'),
         )
         return
-    
+
     def initialize(self, sim):
         """Initialize Type2Diabetes, ensuring susceptibility is properly assigned."""
         print("DEBUGGING: Type2Diabetes.initialize() is being called!")
-    
+
         self.sim = sim  # Manually link the simulation
-    
+
         # Retrieve the number of agents correctly
         n_agents = self.sim.pars['n_agents']  # Get agent count correctly
-    
+
         # Ensure rel_sus is initialized for all individuals
         if self.rel_sus is None or len(self.rel_sus) != n_agents:
             self.rel_sus = np.ones(n_agents)  # Default susceptibility is 1 for all individuals
             print("Initialized rel_sus for Type2Diabetes with default values.")
-    
+
         # Initialize all individuals as susceptible
-        self.susceptible[:] = True  
+        self.susceptible[:] = True
         self.affected[:] = False  # No one starts affected
-    
+
         print(f"DEBUG: After initialize -> Susceptible={np.sum(self.susceptible)}, Affected={np.sum(self.affected)}")
-    
+
     def init_post(self):
         """Assign initial cases based on prevalence data."""
         initial_cases = self.pars.init_prev.filter()
-        
+
         print(f"DEBUG: Initial cases from init_prev = {len(initial_cases)}")
-    
+
         # Set affected individuals correctly
         self.set_prognoses(initial_cases)
-    
+
         # Ensure affected individuals are removed from susceptible pool
-        self.susceptible[initial_cases] = False  
-    
+        self.susceptible[initial_cases] = False
+
         print(f"DEBUG: After init_post -> Susceptible={np.sum(self.susceptible)}, Affected={np.sum(self.affected)}")
-        
+
         return initial_cases
 
     def update_pre(self):
@@ -129,7 +129,7 @@ class Type2Diabetes(ss.NCD):
         new_cases = susceptible_uids[ss.bernoulli(adjusted_prob, strict=False).rvs(len(susceptible_uids))]
 
         # print(f"New cases identified: {len(new_cases)}")
-        
+
         # Set prognoses for the new cases
         self.set_prognoses(new_cases)
         return new_cases
@@ -174,7 +174,7 @@ class Type2Diabetes(ss.NCD):
                 ss.Result(self.name, 'reversal_prevalence', sim.npts, dtype=float),
             ]
         return
-    
+
     def update_results(self):
         """Update prevalence and reversal prevalence results."""
         sim = self.sim
@@ -286,7 +286,7 @@ class Obesity(ss.NCD):
 #         """Initialize the disease, setting rel_sus for each agent."""
 #         super().initialize(sim)  # Call the parent initialize
 #         self.sim = sim  # Link the disease to the simulation
-    
+
 #         # Ensure rel_sus is initialized
 #         if not hasattr(self, 'rel_sus') or self.rel_sus is None:
 #             self.rel_sus = np.ones(len(sim.people))  # Default to 1.0 for all individuals
@@ -302,7 +302,7 @@ class Obesity(ss.NCD):
 #             print("Warning: No initial cases were assigned for Type2Diabetes.")
 #         self.set_prognoses(initial_cases)
 #         return initial_cases
-    
+
 # class Obesity(ss.NCD):
 #     def __init__(self, pars=None, **kwargs):
 #         super().__init__()
@@ -360,7 +360,7 @@ class Obesity(ss.NCD):
 #     'Type1Diabetes', 'Type2Diabetes', 'Obesity', 'Hypertension',
 #     'Depression','Alzheimers', 'Parkinsons','PTSD','HIVAssociatedDementia',
 #     'CerebrovascularDisease','ChronicLiverDisease','Asthma', 'IschemicHeartDisease',
-#     'TrafficAccident','DomesticViolence','TobaccoUse', 'AlcoholUseDisorder', 
+#     'TrafficAccident','DomesticViolence','TobaccoUse', 'AlcoholUseDisorder',
 #     'ChronicKidneyDisease','Flu','HPVVaccination',
 #     'ViralHepatitis','COPD','Hyperlipidemia',
 #     'CervicalCancer','ColorectalCancer', 'BreastCancer', 'LungCancer', 'ProstateCancer', 'OtherCancer',
@@ -403,7 +403,7 @@ class Obesity(ss.NCD):
 #         """Initialize the disease, setting rel_sus for each agent."""
 #         print(f"Calling initialize for {self.name}")
 #         self.sim = sim  # Link the disease to the simulation
-    
+
 #         # Ensure rel_sus is initialized
 #         if not hasattr(self, 'rel_sus') or self.rel_sus is None:
 #             self.rel_sus = np.ones(len(sim.people))  # Default to 1.0 for all individuals
@@ -449,13 +449,13 @@ class Obesity(ss.NCD):
 #         if not hasattr(self, 'rel_sus') or self.rel_sus is None:
 #             print(f"Warning: rel_sus is None for {self.name}. Setting default value.")
 #             self.rel_sus = np.ones(len(sim.people))
-    
+
 #         # Handle remission (reversal)
 #         going_into_remission = self.pars.remission_rate.filter(self.affected.uids)
 #         self.affected[going_into_remission] = False
 #         self.reversed[going_into_remission] = True
 #         self.ti_reversed[going_into_remission] = sim.ti
-    
+
 #         # Handle recovery, death, and beta-cell function exhaustion
 #         recovered = (self.reversed & (self.ti_reversed <= sim.ti)).uids
 #         self.reversed[recovered] = False
@@ -512,14 +512,14 @@ class Obesity(ss.NCD):
 
 #     def init_results(self):
 #         sim = self.sim
-    
+
 #         # # Ensure self.results is initialized
 #         # if self.results is None:
 #         #     self.results = ss.Results(module=self)  # Initialize as an empty container
-    
+
 #         # Call the parent class's init_results method
 #         super().init_results()
-    
+
 #         # Add results only if they are not already present
 #         if 'prevalence' not in self.results:
 #             self.results += ss.Result(self.name, 'prevalence', sim.npts, dtype=float)
@@ -527,7 +527,7 @@ class Obesity(ss.NCD):
 #             self.results += ss.Result(self.name, 'new_deaths', sim.npts, dtype=int)
 #         if 'reversal_prevalence' not in self.results:
 #             self.results += ss.Result(self.name, 'reversal_prevalence', sim.npts, dtype=float)
-    
+
 #         return
 
 #     def update_results(self):
@@ -564,7 +564,7 @@ class Obesity(ss.NCD):
 #             ss.FloatArr('rel_sus'),
 #         )
 #         return
-    
+
 #     # def initialize(self, sim):
 #     #     """Initialize the disease, setting rel_sus for each agent."""
 #     #     print(f"Calling initialize for {self.name}")  # Add this print to confirm
@@ -574,18 +574,18 @@ class Obesity(ss.NCD):
 #     #     self.rel_sus = np.ones(len(sim.people))  # Initialize rel_sus for each agent in the sim (default to 1.0)
 #     #     print(f"Initialized rel_sus for Type2Diabetes: {self.rel_sus}")  # Debugging statement
 #     #     return
-    
+
 #     def initialize(self, sim):
 #         """Initialize the disease, setting rel_sus for each agent."""
 #         print(f"Calling initialize for {self.name}")
 #         self.sim = sim  # Link the disease to the simulation
-    
+
 #         # Ensure rel_sus is initialized
 #         if not hasattr(self, 'rel_sus') or self.rel_sus is None:
 #             self.rel_sus = np.ones(len(sim.people))  # Default to 1.0 for all individuals
 #             print(f"Initialized rel_sus for {self.name}: {self.rel_sus}")
 #         return
-    
+
 #     def init_post(self):
 #         initial_cases = self.pars.init_prev.filter()
 #         self.set_prognoses(initial_cases)
@@ -604,7 +604,7 @@ class Obesity(ss.NCD):
 #         if not hasattr(self, 'rel_sus') or self.rel_sus is None:
 #             print(f"Warning: rel_sus is None for {self.name}. Setting default value.")
 #             self.rel_sus = np.ones(len(sim.people))
-    
+
 #         # Handle recovery
 #         recovered = (self.affected & (self.ti_recovered <= sim.ti)).uids
 #         self.affected[recovered] = False
@@ -626,11 +626,11 @@ class Obesity(ss.NCD):
 
 #     def init_results(self):
 #         sim = self.sim
-    
+
 #         # # Ensure self.results is initialized
 #         # if self.results is None:
 #         #     self.results = ss.Results(module=self)  # Initialize as an empty container
-    
+
 #         # Call the parent class's init_results method
 #         super().init_results()
 
@@ -663,7 +663,7 @@ class Obesity(ss.NCD):
 #         # Load parameters from the CSV
 #         params = mi.load_disease_parameters('Type1Diabetes', 'mighti/data/parameters_eswatini.csv')
 #         self.default_pars(**params)
-        
+
 #         # self.default_pars(
 #         #     dur_condition=ss.lognorm_ex(1),  # Shorter duration before serious complications
 #         #     incidence=ss.bernoulli(0.000015),      # Lower incidence of Type 1 diabetes
@@ -687,7 +687,7 @@ class Obesity(ss.NCD):
 #     #     super().initialize(sim)
 #     #     self.rel_sus = np.ones(len(sim.people))  # Initialize rel_sus for each agent in the sim (default to 1.0)
 #     #     return
-    
+
 #     def initialize(self, sim):
 #         """Initialize the disease, setting rel_sus for each agent."""
 #         self.sim = sim  # Link the disease to the simulation
@@ -749,8 +749,8 @@ class Obesity(ss.NCD):
 #         super().update_results()
 #         self.results.prevalence[sim.ti] = np.count_nonzero(self.affected) / len(sim.people)
 #         return
-    
-    
+
+
 # class Hypertension(ss.NCD):
 
 #     def __init__(self, pars=None, **kwargs):
@@ -1012,7 +1012,7 @@ class Obesity(ss.NCD):
 
 
 # class Alzheimers(ss.Disease):
-    
+
 #     def __init__(self, pars=None, **kwargs):
 #         super().__init__()
 #         self.rel_sus = None  # Initialize rel_sus to store relative susceptibility
