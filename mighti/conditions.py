@@ -129,16 +129,69 @@ class Type2Diabetes(ss.NCD):
     def init_results(self):
         super().init_results()
         self.define_results(
+            ss.Result('prevalence_in_plhiv', dtype=float),  # Initialize this key
+            ss.Result('prevalence_in_hivneg', dtype=float),  # Initialize this key
             ss.Result('reversal_prevalence', dtype=float),
         )
         return
 
     def update_results(self):
         super().update_results()
+    
+        # Compute overall T2D prevalence
         self.results.prevalence[self.ti] = np.count_nonzero(self.affected) / len(self.sim.people)
         self.results.reversal_prevalence[self.ti] = np.count_nonzero(self.reversed) / len(self.sim.people)
-        return
-
+    
+        # Identify PLHIV and HIV-negative individuals
+        plhiv = self.sim.people.hiv.infected  # Ensure this correctly refers to HIV-positive individuals
+        hiv_negative = ~plhiv
+    
+        plhiv_count = np.count_nonzero(plhiv)
+        hiv_negative_count = np.count_nonzero(hiv_negative)
+    
+        # Compute T2D prevalence in PLHIV and HIV-negative groups
+        self.results.setdefault('prevalence_in_plhiv', np.full(len(self.sim.results.timevec), np.nan))
+        self.results.setdefault('prevalence_in_hivneg', np.full(len(self.sim.results.timevec), np.nan))
+    
+        if plhiv_count > 0:
+            self.results.prevalence_in_plhiv[self.ti] = np.count_nonzero(self.affected & plhiv) / plhiv_count
+        else:
+            self.results.prevalence_in_plhiv[self.ti] = np.nan
+    
+        if hiv_negative_count > 0:
+            self.results.prevalence_in_hivneg[self.ti] = np.count_nonzero(self.affected & hiv_negative) / hiv_negative_count
+        else:
+            self.results.prevalence_in_hivneg[self.ti] = np.nan
+    
+        # Define age groups and sexes
+        age_groups = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
+        age_group_labels = [f"{age_groups[i]}_{age_groups[i+1]}" for i in range(len(age_groups) - 1)]
+        sexes = ["male", "female"]
+    
+        # Ensure sex is correctly interpreted
+        male = ~self.sim.people.female  # Assuming `female` is a boolean array
+        female = self.sim.people.female
+    
+        # Compute and store T2D prevalence by age and sex
+        for sex, is_sex in zip(sexes, [male, female]):
+            for i, label in enumerate(age_group_labels):
+                age_min, age_max = age_groups[i], age_groups[i+1]
+                in_age_group = (self.sim.people.age >= age_min) & (self.sim.people.age < age_max)
+                in_group = in_age_group & is_sex
+    
+                total_in_group = np.count_nonzero(in_group)
+    
+                # Initialize results storage if it does not exist
+                key = f'T2D_prevalence_{sex}_{label}'
+                if key not in self.results:
+                    self.results[key] = np.full(len(self.sim.results.timevec), np.nan)
+    
+                # Compute prevalence
+                if total_in_group > 0:
+                    self.results[key][self.ti] = np.count_nonzero(self.affected & in_group) / total_in_group
+                else:
+                    self.results[key][self.ti] = np.nan        
+            
 class Obesity(ss.NCD):
 
     def __init__(self, pars=None, **kwargs):
