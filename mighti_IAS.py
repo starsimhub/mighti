@@ -143,10 +143,139 @@ sim = ss.Sim(
 sim.run()
 
 
+# # Get total population size
+# total_agents = len(sim.people)  
+
+# # Overall T2D prevalence among PLHIV and HIV-negative individuals
+# print(f"T2D Prevalence Among PLHIV in 2025: {sim.results['type2diabetes']['prevalence_in_plhiv'][0] * 100:.2f}%")
+# print(f"T2D Prevalence Among HIV-negative individuals in 2025: {sim.results['type2diabetes']['prevalence_in_hivneg'][0] * 100:.2f}%")
+
+# print(f"T2D Prevalence Among PLHIV in 2050: {sim.results['type2diabetes']['prevalence_in_plhiv'][-1] * 100:.2f}%")
+# print(f"T2D Prevalence Among HIV-negative individuals in 2050: {sim.results['type2diabetes']['prevalence_in_hivneg'][-1] * 100:.2f}%")
+
+# age_groups = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
+# sexes = ['male', 'female']
+
+# for sex in sexes:
+#     for i in range(len(age_groups) - 1):
+#         age_min, age_max = age_groups[i], age_groups[i + 1]
+#         key_name = f'T2D_prevalence_{sex}_{age_min}_{age_max}'
+
+#         if key_name in sim.results['type2diabetes']:
+#             prevalence_2025 = sim.results['type2diabetes'][key_name][0] * 100  # Year 2025
+#             prevalence_2050 = sim.results['type2diabetes'][key_name][-1] * 100  # Year 2050
+#             print(f"T2D Prevalence in {sex.capitalize()} PLHIV aged {age_min}-{age_max}:")
+#             print(f"  - 2025: {prevalence_2025:.2f}%")
+#             print(f"  - 2050: {prevalence_2050:.2f}%\n")
+#         else:
+#             print(f"Key {key_name} not found in sim.results['type2diabetes']")
 
 
+# # Get total population size
+# total_agents = len(sim.people)
+
+# # Overall T2D prevalence among PLHIV and HIV-negative individuals
+# t2d_plhiv_2025 = sim.results['type2diabetes']['prevalence_in_plhiv'][0] * 100
+# t2d_hivneg_2025 = sim.results['type2diabetes']['prevalence_in_hivneg'][0] * 100
+# t2d_plhiv_2050 = sim.results['type2diabetes']['prevalence_in_plhiv'][-1] * 100
+# t2d_hivneg_2050 = sim.results['type2diabetes']['prevalence_in_hivneg'][-1] * 100
+
+# # Ratio of T2D prevalence in PLHIV vs HIV-negative
+# ratio_2025 = t2d_plhiv_2025 / t2d_hivneg_2025 if t2d_hivneg_2025 > 0 else np.nan
+# ratio_2050 = t2d_plhiv_2050 / t2d_hivneg_2050 if t2d_hivneg_2050 > 0 else np.nan
+
+# # Total number of T2D cases
+# total_t2d_2025 = sim.results['type2diabetes']['n_affected'][0]
+# total_t2d_2050 = sim.results['type2diabetes']['n_affected'][-1]
+
+# # Number of PLHIV
+# total_plhiv_2025 = np.count_nonzero(sim.people.hiv.infected)
+# total_plhiv_2050 = total_plhiv_2025  # Assuming we don't have direct HIV prevalence over time
+
+# # Number of T2D cases in PLHIV
+# t2d_in_plhiv_2025 = sim.results['type2diabetes']['prevalence_in_plhiv'][0] * total_plhiv_2025
+# t2d_in_plhiv_2050 = sim.results['type2diabetes']['prevalence_in_plhiv'][-1] * total_plhiv_2050
+
+# # Percentage of all T2D cases in PLHIV
+# percent_t2d_in_plhiv_2025 = (t2d_in_plhiv_2025 / total_t2d_2025) * 100 if total_t2d_2025 > 0 else np.nan
+# percent_t2d_in_plhiv_2050 = (t2d_in_plhiv_2050 / total_t2d_2050) * 100 if total_t2d_2050 > 0 else np.nan
+
+# # Print results
+# print(f"T2D Prevalence Among PLHIV in 2025: {t2d_plhiv_2025:.2f}%")
+# print(f"T2D Prevalence Among HIV-negative individuals in 2025: {t2d_hivneg_2025:.2f}%")
+# print(f"T2D Prevalence Among PLHIV in 2050: {t2d_plhiv_2050:.2f}%")
+# print(f"T2D Prevalence Among HIV-negative individuals in 2050: {t2d_hivneg_2050:.2f}%")
+# print(f"PLHIV have {ratio_2025:.2f} times higher T2D prevalence than HIV-negative individuals in 2025.")
+# print(f"PLHIV have {ratio_2050:.2f} times higher T2D prevalence than HIV-negative individuals in 2050.")
+# print(f"Percentage of all T2D cases occurring in PLHIV (2025): {percent_t2d_in_plhiv_2025:.2f}%")
+# print(f"Percentage of all T2D cases occurring in PLHIV (2050): {percent_t2d_in_plhiv_2050:.2f}%")
 
 
+# Get total population size
+total_agents = len(sim.people)
+
+# Identify PLHIV and HIV-negative individuals
+plhiv = sim.people.hiv.infected
+hivneg = ~plhiv
+
+# Identify individuals aged 18+
+age_18_plus = sim.people.age >= 18
+plhiv_18_plus = plhiv & age_18_plus
+hivneg_18_plus = hivneg & age_18_plus
+
+# Extract correct time indices for 2025 and 2050
+time_index_2025 = np.where(sim.results['timevec'] == 2025)[0][0]
+time_index_2050 = np.where(sim.results['timevec'] == 2050)[0][0]
+
+# Compute Type 2 Diabetes prevalence among PLHIV and HIV-negative individuals aged 18+ in 2025 and 2050
+t2d_in_plhiv_18plus_2025 = sim.results['type2diabetes']['prevalence_in_plhiv'][time_index_2025] * np.count_nonzero(plhiv_18_plus)
+t2d_in_plhiv_18plus_2050 = sim.results['type2diabetes']['prevalence_in_plhiv'][time_index_2050] * np.count_nonzero(plhiv_18_plus)
+
+t2d_in_hivneg_18plus_2025 = sim.results['type2diabetes']['prevalence_in_hivneg'][time_index_2025] * np.count_nonzero(hivneg_18_plus)
+t2d_in_hivneg_18plus_2050 = sim.results['type2diabetes']['prevalence_in_hivneg'][time_index_2050] * np.count_nonzero(hivneg_18_plus)
+
+# Compute total T2D cases among all individuals aged 18+
+total_t2d_18plus_2025 = t2d_in_plhiv_18plus_2025 + t2d_in_hivneg_18plus_2025
+total_t2d_18plus_2050 = t2d_in_plhiv_18plus_2050 + t2d_in_hivneg_18plus_2050
+
+# Compute T2D prevalence among PLHIV and HIV-negative individuals aged 18+
+prevalence_in_plhiv_18plus_2025 = sim.results['type2diabetes']['prevalence_in_plhiv'][time_index_2025] * 100
+prevalence_in_plhiv_18plus_2050 = sim.results['type2diabetes']['prevalence_in_plhiv'][time_index_2050] * 100
+
+prevalence_in_hivneg_18plus_2025 = sim.results['type2diabetes']['prevalence_in_hivneg'][time_index_2025] * 100
+prevalence_in_hivneg_18plus_2050 = sim.results['type2diabetes']['prevalence_in_hivneg'][time_index_2050] * 100
+
+# Compute ratio of T2D prevalence in PLHIV vs. HIV-negative individuals (aged 18+)
+ratio_18plus_2025 = prevalence_in_plhiv_18plus_2025 / prevalence_in_hivneg_18plus_2025 if prevalence_in_hivneg_18plus_2025 > 0 else np.nan
+ratio_18plus_2050 = prevalence_in_plhiv_18plus_2050 / prevalence_in_hivneg_18plus_2050 if prevalence_in_hivneg_18plus_2050 > 0 else np.nan
+
+# Identify individuals aged 50+
+age_50_plus = sim.people.age >= 50
+plhiv_50_plus = plhiv & age_50_plus
+
+# Compute total T2D cases among individuals aged 50+
+t2d_in_plhiv_50plus_2025 = sim.results['type2diabetes']['prevalence_in_plhiv'][time_index_2025] * np.count_nonzero(plhiv_50_plus)
+t2d_in_plhiv_50plus_2050 = sim.results['type2diabetes']['prevalence_in_plhiv'][time_index_2050] * np.count_nonzero(plhiv_50_plus)
+
+total_t2d_50plus_2025 = sim.results['type2diabetes']['prevalence'][time_index_2025] * np.count_nonzero(age_50_plus)
+total_t2d_50plus_2050 = sim.results['type2diabetes']['prevalence'][time_index_2050] * np.count_nonzero(age_50_plus)
+
+# Compute percentage of all T2D cases occurring in PLHIV aged 50+
+percent_t2d_in_plhiv_50plus_2025 = (t2d_in_plhiv_50plus_2025 / total_t2d_50plus_2025) * 100 if total_t2d_50plus_2025 > 0 else np.nan
+percent_t2d_in_plhiv_50plus_2050 = (t2d_in_plhiv_50plus_2050 / total_t2d_50plus_2050) * 100 if total_t2d_50plus_2050 > 0 else np.nan
+
+# Print results
+print(f"T2D Prevalence Among PLHIV aged 18+ in 2025: {prevalence_in_plhiv_18plus_2025:.2f}%")
+print(f"T2D Prevalence Among HIV-negative aged 18+ in 2025: {prevalence_in_hivneg_18plus_2025:.2f}%")
+print(f"T2D Prevalence Among PLHIV aged 18+ in 2050: {prevalence_in_plhiv_18plus_2050:.2f}%")
+print(f"T2D Prevalence Among HIV-negative aged 18+ in 2050: {prevalence_in_hivneg_18plus_2050:.2f}%")
+
+print(f"PLHIV have {ratio_18plus_2025:.2f} times higher T2D prevalence than HIV-negative individuals in 2025.")
+print(f"PLHIV have {ratio_18plus_2050:.2f} times higher T2D prevalence than HIV-negative individuals in 2050.")
+
+print(f"Percentage of all T2D cases occurring in PLHIV aged 50+ in 2025: {percent_t2d_in_plhiv_50plus_2025:.1f}%")
+print(f"Percentage of all T2D cases occurring in PLHIV aged 50+ in 2050: {percent_t2d_in_plhiv_50plus_2050:.1f}%")
+    
 # Retrieve prevalence data
 time = sim.results['timevec']
 prevalence_plhiv = sim.results['type2diabetes']['prevalence_in_plhiv'] * 100  # Convert to %
@@ -161,36 +290,4 @@ plt.ylabel("Prevalence (%)")
 plt.title("T2D Prevalence Among PLHIV vs. HIV-Negative Individuals")
 plt.legend()
 plt.grid()
-plt.show()
-
-
-
-                
-# Extract data from results
-timevec = sim.results['timevec']  # Simulation time
-age_groups = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
-sexes = ['male', 'female']
-
-# Prepare plot
-fig, axs = plt.subplots(2, 2, figsize=(14, 10), sharex=True, sharey=True)
-
-for row, sex in enumerate(sexes):  # Male (row 0), Female (row 1)
-    for col, hiv_status in enumerate(['plhiv', 'hivneg']):  # PLHIV (col 0), HIV-negative (col 1)
-        ax = axs[row, col]
-        
-        for i in range(len(age_groups) - 1):
-            age_min, age_max = age_groups[i], age_groups[i+1]
-            key_name = f'T2D_prevalence_{sex}_{age_min}_{age_max}'
-
-            if key_name in sim.results:
-                prevalence = sim.results[key_name] * 100  # Convert to percentage
-                ax.plot(timevec, prevalence, label=f'{age_min}-{age_max}', alpha=0.8)
-
-        ax.set_title(f'T2D Prevalence ({sex.capitalize()}, {hiv_status.upper()})')
-        ax.set_xlabel('Year')
-        ax.set_ylabel('Prevalence (%)')
-        ax.legend(title="Age Group", loc="upper right", fontsize=8)
-        ax.grid(True)
-
-plt.tight_layout()
 plt.show()
