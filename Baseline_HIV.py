@@ -25,7 +25,7 @@ networks = [mf, maternal]
 # Create demographics
 fertility_rates = {'fertility_rate': pd.read_csv(sc.thispath() / 'tests/test_data/nigeria_asfr.csv')}
 pregnancy = ss.Pregnancy(pars=fertility_rates)
-death_rates = {'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/nigeria_deaths.csv'), 'units': 1}
+death_rates = {'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/nigeria_deaths.csv'), 'rate_units': 1}
 death = ss.Deaths(death_rates)
 
 age_data = {

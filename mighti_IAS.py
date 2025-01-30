@@ -143,7 +143,6 @@ sim = ss.Sim(
 sim.run()
 
 
-
 # Get total population size
 total_agents = len(sim.people)
 
