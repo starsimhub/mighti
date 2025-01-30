@@ -8,13 +8,20 @@ import matplotlib.pyplot as plt
 
 
 ncds = [
-      'Type2Diabetes',#'Obesity', 'Type1Diabetes',#'Hypertension', #
-    # 'Depression','Alzheimers', 'Parkinsons','PTSD','HIVAssociatedDementia',
-    # 'CerebrovascularDisease','ChronicLiverDisease','Asthma', 'IschemicHeartDisease',
-    # 'TrafficAccident','DomesticViolence','TobaccoUse', 'AlcoholUseDisorder', 
-    # 'ChronicKidneyDisease','Flu','HPVVaccination',
-    # 'ViralHepatitis','COPD','Hyperlipidemia',
-    # 'CervicalCancer','ColorectalCancer', 'BreastCancer', 'LungCancer', 'ProstateCancer', 'OtherCancer',
+      'Type2Diabetes', #'Type1Diabetes',
+      
+      
+    # 'Depression','AlzheimersDisease', 'ParkinsonsDisease','AlcoholUseDisorder', 
+    # 'ChronicKidneyDisease','COPD','RoadInjuries','ChronicLiverDisease',
+    #  'IschemicHeartDisease','Asthma',
+    # 'LungCancer', 'CervicalCancer','BreastCancer', 'ProstateCancer','ColorectalCancer', 
+    # 'Hypertension', #'Obesity',
+    # 'PTSD','HIVAssociatedDementia',
+    # 'CerebrovascularDisease',
+    # 'DomesticViolence','TobaccoUse', 
+    # 'Flu','HPVVaccination',
+    # 'ViralHepatitis','Hyperlipidemia',
+    #  'OtherCancer',
 ]
 
 diseases = ['HIV'] + ncds
@@ -62,7 +69,7 @@ fertility_rates = {'fertility_rate': pd.read_csv(sc.thispath() / 'tests/test_dat
 pregnancy = ss.Pregnancy(pars=fertility_rates)
 death_rates = {'death_rate': pd.read_csv(sc.thispath() / 'tests/test_data/eswatini_deaths.csv'), 'rate_units': 1}
 death = ss.Deaths(death_rates)
-ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age_2007.csv'))
+ppl = ss.People(n_agents, age_data=pd.read_csv('tests/test_data/eswatini_age_2023.csv'))
 
 # -------------------------
 # Networks
@@ -391,3 +398,4 @@ except KeyError as e:
     
 # except KeyError as e:
 #     print(f"KeyError: {e} - Check if the correct result keys are being used.")
+
