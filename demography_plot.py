@@ -98,53 +98,5 @@ import os
 # plt.show()
 
 
-# ####### Prevalence HIV, T2D #######
-# # Load the prevalence data
-# file_path = 'mighti/data/prevalence_data_eswatini.csv'  # Update with actual path
-# df = pd.read_csv(file_path)
-
-# # Filter for the year 2021
-# df_2021 = df[df['Year'] == 2021]
-
-# # Extract relevant columns
-# df_2021 = df_2021[['Age', 'HIV_male', 'HIV_female', 'Type2Diabetes_male', 'Type2Diabetes_female']]
-
-# # Convert to percentages
-# df_2021[['HIV_male', 'HIV_female', 'Type2Diabetes_male', 'Type2Diabetes_female']] *= 100
-
-# # Bar width
-# bar_width = 0.4
-# age_groups = df_2021['Age']
-
-# # Set x positions for bars
-# x = np.arange(len(age_groups))
-
-# # Create figure and subplots
-# fig, axs = plt.subplots(1, 2, figsize=(14, 5), sharey=True)
-
-# # Plot HIV prevalence
-# axs[0].bar(x - bar_width/2, df_2021['HIV_male'], width=bar_width, color='blue', label='HIV Male')
-# axs[0].bar(x + bar_width/2, df_2021['HIV_female'], width=bar_width, color='red', label='HIV Female')
-# axs[0].set_xticks(x)
-# axs[0].set_xticklabels(age_groups, rotation=45)
-# axs[0].set_xlabel('Age')
-# axs[0].set_ylabel('Prevalence (%)')
-# axs[0].set_title('HIV Prevalence by Age (2021)')
-# axs[0].legend()
-# axs[0].grid(axis='y', linestyle='--', alpha=0.6)
-
-# # Plot T2D prevalence
-# axs[1].bar(x - bar_width/2, df_2021['Type2Diabetes_male'], width=bar_width, color='blue', label='T2D Male')
-# axs[1].bar(x + bar_width/2, df_2021['Type2Diabetes_female'], width=bar_width, color='red', label='T2D Female')
-# axs[1].set_xticks(x)
-# axs[1].set_xticklabels(age_groups, rotation=45)
-# axs[1].set_xlabel('Age')
-# axs[1].set_title('Type 2 Diabetes Prevalence by Age (2021)')
-# axs[1].legend()
-# axs[1].grid(axis='y', linestyle='--', alpha=0.6)
-
-# # Adjust layout and show the plot
-# plt.tight_layout()
-# plt.show()
 
 
