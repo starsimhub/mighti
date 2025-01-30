@@ -48,7 +48,7 @@ class Type2Diabetes(ss.NCD):
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_reversed'),
             ss.FloatArr('ti_dead'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
             # ss.FloatArr('beta_cell_function'),  # Tracks beta-cell function over time
             # ss.FloatArr('insulin_resistance'),  # Tracks insulin resistance progression
         )
@@ -207,7 +207,7 @@ class Obesity(ss.NCD):
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_recovered'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
         return
 
