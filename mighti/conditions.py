@@ -14,7 +14,7 @@ import mighti as mi
 #     'Type1Diabetes', 'Type2Diabetes', 'Obesity', 'Hypertension',
 #     'Depression','Alzheimers', 'Parkinsons','PTSD','HIVAssociatedDementia',
 #     'CerebrovascularDisease','ChronicLiverDisease','Asthma', 'IschemicHeartDisease',
-#     'TrafficAccident','DomesticViolence','TobaccoUse', 'AlcoholUseDisorder', 
+#     'TrafficAccident','DomesticViolence','TobaccoUse', 'AlcoholUseDisorder',
 #     'ChronicKidneyDisease','Flu','HPVVaccination',
 #     'ViralHepatitis','COPD','Hyperlipidemia',
 #     'CervicalCancer','ColorectalCancer', 'BreastCancer', 'LungCancer', 'ProstateCancer', 'OtherCancer',
@@ -31,18 +31,18 @@ class Type2Diabetes(ss.NCD):
     def __init__(self, pars=None, **kwargs):
         super().__init__()
         self.define_pars(
-            dur_condition=ss.lognorm_ex(15.02897096),  
+            dur_condition=ss.lognorm_ex(15.02897096),
             incidence_prob=0.08,  # Base incidence probability 0.059
-            incidence=ss.bernoulli(0.08),    
-            p_death=ss.bernoulli(0.004315),     
-            init_prev=ss.bernoulli(0.1351),    
-            remission_rate=ss.bernoulli(0.00024), 
-            max_disease_duration=30,        
+            incidence=ss.bernoulli(0.08),
+            p_death=ss.bernoulli(0.004315),
+            init_prev=ss.bernoulli(0.1351),
+            remission_rate=ss.bernoulli(0.00024),
+            max_disease_duration=30,
         )
         self.update_pars(pars, **kwargs)
 
         self.define_states(
-            ss.State('susceptible'),
+            ss.State('susceptible', default=True),
             ss.State('affected'),
             ss.State('reversed'),  # New state for diabetes remission
             ss.FloatArr('ti_affected'),
@@ -58,20 +58,19 @@ class Type2Diabetes(ss.NCD):
         print(f"\n Debugging `init_prev` in Type2Diabetes: {self.pars.init_prev}")
 
         initial_cases = self.pars.init_prev.filter()
-        
+
         print(f"Expected initial cases: {len(initial_cases)}")  # Should be around 13.5% of n_agents
 
         if len(initial_cases) == 0:
             print("WARNING: `init_prev` is filtering 0 cases! Something is wrong.")
 
         self.set_prognoses(initial_cases)
-        
+
         #  Debugging After Initialization
         # print(f" After `init_post`:")
         print(f"  - Affected (should be ~67,651): {np.sum(self.affected.raw)}")
         print(f"  - Susceptible: {np.sum(self.susceptible.raw)}")
 
- 
         return initial_cases
 
     def step_state(self):
@@ -80,7 +79,7 @@ class Type2Diabetes(ss.NCD):
         self.affected[going_into_remission] = False
         self.reversed[going_into_remission] = True
         self.ti_reversed[going_into_remission] = self.ti
-    
+
         # Handle recovery & deaths
         recovered = (self.reversed & (self.ti_reversed <= self.ti)).uids
         self.reversed[recovered] = False
@@ -90,25 +89,25 @@ class Type2Diabetes(ss.NCD):
 
     def step(self):
         print(f"\n Debugging `step` in {self.name}:")
-        print(f"  - Susceptible count before new cases: {np.sum(self.susceptible.raw)}")  
-    
+        print(f"  - Susceptible count before new cases: {np.sum(self.susceptible.raw)}")
+
         # Generate new cases
         new_cases = self.pars.incidence.filter(self.susceptible.uids)
-        
+
         print(f"  - New cases detected: {len(new_cases)}")
-        
+
         self.set_prognoses(new_cases)
-    
+
         print(f"  - Affected count after step: {np.sum(self.affected.raw)}")
-        
+
         return new_cases
-    
+
 
     def set_prognoses(self, uids):
         sim = self.sim
         p = self.pars
         print(f"Debugging `set_prognoses` for {len(uids)} cases.")  # Should be ~67,651
-        
+
         if len(uids) == 0:
             print("WARNING: No affected cases! This may be an issue.")
 
@@ -137,61 +136,61 @@ class Type2Diabetes(ss.NCD):
 
     def update_results(self):
         super().update_results()
-    
+
         # Compute overall T2D prevalence
         self.results.prevalence[self.ti] = np.count_nonzero(self.affected) / len(self.sim.people)
         self.results.reversal_prevalence[self.ti] = np.count_nonzero(self.reversed) / len(self.sim.people)
-    
+
         # Identify PLHIV and HIV-negative individuals
         plhiv = self.sim.people.hiv.infected  # Ensure this correctly refers to HIV-positive individuals
         hiv_negative = ~plhiv
-    
+
         plhiv_count = np.count_nonzero(plhiv)
         hiv_negative_count = np.count_nonzero(hiv_negative)
-    
+
         # Compute T2D prevalence in PLHIV and HIV-negative groups
         self.results.setdefault('prevalence_in_plhiv', np.full(len(self.sim.results.timevec), np.nan))
         self.results.setdefault('prevalence_in_hivneg', np.full(len(self.sim.results.timevec), np.nan))
-    
+
         if plhiv_count > 0:
             self.results.prevalence_in_plhiv[self.ti] = np.count_nonzero(self.affected & plhiv) / plhiv_count
         else:
             self.results.prevalence_in_plhiv[self.ti] = np.nan
-    
+
         if hiv_negative_count > 0:
             self.results.prevalence_in_hivneg[self.ti] = np.count_nonzero(self.affected & hiv_negative) / hiv_negative_count
         else:
             self.results.prevalence_in_hivneg[self.ti] = np.nan
-    
+
         # Define age groups and sexes
         age_groups = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
         age_group_labels = [f"{age_groups[i]}_{age_groups[i+1]}" for i in range(len(age_groups) - 1)]
         sexes = ["male", "female"]
-    
+
         # Ensure sex is correctly interpreted
         male = ~self.sim.people.female  # Assuming `female` is a boolean array
         female = self.sim.people.female
-    
+
         # Compute and store T2D prevalence by age and sex
         for sex, is_sex in zip(sexes, [male, female]):
             for i, label in enumerate(age_group_labels):
                 age_min, age_max = age_groups[i], age_groups[i+1]
                 in_age_group = (self.sim.people.age >= age_min) & (self.sim.people.age < age_max)
                 in_group = in_age_group & is_sex
-    
+
                 total_in_group = np.count_nonzero(in_group)
-    
+
                 # Initialize results storage if it does not exist
                 key = f'T2D_prevalence_{sex}_{label}'
                 if key not in self.results:
                     self.results[key] = np.full(len(self.sim.results.timevec), np.nan)
-    
+
                 # Compute prevalence
                 if total_in_group > 0:
                     self.results[key][self.ti] = np.count_nonzero(self.affected & in_group) / total_in_group
                 else:
-                    self.results[key][self.ti] = np.nan        
-            
+                    self.results[key][self.ti] = np.nan
+
 class Obesity(ss.NCD):
 
     def __init__(self, pars=None, **kwargs):
@@ -204,7 +203,7 @@ class Obesity(ss.NCD):
         self.update_pars(pars, **kwargs)
 
         self.define_states(
-            ss.State('susceptible'),
+            ss.State('susceptible', default=True),
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_recovered'),
@@ -243,7 +242,7 @@ class Obesity(ss.NCD):
 
 
 # class Type1Diabetes(ss.NCD):
-    
+
 #     def __init__(self, pars=None, **kwargs):
 #         super().__init__()
 #         self.define_pars(
@@ -301,10 +300,10 @@ class Obesity(ss.NCD):
 #         super().update_results()
 #         self.results.prevalence[self.ti] = np.count_nonzero(self.affected) / len(self.sim.people)
 #         return
-    
+
 
 # class Hypertension(ss.NCD):
-    
+
 #     def __init__(self, pars=None, **kwargs):
 #         super().__init__()
 #         self.define_pars(
@@ -314,7 +313,7 @@ class Obesity(ss.NCD):
 #             init_prev=ss.bernoulli(0.18),
 #         )
 #         self.update_pars(pars, **kwargs)
-        
+
 #         self.define_states(
 #             ss.State('susceptible'),
 #             ss.State('affected'),
