@@ -28,8 +28,8 @@ diseases = ['HIV'] + ncds
 
 beta = 0.001  # Transmission probability for HIV
 n_agents = 500000  # Number of agents in the simulation
-inityear = 2017  # Simulation start year
-endyear = 2030
+inityear = 2011  # Simulation start year
+endyear = 2050
 
 
 # -------------------------
