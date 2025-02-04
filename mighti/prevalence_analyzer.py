@@ -23,21 +23,6 @@ class PrevalenceAnalyzer(ss.Analyzer):
             self.age_groups[disease] = list(zip(self.age_bins[disease][:-1], self.age_bins[disease][1:])) + [(self.age_bins[disease][-1], float('inf'))]
 
         self.results = sc.objdict()
-
-    # def init_pre(self, sim):
-    #     super().init_pre(sim)
-    #     npts = len(sim.t)  # Number of time points in the simulation
-
-    #     # Initialize result arrays for each disease: time x age groups
-    #     for disease in self.diseases:
-    #         self.results[f'{disease}_prevalence_male'] = np.zeros((npts, len(self.age_groups[disease])))
-    #         self.results[f'{disease}_prevalence_female'] = np.zeros((npts, len(self.age_groups[disease])))
-
-    #     # Initialize array to store population age distribution for each year (single-age resolution)
-    #     self.results['population_age_distribution'] = np.zeros((npts, 101))  # 0 to 100 years (single-year resolution)
-
-    #     print(f"Initialized prevalence array with {npts} time points for {self.diseases}.")
-    #     return
     
     def init_pre(self, sim):
         """ Initialize prevalence tracking and debug initial susceptible counts. """
@@ -53,16 +38,8 @@ class PrevalenceAnalyzer(ss.Analyzer):
 
         print(f"Initialized prevalence array with {npts} time points for {self.diseases}.")
         
-        print("\n--- Debugging Initial Prevalence in `PrevalenceAnalyzer` ---")
-        
-        # Debugging Simulation Object
-        print(f"Sim Attributes Available: {dir(sim)}")  # Print available attributes of sim
-        if hasattr(sim, 'people'):
-            print("`sim.people` exists.")
-            print(f"Total Agents (len(sim.people)): {len(sim.people)}")
-        else:
-            print("`sim.people` does not exist! Something is wrong with initialization.")
-        
+        # print("\n--- Debugging Initial Prevalence in `PrevalenceAnalyzer` ---")
+               
         for disease in self.diseases:
             disease_obj = getattr(sim.diseases, disease.lower(), None)
             if disease_obj:

@@ -7,15 +7,16 @@ from collections import defaultdict
 # Specify all externally visible classes this file defines
 __all__ = [
     'hiv_hypertension', 'hiv_obesity', 'hiv_type1diabetes', 'hiv_type2diabetes',
-    'hiv_depression', 'hiv_accident', 'hiv_alzheimers', 'hiv_assault',
-    'hiv_cerebrovasculardisease', 'hiv_chronicliverdisease',
-    'hiv_chroniclowerrespiratorydisease', 'hiv_heartdisease',
-    'hiv_chronickidneydisease', 'hiv_flu', 'hiv_hpv', 'hiv_parkinsons',
-    'hiv_smoking', 'hiv_alcohol', 'hiv_brca', 'hiv_viralhepatitis',
+    'hiv_depression','hiv_alzheimersdisease', 'hiv_parkinsonsdisease','hiv_ptsd',
+    'hiv_hivassociateddimentia','hiv_cardiovasculardisease', 'hiv_chronicliverdisease',
+    'hiv_asthma','hiv_roadinjury','hiv_domesticviolence',
+    'hiv_chronickidneydisease', 'hiv_flu', 'hiv_hpvvaccination', 'hiv_tobaccouse', 'hiv_alcoholusedisorder',
+    'hiv_viralhepatitis','hiv_copd','hiv_hyperlipidemia',
     'hiv_cervicalcancer', 'hiv_colorectalcancer', 'hiv_breastcancer', 'hiv_lungcancer',
-    'hiv_prostatecancer', 'hiv_othercancer', 'hiv_poverty',
+    'hiv_prostatecancer', 'hiv_othercancer', 
     'GenericNCDConnector', 'read_interactions'
 ]
+
 
 # Base class for HIV-related connectors
 class HIVConnector(ss.Connector):
@@ -39,10 +40,25 @@ class hiv_type2diabetes(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Type2Diabetes', [ss.HIV, mi.Type2Diabetes], 'rel_sus_hiv_type2diabetes', 1.95, pars, **kwargs)
 
+class hiv_type1diabetes(HIVConnector):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__('HIV-Type1Diabetes', [ss.HIV, mi.Type1Diabetes], 'rel_sus_hiv_type1diabetes', 1.95, pars, **kwargs)
 
 class hiv_hypertension(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Hypertension', [ss.HIV, mi.Hypertension], 'rel_sus_hiv_hypertension', 1.3, pars, **kwargs)
+
+class hiv_hyperlipidemia(HIVConnector):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__('HIV-Hyperlipidemia', [ss.HIV, mi.Hyperlipidemia], 'rel_sus_hiv_hyperlipidemia', 1.3, pars, **kwargs)
+
+class hiv_asthma(HIVConnector):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__('HIV-Asthma', [ss.HIV, mi.Asthma], 'rel_sus_hiv_asthma', 1.3, pars, **kwargs)
+
+class hiv_copd(HIVConnector):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__('HIV-COPD', [ss.HIV, mi.COPD], 'rel_sus_hiv_copd', 1.3, pars, **kwargs)
 
 class hiv_obesity(HIVConnector):
     def __init__(self, pars=None, **kwargs):
@@ -52,26 +68,37 @@ class hiv_type1diabetes(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Type1Diabetes', [ss.HIV, mi.Type1Diabetes], 'rel_sus_hiv_type1diabetes', 1.5, pars, **kwargs)
 
-
 class hiv_depression(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Depression', [ss.HIV, mi.Depression], 'rel_sus_hiv_depression', 2, pars, **kwargs)
 
-class hiv_accident(HIVConnector):
+class hiv_ptsd(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Accident', [ss.HIV, mi.Accident], 'rel_sus_hiv_accident', 1.1, pars, **kwargs)
+        super().__init__('HIV-PTSD', [ss.HIV, mi.PTSD], 'rel_sus_hiv_ptsd', 2, pars, **kwargs)
 
-class hiv_alzheimers(HIVConnector):
+class hiv_hivassociateddimentia(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Alzheimers', [ss.HIV, mi.Alzheimers], 'rel_sus_hiv_alzheimers', 1.1, pars, **kwargs)
+        super().__init__('HIV-HIVAssociatedDimentia', [ss.HIV, mi.HIVAssociatedDementia], 'rel_sus_hiv_hivassociateddimentia', 2, pars, **kwargs)
+
+class hiv_roadinjury(HIVConnector):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__('HIV-Accident', [ss.HIV, mi.RoadInjury], 'rel_sus_hiv_roadinjury', 1.1, pars, **kwargs)
+
+class hiv_domesticviolence(HIVConnector):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__('HIV-DomesticViolence', [ss.HIV, mi.DomesticViolence], 'rel_sus_hiv_domesticviolence', 1.1, pars, **kwargs)
+
+class hiv_alzheimersdisease(HIVConnector):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__('HIV-Alzheimers', [ss.HIV, mi.AlzheimersDisease], 'rel_sus_hiv_alzheimers', 1.1, pars, **kwargs)
 
 class hiv_assault(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Assault', [ss.HIV, mi.Assault], 'rel_sus_hiv_assault', 1.1, pars, **kwargs)
+        super().__init__('HIV-Assault', [ss.HIV, mi.DomesticViolence], 'rel_sus_hiv_domesticviolence', 1.1, pars, **kwargs)
 
-class hiv_cerebrovasculardisease(HIVConnector):
+class hiv_cardiovasculardisease(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Cerebrovascular', [ss.HIV, mi.CerebrovascularDisease], 'rel_sus_hiv_cerebro', 1.2, pars, **kwargs)
+        super().__init__('HIV-CardiovascularDisease', [ss.HIV, mi.CardiovascularDisease], 'rel_sus_hiv_cardiovasculardisease', 1.2, pars, **kwargs)
 
 class hiv_chronicliverdisease(HIVConnector):
     def __init__(self, pars=None, **kwargs):
@@ -93,25 +120,21 @@ class hiv_flu(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Flu', [ss.HIV, mi.Flu], 'rel_sus_hiv_flu', 1.2, pars, **kwargs)
 
-class hiv_hpv(HIVConnector):
+class hiv_hpvvaccination(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-HPV', [ss.HIV, mi.HPV], 'rel_sus_hiv_hpv', 1.5, pars, **kwargs)
 
-class hiv_parkinsons(HIVConnector):
+class hiv_parkinsonsdisease(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Parkinsons', [ss.HIV, mi.Parkinsons], 'rel_sus_hiv_parkinsons', 1.3, pars, **kwargs)
+        super().__init__('HIV-ParkinsonsDisease', [ss.HIV, mi.ParkinsonsDisease], 'rel_sus_hiv_parkinsonsdisease', 1.3, pars, **kwargs)
 
-class hiv_smoking(HIVConnector):
+class hiv_tobaccouse(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Smoking', [ss.HIV, mi.Smoking], 'rel_sus_hiv_smoking', 1.5, pars, **kwargs)
+        super().__init__('HIV-TobaccoUse', [ss.HIV, mi.TobaccoUse], 'rel_sus_hiv_tobaccouse', 1.5, pars, **kwargs)
 
-class hiv_alcohol(HIVConnector):
+class hiv_alcoholusedisorder(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Alcohol', [ss.HIV, mi.Alcohol], 'rel_sus_hiv_alcohol', 1.4, pars, **kwargs)
-
-class hiv_brca(HIVConnector):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-BRCA', [ss.HIV, mi.BRCA], 'rel_sus_hiv_brca', 1.3, pars, **kwargs)
+        super().__init__('HIV-AlcoholUseDisorder', [ss.HIV, mi.AlcoholUseDisorder], 'rel_sus_hiv_alcoholusedisorder', 1.4, pars, **kwargs)
 
 class hiv_cervicalcancer(HIVConnector):
     def __init__(self, pars=None, **kwargs):
@@ -140,10 +163,6 @@ class hiv_othercancer(HIVConnector):
 class hiv_viralhepatitis(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Hepatitis', [ss.HIV, mi.ViralHepatitis], 'rel_sus_hiv_hepatitis', 1.3, pars, **kwargs)
-
-class hiv_poverty(HIVConnector):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Poverty', [ss.HIV, mi.Poverty], 'rel_sus_hiv_poverty', 1.3, pars, **kwargs)
 
 # Functions to read in datafiles
 def read_interactions(datafile=None):
