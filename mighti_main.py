@@ -9,11 +9,9 @@ import matplotlib.pyplot as plt
 
 ncds = [
       'Type2Diabetes', #'Type1Diabetes',
-      
-      
     # 'Depression','AlzheimersDisease', 'ParkinsonsDisease','AlcoholUseDisorder', 
     # 'ChronicKidneyDisease','COPD','RoadInjuries','ChronicLiverDisease',
-    #  'IschemicHeartDisease','Asthma',
+    #   'IschemicHeartDisease','Asthma',
     # 'LungCancer', 'CervicalCancer','BreastCancer', 'ProstateCancer','ColorectalCancer', 
     # 'Hypertension', #'Obesity',
     # 'PTSD','HIVAssociatedDementia',
@@ -21,7 +19,7 @@ ncds = [
     # 'DomesticViolence','TobaccoUse', 
     # 'Flu','HPVVaccination',
     # 'ViralHepatitis','Hyperlipidemia',
-    #  'OtherCancer',
+    #   'OtherCancer',
 ]
 
 diseases = ['HIV'] + ncds
@@ -93,6 +91,8 @@ for disease in ncds:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
     if disease == 'Type2Diabetes':
         disease_obj = mi.Type2Diabetes(init_prev=init_prev)
+    # elif disease == 'Type1Diabetes':
+    #     disease_obj = mi.Type1Diabetes(init_prev=init_prev)         
     elif disease == 'Obesity':
         disease_obj = mi.Obesity(init_prev=init_prev)
     disease_objects.append(disease_obj)
@@ -107,6 +107,7 @@ prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, dis
 # Load existing HIV and NCD interactions
 interaction_functions = {
     'Type2Diabetes': mi.hiv_type2diabetes,
+    # 'Type1Diabetes': mi.hiv_type1diabetes,
     'Obesity': mi.hiv_obesity,
 }
 
@@ -328,74 +329,4 @@ except KeyError as e:
 # except KeyError as e:
 #     print(f"KeyError: {e} - Check if the correct result keys are being used.")
 
-
-
-# # Plots without dots for data
-# try:
-#     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
-#     hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
-#     diabetes_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
-#     diabetes_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
-#     diabetes_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
-#     diabetes_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
-#     obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
-#     obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
-#     hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
-#     hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
-
-#     # Ensure age_bins is a list (fix for the previous error)
-#     age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
-#     age_bins_list = list(age_bins)  # Convert to a list if it's not already
-    
-#     # Create subplots for each disease, dynamically based on the number of diseases
-#     n_diseases = len(diseases)
-#     fig, axs = pl.subplots(n_diseases, 2, figsize=(18, n_diseases * 6), sharey='row')
-
-#     # Create age group labels and color map for age bins (generalized)
-#     # Ensure age_bins_list contains integers
-#     age_bins_list = [int(age_bin) for age_bin in age_bins_list]  # Convert age bins to integers
-    
-#     # Now you can perform operations like subtraction
-#     age_group_labels = [f'{left}-{right-1}' for left, right in zip(age_bins_list[:-1], age_bins_list[1:])]  
-    
-#     if age_bins_list[-1] == 80:
-#         age_group_labels.append('80+')
-#     cmap = pl.get_cmap('tab20', len(age_group_labels))  # Color map for distinct age groups
-#     age_bin_colors = {label: cmap(i) for i, label in enumerate(age_group_labels)}
-
-#       # Loop through each disease and plot its prevalence for males and females
-#     for disease_idx, disease in enumerate(diseases):
-#         # Access the male and female prevalence data for each disease
-#         male_data = prevalence_analyzer.results[f'{disease}_prevalence_male'] * 100
-#         female_data = prevalence_analyzer.results[f'{disease}_prevalence_female'] * 100
-
-#         # Plot male prevalence for the disease
-#         for i, label in enumerate(age_group_labels):
-#             axs[disease_idx, 0].plot(sim.timevec, male_data[:, i], label=label, color=age_bin_colors[label])
-#         axs[disease_idx, 0].set_title(f'{disease} (Male)', fontsize=24) 
-#         axs[disease_idx, 0].set_xlabel('Year', fontsize=20) 
-#         axs[disease_idx, 0].set_ylabel('Prevalence (%)', fontsize=20)  
-#         axs[disease_idx, 0].tick_params(axis='both', labelsize=18)  
-#         axs[disease_idx, 0].grid(True)
-
-#         # Plot female prevalence for the disease
-#         for i, label in enumerate(age_group_labels):
-#             axs[disease_idx, 1].plot(sim.timevec, female_data[:, i], color=age_bin_colors[label])
-#         axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24) 
-#         axs[disease_idx, 1].set_xlabel('Year', fontsize=20)  
-#         axs[disease_idx, 0].tick_params(axis='both', labelsize=18) 
-#         axs[disease_idx, 1].grid(True)
-
-#     # Add a single common legend with two rows
-#     handles, labels = axs[0, 0].get_legend_handles_labels()  # Get labels from one axis
-    
-#     # Adjust ncol to ensure the legend is split into two rows
-#     fig.legend(handles, labels, title='Age Groups', loc='lower center', bbox_to_anchor=(0.5, -0.05), ncol=len(age_group_labels) // 2, fontsize=12)
-    
-#     # Adjust layout and show the plot
-#     pl.tight_layout(rect=[0, 0.05, 1, 1])  # Leave space for the legend at the bottom
-#     pl.show()
-    
-# except KeyError as e:
-#     print(f"KeyError: {e} - Check if the correct result keys are being used.")
 
