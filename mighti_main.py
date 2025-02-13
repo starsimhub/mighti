@@ -25,9 +25,9 @@ ncds = [
 diseases = ['HIV'] + ncds
 
 beta = 0.001  # Transmission probability for HIV
-n_agents = 5000 # Number of agents in the simulation
+n_agents = 500000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
-endyear = 2070
+endyear = 2025
 
 
 # -------------------------
@@ -116,6 +116,7 @@ interactions = []
 for disease in ncds:
     interaction_obj = interaction_functions[disease]()  # Call the corresponding function
     interactions.append(interaction_obj)
+
 
 
 # Initialize the simulation
