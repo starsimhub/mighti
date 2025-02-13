@@ -32,8 +32,8 @@ class Type2Diabetes(ss.NCD):
         super().__init__()
         self.define_pars(
             dur_condition=ss.lognorm_ex(15.02897096),
-            incidence_prob=0.059, 
-            incidence=ss.bernoulli(0.059),
+            incidence_prob=0.010125, 
+            incidence=ss.bernoulli(0.010125),
             p_death=ss.bernoulli(0.004315),
             init_prev=ss.bernoulli(0.1351),
             remission_rate=ss.bernoulli(0.024),
