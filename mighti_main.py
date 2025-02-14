@@ -8,19 +8,16 @@ import matplotlib.pyplot as plt
 
 
 ncds = [
-      'Type2Diabetes', 'Type1Diabetes','Obesity',
-    # 'Depression','AlzheimersDisease', 'ParkinsonsDisease','AlcoholUseDisorder', 
-    # 'ChronicKidneyDisease','COPD','RoadInjuries','ChronicLiverDisease',
-    #   'IschemicHeartDisease','Asthma',
-    # 'LungCancer', 'CervicalCancer','BreastCancer', 'ProstateCancer','ColorectalCancer', 
-    # 'Hypertension', #
-    # 'PTSD','HIVAssociatedDementia',
-    # 'CerebrovascularDisease',
-    # 'DomesticViolence','TobaccoUse', 
+      'Type2Diabetes', 'Type1Diabetes','Obesity', 'Hypertension', 
+    'Depression','AlzheimersDisease', 'ParkinsonsDisease','AlcoholUseDisorder', 
+    'ChronicKidneyDisease','COPD','RoadInjuries','ChronicLiverDisease',
+      'CardiovascularDiseases','Asthma',
+    'LungCancer', 'CervicalCancer','BreastCancer', 'ProstateCancer','ColorectalCancer', 
+    'PTSD','HIVAssociatedDementia',
+    'DomesticViolence','TobaccoUse', 
     # 'Flu','HPVVaccination',
-    # 'ViralHepatitis','Hyperlipidemia',
-    #   'OtherCancer',
-]
+    'ViralHepatitis','Hyperlipidemia',
+ ]
 
 diseases = ['HIV'] + ncds
 
@@ -85,17 +82,34 @@ networks = [mf, maternal]
 def get_prevalence_function(disease):
     return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
 
-# Create disease objects
+# # Create disease objects
+# disease_objects = []
+# for disease in ncds:
+#     init_prev = ss.bernoulli(get_prevalence_function(disease))
+#     if disease == 'Type2Diabetes':
+#         disease_obj = mi.Type2Diabetes(init_prev=init_prev)
+#     elif disease == 'Type1Diabetes':
+#         disease_obj = mi.Type1Diabetes(init_prev=init_prev)         
+#     elif disease == 'Obesity':
+#         disease_obj = mi.Obesity(init_prev=init_prev)
+#     disease_objects.append(disease_obj)
+
+
+
+# Automatically create disease objects
+# Automatically create disease objects
 disease_objects = []
 for disease in ncds:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
-    if disease == 'Type2Diabetes':
-        disease_obj = mi.Type2Diabetes(init_prev=init_prev)
-    elif disease == 'Type1Diabetes':
-        disease_obj = mi.Type1Diabetes(init_prev=init_prev)         
-    elif disease == 'Obesity':
-        disease_obj = mi.Obesity(init_prev=init_prev)
-    disease_objects.append(disease_obj)
+    
+    # Dynamically get the disease class from `mi` module
+    disease_class = getattr(mi, disease, None)
+    
+    if disease_class:
+        disease_obj = disease_class(init_prev=init_prev)  # Instantiate dynamically
+        disease_objects.append(disease_obj)
+    else:
+        print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
 
 # HIV-specific setup
 hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
@@ -104,21 +118,32 @@ disease_objects.append(hiv_disease)
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 
-# Load existing HIV and NCD interactions
-interaction_functions = {
-    'Type2Diabetes': mi.hiv_type2diabetes,
-    'Type1Diabetes': mi.hiv_type1diabetes,
-    'Obesity': mi.hiv_obesity,
-}
+# # Load existing HIV and NCD interactions
+# interaction_functions = {
+#     'Type2Diabetes': mi.hiv_type2diabetes,
+#     'Type1Diabetes': mi.hiv_type1diabetes,
+#     'Obesity': mi.hiv_obesity,
+# }
 
-# Initialize interaction objects for HIV-NCD interactions
+# # Initialize interaction objects for HIV-NCD interactions
+# interactions = []
+# for disease in ncds:
+#     interaction_obj = interaction_functions[disease]()  # Call the corresponding function
+#     interactions.append(interaction_obj)
+
+# Automatically create interaction objects if they exist
 interactions = []
 for disease in ncds:
-    interaction_obj = interaction_functions[disease]()  # Call the corresponding function
-    interactions.append(interaction_obj)
-
-
-
+    interaction_function_name = f"hiv_{disease.lower()}"  # e.g., "hiv_type2diabetes"
+    
+    # Check if the function exists in `mighti`
+    interaction_function = getattr(mi, interaction_function_name, None)
+    
+    if interaction_function:
+        interactions.append(interaction_function())  # Instantiate the interaction
+    else:
+        print(f"[WARNING] No HIV-NCD interaction found for {disease}. Skipping.")
+        
 # Initialize the simulation
 sim = ss.Sim(
     n_agents=n_agents,
@@ -127,7 +152,7 @@ sim = ss.Sim(
     analyzers=[prevalence_analyzer],
     start=inityear,
     stop=endyear,
-    # connectors=interactions,  # Both HIV-NCD and NCD-NCD interactions
+    connectors=interactions,  # Both HIV-NCD and NCD-NCD interactions
     people=ppl,
     demographics=[pregnancy, death],
     copy_inputs=False
@@ -136,6 +161,7 @@ sim = ss.Sim(
 # Run the simulation
 sim.run()
 
+diseases = ['HIV','Type2Diabetes', 'Type1Diabetes']
 
 try:
     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
