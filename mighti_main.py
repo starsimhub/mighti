@@ -136,25 +136,6 @@ sim = ss.Sim(
 # Run the simulation
 sim.run()
 
-import mighti.conditions as cond
-
-# Initialize diseases
-disease_from_csv = cond.disease_classes["Type2Diabetes"]()
-disease_hardcoded = cond.Type2Diabetes()
-
-# Create simulations
-sim_csv = ss.Sim(diseases=[disease_from_csv])
-sim_hardcoded = ss.Sim(diseases=[disease_hardcoded])
-
-# Run simulations
-sim_csv.run()
-sim_hardcoded.run()
-
-
-# Compare results
-print("CSV-Based Prevalence:", np.mean(sim_csv.results["type2diabetes"].prevalence))
-print("Hardcoded Prevalence:", np.mean(sim_hardcoded.results["type2diabetes"].prevalence))
-
 
 try:
     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
