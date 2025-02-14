@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 
 ncds = [
-      'Type2Diabetes', #'Type1Diabetes',
+      'Type2Diabetes', 'Type1Diabetes',
     # 'Depression','AlzheimersDisease', 'ParkinsonsDisease','AlcoholUseDisorder', 
     # 'ChronicKidneyDisease','COPD','RoadInjuries','ChronicLiverDisease',
     #   'IschemicHeartDisease','Asthma',
@@ -25,7 +25,7 @@ ncds = [
 diseases = ['HIV'] + ncds
 
 beta = 0.001  # Transmission probability for HIV
-n_agents = 500000 # Number of agents in the simulation
+n_agents = 5000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2025
 
@@ -91,8 +91,8 @@ for disease in ncds:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
     if disease == 'Type2Diabetes':
         disease_obj = mi.Type2Diabetes(init_prev=init_prev)
-    # elif disease == 'Type1Diabetes':
-    #     disease_obj = mi.Type1Diabetes(init_prev=init_prev)         
+    elif disease == 'Type1Diabetes':
+        disease_obj = mi.Type1Diabetes(init_prev=init_prev)         
     elif disease == 'Obesity':
         disease_obj = mi.Obesity(init_prev=init_prev)
     disease_objects.append(disease_obj)
@@ -107,7 +107,7 @@ prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, dis
 # Load existing HIV and NCD interactions
 interaction_functions = {
     'Type2Diabetes': mi.hiv_type2diabetes,
-    # 'Type1Diabetes': mi.hiv_type1diabetes,
+    'Type1Diabetes': mi.hiv_type1diabetes,
     'Obesity': mi.hiv_obesity,
 }
 
@@ -127,7 +127,7 @@ sim = ss.Sim(
     analyzers=[prevalence_analyzer],
     start=inityear,
     stop=endyear,
-    connectors=interactions,  # Both HIV-NCD and NCD-NCD interactions
+    # connectors=interactions,  # Both HIV-NCD and NCD-NCD interactions
     people=ppl,
     demographics=[pregnancy, death],
     copy_inputs=False
@@ -136,12 +136,31 @@ sim = ss.Sim(
 # Run the simulation
 sim.run()
 
+import mighti.conditions as cond
+
+# Initialize diseases
+disease_from_csv = cond.disease_classes["Type2Diabetes"]()
+disease_hardcoded = cond.Type2Diabetes()
+
+# Create simulations
+sim_csv = ss.Sim(diseases=[disease_from_csv])
+sim_hardcoded = ss.Sim(diseases=[disease_hardcoded])
+
+# Run simulations
+sim_csv.run()
+sim_hardcoded.run()
+
+
+# Compare results
+print("CSV-Based Prevalence:", np.mean(sim_csv.results["type2diabetes"].prevalence))
+print("Hardcoded Prevalence:", np.mean(sim_hardcoded.results["type2diabetes"].prevalence))
+
 
 try:
     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
     hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
-    # diabetes1_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
-    # diabetes1_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
+    diabetes1_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
+    diabetes1_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
     diabetes2_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
     diabetes2_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
     # obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100

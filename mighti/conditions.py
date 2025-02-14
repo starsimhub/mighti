@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 import starsim as ss
-from functools import partial
+import functools
+
 
 
 # Load disease parameter values from CSV
@@ -33,7 +34,7 @@ class BaseDisease(ss.NCD):
     def __init__(self, condition, pars=None, **kwargs):
         super().__init__()
         self.condition = condition  # Store the name of the condition
-
+        print(f"[DEBUG] Inside BaseDisease: self.condition = {self.condition}")
         # Dynamically load parameters from CSV
         self.define_pars(
             dur_condition=ss.lognorm_ex(get_param(condition, "dur_condition", 10)),
@@ -43,8 +44,15 @@ class BaseDisease(ss.NCD):
             init_prev=ss.bernoulli(get_param(condition, "init_prev", 0.05)/100),
             remission_rate=ss.bernoulli(get_param(condition, "remmision_rate", 0.0)),  # Corrected column name
             max_disease_duration=get_param(condition, "max_disease_duration", 20),
-            # rel_sus=get_param(condition, "rel_sus", 1.0),  # Default relative susceptibility to 1.0
+            rel_sus=get_param(condition, "rel_sus", 1.0),  # Default relative susceptibility to 1.0
         )
+        
+        # Debugging: Check the stored parameters
+        print(f"\n[DEBUG] Parameters for {condition} after define_pars:")
+        for param in self.pars.keys():
+            print(f"  {param}: {self.pars[param]}")
+        print("\n")
+        
         self.update_pars(pars, **kwargs)
 
         self.define_states(
@@ -54,7 +62,7 @@ class BaseDisease(ss.NCD):
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_reversed'),
             ss.FloatArr('ti_dead'),
-            ss.FloatArr('rel_sus', default=1.0),  # Set rel_sus from CSV
+            ss.FloatArr('rel_sus'),  # Set rel_sus from CSV
         )
 
     def init_post(self):
@@ -106,28 +114,27 @@ def disease_init(self, condition, pars=None, **kwargs):
 
 
     
-for condition in df_params.index:
-    class_name = condition.replace(" ", "").replace("-", "")  # Ensure valid class names
-    disease_classes[class_name] = type(class_name, (BaseDisease,), {
-        "__init__": lambda self, pars=None, **kwargs: super(self.__class__, self).__init__(condition, pars, **kwargs)
-    })
+def create_disease_class(disease_name):
+    """Factory function to create a disease class for a given condition."""
+    class DiseaseClass(BaseDisease):
+        def __init__(self, pars=None, **kwargs):
+            super().__init__(disease_name, pars, **kwargs)
+
+    DiseaseClass.__name__ = disease_name.replace(" ", "").replace("-", "")  # Ensure valid class name
+    return DiseaseClass
+
+# Generate classes correctly
+disease_classes = {disease_name.replace(" ", "").replace("-", ""): create_disease_class(disease_name)
+                   for disease_name in df_params.index}
 
 # Define global `__all__` variable for automatic imports
 __all__ = list(disease_classes.keys())
-
-print("Loaded Type2Diabetes Parameters:")
-for param in ["p_death", "incidence", "dur_condition", "init_prev", "rel_sus", "remmision_rate", "max_disease_duration"]:
-    print(f"{param}: {get_param('Type2Diabetes', param)}")
-    
-    
-for disease in df_params.index:
-    print(f"{disease} rel_sus: {get_param(disease, 'rel_sus')}")    
-
     
 # Unpack dynamically created disease classes into module namespace
 globals().update(disease_classes)
 
 
+##### Following is individual conditions. #####
 
 # import numpy as np
 # import starsim as ss
