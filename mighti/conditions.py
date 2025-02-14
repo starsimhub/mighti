@@ -1,21 +1,12 @@
 import numpy as np
 import pandas as pd
 import starsim as ss
-import functools
-
 
 
 # Load disease parameter values from CSV
 csv_path = "mighti/data/eswatini_parameters.csv"  # Update with actual path
 df_params = pd.read_csv(csv_path, index_col="condition")  # Read CSV and set 'condition' as index
 
-# def get_param(condition, param_name, default=None):
-#     """ Retrieve parameter value for a condition; return default if missing. """
-#     try:
-#         value = df_params.loc[condition, param_name]
-#         return float(value) if not pd.isna(value) else default
-#     except KeyError:
-#         return default
 
 def get_param(condition, param_name, default=None):
     """ Retrieve parameter value for a condition; return default if missing. """
@@ -24,7 +15,7 @@ def get_param(condition, param_name, default=None):
         if pd.isna(value):  # Explicitly check for NaN
             print(f"Warning: {param_name} is missing for {condition}, using default {default}")
             return default
-        return float(value)
+        return value if isinstance(value, str) else float(value)  # Handle strings
     except KeyError:
         print(f"Warning: {param_name} not found for {condition}, using default {default}")
         return default
@@ -34,7 +25,9 @@ class BaseDisease(ss.NCD):
     def __init__(self, condition, pars=None, **kwargs):
         super().__init__()
         self.condition = condition  # Store the name of the condition
-        print(f"[DEBUG] Inside BaseDisease: self.condition = {self.condition}")
+        self.disease_type = get_param(condition, "disease_type", "chronic")  # Default to chronic
+        print(f"[DEBUG] Inside BaseDisease: self.condition = {self.condition}, type = {self.disease_type}")
+
         # Dynamically load parameters from CSV
         self.define_pars(
             dur_condition=ss.lognorm_ex(get_param(condition, "dur_condition", 10)),
@@ -42,9 +35,9 @@ class BaseDisease(ss.NCD):
             incidence=ss.bernoulli(get_param(condition, "incidence", 0.01)),
             p_death=ss.bernoulli(get_param(condition, "p_death", 0.001)),
             init_prev=ss.bernoulli(get_param(condition, "init_prev", 0.05)/100),
-            remission_rate=ss.bernoulli(get_param(condition, "remmision_rate", 0.0)),  # Corrected column name
+            remission_rate=ss.bernoulli(get_param(condition, "remmision_rate", 0.0)),
             max_disease_duration=get_param(condition, "max_disease_duration", 20),
-            rel_sus=get_param(condition, "rel_sus", 1.0),  # Default relative susceptibility to 1.0
+            rel_sus=get_param(condition, "rel_sus", 1.0),
         )
         
         # Debugging: Check the stored parameters
@@ -58,11 +51,11 @@ class BaseDisease(ss.NCD):
         self.define_states(
             ss.State('susceptible', default=True),
             ss.State('affected'),
-            ss.State('reversed'),
+            ss.State('reversed' if self.disease_type == "remitting" else 'chronic'),  # Adjust based on type
             ss.FloatArr('ti_affected'),
-            ss.FloatArr('ti_reversed'),
+            ss.FloatArr('ti_reversed' if self.disease_type == "remitting" else 'ti_chronic'),
             ss.FloatArr('ti_dead'),
-            ss.FloatArr('rel_sus'),  # Set rel_sus from CSV
+            ss.FloatArr('rel_sus'),
         )
 
     def init_post(self):
@@ -71,34 +64,47 @@ class BaseDisease(ss.NCD):
         return initial_cases
 
     def step_state(self):
-        going_into_remission = self.pars.remission_rate.filter(self.affected.uids)
-        self.affected[going_into_remission] = False
-        self.reversed[going_into_remission] = True
-        self.ti_reversed[going_into_remission] = self.ti
+        if self.disease_type == "remitting":
+            going_into_remission = self.pars.remission_rate.filter(self.affected.uids)
+            self.affected[going_into_remission] = False
+            self.reversed[going_into_remission] = True
+            self.ti_reversed[going_into_remission] = self.ti
 
-        # Handle recovery & deaths
-        recovered = (self.reversed & (self.ti_reversed <= self.ti)).uids
-        self.reversed[recovered] = False
-        self.susceptible[recovered] = True  # Recovered individuals become susceptible again
+            # Handle recovery
+            recovered = (self.reversed & (self.ti_reversed <= self.ti)).uids
+            self.reversed[recovered] = False
+            self.susceptible[recovered] = True  # Recovered individuals become susceptible again
 
         deaths = (self.ti_dead == self.ti).uids
         self.sim.people.request_death(deaths)
 
     def step(self):
-        new_cases = self.pars.incidence.filter(self.susceptible.uids)
-        self.set_prognoses(new_cases)
-        return new_cases
+        if self.disease_type == "acute":
+            new_cases = self.pars.incidence.filter(self.susceptible.uids)
+            self.set_prognoses(new_cases)
+            return new_cases
+        elif self.disease_type == "chronic":
+            new_cases = self.pars.incidence.filter(self.susceptible.uids)
+            self.set_prognoses(new_cases)
+            return new_cases
+        elif self.disease_type == "remitting":
+            new_cases = self.pars.incidence.filter(self.susceptible.uids)
+            self.set_prognoses(new_cases)
+            return new_cases
+        return []
 
     def set_prognoses(self, uids):
         dur_condition = self.pars.dur_condition.rvs(uids)
         will_die = self.pars.p_death.rvs(uids)
         dead_uids = uids[will_die]
         rec_uids = uids[~will_die]
-
+    
         self.susceptible[uids] = False
         self.affected[uids] = True
         self.ti_dead[dead_uids] = self.ti + dur_condition[will_die] / self.t.dt
-        self.ti_reversed[rec_uids] = self.ti + dur_condition[~will_die] / self.t.dt
+    
+        if self.disease_type == "remitting":  # Only set ti_reversed if the disease remits
+            self.ti_reversed[rec_uids] = self.ti + dur_condition[~will_die] / self.t.dt
 
     def update_results(self):
         super().update_results()
@@ -129,7 +135,7 @@ disease_classes = {disease_name.replace(" ", "").replace("-", ""): create_diseas
 
 # Define global `__all__` variable for automatic imports
 __all__ = list(disease_classes.keys())
-    
+
 # Unpack dynamically created disease classes into module namespace
 globals().update(disease_classes)
 

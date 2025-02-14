@@ -8,12 +8,12 @@ import matplotlib.pyplot as plt
 
 
 ncds = [
-      'Type2Diabetes', 'Type1Diabetes',
+      'Type2Diabetes', 'Type1Diabetes','Obesity',
     # 'Depression','AlzheimersDisease', 'ParkinsonsDisease','AlcoholUseDisorder', 
     # 'ChronicKidneyDisease','COPD','RoadInjuries','ChronicLiverDisease',
     #   'IschemicHeartDisease','Asthma',
     # 'LungCancer', 'CervicalCancer','BreastCancer', 'ProstateCancer','ColorectalCancer', 
-    # 'Hypertension', #'Obesity',
+    # 'Hypertension', #
     # 'PTSD','HIVAssociatedDementia',
     # 'CerebrovascularDisease',
     # 'DomesticViolence','TobaccoUse', 
@@ -163,8 +163,8 @@ try:
     diabetes1_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
     diabetes2_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
     diabetes2_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
-    # obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
-    # obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
+    obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
+    obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
     # hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
     # hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
 
