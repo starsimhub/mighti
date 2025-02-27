@@ -15,7 +15,7 @@ ncds = [
     'LungCancer', 'CervicalCancer','BreastCancer', 'ProstateCancer','ColorectalCancer', 
     'PTSD','HIVAssociatedDementia',
     'DomesticViolence','TobaccoUse', 
-    # 'Flu','HPV','ViralHepatitis',
+     'Flu','HPV'#,'ViralHepatitis'#
  ]
 
 diseases = ['HIV'] + ncds
@@ -161,7 +161,6 @@ sim = ss.Sim(
 sim.run()
 
 diseases = ['HIV','Type2Diabetes', 'Type1Diabetes']
-
 try:
     hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
     hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
