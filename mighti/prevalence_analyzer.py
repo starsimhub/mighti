@@ -58,10 +58,10 @@ class PrevalenceAnalyzer(ss.Analyzer):
                 else:
                     n_susceptible = "N/A"
     
-                print(f"\n {disease}:")
-                print(f"  - Affected Count: {n_affected}")
-                print(f"  - Infected Count: {n_infected}")
-                print(f"  - Susceptible Count: {n_susceptible}")
+                # print(f"\n {disease}:")
+                # print(f"  - Affected Count: {n_affected}")
+                # print(f"  - Infected Count: {n_infected}")
+                # print(f"  - Susceptible Count: {n_susceptible}")
     
         return
                 

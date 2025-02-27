@@ -12,11 +12,11 @@ def get_param(condition, param_name, default=None):
     try:
         value = df_params.loc[condition, param_name]
         if pd.isna(value):  # Explicitly check for NaN
-            print(f"Warning: {param_name} is missing for {condition}, using default {default}")
+            # print(f"Warning: {param_name} is missing for {condition}, using default {default}")
             return default
         return value if isinstance(value, str) else float(value)  # Handle strings
     except KeyError:
-        print(f"Warning: {param_name} not found for {condition}, using default {default}")
+        # print(f"Warning: {param_name} not found for {condition}, using default {default}")
         return default
 
 
@@ -90,7 +90,7 @@ class BaseNCD(ss.NCD):
         """ Store prevalence for analysis. """
         super().update_results()
         prevalence = np.count_nonzero(self.affected) / len(self.sim.people)
-        print(f"[DEBUG] Time {self.ti}: {self.condition} Prevalence = {prevalence:.4f}")
+        # print(f"[DEBUG] Time {self.ti}: {self.condition} Prevalence = {prevalence:.4f}")
         self.results.prevalence[self.ti] = prevalence
 
 
