@@ -15,7 +15,7 @@ ncds = [
     'LungCancer', 'CervicalCancer','BreastCancer', 'ProstateCancer','ColorectalCancer', 
     'PTSD','HIVAssociatedDementia',
     'DomesticViolence','TobaccoUse', 
-     'Flu','HPV'#,'ViralHepatitis'#
+     'Flu','HPV','ViralHepatitis'
  ]
 
 diseases = ['HIV'] + ncds
@@ -81,21 +81,7 @@ networks = [mf, maternal]
 def get_prevalence_function(disease):
     return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
 
-# # Create disease objects
-# disease_objects = []
-# for disease in ncds:
-#     init_prev = ss.bernoulli(get_prevalence_function(disease))
-#     if disease == 'Type2Diabetes':
-#         disease_obj = mi.Type2Diabetes(init_prev=init_prev)
-#     elif disease == 'Type1Diabetes':
-#         disease_obj = mi.Type1Diabetes(init_prev=init_prev)         
-#     elif disease == 'Obesity':
-#         disease_obj = mi.Obesity(init_prev=init_prev)
-#     disease_objects.append(disease_obj)
 
-
-
-# Automatically create disease objects
 # Automatically create disease objects
 disease_objects = []
 for disease in ncds:
@@ -117,18 +103,6 @@ disease_objects.append(hiv_disease)
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 
-# # Load existing HIV and NCD interactions
-# interaction_functions = {
-#     'Type2Diabetes': mi.hiv_type2diabetes,
-#     'Type1Diabetes': mi.hiv_type1diabetes,
-#     'Obesity': mi.hiv_obesity,
-# }
-
-# # Initialize interaction objects for HIV-NCD interactions
-# interactions = []
-# for disease in ncds:
-#     interaction_obj = interaction_functions[disease]()  # Call the corresponding function
-#     interactions.append(interaction_obj)
 
 # Automatically create interaction objects if they exist
 interactions = []
@@ -141,7 +115,7 @@ for disease in ncds:
     if interaction_function:
         interactions.append(interaction_function())  # Instantiate the interaction
     else:
-        print(f"[WARNING] No HIV-NCD interaction found for {disease}. Skipping.")
+        pass #print(f"[WARNING] No HIV-NCD interaction found for {disease}. Skipping.")
         
 # Initialize the simulation
 sim = ss.Sim(

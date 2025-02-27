@@ -1,4 +1,5 @@
 ﻿condition,p_death,incidence,dur_condition,init_prev,rel_sus,remmision_rate,max_disease_duration,disease_type,disease_class
+HIV,,,,,,,,chronic,sis
 Type1Diabetes,,,27.3970433,0.325872572,,,,chronic,ncd
 Type2Diabetes,0.004315,0.010125,15.028971,13.14,1.95,0.024,30,remitting,ncd
 Hypertension,0.031625,0.0066,,0.530333333,0.93,,,chronic,ncd
