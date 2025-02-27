@@ -16,9 +16,9 @@ TobaccoUse,,,,,2.285,,,remitting,ncd
 HIVAssociatedDementia,,,,,1.8,,,chronic,ncd
 PTSD,,,,,,,,remitting,ncd
 Depression,,,0.83248621,,,,,remitting,ncd
-HPV,,,,,,,,acute,disease
-Flu,0.004815,0.15,,,5.7,,,acute,disease
-ViralHepatitis,0.03030313,,,,,,,remitting,sir
+HPV,,,,,,,,acute,sis
+Flu,0.004815,0.15,,,5.7,,,acute,sis
+ViralHepatitis,0.03030313,,,,,,,remitting,sis
 DomesticViolence,,0.0551,,,,,,acute,ncd
 RoadInjuries,0.0053125,0.1766,,,,,,acute,ncd
 ChronicLiverDisease,,0.0008,25.8234006,,,,,chronic,ncd

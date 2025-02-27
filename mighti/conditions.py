@@ -176,7 +176,7 @@ def create_disease_class(disease_name):
         base_class = BaseNCD
     elif model_type == "disease":
         base_class = BaseDisease
-    elif model_type == "cd":
+    elif model_type == "sis":
         base_class = BaseSIS
     else:
         raise ValueError(f"Unknown model type '{model_type}' for disease {disease_name}")

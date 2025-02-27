@@ -11,12 +11,11 @@ ncds = [
       'Type2Diabetes', 'Type1Diabetes','Obesity', 'Hypertension', 
     'Depression','AlzheimersDisease', 'ParkinsonsDisease','AlcoholUseDisorder', 
     'ChronicKidneyDisease','COPD','RoadInjuries','ChronicLiverDisease',
-      'CardiovascularDiseases','Asthma',
+      'CardiovascularDiseases','Asthma','Hyperlipidemia',
     'LungCancer', 'CervicalCancer','BreastCancer', 'ProstateCancer','ColorectalCancer', 
     'PTSD','HIVAssociatedDementia',
     'DomesticViolence','TobaccoUse', 
-    # 'Flu','HPVVaccination',
-    'ViralHepatitis','Hyperlipidemia',
+    # 'Flu','HPV','ViralHepatitis',
  ]
 
 diseases = ['HIV'] + ncds
