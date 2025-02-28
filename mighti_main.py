@@ -6,6 +6,7 @@ import sciris as sc
 import numpy as np
 import matplotlib.pyplot as plt
 
+# Check population change 
 
 ncds = [
       'Type2Diabetes', 'Type1Diabetes','Obesity', 'Hypertension', 
@@ -24,6 +25,27 @@ beta = 0.001  # Transmission probability for HIV
 n_agents = 5000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2025
+
+
+# -------------------------
+# Loading Data
+# -------------------------
+
+# Load all required CSV files centrally
+csv_path_params = "mighti/data/eswatini_parameters.csv"
+csv_path_interactions = "mighti/data/rel_sus.csv"
+
+df_params = pd.read_csv(csv_path_params, index_col="condition")
+df_interactions = pd.read_csv(csv_path_interactions)
+
+# Initialize disease models with preloaded data
+# mi.initialize_conditions(df_params)
+
+# Initialize prevalence analyzer with preloaded data
+mi.initialize_prevalence_analyzer(df_params)
+
+# Initialize interactions with preloaded data
+mi.initialize_interactions(df_interactions)
 
 
 # -------------------------

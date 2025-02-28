@@ -3,29 +3,24 @@ import mighti as mi
 import pandas as pd
 import sciris as sc
 
-# Specify externally visible classes
-__all__ = ['create_hiv_connectors', 'read_hiv_interactions']
-
 # -------------------------
 # Read HIV Interactions
 # -------------------------
 
-def read_hiv_interactions(datafile=None):
-    """
-    Read HIV interactions from a CSV file.
-    Expected columns: `condition`, `relative_risk`.
-    """
-    if datafile is None:
-        datafile = sc.thispath() / '../mighti/data/rel_sus.csv'
-    
-    df = pd.read_csv(datafile)
-    rel_sus = {}
+df_interactions = None  # Placeholder for external data
 
-    for _, row in df.iterrows():
+def initialize_interactions(data):
+    """ Function to initialize interactions with preloaded interaction data """
+    global df_interactions
+    df_interactions = data
+
+def read_hiv_interactions():
+    """ Read HIV interactions using preloaded data. """
+    rel_sus = {}
+    for _, row in df_interactions.iterrows():
         condition = row['condition']
         rel_sus_value = row['relative_risk']
         rel_sus[condition] = rel_sus_value  # Store only HIV-related interactions
-
     return rel_sus
 
 

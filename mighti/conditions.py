@@ -2,37 +2,40 @@ import numpy as np
 import pandas as pd
 import starsim as ss
 
-# # Load disease parameter values from CSV
+
+# # # Load disease parameter values from CSV
 csv_path = "mighti/data/eswatini_parameters.csv"  # Update with actual path
 df_params = pd.read_csv(csv_path, index_col="condition")  # Read CSV and set 'condition' as index
 
-# __all__ = ['initialize_conditions', 'get_param']
+
 
 
 # df_params = None  # Placeholder for external data
+# disease_classes = {}  # Placeholder for dynamically created disease classes
 
 # def initialize_conditions(data):
-#     """ Initialize conditions with externally loaded parameter data. """
-#     global df_params
+#     """ Initialize conditions with externally loaded parameter data and generate disease classes. """
+#     global df_params, disease_classes
 #     df_params = data
 
 #     if df_params is None or df_params.empty:
-#         raise ValueError("[ERROR] `df_params` is None or empty! Ensure `initialize_conditions()` is called in mighti_main.py.")
+#         raise ValueError("[ERROR] `df_params` is None or empty! Ensure `initialize_conditions(df_params)` is called in mighti_main.py.")
 
-# # Prevent premature access
-# if df_params is None:
-#     raise ValueError("[ERROR] `df_params` has not been initialized. Call `initialize_conditions(df_params)` in mighti_main.py before using conditions.")
-    
+#     # Generate disease classes dynamically after df_params is initialized
+#     disease_classes = {
+#         disease_name.replace(" ", "").replace("-", ""): create_disease_class(disease_name)
+#         for disease_name in df_params.index
+#     }
+
 def get_param(condition, param_name, default=None):
-    """ Retrieve parameter value for a condition; return default if missing. """
+    """ Retrieve parameter value safely after initialization. """
+    if df_params is None:
+        raise ValueError("[ERROR] `df_params` has not been initialized. Call `initialize_conditions(df_params)` in mighti_main.py before using conditions.")
+
     try:
         value = df_params.loc[condition, param_name]
-        if pd.isna(value):  # Explicitly check for NaN
-            # print(f"Warning: {param_name} is missing for {condition}, using default {default}")
-            return default
-        return value if isinstance(value, str) else float(value)  # Handle strings
+        return default if pd.isna(value) else float(value) if isinstance(value, (int, float)) else value
     except KeyError:
-        # print(f"Warning: {param_name} not found for {condition}, using default {default}")
         return default
 
 
@@ -207,7 +210,7 @@ def create_disease_class(disease_name):
 
 # Generate disease classes dynamically
 disease_classes = {disease_name.replace(" ", "").replace("-", ""): create_disease_class(disease_name)
-                   for disease_name in df_params.index}
+                    for disease_name in df_params.index}
 
 # Define global `__all__` variable for automatic imports
 __all__ = list(disease_classes.keys())

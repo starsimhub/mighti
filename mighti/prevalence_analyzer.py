@@ -4,9 +4,16 @@ import sciris as sc
 import pandas as pd
 
 # Load disease classification from CSV
-csv_path = "mighti/data/eswatini_parameters.csv"
-df_params = pd.read_csv(csv_path, index_col="condition")
+# csv_path = "mighti/data/eswatini_parameters.csv"
+# df_params = pd.read_csv(csv_path, index_col="condition")
 
+df_params = None  # Placeholder for external data
+
+def initialize_prevalence_analyzer(data):
+    """ Function to initialize prevalence analyzer with preloaded parameter data """
+    global df_params
+    df_params = data
+    
 def get_disease_class(condition):
     """Retrieve disease classification (e.g., 'ncd', 'disease', 'sis')"""
     try:
