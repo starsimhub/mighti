@@ -3,29 +3,33 @@ import pandas as pd
 import starsim as ss
 
 
-# # # Load disease parameter values from CSV
-csv_path = "mighti/data/eswatini_parameters.csv"  # Update with actual path
-df_params = pd.read_csv(csv_path, index_col="condition")  # Read CSV and set 'condition' as index
+# # # # Load disease parameter values from CSV
+# csv_path = "mighti/data/eswatini_parameters.csv"  # Update with actual path
+# df_params = pd.read_csv(csv_path, index_col="condition")  # Read CSV and set 'condition' as index
 
+df_params = None  # Placeholder for external data
+disease_classes = {}  # Placeholder for dynamically created disease classes
 
+def initialize_conditions(data):
+    """ 
+    Initialize conditions with externally loaded parameter data and generate disease classes. 
+    Ensure that the dynamically created classes are accessible in `mighti` namespace.
+    """
+    global df_params, disease_classes
+    df_params = data
 
+    if df_params is None or df_params.empty:
+        raise ValueError("[ERROR] `df_params` is None or empty! Ensure `initialize_conditions(df_params)` is called in mighti_main.py.")
 
-# df_params = None  # Placeholder for external data
-# disease_classes = {}  # Placeholder for dynamically created disease classes
+    # Now create disease classes dynamically *after* df_params is initialized
+    disease_classes.update({
+        disease_name.replace(" ", "").replace("-", ""): create_disease_class(disease_name)
+        for disease_name in df_params.index
+    })
 
-# def initialize_conditions(data):
-#     """ Initialize conditions with externally loaded parameter data and generate disease classes. """
-#     global df_params, disease_classes
-#     df_params = data
-
-#     if df_params is None or df_params.empty:
-#         raise ValueError("[ERROR] `df_params` is None or empty! Ensure `initialize_conditions(df_params)` is called in mighti_main.py.")
-
-#     # Generate disease classes dynamically after df_params is initialized
-#     disease_classes = {
-#         disease_name.replace(" ", "").replace("-", ""): create_disease_class(disease_name)
-#         for disease_name in df_params.index
-#     }
+    # Register these disease classes globally in mighti module
+    import mighti
+    mighti.__dict__.update(disease_classes)  # Explicitly add to mighti's namespace
 
 def get_param(condition, param_name, default=None):
     """ Retrieve parameter value safely after initialization. """
@@ -208,13 +212,5 @@ def create_disease_class(disease_name):
     return DiseaseClass
 
 
-# Generate disease classes dynamically
-disease_classes = {disease_name.replace(" ", "").replace("-", ""): create_disease_class(disease_name)
-                    for disease_name in df_params.index}
 
-# Define global `__all__` variable for automatic imports
-__all__ = list(disease_classes.keys())
-
-# Unpack dynamically created disease classes into module namespace
-globals().update(disease_classes)
 
