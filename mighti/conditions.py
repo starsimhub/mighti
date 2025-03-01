@@ -3,10 +3,6 @@ import pandas as pd
 import starsim as ss
 
 
-# # # # Load disease parameter values from CSV
-# csv_path = "mighti/data/eswatini_parameters.csv"  # Update with actual path
-# df_params = pd.read_csv(csv_path, index_col="condition")  # Read CSV and set 'condition' as index
-
 df_params = None  # Placeholder for external data
 disease_classes = {}  # Placeholder for dynamically created disease classes
 
