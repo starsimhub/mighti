@@ -207,47 +207,127 @@ print(sim.results.keys())  # See what data is stored
 
 
 
-# ---------------------------------------------------------------------
-# Generate Plots
-# ---------------------------------------------------------------------
+# # ---------------------------------------------------------------------
+# # Generate Plots
+# # ---------------------------------------------------------------------
 
-# Specify which diseases to plot
-selected_diseases = ['HIV', 'Type2Diabetes']
+# # Specify which diseases to plot
+# selected_diseases = ['HIV', 'Type2Diabetes']
 
-# Call the plotting function from `plot_functions.py`
-mi.plot_disease_prevalence(sim, prevalence_analyzer, selected_diseases, eswatini_hiv_data, age_bins)
+# # Call the plotting function from `plot_functions.py`
+# mi.plot_disease_prevalence(sim, prevalence_analyzer, selected_diseases, eswatini_hiv_data, age_bins)
 
 
-import matplotlib.pyplot as plt
+# # Assuming you have these lists recorded during the simulation
+# time_steps = list(range(len(sim.results['n_alive'])))  # Extract time steps
+# total_population = sim.results['n_alive']  # Total population at each time step
+# deaths = sim.results.get('new_deaths', [0] * len(time_steps))  # Deaths per step
 
-# Assuming you have these lists recorded during the simulation
-time_steps = list(range(len(sim.results['n_alive'])))  # Extract time steps
-total_population = sim.results['n_alive']  # Total population at each time step
-deaths = sim.results.get('new_deaths', [0] * len(time_steps))  # Deaths per step
+# # Estimate births (skip first year in calculation)
+# births = [total_population[t] - total_population[t-1] + deaths[t] for t in range(1, len(time_steps))]
 
-# Estimate births
-births = [total_population[0]]  # First time step has no previous value
-for t in range(2, len(time_steps)):
-    births.append(total_population[t] - total_population[t-1] + deaths[t])
+# # Adjust time steps and population to match births (skip first year)
+# time_steps = time_steps[1:]
+# total_population = total_population[1:]
+# deaths = deaths[1:]
 
-# Create figure with two subplots
-fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+# mi.plot_demography(time_steps, total_population, deaths, births)
 
-# First panel: Total Population
-axes[0].plot(time_steps, total_population, label='Total Population', linewidth=2)
-axes[0].set_ylabel('Total Population')
-axes[0].set_title('Total Population Over Time')
-axes[0].legend()
-axes[0].grid()
+# import matplotlib.pyplot as plt
+# import numpy as np
 
-# Second panel: Estimated Births and Deaths
-axes[1].plot(time_steps, births, label='Estimated Births', linestyle='dashed')
-axes[1].plot(time_steps, deaths, label='Deaths', linestyle='dotted')
-axes[1].set_xlabel('Time Steps')
-axes[1].set_ylabel('Count')
-axes[1].set_title('Estimated Births and Deaths Over Time')
-axes[1].legend()
-axes[1].grid()
+# # Extract male and female prevalence matrices
+# male_data = prevalence_analyzer.results.get('HIV_prevalence_male', None)
+# female_data = prevalence_analyzer.results.get('HIV_prevalence_female', None)
 
-plt.tight_layout()
-plt.show()
+# # Ensure data exists
+# if male_data is None or female_data is None:
+#     print("[ERROR] No HIV prevalence data available.")
+# else:
+#     # Compute mean prevalence across all age groups
+#     mean_prevalence_male = np.mean(male_data, axis=1) * 100  # Convert to percentage
+#     mean_prevalence_female = np.mean(female_data, axis=1) * 100
+
+#     # Create figure
+#     plt.figure(figsize=(10, 5))
+
+#     # Plot mean prevalence for males and females
+#     plt.plot(sim.timevec, mean_prevalence_male, label='Male HIV Prevalence', linewidth=2, color='blue')
+#     plt.plot(sim.timevec, mean_prevalence_female, label='Female HIV Prevalence', linewidth=2, color='red')
+
+#     # Labels and title
+#     plt.xlabel('Year')
+#     plt.ylabel('HIV Prevalence (%)')
+#     plt.title('Mean HIV Prevalence Over Time (All Ages)')
+#     plt.legend()
+#     plt.grid()
+
+#     plt.show()
+# Plots without dots for data
+try:
+    hiv_prevalence_data_male = prevalence_analyzer.results['HIV_prevalence_male'] * 100
+    hiv_prevalence_data_female = prevalence_analyzer.results['HIV_prevalence_female'] * 100
+    # diabetes_prevalence_data_male = prevalence_analyzer.results['Type1Diabetes_prevalence_male'] * 100
+    # diabetes_prevalence_data_female = prevalence_analyzer.results['Type1Diabetes_prevalence_female'] * 100
+    diabetes_prevalence_data_male = prevalence_analyzer.results['Type2Diabetes_prevalence_male'] * 100
+    diabetes_prevalence_data_female = prevalence_analyzer.results['Type2Diabetes_prevalence_female'] * 100
+    # obesity_prevalence_data_male = prevalence_analyzer.results['Obesity_prevalence_male'] * 100
+    # obesity_prevalence_data_female = prevalence_analyzer.results['Obesity_prevalence_female'] * 100
+    # hypertension_prevalence_data_male = prevalence_analyzer.results['Hypertension_prevalence_male'] * 100
+    # hypertension_prevalence_data_female = prevalence_analyzer.results['Hypertension_prevalence_female'] * 100
+
+    # Ensure age_bins is a list (fix for the previous error)
+    age_bins = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
+    age_bins_list = list(age_bins)  # Convert to a list if it's not already
+    
+    # Create subplots for each disease, dynamically based on the number of diseases
+    n_diseases = len(diseases)
+    fig, axs = pl.subplots(n_diseases, 2, figsize=(18, n_diseases * 6), sharey='row')
+
+    # Create age group labels and color map for age bins (generalized)
+    # Ensure age_bins_list contains integers
+    age_bins_list = [int(age_bin) for age_bin in age_bins_list]  # Convert age bins to integers
+    
+    # Now you can perform operations like subtraction
+    age_group_labels = [f'{left}-{right-1}' for left, right in zip(age_bins_list[:-1], age_bins_list[1:])]  
+    
+    if age_bins_list[-1] == 80:
+        age_group_labels.append('80+')
+    cmap = pl.get_cmap('tab20', len(age_group_labels))  # Color map for distinct age groups
+    age_bin_colors = {label: cmap(i) for i, label in enumerate(age_group_labels)}
+
+      # Loop through each disease and plot its prevalence for males and females
+    for disease_idx, disease in enumerate(diseases):
+        # Access the male and female prevalence data for each disease
+        male_data = prevalence_analyzer.results[f'{disease}_prevalence_male'] * 100
+        female_data = prevalence_analyzer.results[f'{disease}_prevalence_female'] * 100
+
+        # Plot male prevalence for the disease
+        for i, label in enumerate(age_group_labels):
+            axs[disease_idx, 0].plot(sim.timevec, male_data[:, i], label=label, color=age_bin_colors[label])
+        axs[disease_idx, 0].set_title(f'{disease} (Male)', fontsize=24) 
+        axs[disease_idx, 0].set_xlabel('Year', fontsize=20) 
+        axs[disease_idx, 0].set_ylabel('Prevalence (%)', fontsize=20)  
+        axs[disease_idx, 0].tick_params(axis='both', labelsize=18)  
+        axs[disease_idx, 0].grid(True)
+
+        # Plot female prevalence for the disease
+        for i, label in enumerate(age_group_labels):
+            axs[disease_idx, 1].plot(sim.timevec, female_data[:, i], color=age_bin_colors[label])
+        axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24) 
+        axs[disease_idx, 1].set_xlabel('Year', fontsize=20)  
+        axs[disease_idx, 0].tick_params(axis='both', labelsize=18) 
+        axs[disease_idx, 1].grid(True)
+
+    # Add a single common legend with two rows
+    handles, labels = axs[0, 0].get_legend_handles_labels()  # Get labels from one axis
+    
+    # Adjust ncol to ensure the legend is split into two rows
+    fig.legend(handles, labels, title='Age Groups', loc='lower center', bbox_to_anchor=(0.5, -0.05), ncol=len(age_group_labels) // 2, fontsize=12)
+    
+    # Adjust layout and show the plot
+    pl.tight_layout(rect=[0, 0.05, 1, 1])  # Leave space for the legend at the bottom
+    pl.show()
+    
+except KeyError as e:
+    print(f"KeyError: {e} - Check if the correct result keys are being used.")
