@@ -98,3 +98,27 @@ def plot_disease_prevalence(sim, prevalence_analyzer, diseases, eswatini_hiv_dat
     # Adjust layout and show
     pl.tight_layout(rect=[0, 0.05, 1, 1])
     pl.show()
+    
+
+def plot_demography(time_steps, total_population, deaths, births):
+    # Create figure with two subplots
+    fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+    # First panel: Total Population (from second year)
+    axes[0].plot(time_steps, total_population, label='Total Population', linewidth=2)
+    axes[0].set_ylabel('Total Population')
+    axes[0].set_title('Total Population Over Time')
+    axes[0].legend()
+    axes[0].grid()
+
+    # Second panel: Estimated Births and Deaths
+    axes[1].plot(time_steps, births, label='Estimated Births', linestyle='dashed')
+    axes[1].plot(time_steps, deaths, label='Deaths', linestyle='dotted')
+    axes[1].set_xlabel('Time Steps')
+    axes[1].set_ylabel('Count')
+    axes[1].set_title('Estimated Births and Deaths Over Time')
+    axes[1].legend()
+    axes[1].grid()
+
+    plt.tight_layout()
+    plt.show()
