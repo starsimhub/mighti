@@ -62,10 +62,11 @@ class BaseNCD(ss.NCD):
         )
 
         states = [
+            ss.State('susceptible', default=True),  # Individuals start as susceptible
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_dead'),
-            ss.FloatArr('rel_sus'),
+            ss.FloatArr('rel_sus', default=1.0),
         ]
 
         if self.disease_type == "remitting":
@@ -93,7 +94,15 @@ class BaseNCD(ss.NCD):
 
     def step(self):
         new_cases = self.pars.incidence.filter(self.affected.uids)
+        print(f"[DEBUG] Step {self.sim.ti}: New T2D cases = {len(new_cases)}")
+
         self.set_prognoses(new_cases)
+        
+        # Track a specific individual's `rel_sus`
+        # tracked_uid = 6  # Pick an arbitrary agent
+        # if tracked_uid < len(self.rel_sus):
+        #     print(f"[DEBUG] Time {self.sim.ti}: Agent {tracked_uid} rel_sus = {self.rel_sus[tracked_uid]}")
+
         return new_cases
 
     def set_prognoses(self, uids):
@@ -132,9 +141,11 @@ class BaseDisease(ss.Disease):
         )
 
         self.define_states(
+            ss.State('susceptible', default=True),  # Individuals start as susceptible
             ss.State('affected'),
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_dead'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
         self.update_pars(pars, **kwargs)
@@ -168,6 +179,7 @@ class BaseSIS(ss.SIS):
             ss.State('infected'),
             ss.FloatArr('ti_infected'),
             ss.FloatArr('ti_dead'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
 
         self.update_pars(pars, **kwargs)
