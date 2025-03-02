@@ -106,39 +106,7 @@ fertility_rates = {'fertility_rate': pd.read_csv(csv_path_fertility)}
 pregnancy = ss.Pregnancy(pars=fertility_rates)
 death_rates = {'death_rate': pd.read_csv(csv_path_death), 'rate_units': 1}
 death = ss.Deaths(death_rates)
-# ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
-# Debugging People Object Initialization
-
-
-ppl = ss.People(n_agents=n_agents)  # Ensure this is how it's being initialized
-
-print("[DEBUG] Initializing distributions manually before `ppl.init_vals()`...")
-
-for key, state in ppl.states.items():
-    if hasattr(state, "default") and hasattr(state.default, "init"):
-        print(f"[DEBUG] Preparing distribution for state: {key}")
-
-        # Check for missing dependencies and set them
-        if hasattr(state.default, 'sim') and state.default.sim is None:
-            print(f"[DEBUG] Setting `sim` for `{key}` distribution")
-            state.default.sim = None  # Replace with the correct simulation object if needed
-        
-        if hasattr(state.default, 'slots') and state.default.slots is None:
-            print(f"[DEBUG] Setting `slots` for `{key}` distribution")
-            state.default.slots = ppl.slot  # Ensure `ppl.slot` exists
-
-        # Now try initializing
-        try:
-            print(f"[DEBUG] Initializing distribution for state: {key}")
-            state.default.init()
-            print(f"[DEBUG] `{key}` distribution initialized successfully.")
-        except Exception as e:
-            print(f"[ERROR] Failed to initialize `{key}`: {e}")
-
-print("[DEBUG] Distributions initialized. Now calling `ppl.init_vals()`...")
-ppl.init_vals()
-
-
+ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
 
 # -------------------------
 # Networks
