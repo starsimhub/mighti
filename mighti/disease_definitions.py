@@ -89,4 +89,9 @@ def age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size):
         if ages[i] >= 80 and 80 in prevalence_data[disease][sex]:
             prevalence[i] = prevalence_data[disease][sex][80]
 
+    # Debugging Prevalence Calculation
+    print(f"[DEBUG] Disease: {disease}")
+    print(f"  Males: {np.sum(is_male)} | Females: {np.sum(~is_male)}")
+    print(f"  First 10 Prevalence Male: {prevalence[is_male][:10]}")
+    print(f"  First 10 Prevalence Female: {prevalence[~is_male][:10]}")
     return prevalence

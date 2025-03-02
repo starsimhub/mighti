@@ -144,3 +144,6 @@ class PrevalenceAnalyzer(ss.Analyzer):
     
                 disease_key = f'{disease}_prevalence_{label}'
                 self.results[disease_key][sim.ti, :] = prevalence_by_age_group
+        for label in ['male', 'female']:
+            key = f'{disease}_prevalence_{label}'
+            print(f"[DEBUG] {key} at time {sim.ti}: Mean = {np.mean(self.results[key][sim.ti, :])}")
