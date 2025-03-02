@@ -75,21 +75,21 @@ def plot_disease_prevalence(sim, prevalence_analyzer, diseases, eswatini_hiv_dat
         axs[disease_idx, 1].tick_params(axis='both', labelsize=18)
         axs[disease_idx, 1].grid(True)
 
-        # Add real data points for HIV if available
-        if disease == 'HIV':
-            for year, real_data in eswatini_hiv_data.items():
-                real_male_data = real_data['male']
-                real_female_data = real_data['female']
+        # # Add real data points for HIV if available
+        # if disease == 'HIV':
+        #     for year, real_data in eswatini_hiv_data.items():
+        #         real_male_data = real_data['male']
+        #         real_female_data = real_data['female']
 
-                for age_bin in real_male_data:
-                    age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
-                    if age_label in age_bin_colors:
-                        axs[disease_idx, 0].scatter(year, real_male_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, zorder=5)
+        #         for age_bin in real_male_data:
+        #             age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
+        #             if age_label in age_bin_colors:
+        #                 axs[disease_idx, 0].scatter(year, real_male_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, zorder=5)
 
-                for age_bin in real_female_data:
-                    age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
-                    if age_label in age_bin_colors:
-                        axs[disease_idx, 1].scatter(year, real_female_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, zorder=5)
+        #         for age_bin in real_female_data:
+        #             age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
+        #             if age_label in age_bin_colors:
+        #                 axs[disease_idx, 1].scatter(year, real_female_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, zorder=5)
 
     # Add a common legend
     handles, labels = axs[0, 0].get_legend_handles_labels()

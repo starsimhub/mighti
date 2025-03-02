@@ -11,10 +11,10 @@ import sciris as sc
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
-
+beta = 0.001
 n_agents = 5000  # Number of agents in the simulation
-inityear = 2007  # Simulation start year
-endyear = 2025
+inityear = 2017  # Simulation start year
+endyear = 2050
 
 # ---------------------------------------------------------------------
 # Specify data file paths
@@ -47,12 +47,13 @@ csv_path_age = 'mighti/data/eswatini_age_2023.csv'
 # Read disease parameter file and interactions file
 df_params = pd.read_csv(csv_path_params, index_col="condition")
 df_interactions = pd.read_csv(csv_path_interactions)
-print(df_interactions.head())  # Print first few rows
-print(df_interactions.columns)  # Check column names
+# print(df_interactions.head())  # Print first few rows
+# print(df_interactions.columns)  # Check column names
 
 # Extract all conditions except HIV
 # healthconditions = [condition for condition in df_params.index if condition != "HIV"]
-healthconditions = ['Type2Diabetes','Obesity']
+healthconditions = ['Type2Diabetes']
+
 # Combine with HIV
 diseases = ["HIV"] + healthconditions
 
@@ -136,6 +137,16 @@ for disease in healthconditions:
     else:
         print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
 
+# # Create disease objects
+# disease_objects = []
+# for disease in healthconditions:
+#     init_prev = ss.bernoulli(get_prevalence_function(disease))
+#     if disease == 'Type2Diabetes':
+#         disease_obj = mi.Type2Diabetes(init_prev=init_prev)
+#     elif disease == 'Obesity':
+#         disease_obj = mi.Obesity(init_prev=init_prev)
+#     disease_objects.append(disease_obj)
+
 # HIV-specific setup
 beta = 0.001  # Transmission probability for HIV
 hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
@@ -150,8 +161,8 @@ prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, dis
 
 # interactions = [] 
 
-# # **Explicitly generate HIV-NCD interactions**
-# hiv_ncd_connectors = mi.create_hiv_connectors(df_params)  # Explicitly pass df_params
+# # # **Explicitly generate HIV-NCD interactions**
+# hiv_ncd_connectors = mi.create_hiv_connectors()  # Explicitly pass df_params
 # interactions.extend(hiv_ncd_connectors)
 
 # # Debugging: Show interactions created
@@ -170,6 +181,8 @@ for disease in healthconditions:
     interaction_obj = interaction_functions[disease]()  # Call the corresponding function
     interactions.append(interaction_obj)
 print(f"Final interactions added ({len(interactions)}): {[i.label for i in interactions]}")
+
+
 # -------------------------
 # Initialize the simulation
 # -------------------------
@@ -187,8 +200,12 @@ sim = ss.Sim(
     copy_inputs=False
 )
 
+    
 # Run the simulation
 sim.run()
+print(sim.results.keys())  # See what data is stored
+
+
 
 # ---------------------------------------------------------------------
 # Generate Plots
@@ -199,3 +216,38 @@ selected_diseases = ['HIV', 'Type2Diabetes']
 
 # Call the plotting function from `plot_functions.py`
 mi.plot_disease_prevalence(sim, prevalence_analyzer, selected_diseases, eswatini_hiv_data, age_bins)
+
+
+import matplotlib.pyplot as plt
+
+# Assuming you have these lists recorded during the simulation
+time_steps = list(range(len(sim.results['n_alive'])))  # Extract time steps
+total_population = sim.results['n_alive']  # Total population at each time step
+deaths = sim.results.get('new_deaths', [0] * len(time_steps))  # Deaths per step
+
+# Estimate births
+births = [total_population[0]]  # First time step has no previous value
+for t in range(2, len(time_steps)):
+    births.append(total_population[t] - total_population[t-1] + deaths[t])
+
+# Create figure with two subplots
+fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+# First panel: Total Population
+axes[0].plot(time_steps, total_population, label='Total Population', linewidth=2)
+axes[0].set_ylabel('Total Population')
+axes[0].set_title('Total Population Over Time')
+axes[0].legend()
+axes[0].grid()
+
+# Second panel: Estimated Births and Deaths
+axes[1].plot(time_steps, births, label='Estimated Births', linestyle='dashed')
+axes[1].plot(time_steps, deaths, label='Deaths', linestyle='dotted')
+axes[1].set_xlabel('Time Steps')
+axes[1].set_ylabel('Count')
+axes[1].set_title('Estimated Births and Deaths Over Time')
+axes[1].legend()
+axes[1].grid()
+
+plt.tight_layout()
+plt.show()

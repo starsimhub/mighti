@@ -3,22 +3,22 @@ import mighti as mi
 import pandas as pd
 import sciris as sc
 from collections import defaultdict
+import numpy as np
 
 # Specify all externally visible classes this file defines
 __all__ = [
     'hiv_hypertension', 'hiv_obesity', 'hiv_type1diabetes', 'hiv_type2diabetes',
-    'hiv_depression','hiv_alzheimersdisease', 'hiv_parkinsonsdisease','hiv_ptsd',
-    'hiv_hivassociateddimentia','hiv_cardiovasculardiseases', 'hiv_chronicliverdisease',
-    'hiv_asthma','hiv_roadinjuries','hiv_domesticviolence',
-    'hiv_chronickidneydisease', 'hiv_flu', 'hiv_hpvvaccination', 'hiv_tobaccouse', 'hiv_alcoholusedisorder',
-    'hiv_viralhepatitis','hiv_copd','hiv_hyperlipidemia',
+    'hiv_depression', 'hiv_accident', 'hiv_alzheimers', 'hiv_assault',
+    'hiv_cerebrovasculardisease', 'hiv_chronicliverdisease',
+    'hiv_chroniclowerrespiratorydisease', 'hiv_heartdisease',
+    'hiv_chronickidneydisease', 'hiv_flu', 'hiv_hpv', 'hiv_parkinsons',
+    'hiv_smoking', 'hiv_alcohol', 'hiv_brca', 'hiv_viralhepatitis',
     'hiv_cervicalcancer', 'hiv_colorectalcancer', 'hiv_breastcancer', 'hiv_lungcancer',
-    'hiv_prostatecancer', 
+    'hiv_prostatecancer', 'hiv_othercancer', 'hiv_poverty',
     'GenericNCDConnector', 'read_interactions'
 ]
 
 
-# Base class for HIV-related connectors
 class HIVConnector(ss.Connector):
     """ Base class for connectors that increase susceptibility due to HIV """
     def __init__(self, label, requires, susceptibility_key, default_susceptibility, pars=None, **kwargs):
@@ -29,95 +29,108 @@ class HIVConnector(ss.Connector):
         self.requires = requires
 
     def step(self):
-        sim = self.sim
-        disease_name = self.susceptibility_key.split('_')[-1].lower()
-        disease_obj = getattr(sim.diseases, disease_name, None)
+        sim = self.sim  
+        disease_name = self.susceptibility_key.split('_')[-1]
+        disease_obj = getattr(sim.diseases, disease_name.lower())
+
         hiv_infected_uids = sim.people.hiv.infected.uids
-        if disease_obj is None:
-            print(f"[WARNING] {disease_name} not found in simulation diseases.")
-            return
+        all_agents = np.arange(len(disease_obj.rel_sus))
+        non_hiv_agents = np.setdiff1d(all_agents, hiv_infected_uids)
 
-    # Check if rel_sus exists
-        if not hasattr(disease_obj, 'rel_sus'):
-            print(f"[ERROR] Disease {disease_name} does not have `rel_sus`. Fix initialization.")
-            return
-    
-        print(f"[DEBUG] Adjusting susceptibility for {disease_name}. HIV-infected individuals: {len(hiv_infected_uids)}")
-    
-        # Check for NaN values in rel_sus
-        print(f"[DEBUG] Initial rel_sus values for {disease_name}: {disease_obj.rel_sus}")
-    
-        # Ensure rel_sus is properly initialized
-        if disease_obj.rel_sus is None or isinstance(disease_obj.rel_sus, float):
-            print(f"[ERROR] `rel_sus` is not initialized correctly for {disease_name}.")
-            return
-    
-        if len(hiv_infected_uids) > 0:
-            print(f"[DEBUG] Before: {disease_name} rel_sus first 5 values: {list(disease_obj.rel_sus[:5])}")
-            disease_obj.rel_sus[hiv_infected_uids] = self.pars[self.susceptibility_key]
-            print(f"[DEBUG] After: {disease_name} rel_sus first 5 values: {list(disease_obj.rel_sus[:5])}")
-    
-        return
+        print(f"[DEBUG] Before update: {disease_name} rel_sus first 5 values: {disease_obj.rel_sus[:5]}")
 
+        # Reset rel_sus for non-HIV agents
+        disease_obj.rel_sus.set(non_hiv_agents, 1.0)
+
+        # Ensure rel_sus is modified correctly
+        print(f"[DEBUG] rel_sus ID before: {id(disease_obj.rel_sus)}")
+        disease_obj.rel_sus.set(hiv_infected_uids, self.pars[self.susceptibility_key])
+        print(f"[DEBUG] rel_sus ID after: {id(disease_obj.rel_sus)}")
+
+        # Debug available disease attributes
+        print(f"[DEBUG] {disease_name} attributes: {dir(disease_obj)}")
+
+        # Check transmission rate location
+        if hasattr(sim, "transmission_rate"):
+            print(f"[DEBUG] Transmission rate found in sim: {sim.transmission_rate[:5]}")
+        elif hasattr(disease_obj, "transmission_rate"):
+            print(f"[DEBUG] Transmission rate found in {disease_name}: {disease_obj.transmission_rate[:5]}")
+        else:
+            print(f"[WARNING] Transmission rate not found in sim or disease.")
+
+        print(f"[DEBUG] After update: {disease_name} rel_sus first 5 values: {disease_obj.rel_sus[:5]}")
+
+        # Check if age_bins exist
+        print(f"[DEBUG] age_bins: {getattr(sim, 'age_bins', 'Not Found')}")
+        
+
+        
+# class hiv_type2diabetes(HIVConnector):
+#     def __init__(self, pars=None, **kwargs):
+#         super().__init__('HIV-Type2Diabetes', [ss.HIV, mi.Type2Diabetes], 'rel_sus_hiv_type2diabetes', 1.95, pars, **kwargs)
 class hiv_type2diabetes(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Type2Diabetes', [ss.HIV, mi.Type2Diabetes], 'rel_sus_hiv_type2diabetes', 1.95, pars, **kwargs)
 
-class hiv_type1diabetes(HIVConnector):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Type1Diabetes', [ss.HIV, mi.Type1Diabetes], 'rel_sus_hiv_type1diabetes', 1.95, pars, **kwargs)
+    def step(self):
+        sim = self.sim
+        t2d_obj = getattr(sim.diseases, 'type2diabetes', None)
+
+        if t2d_obj is None:
+            print("[DEBUG] Type2Diabetes object not found!")
+            return
+
+        hiv_infected_uids = sim.people.hiv.infected.uids
+
+        print(f"[DEBUG] Step {sim.ti}: Before update - rel_sus (first 5) {t2d_obj.rel_sus[:5]}")
+
+        # Reset rel_sus for non-HIV agents
+        all_agents = np.arange(len(t2d_obj.rel_sus))
+        non_hiv_agents = np.setdiff1d(all_agents, hiv_infected_uids)
+        t2d_obj.rel_sus.set(non_hiv_agents, 1.0)
+
+        # Apply increased susceptibility for HIV-positive individuals
+        t2d_obj.rel_sus.set(hiv_infected_uids, self.pars['rel_sus_hiv_type2diabetes'])
+
+        print(f"[DEBUG] Step {sim.ti}: After update - rel_sus (first 5) {t2d_obj.rel_sus[:5]}")
+        
 
 class hiv_hypertension(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Hypertension', [ss.HIV, mi.Hypertension], 'rel_sus_hiv_hypertension', 1.3, pars, **kwargs)
 
-class hiv_hyperlipidemia(HIVConnector):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Hyperlipidemia', [ss.HIV, mi.Hyperlipidemia], 'rel_sus_hiv_hyperlipidemia', 1.3, pars, **kwargs)
-
-class hiv_asthma(HIVConnector):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Asthma', [ss.HIV, mi.Asthma], 'rel_sus_hiv_asthma', 1.3, pars, **kwargs)
-
-class hiv_copd(HIVConnector):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-COPD', [ss.HIV, mi.COPD], 'rel_sus_hiv_copd', 1.3, pars, **kwargs)
-
 class hiv_obesity(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Obesity', [ss.HIV, mi.Obesity], 'rel_sus_hiv_obesity', 1.2, pars, **kwargs)
+
+class hiv_type1diabetes(HIVConnector):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__('HIV-Type1Diabetes', [ss.HIV, mi.Type1Diabetes], 'rel_sus_hiv_type1diabetes', 1.5, pars, **kwargs)
+
 
 class hiv_depression(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Depression', [ss.HIV, mi.Depression], 'rel_sus_hiv_depression', 2, pars, **kwargs)
 
-class hiv_ptsd(HIVConnector):
+class hiv_accident(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-PTSD', [ss.HIV, mi.PTSD], 'rel_sus_hiv_ptsd', 2, pars, **kwargs)
+        super().__init__('HIV-Accident', [ss.HIV, mi.Accident], 'rel_sus_hiv_accident', 1.1, pars, **kwargs)
 
-class hiv_hivassociateddimentia(HIVConnector):
+class hiv_alzheimers(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-HIVAssociatedDimentia', [ss.HIV, mi.HIVAssociatedDementia], 'rel_sus_hiv_hivassociateddimentia', 2, pars, **kwargs)
+        super().__init__('HIV-Alzheimers', [ss.HIV, mi.Alzheimers], 'rel_sus_hiv_alzheimers', 1.1, pars, **kwargs)
 
-class hiv_roadinjuries(HIVConnector):
+class hiv_assault(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-Accident', [ss.HIV, mi.RoadInjuries], 'rel_sus_hiv_roadinjuries', 1.1, pars, **kwargs)
+        super().__init__('HIV-Assault', [ss.HIV, mi.Assault], 'rel_sus_hiv_assault', 1.1, pars, **kwargs)
 
-class hiv_domesticviolence(HIVConnector):
+class hiv_cerebrovasculardisease(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-DomesticViolence', [ss.HIV, mi.DomesticViolence], 'rel_sus_hiv_domesticviolence', 1.1, pars, **kwargs)
-
-class hiv_alzheimersdisease(HIVConnector):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-AlzheimersDisease', [ss.HIV, mi.AlzheimersDisease], 'rel_sus_hiv_alzheimersdisease', 1.1, pars, **kwargs)
-
-class hiv_cardiovasculardiseases(HIVConnector):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-CardiovascularDiseases', [ss.HIV, mi.CardiovascularDiseases], 'rel_sus_hiv_cardiovasculardiseases', 1.2, pars, **kwargs)
+        super().__init__('HIV-Cerebrovascular', [ss.HIV, mi.CerebrovascularDisease], 'rel_sus_hiv_cerebro', 1.2, pars, **kwargs)
 
 class hiv_chronicliverdisease(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-ChronicLiverDisease', [ss.HIV, mi.ChronicLiverDisease], 'rel_sus_hiv_chronicliverdisease', 1.2, pars, **kwargs)
+        super().__init__('HIV-Liver', [ss.HIV, mi.ChronicLiverDisease], 'rel_sus_hiv_liver', 1.2, pars, **kwargs)
 
 class hiv_chroniclowerrespiratorydisease(HIVConnector):
     def __init__(self, pars=None, **kwargs):
@@ -129,27 +142,31 @@ class hiv_heartdisease(HIVConnector):
 
 class hiv_chronickidneydisease(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-ChronicKidneyDisease', [ss.HIV, mi.ChronicKidneyDisease], 'rel_sus_hiv_chronickidneydisease', 1.3, pars, **kwargs)
+        super().__init__('HIV-Kidney', [ss.HIV, mi.ChronicKidneyDisease], 'rel_sus_hiv_kidney', 1.3, pars, **kwargs)
 
 class hiv_flu(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Flu', [ss.HIV, mi.Flu], 'rel_sus_hiv_flu', 1.2, pars, **kwargs)
 
-class hiv_hpvvaccination(HIVConnector):
+class hiv_hpv(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-HPV', [ss.HIV, mi.HPVVaccination], 'rel_sus_hiv_hpv', 1.5, pars, **kwargs)
+        super().__init__('HIV-HPV', [ss.HIV, mi.HPV], 'rel_sus_hiv_hpv', 1.5, pars, **kwargs)
 
-class hiv_parkinsonsdisease(HIVConnector):
+class hiv_parkinsons(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-ParkinsonsDisease', [ss.HIV, mi.ParkinsonsDisease], 'rel_sus_hiv_parkinsonsdisease', 1.3, pars, **kwargs)
+        super().__init__('HIV-Parkinsons', [ss.HIV, mi.Parkinsons], 'rel_sus_hiv_parkinsons', 1.3, pars, **kwargs)
 
-class hiv_tobaccouse(HIVConnector):
+class hiv_smoking(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-TobaccoUse', [ss.HIV, mi.TobaccoUse], 'rel_sus_hiv_tobaccouse', 1.5, pars, **kwargs)
+        super().__init__('HIV-Smoking', [ss.HIV, mi.Smoking], 'rel_sus_hiv_smoking', 1.5, pars, **kwargs)
 
-class hiv_alcoholusedisorder(HIVConnector):
+class hiv_alcohol(HIVConnector):
     def __init__(self, pars=None, **kwargs):
-        super().__init__('HIV-AlcoholUseDisorder', [ss.HIV, mi.AlcoholUseDisorder], 'rel_sus_hiv_alcoholusedisorder', 1.4, pars, **kwargs)
+        super().__init__('HIV-Alcohol', [ss.HIV, mi.Alcohol], 'rel_sus_hiv_alcohol', 1.4, pars, **kwargs)
+
+class hiv_brca(HIVConnector):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__('HIV-BRCA', [ss.HIV, mi.BRCA], 'rel_sus_hiv_brca', 1.3, pars, **kwargs)
 
 class hiv_cervicalcancer(HIVConnector):
     def __init__(self, pars=None, **kwargs):
@@ -178,6 +195,10 @@ class hiv_othercancer(HIVConnector):
 class hiv_viralhepatitis(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Hepatitis', [ss.HIV, mi.ViralHepatitis], 'rel_sus_hiv_hepatitis', 1.3, pars, **kwargs)
+
+class hiv_poverty(HIVConnector):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__('HIV-Poverty', [ss.HIV, mi.Poverty], 'rel_sus_hiv_poverty', 1.3, pars, **kwargs)
 
 # Functions to read in datafiles
 def read_interactions(datafile=None):
@@ -247,9 +268,8 @@ class GenericNCDConnector(ss.Connector):
         else:
             raise AttributeError(f"{self.condition2} does not have 'infected' or 'affected' attribute.")
         return
-
-
-# import starsim as ss
+    
+    # import starsim as ss
 # import mighti as mi
 # import pandas as pd
 # import sciris as sc
@@ -258,22 +278,20 @@ class GenericNCDConnector(ss.Connector):
 # # Read HIV Interactions
 # # -------------------------
 
-# def read_hiv_interactions(df_params):
-#     """ Read HIV interactions from `eswatini_parameters.csv`. """
-#     if df_params is None:
-#         raise ValueError("[ERROR] `df_params` has not been initialized. Call `initialize_conditions(df_params)` first.")
+# df_interactions = None  # Placeholder for external data
 
-#     # Debugging: Check available columns
-#     print(f"[DEBUG] Available columns in df_params: {df_params.columns}")
+# def initialize_interactions(data):
+#     """ Function to initialize interactions with preloaded interaction data """
+#     global df_interactions
+#     df_interactions = data
 
-#     # Ensure 'rel_sus' column exists
-#     if 'rel_sus' not in df_params.columns:
-#         raise ValueError(f"[ERROR] 'rel_sus' column is missing in parameter file. Available columns: {df_params.columns}")
-
-#     # Read HIV interactions (filtering out NaN values)
-#     rel_sus = df_params['rel_sus'].dropna().to_dict()
-
-#     print(f"[DEBUG] Read HIV interactions: {rel_sus}")
+# def read_hiv_interactions():
+#     """ Read HIV interactions using preloaded data. """
+#     rel_sus = {}
+#     for _, row in df_interactions.iterrows():
+#         condition = row['condition']
+#         rel_sus_value = row['relative_risk']
+#         rel_sus[condition] = rel_sus_value  # Store only HIV-related interactions
 #     return rel_sus
 
 
@@ -288,12 +306,11 @@ class GenericNCDConnector(ss.Connector):
 
 #     def __init__(self, condition, relative_risk, pars=None, **kwargs):
 #         label = f'HIV-{condition}'
-#         condition_obj = globals().get(condition, None)  # Ensure the disease class exists
+#         super().__init__(label=label, requires=[ss.HIV, getattr(mi, condition, None)])
 
-#         if condition_obj is None:
-#             raise ValueError(f"[ERROR] Condition {condition} not found in `mighti` module.")
+#         if None in self.requires:
+#             raise ValueError(f"Condition {condition} not found in `mighti`.")
 
-#         super().__init__(label=label)
 #         self.condition = condition
 #         self.relative_risk = relative_risk
 #         self.define_pars(rel_sus=relative_risk)
@@ -310,8 +327,7 @@ class GenericNCDConnector(ss.Connector):
 #         hiv_infected_uids = sim.people.hiv.infected.uids
 
 #         # Adjust relative susceptibility
-#         for uid in hiv_infected_uids:
-#             condition_obj.rel_sus[uid] = self.pars.rel_sus
+#         setattr(condition_obj, 'rel_sus', {uid: self.pars.rel_sus for uid in hiv_infected_uids})
 #         return
 
 
@@ -319,21 +335,29 @@ class GenericNCDConnector(ss.Connector):
 # # Create HIV-NCD Connectors Dynamically
 # # -------------------------
 
-# def create_hiv_connectors(df_params):
+# def create_hiv_connectors():
 #     """
-#     Reads HIV interaction data from `eswatini_parameters.csv` and dynamically creates HIV-NCD connectors.
+#     Reads HIV interaction data and dynamically creates HIV-NCD connectors.
 #     """
-#     rel_sus_data = read_hiv_interactions(df_params)
+#     rel_sus_data = read_hiv_interactions()
 #     connectors = []
 
 #     for condition, relative_risk in rel_sus_data.items():
-#         print(f"[DEBUG] Creating HIV connector for {condition} with RR={relative_risk}")
+#         connector_label = f'hiv_{condition.lower()}'
 
-#         try:
-#             connector = HIVConnector(condition, relative_risk)
-#             connectors.append(connector)
-#         except ValueError as e:
-#             print(f"[WARNING] Skipping {condition}: {e}")
+#         if connector_label not in globals():
+#             # Dynamically create and add a new connector class
+#             connector_class = type(
+#                 connector_label,
+#                 (HIVConnector,),
+#                 {
+#                     '__init__': lambda self, pars=None, **kwargs: super(connector_class, self).__init__(
+#                         condition, relative_risk, pars, **kwargs
+#                     )
+#                 }
+#             )
 
-#     print(f"[DEBUG] Created {len(connectors)} HIV-NCD connectors: {connectors}")
+#             globals()[connector_label] = connector_class  # Register globally
+#             connectors.append(connector_class())
+
 #     return connectors
