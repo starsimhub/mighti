@@ -94,7 +94,7 @@ class BaseNCD(ss.NCD):
 
     def step(self):
         new_cases = self.pars.incidence.filter(self.affected.uids)
-        print(f"[DEBUG] Step {self.sim.ti}: New T2D cases = {len(new_cases)}")
+        # print(f"[DEBUG] Step {self.sim.ti}: New T2D cases = {len(new_cases)}")
 
         self.set_prognoses(new_cases)
         
@@ -164,7 +164,7 @@ class BaseSIS(ss.SIS):
     def __init__(self, condition, pars=None, **kwargs):
         super().__init__()
         self.condition = condition
-        print(f"[DEBUG] Inside BaseSIS: {self.condition}")
+        # print(f"[DEBUG] Inside BaseSIS: {self.condition}")
 
         self.define_pars(
             dur_condition=ss.lognorm_ex(get_param(condition, "dur_condition", 10)),
