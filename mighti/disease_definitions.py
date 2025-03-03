@@ -53,6 +53,9 @@ def initialize_prevalence_data(diseases, csv_file_path, inityear):
     return prevalence_data, age_bins
 
 
+
+import numpy as np
+
 def age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size):
     """
     Compute age- and sex-dependent prevalence for a given disease.
@@ -67,31 +70,37 @@ def age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size):
     Returns:
         np.array: Prevalence values for the subset of the population.
     """
-    # **Fix: Use .raw to extract values before indexing**
-    ages = sim.people.age.raw[size]  
-    is_male = sim.people.male.raw[size]  # Starsim only tracks male, not female
-    
-    prevalence = np.zeros(len(ages))
-    disease_age_bins = age_bins[disease]  # Get age bins for the specific disease
 
+    # Extract values (without `.raw`)
+    ages = sim.people.age[size]  
+    is_male = sim.people.male[size]  
+
+    # Initialize prevalence array
+    prevalence = np.zeros(len(ages), dtype=float)
+
+    # Get age bins for the specific disease
+    disease_age_bins = age_bins[disease]  
+
+    # Iterate over individuals and assign prevalence
     for i in range(len(ages)):
         sex = 'male' if is_male[i] else 'female'
+
+        assigned_prevalence = None  # Debugging variable
 
         # Assign prevalence based on age bins
         for j in range(len(disease_age_bins) - 1):
             left = disease_age_bins[j]
             right = disease_age_bins[j + 1]
+
             if left <= ages[i] < right:
-                prevalence[i] = prevalence_data[disease][sex][left]
+                assigned_prevalence = prevalence_data[disease][sex].get(left, 0)
                 break
 
         # Special case for 80+ age group
-        if ages[i] >= 80 and 80 in prevalence_data[disease][sex]:
-            prevalence[i] = prevalence_data[disease][sex][80]
+        if ages[i] >= 80:
+            assigned_prevalence = prevalence_data[disease][sex].get(80, 0)
 
-    # Debugging Prevalence Calculation
-    print(f"[DEBUG] Disease: {disease}")
-    print(f"  Males: {np.sum(is_male)} | Females: {np.sum(~is_male)}")
-    print(f"  First 10 Prevalence Male: {prevalence[is_male][:10]}")
-    print(f"  First 10 Prevalence Female: {prevalence[~is_male][:10]}")
+        # Assign the final prevalence
+        prevalence[i] = assigned_prevalence if assigned_prevalence is not None else 0
+
     return prevalence

@@ -122,3 +122,45 @@ def plot_demography(time_steps, total_population, deaths, births):
 
     plt.tight_layout()
     plt.show()
+    
+
+
+def plot_mean_prevalence(sim, prevalence_analyzer, disease):
+    """
+    Plot mean prevalence over time for a given disease and both sexes.
+
+    Parameters:
+    - sim: The simulation object (provides `sim.timevec`)
+    - prevalence_analyzer: The prevalence analyzer with stored results
+    - disease: Name of the disease (e.g., 'HIV', 'Type2Diabetes')
+    """
+
+
+    # Extract male and female prevalence matrices
+    male_data = prevalence_analyzer.results.get(f'{disease}_prevalence_male', None)
+    female_data = prevalence_analyzer.results.get(f'{disease}_prevalence_female', None)
+
+    # Ensure data exists
+    if male_data is None or female_data is None:
+        print(f"[ERROR] No prevalence data available for {disease}.")
+        return
+
+    # Compute mean prevalence across all age groups
+    mean_prevalence_male = np.mean(male_data, axis=1)   # Convert to percentage
+    mean_prevalence_female = np.mean(female_data, axis=1)
+
+    # Create figure
+    plt.figure(figsize=(10, 5))
+
+    # Plot mean prevalence for males and females
+    plt.plot(sim.timevec, mean_prevalence_male, label=f'Male {disease.capitalize()} Prevalence', linewidth=2, color='blue')
+    plt.plot(sim.timevec, mean_prevalence_female, label=f'Female {disease.capitalize()} Prevalence', linewidth=2, color='red')
+
+    # Labels and title
+    plt.xlabel('Year')
+    plt.ylabel(f'{disease.capitalize()} Prevalence (%)')
+    plt.title(f'Mean {disease.capitalize()} Prevalence Over Time (All Ages)')
+    plt.legend()
+    plt.grid()
+
+    plt.show()
