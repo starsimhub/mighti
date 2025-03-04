@@ -204,9 +204,8 @@ class hiv_viralhepatitis(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Hepatitis', [ss.HIV, mi.ViralHepatitis], 'rel_sus_hiv_viralhepatitis', 1.3, pars, **kwargs)
 
+import numpy as np
 
-
-# Generic connector for NCD-NCD interactions
 class GenericNCDConnector(ss.Connector):
     """
     A generic connector to model interactions between two diseases.
@@ -214,10 +213,12 @@ class GenericNCDConnector(ss.Connector):
     """
 
     def __init__(self, condition1, condition2, relative_risk, pars=None, **kwargs):
-        label = f'{condition1}-{condition2}'#'-{unique_id}'  
+        label = f'{condition1}-{condition2}'  
         name = label.lower().replace(" ", "_")
+
+        # print(f"Creating GenericNCDConnector with label: {label}")  # Debugging
+
         super().__init__(name=name, label=label)
-        
         self.condition1 = condition1
         self.condition2 = condition2
         self.relative_risk = relative_risk
@@ -229,20 +230,50 @@ class GenericNCDConnector(ss.Connector):
         cond1_obj = getattr(sim.diseases, self.condition1.lower(), None)
         cond2_obj = getattr(sim.diseases, self.condition2.lower(), None)
 
-        if not cond1_obj or not cond2_obj:
+        if cond1_obj is None or cond2_obj is None:
             print(f"[ERROR] {self.condition1} or {self.condition2} not found in sim.diseases")
             return
-
-        condition1_uids = getattr(cond1_obj, "infected", None) or getattr(cond1_obj, "affected", None)
-        if condition1_uids is None:
+        if sim.ti == 0:
+            print(f"Time {sim.ti} |[BEGIN] {self.name}: {self.condition2} rel_sus mean BEFORE: {np.mean(cond2_obj.rel_sus)}")
+        
+        # Determine if the first condition uses 'infected' or 'affected'
+        if hasattr(cond1_obj, 'infected'):
+            condition1_uids = cond1_obj.infected.uids
+        elif hasattr(cond1_obj, 'affected'):
+            condition1_uids = cond1_obj.affected.uids
+        else:
             print(f"[ERROR] {self.condition1} does not have 'infected' or 'affected' attribute.")
             return
 
-        if hasattr(cond2_obj, "rel_sus"):
-            cond2_obj.rel_sus[condition1_uids.uids] *= self.relative_risk
+        # print("---- Checking rel_sus for Each Disease ----")
+        # for disease_name in sim.diseases:
+        #     disease = getattr(sim.diseases, disease_name, None)
+        #     if disease is not None:
+        #         print(f"{disease_name}: Has rel_sus? {'rel_sus' in dir(disease)}")
+        # print("--------------------------------------------")
+        # print(f"Applying rel_sus={self.relative_risk} to {self.condition2} for {len(condition1_uids)} individuals with {self.condition1}")
+        
+        if cond2_obj is not None and hasattr(cond2_obj, "rel_sus") and isinstance(cond2_obj.rel_sus, ss.Arr):
+            # print(f"🔹 [BEGIN] {self.name}: {self.condition2} rel_sus.mean() BEFORE: {np.mean(cond2_obj.rel_sus)}")
+            condition1_uids = cond1_obj.affected.uids if hasattr(cond1_obj, "affected") else []
+            
+            if len(condition1_uids) > 0:
+                cond2_obj.rel_sus[condition1_uids] *= self.relative_risk
+            
+            print(f"🔹 [END] {self.name}: {self.condition2} rel_sus.mean() AFTER: {np.mean(cond2_obj.rel_sus)}")
+        else:
+            print(f"[ERROR] {self.name}: {self.condition2} rel_sus is not initialized yet!")
+            
+
+        # Apply the susceptibility adjustment
+        if hasattr(cond2_obj, 'rel_sus'):
+            before_values = cond2_obj.rel_sus[condition1_uids] if len(condition1_uids) > 0 else None
+            cond2_obj.rel_sus[condition1_uids] *= self.relative_risk
+            after_values = cond2_obj.rel_sus[condition1_uids] if len(condition1_uids) > 0 else None
         else:
             print(f"[ERROR] {self.condition2} does not have 'rel_sus' attribute.")
 
+        print(f"🔹 [END] {self.name}: {self.condition2} rel_sus.mean() AFTER: {np.mean(cond2_obj.rel_sus)}")
         return
 
 
