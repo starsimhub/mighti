@@ -19,13 +19,13 @@ def plot_disease_prevalence(sim, prevalence_analyzer, diseases, eswatini_hiv_dat
 
     # Ensure age_bins is a valid list of numbers
     if not age_bins or not isinstance(age_bins, (list, np.ndarray)):
-        print("[ERROR] age_bins is empty or not a valid list. Using default values.")
+        # print("[ERROR] age_bins is empty or not a valid list. Using default values.")
         age_bins_list = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
     else:
         try:
             age_bins_list = [int(age) for age in age_bins if str(age).isdigit()]
         except ValueError:
-            print("[ERROR] age_bins contains non-numeric values. Using default values.")
+            # print("[ERROR] age_bins contains non-numeric values. Using default values.")
             age_bins_list = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
 
     # Ensure age_bins_list has valid elements
