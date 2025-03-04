@@ -54,8 +54,6 @@ def initialize_prevalence_data(diseases, csv_file_path, inityear):
 
 
 
-import numpy as np
-
 def age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size):
     """
     Compute age- and sex-dependent prevalence for a given disease.

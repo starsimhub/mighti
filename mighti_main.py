@@ -5,16 +5,20 @@ import pandas as pd
 import sciris as sc
 import numpy as np
 
+import importlib
+import mighti
+importlib.reload(mighti)
+
 ### TO DO
 
 
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
-beta = 0.001
-n_agents = 50000  # Number of agents in the simulation
+# beta = 0.001
+n_agents = 5000  # Number of agents in the simulation
 inityear = 2017  # Simulation start year
-endyear = 2050
+endyear = 2030
 
 # ---------------------------------------------------------------------
 # Specify data file paths
@@ -46,31 +50,11 @@ csv_path_age = 'mighti/data/eswatini_age_2023.csv'
 
 # Read disease parameter file and interactions file
 df_params = pd.read_csv(csv_path_params, index_col="condition")
-# -------------------------
-# NCD-NCD Interaction Handling
-# -------------------------
-
-# Read NCD-NCD interaction data
-# ncd_ncd_interactions = mi.read_interactions()
-# print("[DEBUG] NCD-NCD Interaction Data:", ncd_ncd_interactions)
-
-
-
-# print("[DEBUG] Final interactions added:", [conn.label for conn in interactions])
-# mi.initialize_interactions(df_hiv_ncd, df_ncd_ncd)
-
-# # Create interaction objects
-# interactions = []  
-# hiv_ncd_connectors = mi.create_hiv_connectors()  
-# ncd_ncd_connectors = mi.create_ncd_connectors()  
-
-# interactions.extend(hiv_ncd_connectors)
-# interactions.extend(ncd_ncd_connectors)
 
 # Extract all conditions except HIV
-# healthconditions = [condition for condition in df_params.index if condition != "HIV"]
-healthconditions = ['Type2Diabetes']
-
+healthconditions = [condition for condition in df_params.index if condition != "HIV"]
+# healthconditions = ['Type2Diabetes']
+# 
 # Combine with HIV
 diseases = ["HIV"] + healthconditions
 
@@ -78,14 +62,12 @@ diseases = ["HIV"] + healthconditions
 # Initialize conditions, prevalence analyzer, and interactions
 # ---------------------------------------------------------------------
 
-# Initialize disease models with preloaded data
-mi.initialize_conditions(df_params)
+# # Initialize disease models with preloaded data
+# mi.initialize_conditions(df_params)
 
-# Initialize prevalence analyzer with preloaded data
-mi.initialize_prevalence_analyzer(df_params)
+# # Initialize prevalence analyzer with preloaded data
+# mi.initialize_prevalence_analyzer(df_params)
 
-# Initialize interactions with preloaded data
-# mi.initialize_interactions(df_interactions)
 
 # ---------------------------------------------------------------------
 # Load disease prevalence data
@@ -104,15 +86,6 @@ for year in years:
         inityear=year
     )
     eswatini_hiv_data[year] = hiv_prevalence_data['HIV']  # Store data for the specific year
-
-eswatini_t2d_data = {}
-for year in years:
-    t2d_prevalence_data, _ = mi.initialize_prevalence_data(
-        diseases=['Type2Diabetes'], 
-        csv_file_path=csv_prevalence, 
-        inityear=year
-    )
-    eswatini_t2d_data[year] = t2d_prevalence_data['Type2Diabetes']
 
 # -------------------------
 # Demographics
@@ -155,8 +128,8 @@ for disease in healthconditions:
         print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
 
 
-# HIV-specific setup
-beta = 0.001  # Transmission probability for HIV
+# HIV-specific setup 
+beta = 0.00001  # Transmission probability for HIV
 hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 disease_objects.append(hiv_disease)
 
@@ -168,60 +141,91 @@ prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, dis
 # HIV-NCD Interaction
 # -------------------------
 
-interactions = [] 
+# Load existing HIV and NCD interactions
+interaction_functions = {
+    'Type1Diabetes': mi.hiv_type1diabetes,
+    'Type2Diabetes': mi.hiv_type2diabetes,
+    'Obesity': mi.hiv_obesity,
+    'Hypertension': mi.hiv_hypertension,
+    'CardiovascularDiseases': mi.hiv_cardiovasculardiseases,
+    'ChronicKidneyDisease': mi.hiv_chronickidneydisease,
+    'Hyperlipidemia': mi.hiv_hyperlipidemia,
+    'CervicalCancer': mi.hiv_cervicalcancer,
+    'ColorectalCancer': mi.hiv_colorectalcancer,
+    'BreastCancer': mi.hiv_breastcancer,
+    'LungCancer': mi.hiv_lungcancer,
+    'ProstateCancer': mi.hiv_prostatecancer,
+    'AlcoholUseDisorder': mi.hiv_alcoholusedisorder,
+    'TobaccoUse': mi.hiv_tobaccouse,
+    'HIVAssociatedDementia': mi.hiv_hivassociateddementia,
+    'PTSD': mi.hiv_ptsd,
+    'Depression': mi.hiv_depression,
+    'HPV': mi.hiv_hpv,
+    'Flu': mi.hiv_flu,
+    'ViralHepatitis': mi.hiv_viralhepatitis,
+    'DomesticViolence': mi.hiv_domesticviolence,
+    'RoadInjuries': mi.hiv_roadinjuries,
+    'ChronicLiverDisease': mi.hiv_chronicliverdisease,
+    'Asthma': mi.hiv_asthma,
+    'COPD': mi.hiv_copd,
+    'AlzheimersDisease': mi.hiv_alzheimersdisease,
+    'ParkinsonsDisease': mi.hiv_parkinsonsdisease,
+}
 
-# # # **Explicitly generate HIV-NCD interactions**
-hiv_ncd_connectors = mi.create_hiv_connectors()  # Explicitly pass df_params
-interactions.extend(hiv_ncd_connectors)
-# print("[DEBUG] Created HIV-NCD Connectors:", [conn.label for conn in hiv_ncd_connectors])
+# # Initialize interaction objects for HIV-NCD interactions
+interactions = []
+for disease in healthconditions:
+    interaction_obj = interaction_functions[disease]()  # Call the corresponding function
+    interactions.append(interaction_obj)
+    
+# Load NCD-NCD interactions
+ncd_interactions = mi.read_interactions()  # Reads rel_sus.csv
 
+for condition1, interactions_dict in ncd_interactions.items():
+    for condition2, relative_risk in interactions_dict.items():
+        if condition1 != condition2:  # Avoid self-interactions
+            interaction_obj = mi.GenericNCDConnector(condition1, condition2, relative_risk)
+            interactions.append(interaction_obj)
 
-
-
-# # Load existing HIV and NCD interactions
-# interaction_functions = {
-#     'Type2Diabetes': mi.hiv_type2diabetes,
-#     'Obesity': mi.hiv_obesity,
-# }
-
-# # # Initialize interaction objects for HIV-NCD interactions
-# interactions = []
-# for disease in healthconditions:
-#     interaction_obj = interaction_functions[disease]()  # Call the corresponding function
-#     interactions.append(interaction_obj)
-
-# ncd_ncd_connectors = mi.create_ncd_connectors()
-# print("[DEBUG] Created NCD-NCD Connectors:", [conn.name for conn in ncd_ncd_connectors])
-
-# # Create interaction objects
-# interactions = []  
-# hiv_ncd_connectors = mi.create_hiv_connectors()  
-# ncd_ncd_connectors = mi.create_ncd_connectors()  
-
-# interactions.extend(hiv_ncd_connectors)
-# interactions.extend(ncd_ncd_connectors)
+# print(f"Total interactions after adding NCD-NCD: {len(interactions)}")
+# for inter in interactions:
+#     if isinstance(inter, mi.GenericNCDConnector):
+#         print(f"Interaction: {inter.label} with rel_sus={inter.relative_risk}")
+#     else:
+#         print(f"Interaction: {inter.label} (HIV-NCD)")
+    
 # -------------------------
 # Initialize the simulation
 # -------------------------
-
+# print(f"Number of interactions: {len(interactions)}")
+# for inter in interactions:
+#     print(f"Interaction: {inter.label}")
+    
 sim = ss.Sim(
     n_agents=n_agents,
     networks=networks,
-    diseases=disease_objects,  # Pass the full list of diseases (HIV + NCDs)
+    diseases=disease_objects,  
     analyzers=[prevalence_analyzer],
     start=inityear,
     stop=endyear,
-    connectors=interactions,  # **Now includes HIV-NCD interactions**
+    connectors=interactions,  
     people=ppl,
     demographics=[pregnancy, death],
     copy_inputs=False
 )
 
-# Run the simulation
+
+# print(f"Number of interactions before sim init: {len(interactions)}")
+# for conn in interactions[:30]:  # Print first 5 connectors
+#     print(f"Connector Name: {conn.name if hasattr(conn, 'name') else conn}")
+        
 sim.run()
 
-
-
+# # Print `rel_sus` after running the simulation
+# print("---- Checking rel_sus After Updates ----")
+# for key, disease_obj in sim.pars.items():
+#     if isinstance(disease_obj, ss.Disease):
+#         print(f"{key} rel_sus after update: {disease_obj.rel_sus}")
 # ---------------------------------------------------------------------
 # Generate Plots
 # ---------------------------------------------------------------------
@@ -230,23 +234,5 @@ sim.run()
 selected_diseases = ['HIV', 'Type2Diabetes']
 
 # Call the plotting function from `plot_functions.py`
-mi.plot_disease_prevalence(sim, prevalence_analyzer, selected_diseases, eswatini_hiv_data, age_bins)
-
-
-##### Plot demography
-time_steps = list(range(len(sim.results['n_alive'])))  # Extract time steps
-total_population = sim.results['n_alive']  # Total population at each time step
-deaths = sim.results.get('new_deaths', [0] * len(time_steps))  # Deaths per step
-
-# Estimate births (skip first year in calculation)
-births = [total_population[t] - total_population[t-1] + deaths[t] for t in range(1, len(time_steps))]
-
-# Adjust time steps and population to match births (skip first year)
-time_steps = time_steps[1:]
-total_population = total_population[1:]
-deaths = deaths[1:]
-
-# mi.plot_demography(time_steps, total_population, deaths, births)
-
-##### Plot mean HIV prevalence
-mi.plot_mean_prevalence(sim, prevalence_analyzer,'Type2Diabetes')
+# mi.plot_disease_prevalence(sim, prevalence_analyzer, selected_diseases, eswatini_hiv_data, age_bins)
+mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes')
