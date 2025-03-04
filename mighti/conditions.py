@@ -5,8 +5,6 @@ import numpy as np
 import starsim as ss
 import mighti as mi
 import sciris as sc
-import pandas as pd
-
 
 # CONDITIONS
 # This is an umbrella term for any health condition. Some conditions can lead directly
@@ -15,35 +13,6 @@ import pandas as pd
 # other conditions.
 
 
-# Load the CSV file
-csv_path = sc.thispath() / '../mighti/data/eswatini_parameters.csv'
-
-def get_disease_parameters(disease_name, csv_path):
-    """
-    Extracts disease-specific parameters from the CSV file.
-    """
-    df = pd.read_csv(csv_path)
-
-    # Ensure column names match
-    df.columns = df.columns.str.strip()  # Remove extra spaces
-
-    if "condition" not in df.columns:
-        raise KeyError(f"Column 'condition' not found in {csv_path}. Available columns: {df.columns}")
-
-    row = df[df["condition"] == disease_name]
-    if row.empty:
-        raise ValueError(f"Disease '{disease_name}' not found in {csv_path}.")
-
-    # Extract and handle NaNs
-    return {
-        "p_death": row["p_death"].values[0] if pd.notna(row["p_death"].values[0]) else 0.0001,
-        "incidence_prob": row["incidence"].values[0] if pd.notna(row["incidence"].values[0]) else 0.1,
-        "dur_condition": row["dur_condition"].values[0] if pd.notna(row["dur_condition"].values[0]) else None,
-        "init_prev": row["init_prev"].values[0] if pd.notna(row["init_prev"].values[0]) else 0.1,
-        "rel_sus": row["rel_sus"].values[0] if pd.notna(row["rel_sus"].values[0]) else 1.0,
-        "remission_rate": row["remmision_rate"].values[0] if pd.notna(row["remmision_rate"].values[0]) else None,
-        "max_disease_duration": row["max_disease_duration"].values[0] if pd.notna(row["max_disease_duration"].values[0]) else None
-    }
 
 class GenericDisease(ss.Disease):
     """ Minimal placeholder class for diseases that are not fully implemented yet. """
@@ -61,13 +30,10 @@ class GenericDisease(ss.Disease):
             ss.State('affected'),
             ss.FloatArr('rel_sus', default=1.0),
         )
+        # print(f"[DEBUG] {self.name} initialized → rel_sus.mean(): {self.rel_sus.mean()}")
     def step(self):
         # print(f"{self.name} rel_sus during step: {self.rel_sus}")
         super().step()
-        
-        
-        
-        
 
 # Define all diseases using GenericDisease
 class Type1Diabetes(GenericDisease): pass
@@ -98,10 +64,32 @@ class COPD(GenericDisease): pass
 class AlzheimersDisease(GenericDisease): pass
 class ParkinsonsDisease(GenericDisease): pass
 
+import pandas as pd
+import starsim as ss
+import sciris as sc
 
+# Load the CSV file
+datafile = sc.thispath() / '../mighti/data/eswatini_parameters.csv'
+df =  pd.read_csv(datafile)
+
+# Function to get disease parameters from the CSV
+def get_disease_parameters(condition_name):
+    row = df[df["condition"] == condition_name]
+    if row.empty:
+        raise ValueError(f"Condition {condition_name} not found in CSV.")
+
+    return {
+        "p_death": row["p_death"].values[0] if pd.notna(row["p_death"].values[0]) else None,
+        "incidence_prob": row["incidence"].values[0] if pd.notna(row["incidence"].values[0]) else None,
+        "dur_condition": row["dur_condition"].values[0] if pd.notna(row["dur_condition"].values[0]) else None,
+        "init_prev": row["init_prev"].values[0] if pd.notna(row["init_prev"].values[0]) else None,
+        "rel_sus": row["rel_sus"].values[0] if pd.notna(row["rel_sus"].values[0]) else None,
+        "remission_rate": row["remmision_rate"].values[0] if pd.notna(row["remmision_rate"].values[0]) else None,
+        "max_disease_duration": row["max_disease_duration"].values[0] if pd.notna(row["max_disease_duration"].values[0]) else None
+    }
 
 # Extract parameters for Type2Diabetes
-type2diabetes_params = get_disease_parameters("Type2Diabetes",csv_path)
+type2diabetes_params = get_disease_parameters("Type2Diabetes")
 
 # Define the class dynamically using extracted parameters
 class Type2Diabetes(ss.NCD):
@@ -116,6 +104,7 @@ class Type2Diabetes(ss.NCD):
             remission_rate=ss.bernoulli(type2diabetes_params["remission_rate"]),
             max_disease_duration=type2diabetes_params["max_disease_duration"],
         )
+
 # class Type2Diabetes(ss.NCD):
 
 #     def __init__(self, pars=None, **kwargs):
@@ -140,28 +129,36 @@ class Type2Diabetes(ss.NCD):
             ss.FloatArr('ti_reversed'),
             ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus', default=1.0),
-            # ss.FloatArr('beta_cell_function'),  # Tracks beta-cell function over time
-            # ss.FloatArr('insulin_resistance'),  # Tracks insulin resistance progression
         )
+        # Check if rel_sus exists and has values
+        if self.rel_sus is None:
+            print(f"[ERROR] {self.name}: rel_sus is None")
+        elif len(self.rel_sus) == 0:
+            print(f"[ERROR] {self.name}: rel_sus is EMPTY")
+        else:
+            print(f"[DEBUG] {self.name} initialized → rel_sus.mean(): {self.rel_sus.mean()}")  # This should print a valid number
+        
+        # print(f"[DEBUG] {self.name} initialized → rel_sus: {self.rel_sus}")
         return
 
     def init_post(self):
-        # print(f"\n Debugging `init_prev` in Type2Diabetes: {self.pars.init_prev}")
-
+        """Check rel_sus right after initial prevalence is set."""
         initial_cases = self.pars.init_prev.filter()
-
-        print(f"Expected initial cases: {len(initial_cases)}")  # Should be around 13.5% of n_agents
-
+        print(f"Expected initial cases: {len(initial_cases)}")
+    
         if len(initial_cases) == 0:
             print("WARNING: `init_prev` is filtering 0 cases! Something is wrong.")
-
+    
         self.set_prognoses(initial_cases)
-
-        #  Debugging After Initialization
-        # print(f" After `init_post`:")
-        # print(f"  - Affected (should be ~67,651): {np.sum(self.affected.raw)}")
-        # print(f"  - Susceptible: {np.sum(self.susceptible.raw)}")
-
+    
+        # Check rel_sus after `init_post`
+        if self.rel_sus is None:
+            print(f"[ERROR] {self.name}: rel_sus is None after init_post()")
+        elif len(self.rel_sus) == 0:
+            print(f"[ERROR] {self.name}: rel_sus is EMPTY after init_post()")
+        else:
+            print(f"[DEBUG] {self.name} → rel_sus after init_post(): {self.rel_sus.mean()}")
+        
         return initial_cases
 
     def step_state(self):
@@ -179,8 +176,15 @@ class Type2Diabetes(ss.NCD):
         self.sim.people.request_death(deaths)
 
     def step(self):
+    
+        print(f"[DEBUG] Start of {self.name}.step() → rel_sus.mean(): {self.rel_sus.mean()}")
+    
         new_cases = self.pars.incidence.filter(self.susceptible.uids)
         self.set_prognoses(new_cases)
+    
+        # Print after disease step
+        print(f"[DEBUG] End of {self.name}.step() → rel_sus.mean(): {self.rel_sus.mean()}")
+        
         return new_cases
 
 

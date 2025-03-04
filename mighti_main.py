@@ -4,6 +4,10 @@ import pylab as pl
 import pandas as pd
 import sciris as sc
 import numpy as np
+import sys
+log_file = open("debug_output.txt", "w")
+sys.stdout = log_file  # Redirects all print outputs to this file
+
 
 import importlib
 import mighti
@@ -58,6 +62,20 @@ healthconditions = [condition for condition in df_params.index if condition != "
 # Combine with HIV
 diseases = ["HIV"] + healthconditions
 
+# csv_path ='mighti/data/eswatini_parameters.csv'
+# # Automatically create all disease classes using GenericDisease
+
+# # Automatically create all disease classes using GenericDisease
+# disease_names = [ "Type2Diabetes"]  # Extend this list
+
+# for disease in disease_names:
+#     class_dict = {
+#         "__init__": (lambda disease_name: 
+#                      lambda self, pars=None, **kwargs: 
+#                      mi.GenericDisease.__init__(self, disease_name=disease_name, csv_path=csv_path, pars=pars, **kwargs)
+#                     )(disease)  # This ensures each class gets the correct disease_name
+#     }
+#     globals()[disease] = type(disease, (mi.GenericDisease,), class_dict)  # No extra indentation here
 # ---------------------------------------------------------------------
 # Initialize conditions, prevalence analyzer, and interactions
 # ---------------------------------------------------------------------
@@ -215,10 +233,6 @@ sim = ss.Sim(
 )
 
 
-# print(f"Number of interactions before sim init: {len(interactions)}")
-# for conn in interactions[:30]:  # Print first 5 connectors
-#     print(f"Connector Name: {conn.name if hasattr(conn, 'name') else conn}")
-        
 sim.run()
 
 # # Print `rel_sus` after running the simulation
