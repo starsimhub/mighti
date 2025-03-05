@@ -4,9 +4,9 @@ import pylab as pl
 import pandas as pd
 import sciris as sc
 import numpy as np
-import sys
-log_file = open("debug_output.txt", "w")
-sys.stdout = log_file  # Redirects all print outputs to this file
+# import sys
+# log_file = open("debug_output.txt", "w")
+# sys.stdout = log_file  # Redirects all print outputs to this file
 
 
 import importlib
@@ -232,6 +232,8 @@ sim = ss.Sim(
     copy_inputs=False
 )
 
+# print(f"[DEBUG] Before simulation: {sim.diseases.type2diabetes.rel_sus}")
+print(f"[DEBUG] Type2Diabetes result data: {sim.results.get('type2diabetes', None)}")
 
 sim.run()
 
