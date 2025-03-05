@@ -105,20 +105,6 @@ class Type2Diabetes(ss.NCD):
             max_disease_duration=type2diabetes_params["max_disease_duration"],
         )
 
-# class Type2Diabetes(ss.NCD):
-
-#     def __init__(self, pars=None, **kwargs):
-#         super().__init__()
-#         self.define_pars(
-#             dur_condition=ss.lognorm_ex(15.02897096),
-#             incidence_prob=0.010125, 
-#             incidence=ss.bernoulli(0.010125),
-#             p_death=ss.bernoulli(0.004315),
-#             init_prev=ss.bernoulli(13.14),
-#             remission_rate=ss.bernoulli(0.024),
-#             max_disease_duration=30,
-#         )
-
         self.update_pars(pars, **kwargs)
 
         self.define_states(
@@ -130,15 +116,7 @@ class Type2Diabetes(ss.NCD):
             ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus', default=1.0),
         )
-        # Check if rel_sus exists and has values
-        if self.rel_sus is None:
-            print(f"[ERROR] {self.name}: rel_sus is None")
-        elif len(self.rel_sus) == 0:
-            print(f"[ERROR] {self.name}: rel_sus is EMPTY")
-        else:
-            print(f"[DEBUG] {self.name} initialized → rel_sus.mean(): {self.rel_sus.mean()}")  # This should print a valid number
-        
-        # print(f"[DEBUG] {self.name} initialized → rel_sus: {self.rel_sus}")
+        # print(f"[DEBUG] {self.name} → rel_sus after define_states: {self.rel_sus}")
         return
 
     def init_post(self):
