@@ -44,21 +44,6 @@ class PrevalenceAnalyzer(ss.Analyzer):
 
         self.results = sc.objdict()
 
-    # def init_pre(self, sim):
-    #     super().init_pre(sim)
-    #     npts = len(sim.t)  # Number of time points in the simulation
-
-    #     # Initialize result arrays for each disease: time x age groups
-    #     for disease in self.diseases:
-    #         self.results[f'{disease}_prevalence_male'] = np.zeros((npts, len(self.age_groups[disease])))
-    #         self.results[f'{disease}_prevalence_female'] = np.zeros((npts, len(self.age_groups[disease])))
-
-    #     # Initialize array to store population age distribution for each year (single-age resolution)
-    #     self.results['population_age_distribution'] = np.zeros((npts, 101))  # 0 to 100 years (single-year resolution)
-
-    #     print(f"Initialized prevalence array with {npts} time points for {self.diseases}.")
-    #     return
-    
     def init_pre(self, sim):
         """ Initialize prevalence tracking and debug initial susceptible counts. """
         super().init_pre(sim)

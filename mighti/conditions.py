@@ -98,8 +98,7 @@ class GenericNCD(ss.NCD):
         p_death=ss.bernoulli(disease_params["p_death"]),
         init_prev=ss.bernoulli(disease_params["init_prev"]),
         remission_rate=ss.bernoulli(disease_params["remission_rate"]),
-        max_disease_duration=disease_params["max_disease_duration"] or 30,  # Default = 30
-        rel_sus=ss.FloatArr(default=1.0),
+        max_disease_duration=disease_params["max_disease_duration"] or 30  # Default = 30
     )
 
         # Define base states
@@ -121,21 +120,39 @@ class GenericNCD(ss.NCD):
 
         self.define_states(*states)
         self.update_pars(pars, **kwargs)
-
+    
     def init_post(self):
         """ Initialize disease prevalence based on `init_prev`. """
         initial_cases = self.pars.init_prev.filter()
-        print(f" {self.disease_name}: Expected initial cases: {len(initial_cases)}")
+        print(f"{self.disease_name}: Expected initial cases: {len(initial_cases)}")
+    
         if len(initial_cases) == 0:
-            print("WARNING: `init_prev` is filtering 0 cases! Something is wrong.")
+            print(f"WARNING: {self.disease_name}: `init_prev` is filtering 0 cases! Something is wrong.")
+    
+        # Debug: Check the initial state of rel_sus
+        print(f"[DEBUG] {self.disease_name} → rel_sus at init_post(): {self.rel_sus}")
+    
         self.set_prognoses(initial_cases)
+    
+        # Debug: Check rel_sus after set_prognoses
+        print(f"[DEBUG] {self.disease_name} → rel_sus after set_prognoses(): {self.rel_sus}")
+    
         return initial_cases
-
+    
+        
     def step(self):
         """ Process new disease cases based on incidence. """
+        
+        # Print basic debugging info
+        print(f"[DEBUG] {self.disease_name} → rel_sus at start of step(): mean={self.rel_sus.mean()}, min={self.rel_sus.min()}, max={self.rel_sus.max()}")
+        
         if hasattr(self, "susceptible"):  
             new_cases = self.pars.incidence.filter(self.susceptible.uids)
             self.set_prognoses(new_cases)
+    
+        # Print after running new cases
+        print(f"[DEBUG] {self.disease_name}: Incidence probability BEFORE applying rel_sus: {self.pars.incidence_prob}")
+        print(f"[DEBUG] {self.disease_name}: rel_sus mean: {self.rel_sus.mean()} min: {self.rel_sus.min()} max: {self.rel_sus.max()}")        
 
     def step_state(self):
         """ Handle remission, recovery, and deaths. """
@@ -156,26 +173,31 @@ class GenericNCD(ss.NCD):
         deaths = (self.ti_dead == self.ti).uids
         self.sim.people.request_death(deaths)
 
+        
     def set_prognoses(self, uids):
-                
-
         """ Assign disease progression, including deaths and remission. """
         if len(uids) == 0:
-            print(f"WARNING:  {self.disease_name}: No affected cases! This may be an issue.")
-
+            print(f"WARNING: {self.disease_name}: No affected cases! This may be an issue.")
+    
+        print(f"[DEBUG] {self.disease_name} → rel_sus before updating in set_prognoses(): {self.rel_sus}")
+    
         self.affected[uids] = True  
         if hasattr(self, "susceptible"):
             self.susceptible[uids] = False 
-        
+    
         dur_condition = self.pars.dur_condition.rvs(uids)
         will_die = self.pars.p_death.rvs(uids)
         dead_uids = uids[will_die]
         rec_uids = uids[~will_die]
-
+    
         if hasattr(self, "reversed"):
             self.ti_reversed[rec_uids] = self.ti + dur_condition[~will_die] / self.t.dt
             self.reversed[rec_uids] = True
         self.ti_dead[dead_uids] = self.ti + dur_condition[will_die] / self.t.dt
+    
+        # Debug: Check rel_sus after set_prognoses
+        print(f"[DEBUG] {self.disease_name} → rel_sus after updating in set_prognoses(): {self.rel_sus}")
+        
 
     def init_results(self):
         """ Define results tracking for prevalence and remission. """
@@ -224,8 +246,8 @@ class GenericSIS(ss.SIS):
             ss.State('infected'),
             ss.FloatArr('ti_infected'),
             ss.FloatArr('ti_dead'),
+            ss.FloatArr('rel_sus', default=1.0),
         )
-
         self.update_pars(pars, **kwargs)
 
     def step_state(self):
