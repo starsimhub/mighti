@@ -17,6 +17,9 @@ __all__ = [
     'hiv_parkinsonsdisease', 'GenericNCDConnector', 'read_interactions'
 ]
 
+# Base class for HIV-related connectors
+
+
 class HIVConnector(ss.Connector):
     """ 
     Connector that increases susceptibility to diseases due to HIV infection.
@@ -27,10 +30,10 @@ class HIVConnector(ss.Connector):
 
     def __init__(self, label, requires, susceptibility_key, default_susceptibility, pars=None, **kwargs):
         super().__init__(label=label)
-        self.requires = requires
-        self.susceptibility_key = susceptibility_key
         self.define_pars(**{susceptibility_key: default_susceptibility})
         self.update_pars(pars, **kwargs)
+        self.susceptibility_key = susceptibility_key
+        self.requires = requires
 
     def step(self):
         sim = self.sim
@@ -76,7 +79,7 @@ class HIVConnector(ss.Connector):
 
         # Debug info after update
         print(f"[DEBUG] {self.label}: {disease_name} rel_sus AFTER update: {disease_obj.rel_sus[:first_n]}")
-
+    
 class hiv_type2diabetes(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Type2Diabetes', [ss.HIV, mi.Type2Diabetes], 'rel_sus_hiv_type2diabetes', 20, pars, **kwargs)
@@ -106,8 +109,8 @@ class hiv_type2diabetes(HIVConnector):
     
         # Print after update
         # print(f"After update, rel_sus (first 5 values): {disease_obj.rel_sus[hiv_infected_uids[:5]]}")
-        
-        
+         
+
 class hiv_type1diabetes(HIVConnector):
     def __init__(self, pars=None, **kwargs):
         super().__init__('HIV-Type1Diabetes', [ss.HIV, mi.Type1Diabetes], 'rel_sus_hiv_type1diabetes', 1.95, pars, **kwargs)
