@@ -22,7 +22,7 @@ importlib.reload(mighti)
 # beta = 0.001
 n_agents = 5000  # Number of agents in the simulation
 inityear = 2017  # Simulation start year
-endyear = 2030
+endyear = 2050
 
 # ---------------------------------------------------------------------
 # Specify data file paths
@@ -53,7 +53,7 @@ csv_path_age = 'mighti/data/eswatini_age_2023.csv'
 # ---------------------------------------------------------------------
 # Read disease parameter file and interactions file
 df_params = pd.read_csv(csv_path_params, index_col="condition")
-
+print(df_params.loc[['CervicalCancer', 'ProstateCancer'], ['incidence']])
 # Extract all conditions except HIV
 healthconditions = [condition for condition in df_params.index if condition != "HIV"]
 # healthconditions = ['Type2Diabetes']
@@ -72,12 +72,16 @@ communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
 # ---------------------------------------------------------------------
 # Initialize conditions, prevalence analyzer, and interactions
 # ---------------------------------------------------------------------
+# Initialize disease models with preloaded data
+mi.initialize_conditions(df, ncds, communicable_diseases)
 
+        
 # # Initialize disease models with preloaded data
 # mi.initialize_conditions(df, ncds, communicable_diseases)
 
 # # Initialize prevalence analyzer with preloaded data
 # mi.initialize_prevalence_analyzer(df_params)
+
 
 
 # ---------------------------------------------------------------------
@@ -211,7 +215,7 @@ sim = ss.Sim(
     analyzers=[prevalence_analyzer],
     start=inityear,
     stop=endyear,
-    connectors=interactions,  
+    # connectors=interactions,  
     people=ppl,
     demographics=[pregnancy, death],
     copy_inputs=False
@@ -230,4 +234,7 @@ sim.run()
 
 # Call the plotting function from `plot_functions.py`
 # mi.plot_disease_prevalence(sim, prevalence_analyzer, selected_diseases, eswatini_hiv_data, age_bins)
+mi.plot_mean_prevalence(sim, prevalence_analyzer, 'CervicalCancer')
+mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ProstateCancer')
+mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes')
 mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Hypertension')

@@ -1,6 +1,5 @@
 import numpy as np
 import starsim as ss
-import sciris as sc
 import pandas as pd
 
 # CONDITIONS
@@ -9,46 +8,79 @@ import pandas as pd
 # conditions can affect the (1) risk of acquiring, (2) persistence of, (3) severity of
 # other conditions.
 
+# Global variables to store disease lists
+ncds = []  # Ensures ncds exists even if initialize_conditions() fails
+communicable_diseases = []
 
-# Load the CSV file
-csv_path = sc.thispath() / '../mighti/data/eswatini_parameters.csv'
-df = pd.read_csv(csv_path)
+def initialize_conditions(df, ncd_list, sis_list):
+    """ Load disease parameters and categories from `mighti_main.py`. """
+    global df_params, ncds, communicable_diseases
+    df_params = df  # Store the entire DataFrame globally
+    ncds = ncd_list
+    communicable_diseases = sis_list
+    # Register disease classes right after receiving the parameters
+    register_disease_classes()
+    
 
-# Ensure column names are trimmed to remove extra spaces
-df.columns = df.columns.str.strip()
+def register_disease_classes():
+    """ Dynamically create and register disease classes in `mighti`. """
+    global disease_classes
+    disease_classes = {}  # Reset to avoid duplicates
 
-# Filter based on `disease_class`
-ncds = df[df["disease_class"] == "ncd"]["condition"].tolist()   # List of NCDs
-communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()  # List of communicable diseases
+    # Create NCD classes dynamically
+    for disease in ncds:
+        class_definition = type(
+            disease,  # Class name (e.g., "Type2Diabetes")
+            (GenericNCD,),  # Base class (NCD)
+            {
+                "__init__": (lambda disease_name: 
+                    lambda self, pars=None, **kwargs: 
+                    GenericNCD.__init__(self, disease_name, pars, **kwargs)
+                )(disease)  # Correct lambda closure
+            }
+        )
+        globals()[disease] = class_definition  # Add to global namespace
+        disease_classes[disease] = class_definition  # Store in dictionary
 
-# Print out the categories
-print("Non-Communicable Diseases (NCDs):", ncds)
-print("Communicable Diseases (SIS Model):", communicable_diseases)
+    # Create SIS (communicable disease) classes dynamically
+    for disease in communicable_diseases:
+        class_definition = type(
+            disease,  # Class name (e.g., "Flu")
+            (GenericSIS,),  # Base class for communicable diseases
+            {
+                "__init__": (lambda disease_name: 
+                    lambda self, pars=None, **kwargs: 
+                    GenericSIS.__init__(self, disease_name, pars, **kwargs)
+                )(disease)  # Correct lambda closure
+            }
+        )
+        globals()[disease] = class_definition  # Add to global namespace
+        disease_classes[disease] = class_definition  # Store in dictionary
 
+    # Register dynamically created classes in `mighti`
+    import mighti
+    mighti.__dict__.update(disease_classes)
+    
+    
+def get_disease_parameters(disease_name):
+    """ Extract parameters for a given disease using the globally stored DataFrame. """
+    if df_params is None:
+        raise ValueError("⚠️ `df_params` is not initialized! Call `initialize_conditions(df, ncds, communicable_diseases)` first.")
 
-def get_disease_parameters(disease_name, csv_path):
-    df = pd.read_csv(csv_path)
-    df.columns = df.columns.str.strip()  # Remove extra spaces
-
-    if "condition" not in df.columns:
-        raise KeyError(f"Column 'condition' not found in {csv_path}. Available columns: {df.columns}")
-
-    row = df[df["condition"] == disease_name]
+    row = df_params[df_params["condition"] == disease_name]
     if row.empty:
-        raise ValueError(f"Disease '{disease_name}' not found in {csv_path}.")
+        raise ValueError(f"Disease '{disease_name}' not found in disease parameters.")
 
-    # Extract and handle NaNs
-    params = {
+    return {
         "p_death": row["p_death"].values[0] if pd.notna(row["p_death"].values[0]) else 0.0001,
         "incidence_prob": row["incidence"].values[0] if pd.notna(row["incidence"].values[0]) else 0.1,
-        "dur_condition": row["dur_condition"].values[0] if pd.notna(row["dur_condition"].values[0]) else 10,  # Default 10 if missing
+        "dur_condition": row["dur_condition"].values[0] if pd.notna(row["dur_condition"].values[0]) else 10,  
         "init_prev": row["init_prev"].values[0] if pd.notna(row["init_prev"].values[0]) else 0.1,
         "rel_sus": row["rel_sus"].values[0] if pd.notna(row["rel_sus"].values[0]) else 1.0,
         "remission_rate": row["remmision_rate"].values[0] if pd.notna(row["remmision_rate"].values[0]) else 0.0,
-        "max_disease_duration": row["max_disease_duration"].values[0] if pd.notna(row["max_disease_duration"].values[0]) else None
+        "max_disease_duration": row["max_disease_duration"].values[0] if pd.notna(row["max_disease_duration"].values[0]) else None,
+        "affected_sex": row["affected_sex"].values[0] if "affected_sex" in row else "both"
     }
-
-    return params
 
 class GenericNCD(ss.NCD):
     """ Base class for all Non-Communicable Diseases (NCDs). """
@@ -56,7 +88,7 @@ class GenericNCD(ss.NCD):
     def __init__(self, disease_name, csv_path, pars=None, **kwargs):
         super().__init__()
         self.disease_name = disease_name
-        disease_params = get_disease_parameters(disease_name, csv_path)
+        disease_params = get_disease_parameters(disease_name)
 
         # Define parameters using extracted values
         self.define_pars(
@@ -93,7 +125,7 @@ class GenericNCD(ss.NCD):
     def init_post(self):
         """ Initialize disease prevalence based on `init_prev`. """
         initial_cases = self.pars.init_prev.filter()
-        print(f"Expected initial cases: {len(initial_cases)}")
+        print(f" {self.disease_name}: Expected initial cases: {len(initial_cases)}")
         if len(initial_cases) == 0:
             print("WARNING: `init_prev` is filtering 0 cases! Something is wrong.")
         self.set_prognoses(initial_cases)
@@ -125,9 +157,11 @@ class GenericNCD(ss.NCD):
         self.sim.people.request_death(deaths)
 
     def set_prognoses(self, uids):
+                
+
         """ Assign disease progression, including deaths and remission. """
         if len(uids) == 0:
-            print("WARNING: No affected cases! This may be an issue.")
+            print(f"WARNING:  {self.disease_name}: No affected cases! This may be an issue.")
 
         self.affected[uids] = True  
         if hasattr(self, "susceptible"):
@@ -173,7 +207,7 @@ class GenericSIS(ss.SIS):
         self.disease_name = disease_name
 
         # Fetch disease parameters from the globally stored DataFrame
-        disease_params = get_disease_parameters(disease_name, csv_path)
+        disease_params = get_disease_parameters(disease_name)
 
         # Define parameters using extracted values
         self.define_pars(
@@ -219,7 +253,7 @@ for disease in ncds:
         disease,  # Class name (e.g., "Type2Diabetes")
         (GenericNCD,),  # Base class (NCD)
         {"__init__": lambda self, pars=None, disease=disease, **kwargs: 
-            super(self.__class__, self).__init__(disease, csv_path, pars, **kwargs)}
+            super(self.__class__, self).__init__(disease, pars, **kwargs)}
     )
     globals()[disease] = disease_class  # Add to global namespace
     disease_classes[disease] = disease_class  # Store in dictionary
@@ -230,7 +264,8 @@ for disease in communicable_diseases:
         disease,  # Class name (e.g., "Flu")
         (GenericSIS,),  # Base class for communicable diseases (to be defined)
         {"__init__": lambda self, pars=None, disease=disease, **kwargs: 
-            super(self.__class__, self).__init__(disease, csv_path, pars, **kwargs)}
+            super(self.__class__, self).__init__(disease, pars, **kwargs)}
     )
     globals()[disease] = disease_class  # Add to global namespace
     disease_classes[disease] = disease_class  # Store in dictionary
+    

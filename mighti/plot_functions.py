@@ -70,7 +70,7 @@ def plot_disease_prevalence(sim, prevalence_analyzer, diseases, eswatini_hiv_dat
         # Plot female prevalence
         for i, label in enumerate(age_group_labels):
             axs[disease_idx, 1].plot(sim.timevec, female_data[:, i], color=age_bin_colors[label])
-        axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24)
+        axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24, linestyle='dotted')
         axs[disease_idx, 1].set_xlabel('Year', fontsize=20)
         axs[disease_idx, 1].tick_params(axis='both', labelsize=18)
         axs[disease_idx, 1].grid(True)
@@ -146,15 +146,15 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease):
         return
 
     # Compute mean prevalence across all age groups
-    mean_prevalence_male = np.mean(male_data, axis=1)   # Convert to percentage
-    mean_prevalence_female = np.mean(female_data, axis=1)
+    mean_prevalence_male = np.mean(male_data, axis=1)   *100
+    mean_prevalence_female = np.mean(female_data, axis=1) *100
 
     # Create figure
     plt.figure(figsize=(10, 5))
 
     # Plot mean prevalence for males and females
     plt.plot(sim.timevec, mean_prevalence_male, label=f'Male {disease.capitalize()} Prevalence', linewidth=2, color='blue')
-    plt.plot(sim.timevec, mean_prevalence_female, label=f'Female {disease.capitalize()} Prevalence', linewidth=2, color='red')
+    plt.plot(sim.timevec, mean_prevalence_female, label=f'Female {disease.capitalize()} Prevalence', linewidth=2, color='red', linestyle='dashed')
 
     # Labels and title
     plt.xlabel('Year')
