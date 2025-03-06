@@ -72,27 +72,35 @@ class PrevalenceAnalyzer(ss.Analyzer):
         self.results['population_age_distribution'] = np.zeros((npts, 101))  # 0 to 100 years (single-year resolution)
     
         return
-                
-        
+
     def step(self):
         sim = self.sim  # Access the sim object from the Analyzer base class
-    
+        
         # Extract ages of agents alive at this time step
         ages = sim.people.age[:]
         is_male = sim.people.male[:]
-
+    
         # Store single-age population distribution at each time step
         age_distribution = np.histogram(ages, bins=np.arange(0, 102, 1))  # Single-year resolution from 0 to 101
         self.results['population_age_distribution'][sim.ti, :] = age_distribution[0]
     
         # Existing logic for calculating and storing prevalence...
         for disease in self.diseases:
-            disease_obj = getattr(sim.diseases, disease.lower())
+            disease_obj = getattr(sim.diseases, disease.lower(), None)
             
-            # # Set 'infected' for HIV, HPV, and Flu; 'affected' for all other diseases
-            # status_attr = 'infected' if disease in ['HIV', 'HPV', 'Flu'] else 'affected'
+            if disease_obj is None:
+                print(f"[WARNING] {disease} not found in sim.diseases, skipping...")
+                continue  # Skip if the disease object does not exist
+    
+            # Determine the correct status attribute: 'infected' for SIS diseases, 'affected' for NCDs
+            disease_class = "sis" if disease in sim.pars.get("communicable_diseases", []) else "ncd"
+            status_attr = 'infected' if disease_class == 'sis' else 'affected'
             
-            # status_array = getattr(disease_obj, status_attr)
+            if not hasattr(disease_obj, status_attr):
+                # print(f"[ERROR] {disease} does not have attribute {status_attr}, skipping...")
+                continue  # Skip if the disease object does not have the required attribute
+    
+            status_array = getattr(disease_obj, status_attr)
     
             for sex, label in zip([0, 1], ['male', 'female']):
                 prevalence_by_age_group = np.zeros(len(self.age_groups[disease]))
@@ -102,12 +110,13 @@ class PrevalenceAnalyzer(ss.Analyzer):
                     sex_mask = (is_male == sex)
                     status_mask = age_mask & sex_mask
                     
-                    status_array = getattr(disease_obj, 'affected' if disease != 'HIV' else 'infected')
                     status_for_group = status_array[:][status_mask]
-                    
+    
                     if status_for_group.size > 0:
                         prevalence_by_age_group[i] = np.mean(status_for_group)
     
                 disease_key = f'{disease}_prevalence_{label}'
-                self.results[disease_key][sim.ti, :] = prevalence_by_age_group
+                self.results[disease_key][sim.ti, :] = prevalence_by_age_group                
+
+
        
