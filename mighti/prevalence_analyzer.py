@@ -1,7 +1,7 @@
 import starsim as ss
 import numpy as np
 import sciris as sc
-import pandas as pd
+import mighti as mi
 
 # Load disease classification from CSV
 # csv_path = "mighti/data/eswatini_parameters.csv"
@@ -101,6 +101,9 @@ class PrevalenceAnalyzer(ss.Analyzer):
                 continue  # Skip if the disease object does not have the required attribute
     
             status_array = getattr(disease_obj, status_attr)
+            # Get affected sex for this disease
+            disease_params = mi.get_disease_parameters(disease)
+            affected_sex = disease_params.get("affected_sex", "both")  # Default to both
     
             for sex, label in zip([0, 1], ['male', 'female']):
                 prevalence_by_age_group = np.zeros(len(self.age_groups[disease]))
@@ -108,9 +111,15 @@ class PrevalenceAnalyzer(ss.Analyzer):
                 for i, (start, end) in enumerate(self.age_groups[disease]):
                     age_mask = (ages >= start) if end == float('inf') else (ages >= start) & (ages < end)
                     sex_mask = (is_male == sex)
+                    # Skip if the disease does not affect this sex
+                    if affected_sex == "female" and sex == 0:  # If males, skip female-only diseases
+                        continue
+                    elif affected_sex == "male" and sex == 1:  # If females, skip male-only diseases
+                        continue
+
                     status_mask = age_mask & sex_mask
-                    
                     status_for_group = status_array[:][status_mask]
+
     
                     if status_for_group.size > 0:
                         prevalence_by_age_group[i] = np.mean(status_for_group)
