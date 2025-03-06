@@ -50,26 +50,6 @@ def get_disease_parameters(disease_name, csv_path):
 
     return params
 
-class GenericDisease(ss.Disease):
-    """ Minimal placeholder class for diseases that are not fully implemented yet. """
-    def __init__(self, pars=None, **kwargs):
-        super().__init__()
-        self.define_pars(
-            init_prev=ss.bernoulli(0.1),  # Default prevalence (1%)
-            incidence=ss.bernoulli(0.1),  # Default incidence (0.1%)
-            p_death=ss.bernoulli(0.0001),   # Default death probability (0.01%)
-        )
-        self.update_pars(pars, **kwargs)
-
-        self.define_states(
-            ss.State('susceptible', default=True),
-            ss.State('affected'),
-            ss.FloatArr('rel_sus', default=1.0),
-        )
-    def step(self):
-        # print(f"{self.name} rel_sus during step: {self.rel_sus}")
-        super().step()
-
 class GenericNCD(ss.NCD):
     """ Base class for all Non-Communicable Diseases (NCDs). """
 
@@ -191,6 +171,8 @@ class GenericSIS(ss.SIS):
     def __init__(self, disease_name, csv_path, pars=None, **kwargs):
         super().__init__()
         self.disease_name = disease_name
+
+        # Fetch disease parameters from the globally stored DataFrame
         disease_params = get_disease_parameters(disease_name, csv_path)
 
         # Define parameters using extracted values
@@ -200,7 +182,7 @@ class GenericSIS(ss.SIS):
             incidence=ss.bernoulli(disease_params["incidence_prob"]),
             p_death=ss.bernoulli(disease_params["p_death"]),
             init_prev=ss.bernoulli(disease_params["init_prev"]),
-            recovery_prob=ss.bernoulli(0.1),  # SIS needs recovery parameter
+            recovery_prob=ss.bernoulli(disease_params.get("recovery_prob", 0.1)),  # Use CSV if available
         )
 
         self.define_states(
@@ -213,18 +195,21 @@ class GenericSIS(ss.SIS):
         self.update_pars(pars, **kwargs)
 
     def step_state(self):
+        """Handles transitions between states in an SIS model (new infections & recoveries)."""
         new_cases = self.pars.incidence.filter(self.susceptible.uids)
         recovered_cases = self.pars.recovery_prob.filter(self.infected.uids)
 
+        # Process recoveries
         self.susceptible[recovered_cases] = True
         self.infected[recovered_cases] = False
 
+        # Process new infections
         self.susceptible[new_cases] = False
         self.infected[new_cases] = True
-        self.ti_infected[new_cases] = self.ti
-        
-        
+        self.ti_infected[new_cases] = self.ti  # Track infection time
 
+        
+        
 # Dictionary to store dynamically created disease classes
 disease_classes = {}
 
@@ -249,4 +234,3 @@ for disease in communicable_diseases:
     )
     globals()[disease] = disease_class  # Add to global namespace
     disease_classes[disease] = disease_class  # Store in dictionary
-

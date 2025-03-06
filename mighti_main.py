@@ -29,7 +29,7 @@ endyear = 2030
 # ---------------------------------------------------------------------
 
 # Parameters
-csv_path_params = "mighti/data/eswatini_parameters.csv"
+csv_path_params =  'mighti/data/eswatini_parameters.csv'
 
 # Relative Risks
 csv_path_interactions = "mighti/data/rel_sus.csv"
@@ -51,7 +51,6 @@ csv_path_age = 'mighti/data/eswatini_age_2023.csv'
 # ---------------------------------------------------------------------
 # Load health conditions to include in the simulation
 # ---------------------------------------------------------------------
-
 # Read disease parameter file and interactions file
 df_params = pd.read_csv(csv_path_params, index_col="condition")
 
@@ -62,8 +61,6 @@ healthconditions = [condition for condition in df_params.index if condition != "
 # Combine with HIV
 diseases = ["HIV"] + healthconditions
 
-# csv_path ='mighti/data/eswatini_parameters.csv'
-
 # Ensure column names are trimmed to remove extra spaces
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
@@ -72,13 +69,12 @@ df.columns = df.columns.str.strip()
 ncds = df[df["disease_class"] == "ncd"]["condition"].tolist()
 communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
 
-
 # ---------------------------------------------------------------------
 # Initialize conditions, prevalence analyzer, and interactions
 # ---------------------------------------------------------------------
 
 # # Initialize disease models with preloaded data
-# mi.initialize_conditions(df_params)
+# mi.initialize_conditions(df, ncds, communicable_diseases)
 
 # # Initialize prevalence analyzer with preloaded data
 # mi.initialize_prevalence_analyzer(df_params)
