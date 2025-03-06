@@ -151,8 +151,8 @@ class GenericNCD(ss.NCD):
             self.set_prognoses(new_cases)
     
         # Print after running new cases
-        print(f"[DEBUG] {self.disease_name}: Incidence probability BEFORE applying rel_sus: {self.pars.incidence_prob}")
-        print(f"[DEBUG] {self.disease_name}: rel_sus mean: {self.rel_sus.mean()} min: {self.rel_sus.min()} max: {self.rel_sus.max()}")        
+        print(f"[DEBUG] {self.disease_name} → rel_sus at end of step(): mean={self.rel_sus.mean()}, min={self.rel_sus.min()}, max={self.rel_sus.max()}")    
+        
 
     def step_state(self):
         """ Handle remission, recovery, and deaths. """
@@ -246,8 +246,8 @@ class GenericSIS(ss.SIS):
             ss.State('infected'),
             ss.FloatArr('ti_infected'),
             ss.FloatArr('ti_dead'),
-            ss.FloatArr('rel_sus', default=1.0),
         )
+
         self.update_pars(pars, **kwargs)
 
     def step_state(self):
