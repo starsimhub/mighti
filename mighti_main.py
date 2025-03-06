@@ -63,19 +63,16 @@ healthconditions = [condition for condition in df_params.index if condition != "
 diseases = ["HIV"] + healthconditions
 
 # csv_path ='mighti/data/eswatini_parameters.csv'
-# # Automatically create all disease classes using GenericDisease
 
-# # Automatically create all disease classes using GenericDisease
-# disease_names = [ "Type2Diabetes"]  # Extend this list
+# Ensure column names are trimmed to remove extra spaces
+df = pd.read_csv(csv_path_params)
+df.columns = df.columns.str.strip()
 
-# for disease in disease_names:
-#     class_dict = {
-#         "__init__": (lambda disease_name: 
-#                      lambda self, pars=None, **kwargs: 
-#                      mi.GenericDisease.__init__(self, disease_name=disease_name, csv_path=csv_path, pars=pars, **kwargs)
-#                     )(disease)  # This ensures each class gets the correct disease_name
-#     }
-#     globals()[disease] = type(disease, (mi.GenericDisease,), class_dict)  # No extra indentation here
+# Extract disease categories
+ncds = df[df["disease_class"] == "ncd"]["condition"].tolist()
+communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
+
+
 # ---------------------------------------------------------------------
 # Initialize conditions, prevalence analyzer, and interactions
 # ---------------------------------------------------------------------
@@ -205,19 +202,11 @@ for condition1, interactions_dict in ncd_interactions.items():
             interaction_obj = mi.GenericNCDConnector(condition1, condition2, relative_risk)
             interactions.append(interaction_obj)
 
-# print(f"Total interactions after adding NCD-NCD: {len(interactions)}")
-# for inter in interactions:
-#     if isinstance(inter, mi.GenericNCDConnector):
-#         print(f"Interaction: {inter.label} with rel_sus={inter.relative_risk}")
-#     else:
-#         print(f"Interaction: {inter.label} (HIV-NCD)")
-    
-# -------------------------
-# Initialize the simulation
-# -------------------------
-# print(f"Number of interactions: {len(interactions)}")
-# for inter in interactions:
-#     print(f"Interaction: {inter.label}")
+# Store disease categories in simulation parameters
+sim_pars = {
+    "communicable_diseases": communicable_diseases,  
+    "ncds": ncds  
+}
     
 sim = ss.Sim(
     n_agents=n_agents,
@@ -232,9 +221,6 @@ sim = ss.Sim(
     copy_inputs=False
 )
 
-# print(f"[DEBUG] Before simulation: {sim.diseases.type2diabetes.rel_sus}")
-print(f"[DEBUG] Type2Diabetes result data: {sim.results.get('type2diabetes', None)}")
-
 sim.run()
 
 # # Print `rel_sus` after running the simulation
@@ -246,9 +232,6 @@ sim.run()
 # Generate Plots
 # ---------------------------------------------------------------------
 
-# Specify which diseases to plot
-selected_diseases = ['HIV', 'Type2Diabetes']
-
 # Call the plotting function from `plot_functions.py`
 # mi.plot_disease_prevalence(sim, prevalence_analyzer, selected_diseases, eswatini_hiv_data, age_bins)
-mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes')
+mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Hypertension')
