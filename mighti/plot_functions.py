@@ -19,13 +19,13 @@ def plot_disease_prevalence(sim, prevalence_analyzer, diseases, eswatini_hiv_dat
 
     # Ensure age_bins is a valid list of numbers
     if not age_bins or not isinstance(age_bins, (list, np.ndarray)):
-        # print("[ERROR] age_bins is empty or not a valid list. Using default values.")
+        print("[ERROR] age_bins is empty or not a valid list. Using default values.")
         age_bins_list = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
     else:
         try:
             age_bins_list = [int(age) for age in age_bins if str(age).isdigit()]
         except ValueError:
-            # print("[ERROR] age_bins contains non-numeric values. Using default values.")
+            print("[ERROR] age_bins contains non-numeric values. Using default values.")
             age_bins_list = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
 
     # Ensure age_bins_list has valid elements
@@ -70,7 +70,7 @@ def plot_disease_prevalence(sim, prevalence_analyzer, diseases, eswatini_hiv_dat
         # Plot female prevalence
         for i, label in enumerate(age_group_labels):
             axs[disease_idx, 1].plot(sim.timevec, female_data[:, i], color=age_bin_colors[label])
-        axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24, linestyle='dotted')
+        axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24)
         axs[disease_idx, 1].set_xlabel('Year', fontsize=20)
         axs[disease_idx, 1].tick_params(axis='both', labelsize=18)
         axs[disease_idx, 1].grid(True)
@@ -124,62 +124,37 @@ def plot_demography(time_steps, total_population, deaths, births):
     plt.show()
     
 
+
 def plot_mean_prevalence(sim, prevalence_analyzer, disease):
     """
-    Plot mean prevalence over time for a given disease, differentiating by sex and HIV status.
+    Plot mean prevalence over time for a given disease and both sexes.
 
     Parameters:
     - sim: The simulation object (provides `sim.timevec`)
     - prevalence_analyzer: The prevalence analyzer with stored results
     - disease: Name of the disease (e.g., 'HIV', 'Type2Diabetes')
     """
-    
-    # Extract prevalence matrices using the new disease_key format
-    male_with_HIV_data = prevalence_analyzer.results.get(f'{disease}_prevalence_male_with_HIV', None)
-    female_with_HIV_data = prevalence_analyzer.results.get(f'{disease}_prevalence_female_with_HIV', None)
-    male_without_HIV_data = prevalence_analyzer.results.get(f'{disease}_prevalence_male_without_HIV', None)
-    female_without_HIV_data = prevalence_analyzer.results.get(f'{disease}_prevalence_female_without_HIV', None)
 
-    # Debug: Print statements to check data retrieval
-    if male_with_HIV_data is None:
-        print(f"[ERROR] No male with HIV prevalence data available for {disease}.")
-    else:
-        print(f"Male with HIV prevalence data for {disease}: {male_with_HIV_data.shape}")
 
-    if female_with_HIV_data is None:
-        print(f"[ERROR] No female with HIV prevalence data available for {disease}.")
-    else:
-        print(f"Female with HIV prevalence data for {disease}: {female_with_HIV_data.shape}")
-
-    if male_without_HIV_data is None:
-        print(f"[ERROR] No male without HIV prevalence data available for {disease}.")
-    else:
-        print(f"Male without HIV prevalence data for {disease}: {male_without_HIV_data.shape}")
-
-    if female_without_HIV_data is None:
-        print(f"[ERROR] No female without HIV prevalence data available for {disease}.")
-    else:
-        print(f"Female without HIV prevalence data for {disease}: {female_without_HIV_data.shape}")
+    # Extract male and female prevalence matrices
+    male_data = prevalence_analyzer.results.get(f'{disease}_prevalence_male', None)
+    female_data = prevalence_analyzer.results.get(f'{disease}_prevalence_female', None)
 
     # Ensure data exists
-    if male_with_HIV_data is None or female_with_HIV_data is None or male_without_HIV_data is None or female_without_HIV_data is None:
+    if male_data is None or female_data is None:
         print(f"[ERROR] No prevalence data available for {disease}.")
         return
 
     # Compute mean prevalence across all age groups
-    mean_prevalence_male_with_HIV = np.mean(male_with_HIV_data, axis=1) * 100
-    mean_prevalence_female_with_HIV = np.mean(female_with_HIV_data, axis=1) * 100
-    mean_prevalence_male_without_HIV = np.mean(male_without_HIV_data, axis=1) * 100
-    mean_prevalence_female_without_HIV = np.mean(female_without_HIV_data, axis=1) * 100
+    mean_prevalence_male = np.mean(male_data, axis=1)   # Convert to percentage
+    mean_prevalence_female = np.mean(female_data, axis=1)
 
     # Create figure
-    plt.figure(figsize=(15, 8))
+    plt.figure(figsize=(10, 5))
 
-    # Plot mean prevalence for each group
-    plt.plot(sim.timevec, mean_prevalence_male_with_HIV, label='Male with HIV', linewidth=2, color='blue')
-    plt.plot(sim.timevec, mean_prevalence_female_with_HIV, label='Female with HIV', linewidth=2, color='red')
-    plt.plot(sim.timevec, mean_prevalence_male_without_HIV, label='Male without HIV', linewidth=2, color='blue', linestyle='dashed')
-    plt.plot(sim.timevec, mean_prevalence_female_without_HIV, label='Female without HIV', linewidth=2, color='red', linestyle='dashed')
+    # Plot mean prevalence for males and females
+    plt.plot(sim.timevec, mean_prevalence_male, label=f'Male {disease.capitalize()} Prevalence', linewidth=2, color='blue')
+    plt.plot(sim.timevec, mean_prevalence_female, label=f'Female {disease.capitalize()} Prevalence', linewidth=2, color='red')
 
     # Labels and title
     plt.xlabel('Year')

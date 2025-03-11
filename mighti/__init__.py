@@ -1,11 +1,11 @@
 from .version import __version__, __versiondate__, __license__
 from .utils import *
-from .people_ext import *
 from .conditions import *
 from .interactions import *
 from .disease_definitions import *  
 from .prevalence_analyzer import *  
 from .plot_functions import *
+
 
 
 
