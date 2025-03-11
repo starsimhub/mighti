@@ -124,37 +124,62 @@ def plot_demography(time_steps, total_population, deaths, births):
     plt.show()
     
 
-
 def plot_mean_prevalence(sim, prevalence_analyzer, disease):
     """
-    Plot mean prevalence over time for a given disease and both sexes.
+    Plot mean prevalence over time for a given disease, differentiating by sex and HIV status.
 
     Parameters:
     - sim: The simulation object (provides `sim.timevec`)
     - prevalence_analyzer: The prevalence analyzer with stored results
     - disease: Name of the disease (e.g., 'HIV', 'Type2Diabetes')
     """
+    
+    # Extract prevalence matrices using the new disease_key format
+    male_with_HIV_data = prevalence_analyzer.results.get(f'{disease}_prevalence_male_with_HIV', None)
+    female_with_HIV_data = prevalence_analyzer.results.get(f'{disease}_prevalence_female_with_HIV', None)
+    male_without_HIV_data = prevalence_analyzer.results.get(f'{disease}_prevalence_male_without_HIV', None)
+    female_without_HIV_data = prevalence_analyzer.results.get(f'{disease}_prevalence_female_without_HIV', None)
 
+    # Debug: Print statements to check data retrieval
+    if male_with_HIV_data is None:
+        print(f"[ERROR] No male with HIV prevalence data available for {disease}.")
+    else:
+        print(f"Male with HIV prevalence data for {disease}: {male_with_HIV_data.shape}")
 
-    # Extract male and female prevalence matrices
-    male_data = prevalence_analyzer.results.get(f'{disease}_prevalence_male', None)
-    female_data = prevalence_analyzer.results.get(f'{disease}_prevalence_female', None)
+    if female_with_HIV_data is None:
+        print(f"[ERROR] No female with HIV prevalence data available for {disease}.")
+    else:
+        print(f"Female with HIV prevalence data for {disease}: {female_with_HIV_data.shape}")
+
+    if male_without_HIV_data is None:
+        print(f"[ERROR] No male without HIV prevalence data available for {disease}.")
+    else:
+        print(f"Male without HIV prevalence data for {disease}: {male_without_HIV_data.shape}")
+
+    if female_without_HIV_data is None:
+        print(f"[ERROR] No female without HIV prevalence data available for {disease}.")
+    else:
+        print(f"Female without HIV prevalence data for {disease}: {female_without_HIV_data.shape}")
 
     # Ensure data exists
-    if male_data is None or female_data is None:
+    if male_with_HIV_data is None or female_with_HIV_data is None or male_without_HIV_data is None or female_without_HIV_data is None:
         print(f"[ERROR] No prevalence data available for {disease}.")
         return
 
     # Compute mean prevalence across all age groups
-    mean_prevalence_male = np.mean(male_data, axis=1)   *100
-    mean_prevalence_female = np.mean(female_data, axis=1) *100
+    mean_prevalence_male_with_HIV = np.mean(male_with_HIV_data, axis=1) * 100
+    mean_prevalence_female_with_HIV = np.mean(female_with_HIV_data, axis=1) * 100
+    mean_prevalence_male_without_HIV = np.mean(male_without_HIV_data, axis=1) * 100
+    mean_prevalence_female_without_HIV = np.mean(female_without_HIV_data, axis=1) * 100
 
     # Create figure
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(15, 8))
 
-    # Plot mean prevalence for males and females
-    plt.plot(sim.timevec, mean_prevalence_male, label=f'Male {disease.capitalize()} Prevalence', linewidth=2, color='blue')
-    plt.plot(sim.timevec, mean_prevalence_female, label=f'Female {disease.capitalize()} Prevalence', linewidth=2, color='red', linestyle='dashed')
+    # Plot mean prevalence for each group
+    plt.plot(sim.timevec, mean_prevalence_male_with_HIV, label='Male with HIV', linewidth=2, color='blue')
+    plt.plot(sim.timevec, mean_prevalence_female_with_HIV, label='Female with HIV', linewidth=2, color='red')
+    plt.plot(sim.timevec, mean_prevalence_male_without_HIV, label='Male without HIV', linewidth=2, color='blue', linestyle='dashed')
+    plt.plot(sim.timevec, mean_prevalence_female_without_HIV, label='Female without HIV', linewidth=2, color='red', linestyle='dashed')
 
     # Labels and title
     plt.xlabel('Year')

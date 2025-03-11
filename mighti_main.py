@@ -12,6 +12,8 @@ import numpy as np
 ### TO DO
 # Resolve interaction
 # PLHIV and without HIV
+# TO DO: HIV prevalence is 0% check.
+# Prevalence analyzer is updated. Modify plot function
 # Automate interactions.py
 
 # ---------------------------------------------------------------------
@@ -51,11 +53,11 @@ csv_path_age = 'mighti/data/eswatini_age_2023.csv'
 # ---------------------------------------------------------------------
 # Read disease parameter file and interactions file
 df_params = pd.read_csv(csv_path_params, index_col="condition")
-print(df_params.loc[['CervicalCancer', 'ProstateCancer'], ['incidence']])
+
 # Extract all conditions except HIV
 healthconditions = [condition for condition in df_params.index if condition != "HIV"]
 # healthconditions = ['Type2Diabetes']
-# 
+ 
 # Combine with HIV
 diseases = ["HIV"] + healthconditions
 
@@ -215,18 +217,5 @@ sim = ss.Sim(
 
 sim.run()
 
-# # Print `rel_sus` after running the simulation
-# print("---- Checking rel_sus After Updates ----")
-# for key, disease_obj in sim.pars.items():
-#     if isinstance(disease_obj, ss.Disease):
-#         print(f"{key} rel_sus after update: {disease_obj.rel_sus}")
-# ---------------------------------------------------------------------
-# Generate Plots
-# ---------------------------------------------------------------------
-
-# Call the plotting function from `plot_functions.py`
-# mi.plot_disease_prevalence(sim, prevalence_analyzer, selected_diseases, eswatini_hiv_data, age_bins)
-# mi.plot_mean_prevalence(sim, prevalence_analyzer, 'CervicalCancer')
-# mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ProstateCancer')
 mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes')
-# mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Hypertension')
+
