@@ -9,12 +9,12 @@ import numpy as np
 # sys.stdout = log_file  # Redirects all print outputs to this file
 
 
+import importlib
+import mighti
+importlib.reload(mighti)
+
 ### TO DO
-# Resolve interaction
-# PLHIV and without HIV
-# TO DO: HIV prevalence is 0% check.
-# Prevalence analyzer is updated. Modify plot function
-# Automate interactions.py
+
 
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
@@ -57,7 +57,7 @@ df_params = pd.read_csv(csv_path_params, index_col="condition")
 # Extract all conditions except HIV
 healthconditions = [condition for condition in df_params.index if condition != "HIV"]
 # healthconditions = ['Type2Diabetes']
- 
+# 
 # Combine with HIV
 diseases = ["HIV"] + healthconditions
 
@@ -75,6 +75,12 @@ communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
 # Initialize disease models with preloaded data
 mi.initialize_conditions(df, ncds, communicable_diseases)
 
+        
+# # Initialize disease models with preloaded data
+# mi.initialize_conditions(df, ncds, communicable_diseases)
+
+# # Initialize prevalence analyzer with preloaded data
+# mi.initialize_prevalence_analyzer(df_params)
 
 
 
@@ -217,5 +223,15 @@ sim = ss.Sim(
 
 sim.run()
 
-mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes')
+# ---------------------------------------------------------------------
+# Generate Plots
+# ---------------------------------------------------------------------
 
+# Call the plotting function from `plot_functions.py`
+selected_diseases = ['HIV', 'Type2Diabetes']
+mi.plot_disease_prevalence(sim, prevalence_analyzer, selected_diseases, eswatini_hiv_data, age_bins)
+# mi.plot_mean_prevalence(sim, prevalence_analyzer, 'CervicalCancer')
+# mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ProstateCancer')
+mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes')
+mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV')
+# mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Hypertension')
