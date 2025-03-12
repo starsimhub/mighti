@@ -42,43 +42,43 @@ class HIVConnector(ss.Connector):
         # Get the disease object
         disease_obj = getattr(sim.diseases, disease_name.lower(), None)
         if disease_obj is None:
-            print(f"[ERROR] Disease {disease_name} not found in sim.diseases")
+            # print(f"[ERROR] Disease {disease_name} not found in sim.diseases")
             return
 
         # Ensure `sim.people.hiv` and `sim.people.hiv.infected` exist
         if not hasattr(sim.people, 'hiv') or not hasattr(sim.people.hiv, 'infected'):
-            print("[ERROR] sim.people.hiv.infected is missing")
+            # print("[ERROR] sim.people.hiv.infected is missing")
             return
 
         # Get HIV-infected individuals
         hiv_infected_uids = sim.people.hiv.infected.uids
         if len(hiv_infected_uids) == 0:
-            print(f"[DEBUG] No HIV-infected individuals found at time {sim.ti}. Skipping update.")
+            # print(f"[DEBUG] No HIV-infected individuals found at time {sim.ti}. Skipping update.")
             return
 
         # Ensure the disease object has `rel_sus` attribute
         if not hasattr(disease_obj, 'rel_sus'):
-            print(f"[ERROR] {disease_name} does not have 'rel_sus' attribute.")
+            # print(f"[ERROR] {disease_name} does not have 'rel_sus' attribute.")
             return
         
-        print(f"[DEBUG] {self.label}: Before update, mean rel_sus={disease_obj.rel_sus.mean()}")
+        # print(f"[DEBUG] {self.label}: Before update, mean rel_sus={disease_obj.rel_sus.mean()}")
         
 
         # Debug info before update
         first_n = 10  # Number of elements to print for debugging
-        print(f"[DEBUG] {self.label}: {disease_name} rel_sus BEFORE update: {disease_obj.rel_sus[:first_n]}")
+        # print(f"[DEBUG] {self.label}: {disease_name} rel_sus BEFORE update: {disease_obj.rel_sus[:first_n]}")
         
         # Apply susceptibility update
         disease_obj.rel_sus[hiv_infected_uids] = self.pars[self.susceptibility_key]
-        print(f"[DEBUG] {self.label}: After update, mean rel_sus={disease_obj.rel_sus.mean()}")
+        # print(f"[DEBUG] {self.label}: After update, mean rel_sus={disease_obj.rel_sus.mean()}")
 
         # Ensure no NaNs were introduced
         if np.isnan(disease_obj.rel_sus).any():
-            print(f"[ERROR] {disease_name} rel_sus contains NaN AFTER update!")
+            # print(f"[ERROR] {disease_name} rel_sus contains NaN AFTER update!")
             disease_obj.rel_sus = np.nan_to_num(disease_obj.rel_sus, nan=1.0)  # Replace NaNs with 1.0
 
         # Debug info after update
-        print(f"[DEBUG] {self.label}: {disease_name} rel_sus AFTER update: {disease_obj.rel_sus[:first_n]}")
+        # print(f"[DEBUG] {self.label}: {disease_name} rel_sus AFTER update: {disease_obj.rel_sus[:first_n]}")
     
 class hiv_type2diabetes(HIVConnector):
     def __init__(self, pars=None, **kwargs):
@@ -90,13 +90,13 @@ class hiv_type2diabetes(HIVConnector):
         disease_obj = getattr(sim.diseases, disease_name.lower(), None)
     
         if disease_obj is None:
-            print(f"[ERROR] Disease {disease_name} not found in sim.diseases")
+            # print(f"[ERROR] Disease {disease_name} not found in sim.diseases")
             return
     
         hiv_infected_uids = sim.people.hiv.infected.uids
     
         if len(hiv_infected_uids) == 0:
-            print("No HIV-infected individuals found.")
+            # print("No HIV-infected individuals found.")
             return
         
         # print(f"HIV-infected UIDs: {list(hiv_infected_uids)[:5]}")  # Print first 5 for sanity check
@@ -245,27 +245,27 @@ class GenericNCDConnector(ss.Connector):
         cond2_obj = getattr(sim.diseases, self.condition2.lower(), None)
     
         if cond1_obj is None or cond2_obj is None:
-            print(f"[ERROR] {self.name}: One or both disease objects not found in simulation! Skipping step.")
+            # print(f"[ERROR] {self.name}: One or both disease objects not found in simulation! Skipping step.")
             return  
 
-        print(f"[DEBUG] {self.name}: Applying interaction at time {self.sim.ti}")
+        # print(f"[DEBUG] {self.name}: Applying interaction at time {self.sim.ti}")
         
         # Print number of already affected individuals
         num_already_affected = np.sum(cond2_obj.ti_affected != -1)
-        print(f"[DEBUG] {self.name}: {self.condition2} individuals already affected before step: {num_already_affected}")
+        # print(f"[DEBUG] {self.name}: {self.condition2} individuals already affected before step: {num_already_affected}")
 
         # Print incidence probability for debugging
-        print(f"[DEBUG] {self.name}: {self.condition2} incidence probability → {sim.pars[self.condition2.lower()]['incidence_prob']}")
+        # print(f"[DEBUG] {self.name}: {self.condition2} incidence probability → {sim.pars[self.condition2.lower()]['incidence_prob']}")
 
         # Ensure `rel_sus` array exists and has no NaNs
         if cond2_obj.rel_sus is None or len(cond2_obj.rel_sus) == 0:
-            print(f"[WARNING] {self.name}: rel_sus for {self.condition2} is EMPTY. Skipping interaction.")
+            # print(f"[WARNING] {self.name}: rel_sus for {self.condition2} is EMPTY. Skipping interaction.")
             return
 
         cond2_obj.rel_sus.raw = np.nan_to_num(cond2_obj.rel_sus.raw, nan=1.0)
 
         before = cond2_obj.rel_sus.mean()
-        print(f"[DEBUG] {self.name}: {self.condition2} rel_sus mean BEFORE: {before}, min: {cond2_obj.rel_sus.min()}, max: {cond2_obj.rel_sus.max()}")
+        # print(f"[DEBUG] {self.name}: {self.condition2} rel_sus mean BEFORE: {before}, min: {cond2_obj.rel_sus.min()}, max: {cond2_obj.rel_sus.max()}")
 
         # Determine whether `cond2_obj` uses "affected" (NCD) or "infected" (SIS)
         status_attr = "infected" if hasattr(cond2_obj, "infected") else "affected"
@@ -273,11 +273,11 @@ class GenericNCDConnector(ss.Connector):
         uids = getattr(cond2_obj, status_attr).uids  
 
         if len(uids) == 0:
-            print(f"[WARNING] {self.name}: No {status_attr} individuals in {self.condition2}. Skipping update.")
+            # print(f"[WARNING] {self.name}: No {status_attr} individuals in {self.condition2}. Skipping update.")
             return
         
         # Print `ti_affected` values before update
-        print(f"[DEBUG] {self.name}: {self.condition2} ti_affected values BEFORE update: {cond2_obj.ti_affected[:20]}")
+        # print(f"[DEBUG] {self.name}: {self.condition2} ti_affected values BEFORE update: {cond2_obj.ti_affected[:20]}")
 
         # Fix NaNs in `ti_affected`
         if np.isnan(cond2_obj.ti_affected).any():
@@ -287,13 +287,13 @@ class GenericNCDConnector(ss.Connector):
         # Find newly affected individuals safely
         valid_uids = uids[uids < len(cond2_obj.ti_affected)]
         if len(valid_uids) == 0:
-            print(f"[WARNING] {self.name}: No valid indices for {self.condition2}. Skipping update.")
+            # print(f"[WARNING] {self.name}: No valid indices for {self.condition2}. Skipping update.")
             return
         
         new_cases = valid_uids[np.where(cond2_obj.ti_affected[valid_uids] == self.sim.ti)]
         
         if len(new_cases) == 0:
-            print(f"[DEBUG] {self.name}: No new cases detected for {self.condition2}. Check incidence calculation.")
+            # print(f"[DEBUG] {self.name}: No new cases detected for {self.condition2}. Check incidence calculation.")
             return
 
         # Apply relative risk adjustment
@@ -306,11 +306,11 @@ class GenericNCDConnector(ss.Connector):
         # Compute adjusted incidence probability
         adjusted_incidence = sim.pars[self.condition2.lower()]['incidence_prob'] * cond2_obj.rel_sus.raw
 
-        print(f"[DEBUG] {self.condition2}: Adjusted incidence probability → mean={np.nanmean(adjusted_incidence)}, min={np.nanmin(adjusted_incidence)}, max={np.nanmax(adjusted_incidence)}")
+        # print(f"[DEBUG] {self.condition2}: Adjusted incidence probability → mean={np.nanmean(adjusted_incidence)}, min={np.nanmin(adjusted_incidence)}, max={np.nanmax(adjusted_incidence)}")
 
         # Check `rel_sus` after update
         if np.isnan(cond2_obj.rel_sus.raw).any():
-            print(f"[ERROR] {self.name}: {self.condition2} rel_sus contains NaN AFTER update!")
+            # print(f"[ERROR] {self.name}: {self.condition2} rel_sus contains NaN AFTER update!")
             print(f"[CRITICAL INFO] {self.name}: rel_sus first 10 values AFTER update: {cond2_obj.rel_sus.raw[:10]}")
 
 # Function to read interaction data

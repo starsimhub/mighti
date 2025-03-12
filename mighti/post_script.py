@@ -24,9 +24,9 @@ def analyze_hiv_ncd_prevalence(sim, prevalence_analyzer, ncd):
     # Compute mean prevalence across all age groups
     mean_hiv_male = np.mean(hiv_male_data, axis=1) * 100
     mean_hiv_female = np.mean(hiv_female_data, axis=1) * 100
-    mean_ncd_male = np.mean(ncd_male_data, axis=1) * 100
+    mean_ncd_male = np.mean(ncd_male_data, axis=1)  * 100
     mean_ncd_female = np.mean(ncd_female_data, axis=1) * 100
-
+    
     # Plot mean prevalence for each group
     plt.figure(figsize=(15, 8))
     plt.plot(sim.timevec, mean_hiv_male, label=f'Male with HIV', linewidth=2, color='blue')
