@@ -1,9 +1,6 @@
 import matplotlib.pyplot as plt
 import pylab as pl
 import numpy as np
-import matplotlib.pyplot as plt
-
-
 
 def plot_disease_prevalence(sim, prevalence_analyzer, diseases, eswatini_hiv_data, age_bins):
     """
@@ -50,17 +47,28 @@ def plot_disease_prevalence(sim, prevalence_analyzer, diseases, eswatini_hiv_dat
         # Extract male and female prevalence data
         male_data = prevalence_analyzer.results.get(f'{disease}_prevalence_male', None)
         female_data = prevalence_analyzer.results.get(f'{disease}_prevalence_female', None)
+        male_data_with_HIV = prevalence_analyzer.results.get(f'{disease}_prevalence_male_with_HIV', None)
+        female_data_with_HIV = prevalence_analyzer.results.get(f'{disease}_prevalence_female_with_HIV', None)
+        male_data_without_HIV = prevalence_analyzer.results.get(f'{disease}_prevalence_male_without_HIV', None)
+        female_data_without_HIV = prevalence_analyzer.results.get(f'{disease}_prevalence_female_without_HIV', None)
 
         if male_data is None or female_data is None:
             print(f"[WARNING] No prevalence data for {disease}. Skipping plot.")
             continue  # Skip plotting this disease if no data exists
 
-        male_data *= 100  # Convert to percentage
+        # Convert prevalence data to percentage
+        male_data *= 100
         female_data *= 100
+        # male_data_with_HIV *= 100
+        # female_data_with_HIV *= 100
+        # male_data_without_HIV *= 100
+        # female_data_without_HIV *= 100
 
         # Plot male prevalence
         for i, label in enumerate(age_group_labels):
-            axs[disease_idx, 0].plot(sim.timevec, male_data[:, i], label=label, color=age_bin_colors[label])
+            axs[disease_idx, 0].plot(sim.timevec, male_data[:, i], label=f'{label} (Total)', color=age_bin_colors[label], linestyle='solid')
+            # axs[disease_idx, 0].plot(sim.timevec, male_data_with_HIV[:, i], label=f'{label} (HIV+)', color=age_bin_colors[label], linestyle='solid')
+            # axs[disease_idx, 0].plot(sim.timevec, male_data_without_HIV[:, i], label=f'{label} (HIV-)', color=age_bin_colors[label], linestyle='dashed')
         axs[disease_idx, 0].set_title(f'{disease} (Male)', fontsize=24)
         axs[disease_idx, 0].set_xlabel('Year', fontsize=20)
         axs[disease_idx, 0].set_ylabel('Prevalence (%)', fontsize=20)
@@ -69,27 +77,13 @@ def plot_disease_prevalence(sim, prevalence_analyzer, diseases, eswatini_hiv_dat
 
         # Plot female prevalence
         for i, label in enumerate(age_group_labels):
-            axs[disease_idx, 1].plot(sim.timevec, female_data[:, i], color=age_bin_colors[label])
+            axs[disease_idx, 1].plot(sim.timevec, female_data[:, i], label=f'{label} (Total)', color=age_bin_colors[label], linestyle='solid')
+            # axs[disease_idx, 1].plot(sim.timevec, female_data_with_HIV[:, i], label=f'{label} (HIV+)', color=age_bin_colors[label], linestyle='solid')
+            # axs[disease_idx, 1].plot(sim.timevec, female_data_without_HIV[:, i], label=f'{label} (HIV-)', color=age_bin_colors[label], linestyle='dashed')
         axs[disease_idx, 1].set_title(f'{disease} (Female)', fontsize=24)
         axs[disease_idx, 1].set_xlabel('Year', fontsize=20)
         axs[disease_idx, 1].tick_params(axis='both', labelsize=18)
         axs[disease_idx, 1].grid(True)
-
-        # # Add real data points for HIV if available
-        # if disease == 'HIV':
-        #     for year, real_data in eswatini_hiv_data.items():
-        #         real_male_data = real_data['male']
-        #         real_female_data = real_data['female']
-
-        #         for age_bin in real_male_data:
-        #             age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
-        #             if age_label in age_bin_colors:
-        #                 axs[disease_idx, 0].scatter(year, real_male_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, zorder=5)
-
-        #         for age_bin in real_female_data:
-        #             age_label = f'{age_bin}-99' if age_bin == 80 else f'{age_bin}-{age_bin + 4}'
-        #             if age_label in age_bin_colors:
-        #                 axs[disease_idx, 1].scatter(year, real_female_data[age_bin] * 100, color=age_bin_colors[age_label], s=100, zorder=5)
 
     # Add a common legend
     handles, labels = axs[0, 0].get_legend_handles_labels()
@@ -99,32 +93,6 @@ def plot_disease_prevalence(sim, prevalence_analyzer, diseases, eswatini_hiv_dat
     pl.tight_layout(rect=[0, 0.05, 1, 1])
     pl.show()
     
-
-def plot_demography(time_steps, total_population, deaths, births):
-    # Create figure with two subplots
-    fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
-
-    # First panel: Total Population (from second year)
-    axes[0].plot(time_steps, total_population, label='Total Population', linewidth=2)
-    axes[0].set_ylabel('Total Population')
-    axes[0].set_title('Total Population Over Time')
-    axes[0].legend()
-    axes[0].grid()
-
-    # Second panel: Estimated Births and Deaths
-    axes[1].plot(time_steps, births, label='Estimated Births', linestyle='dashed')
-    axes[1].plot(time_steps, deaths, label='Deaths', linestyle='dotted')
-    axes[1].set_xlabel('Time Steps')
-    axes[1].set_ylabel('Count')
-    axes[1].set_title('Estimated Births and Deaths Over Time')
-    axes[1].legend()
-    axes[1].grid()
-
-    plt.tight_layout()
-    plt.show()
-    
-
-
 def plot_mean_prevalence(sim, prevalence_analyzer, disease):
     """
     Plot mean prevalence over time for a given disease and both sexes.
@@ -135,10 +103,13 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease):
     - disease: Name of the disease (e.g., 'HIV', 'Type2Diabetes')
     """
 
-
     # Extract male and female prevalence matrices
     male_data = prevalence_analyzer.results.get(f'{disease}_prevalence_male', None)
     female_data = prevalence_analyzer.results.get(f'{disease}_prevalence_female', None)
+    # male_data_with_HIV = prevalence_analyzer.results.get(f'{disease}_prevalence_male_with_HIV', None)
+    # female_data_with_HIV = prevalence_analyzer.results.get(f'{disease}_prevalence_female_with_HIV', None)
+    # male_data_without_HIV = prevalence_analyzer.results.get(f'{disease}_prevalence_male_without_HIV', None)
+    # female_data_without_HIV = prevalence_analyzer.results.get(f'{disease}_prevalence_female_without_HIV', None)
 
     # Ensure data exists
     if male_data is None or female_data is None:
@@ -146,15 +117,23 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease):
         return
 
     # Compute mean prevalence across all age groups
-    mean_prevalence_male = np.mean(male_data, axis=1)   # Convert to percentage
+    mean_prevalence_male = np.mean(male_data, axis=1)  # Convert to percentage
     mean_prevalence_female = np.mean(female_data, axis=1)
+    # mean_prevalence_male_with_HIV = np.mean(male_data_with_HIV, axis=1) * 100
+    # mean_prevalence_female_with_HIV = np.mean(female_data_with_HIV, axis=1) * 100
+    # mean_prevalence_male_without_HIV = np.mean(male_data_without_HIV, axis=1) * 100
+    # mean_prevalence_female_without_HIV = np.mean(female_data_without_HIV, axis=1) * 100
 
     # Create figure
     plt.figure(figsize=(10, 5))
 
     # Plot mean prevalence for males and females
-    plt.plot(sim.timevec, mean_prevalence_male, label=f'Male {disease.capitalize()} Prevalence', linewidth=2, color='blue')
-    plt.plot(sim.timevec, mean_prevalence_female, label=f'Female {disease.capitalize()} Prevalence', linewidth=2, color='red')
+    plt.plot(sim.timevec, mean_prevalence_male, label=f'Male {disease.capitalize()} Prevalence (Total)', linewidth=5, color='blue', linestyle='dotted')
+    plt.plot(sim.timevec, mean_prevalence_female, label=f'Female {disease.capitalize()} Prevalence (Total)', linewidth=5, color='red', linestyle='dotted')
+    # plt.plot(sim.timevec, mean_prevalence_male_with_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV+)', linewidth=2, color='blue', linestyle='solid')
+    # plt.plot(sim.timevec, mean_prevalence_female_with_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV+)', linewidth=2, color='red', linestyle='solid')
+    # plt.plot(sim.timevec, mean_prevalence_male_without_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV-)', linewidth=2, color='blue', linestyle='dashed')
+    # plt.plot(sim.timevec, mean_prevalence_female_without_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV-)', linewidth=2, color='red', linestyle='dashed')
 
     # Labels and title
     plt.xlabel('Year')

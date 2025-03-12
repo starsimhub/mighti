@@ -9,10 +9,6 @@ import numpy as np
 # sys.stdout = log_file  # Redirects all print outputs to this file
 
 
-import importlib
-import mighti
-importlib.reload(mighti)
-
 ### TO DO
 
 
@@ -20,7 +16,7 @@ importlib.reload(mighti)
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 # beta = 0.001
-n_agents = 5000  # Number of agents in the simulation
+n_agents = 50000  # Number of agents in the simulation
 inityear = 2017  # Simulation start year
 endyear = 2050
 
@@ -215,7 +211,7 @@ sim = ss.Sim(
     analyzers=[prevalence_analyzer],
     start=inityear,
     stop=endyear,
-    connectors=interactions,  
+    # connectors=interactions,  
     people=ppl,
     demographics=[pregnancy, death],
     copy_inputs=False
@@ -228,10 +224,11 @@ sim.run()
 # ---------------------------------------------------------------------
 
 # Call the plotting function from `plot_functions.py`
-selected_diseases = ['HIV', 'Type2Diabetes']
+selected_diseases = ['HIV','Type2Diabetes']
 mi.plot_disease_prevalence(sim, prevalence_analyzer, selected_diseases, eswatini_hiv_data, age_bins)
 # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'CervicalCancer')
 # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ProstateCancer')
-mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes')
+# mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes')
 mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV')
 # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Hypertension')
+# mi.analyze_hiv_ncd_prevalence(sim, prevalence_analyzer, 'Type2Diabetes')

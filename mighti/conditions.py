@@ -124,18 +124,18 @@ class GenericNCD(ss.NCD):
     def init_post(self):
         """ Initialize disease prevalence based on `init_prev`. """
         initial_cases = self.pars.init_prev.filter()
-        print(f"{self.disease_name}: Expected initial cases: {len(initial_cases)}")
+        # print(f"{self.disease_name}: Expected initial cases: {len(initial_cases)}")
     
         if len(initial_cases) == 0:
             print(f"WARNING: {self.disease_name}: `init_prev` is filtering 0 cases! Something is wrong.")
     
         # Debug: Check the initial state of rel_sus
-        print(f"[DEBUG] {self.disease_name} → rel_sus at init_post(): {self.rel_sus}")
+        # print(f"[DEBUG] {self.disease_name} → rel_sus at init_post(): {self.rel_sus}")
     
         self.set_prognoses(initial_cases)
     
         # Debug: Check rel_sus after set_prognoses
-        print(f"[DEBUG] {self.disease_name} → rel_sus after set_prognoses(): {self.rel_sus}")
+        # print(f"[DEBUG] {self.disease_name} → rel_sus after set_prognoses(): {self.rel_sus}")
     
         return initial_cases
     
@@ -144,14 +144,14 @@ class GenericNCD(ss.NCD):
         """ Process new disease cases based on incidence. """
         
         # Print basic debugging info
-        print(f"[DEBUG] {self.disease_name} → rel_sus at start of step(): mean={self.rel_sus.mean()}, min={self.rel_sus.min()}, max={self.rel_sus.max()}")
+        # print(f"[DEBUG] {self.disease_name} → rel_sus at start of step(): mean={self.rel_sus.mean()}, min={self.rel_sus.min()}, max={self.rel_sus.max()}")
         
         if hasattr(self, "susceptible"):  
             new_cases = self.pars.incidence.filter(self.susceptible.uids)
             self.set_prognoses(new_cases)
     
         # Print after running new cases
-        print(f"[DEBUG] {self.disease_name} → rel_sus at end of step(): mean={self.rel_sus.mean()}, min={self.rel_sus.min()}, max={self.rel_sus.max()}")    
+        # print(f"[DEBUG] {self.disease_name} → rel_sus at end of step(): mean={self.rel_sus.mean()}, min={self.rel_sus.min()}, max={self.rel_sus.max()}")    
         
 
     def step_state(self):
@@ -179,7 +179,7 @@ class GenericNCD(ss.NCD):
         if len(uids) == 0:
             print(f"WARNING: {self.disease_name}: No affected cases! This may be an issue.")
     
-        print(f"[DEBUG] {self.disease_name} → rel_sus before updating in set_prognoses(): {self.rel_sus}")
+        # print(f"[DEBUG] {self.disease_name} → rel_sus before updating in set_prognoses(): {self.rel_sus}")
     
         self.affected[uids] = True  
         if hasattr(self, "susceptible"):
@@ -196,7 +196,7 @@ class GenericNCD(ss.NCD):
         self.ti_dead[dead_uids] = self.ti + dur_condition[will_die] / self.t.dt
     
         # Debug: Check rel_sus after set_prognoses
-        print(f"[DEBUG] {self.disease_name} → rel_sus after updating in set_prognoses(): {self.rel_sus}")
+        # print(f"[DEBUG] {self.disease_name} → rel_sus after updating in set_prognoses(): {self.rel_sus}")
         
 
     def init_results(self):
