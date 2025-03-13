@@ -9,7 +9,6 @@ from .disease_definitions import *
 from .prevalence_analyzer import *  
 from .plot_functions import *
 
-
 # Set the root directory for the codebase
 import pathlib
 rootdir = pathlib.Path(__file__).parent

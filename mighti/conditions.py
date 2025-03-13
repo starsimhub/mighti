@@ -2,17 +2,7 @@ import numpy as np
 import starsim as ss
 import mighti as mi
 
-# CONDITIONS
-# This is an umbrella term for any health condition. Some conditions can lead directly
-# to death/disutility (e.g. heart disease, HIV, depression), while others do not. All
-# conditions can affect the (1) risk of acquiring, (2) persistence of, (3) severity of
-# other conditions.
-
-
-
-__all__ = ['Type2Diabetes']
-
-
+# Define Type2Diabetes condition
 class Type2Diabetes(ss.NCD):
 
     def __init__(self, pars=None, **kwargs):
@@ -58,14 +48,12 @@ class Type2Diabetes(ss.NCD):
         deaths = (self.ti_dead == self.ti).uids
         self.sim.people.request_death(deaths)
         self.results.new_deaths[self.ti] = len(deaths)
-        # self.log.add_data(deaths, died=True)
 
     def step(self):
         new_cases = self.pars.incidence.filter(self.susceptible.uids)
         self.set_prognoses(new_cases)
         return new_cases
     
-
     def set_prognoses(self, uids):
         sim = self.sim
         p = self.pars
@@ -91,4 +79,3 @@ class Type2Diabetes(ss.NCD):
         self.results.prevalence[self.ti] = np.count_nonzero(self.affected) / len(self.sim.people)
         self.results.reversal_prevalence[self.ti] = np.count_nonzero(self.reversed) / len(self.sim.people)
         return
-
