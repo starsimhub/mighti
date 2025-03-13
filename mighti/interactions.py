@@ -14,8 +14,8 @@ __all__ = [
     'hiv_hivassociateddementia', 'hiv_ptsd', 'hiv_depression', 'hiv_hpv', 'hiv_flu',
     'hiv_viralhepatitis', 'hiv_domesticviolence', 'hiv_roadinjuries',
     'hiv_chronicliverdisease', 'hiv_asthma', 'hiv_copd', 'hiv_alzheimersdisease',
-    'hiv_parkinsonsdisease', 'GenericNCDConnector', 'read_interactions', 'HIVType2DiabetesConnector'
-]
+    'hiv_parkinsonsdisease', 'GenericNCDConnector', 'read_interactions', 
+    'HIVType2DiabetesConnector']
 
 # Base class for HIV-related connectors
 
@@ -334,11 +334,34 @@ def read_interactions(datafile=None):
 
     return rel_sus
 
+# # Specific connector for the interaction between HIV and Type2Diabetes
+# class HIVType2DiabetesConnector(ss.Connector):
+#     def __init__(self, pars=None, **kwargs):
+#         super().__init__(label='HIV-Type2Diabetes')
+#         self.define_pars(rel_sus=1.95)
+#         self.update_pars(pars, **kwargs)
+#         self.time = sc.autolist()
+#         self.rel_sus = sc.autolist()
+#         self.t2d_prev = sc.autolist()
+#         self.hiv_prev = sc.autolist()
+        
+#     def step(self):
+#         t2d = self.sim.diseases.type2diabetes
+#         hiv = self.sim.diseases.hiv
+#         hiv.rel_sus[t2d.affected.uids] = self.pars.rel_sus
+        
+#         # Collecting data for analysis
+#         self.time += self.sim.t
+#         self.rel_sus += hiv.rel_sus.mean()
+#         self.t2d_prev += t2d.results.prevalence[self.sim.ti]
+#         self.hiv_prev += hiv.results.prevalence[self.sim.ti]
+#         return
+
 # Specific connector for the interaction between HIV and Type2Diabetes
 class HIVType2DiabetesConnector(ss.Connector):
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Type2Diabetes')
-        self.define_pars(rel_sus=1.5)
+        self.define_pars(rel_sus=1.95)
         self.update_pars(pars, **kwargs)
         self.time = sc.autolist()
         self.rel_sus = sc.autolist()
@@ -348,12 +371,35 @@ class HIVType2DiabetesConnector(ss.Connector):
     def step(self):
         t2d = self.sim.diseases.type2diabetes
         hiv = self.sim.diseases.hiv
-        hiv.rel_sus[t2d.affected.uids] = self.pars.rel_sus
+        t2d.rel_sus[hiv.infected.uids] = self.pars.rel_sus
         
         # Collecting data for analysis
         self.time += self.sim.t
-        self.rel_sus += hiv.rel_sus.mean()
+        self.rel_sus += t2d.rel_sus.mean()
         self.t2d_prev += t2d.results.prevalence[self.sim.ti]
         self.hiv_prev += hiv.results.prevalence[self.sim.ti]
         return
+
+# # Specific connector for the interaction between HIV and Type2Diabetes
+# class HIVObesityConnector(ss.Connector):
+#     def __init__(self, pars=None, **kwargs):
+#         super().__init__(label='HIV-Obesity')
+#         self.define_pars(rel_sus=1.5)
+#         self.update_pars(pars, **kwargs)
+#         self.time = sc.autolist()
+#         self.rel_sus = sc.autolist()
+#         self.obesity_prev = sc.autolist()
+#         self.hiv_prev = sc.autolist()
+        
+#     def step(self):
+#         obesity = self.sim.diseases.obesity
+#         hiv = self.sim.diseases.hiv
+#         hiv.rel_sus[obesity.affected.uids] = self.pars.rel_sus
+        
+#         # Collecting data for analysis
+#         self.time += self.sim.t
+#         self.rel_sus += hiv.rel_sus.mean()
+#         self.obesity_prev += obesity.results.prevalence[self.sim.ti]
+#         self.hiv_prev += hiv.results.prevalence[self.sim.ti]
+#         return
 
