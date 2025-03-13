@@ -2,8 +2,6 @@ import starsim as ss
 import numpy as np
 import sciris as sc
 
-
-
 class PrevalenceAnalyzer(ss.Analyzer):
     """ Generalized analyzer to calculate disease prevalence over time by age group and sex """
 
@@ -35,19 +33,29 @@ class PrevalenceAnalyzer(ss.Analyzer):
             self.results[f'{disease}_prevalence_male'] = np.zeros((npts, len(self.age_groups[disease])))
             self.results[f'{disease}_prevalence_female'] = np.zeros((npts, len(self.age_groups[disease])))
 
+            # Initialize result arrays for people living with and without HIV
+            self.results[f'{disease}_prevalence_with_HIV_male'] = np.zeros((npts, len(self.age_groups[disease])))
+            self.results[f'{disease}_prevalence_with_HIV_female'] = np.zeros((npts, len(self.age_groups[disease])))
+            self.results[f'{disease}_prevalence_without_HIV_male'] = np.zeros((npts, len(self.age_groups[disease])))
+            self.results[f'{disease}_prevalence_without_HIV_female'] = np.zeros((npts, len(self.age_groups[disease])))
+
         # Initialize array to store population age distribution for each year (single-age resolution)
         self.results['population_age_distribution'] = np.zeros((npts, 101))  # 0 to 100 years (single-year resolution)
 
         print(f"Initialized prevalence array with {npts} time points for {self.diseases}.")
         return
-    
-        
+     
     def step(self):
         sim = self.sim  # Access the sim object from the Analyzer base class
     
         # Extract ages of agents alive at this time step
         ages = sim.people.age[:]
         is_male = sim.people.male[:]
+        hiv_status = sim.people.hiv.infected[:]
+        
+        print(f"ages: {ages}")
+        print(f"uids: {is_male}")
+        print(f"hiv_status: {hiv_status}")
 
         # Store single-age population distribution at each time step
         age_distribution = np.histogram(ages, bins=np.arange(0, 102, 1))  # Single-year resolution from 0 to 101
@@ -60,25 +68,56 @@ class PrevalenceAnalyzer(ss.Analyzer):
             # Set 'infected' for HIV, HPV, and Flu; 'affected' for all other diseases
             status_attr = 'infected' if disease in ['HIV', 'HPV', 'Flu'] else 'affected'
             status_array = getattr(disease_obj, status_attr)
-    
+
+             # Identify the indices of entries that are not NaN in ages
+            valid_age_indices = np.where(~np.isnan(ages))[0]
+            print(f"np.where(~np.isnan(ages))[0]: {np.where(~np.isnan(ages))[0]}")
+            
+            # Use valid indices to filter ages, is_male, hiv_status, and uids
+            hiv_status_alive = hiv_status[valid_age_indices]
+            print(f"hiv_status_alive: {hiv_status_alive}")
+            print(f"valid_age_indices: {valid_age_indices}")
+
+
             for sex, label in zip([0, 1], ['male', 'female']):
                 prevalence_by_age_group = np.zeros(len(self.age_groups[disease]))
-    
+                prevalence_with_hiv_by_age_group = np.zeros(len(self.age_groups[disease]))
+                prevalence_without_hiv_by_age_group = np.zeros(len(self.age_groups[disease]))
+
                 for i, (start, end) in enumerate(self.age_groups[disease]):
                     age_mask = (ages >= start) if end == float('inf') else (ages >= start) & (ages < end)
                     sex_mask = (is_male == sex)
                     status_mask = age_mask & sex_mask
                     
                     status_for_group = status_array[:][status_mask]
-                    
+                    hiv_status_for_group = hiv_status[status_mask]
+
                     if status_for_group.size > 0:
                         prevalence_by_age_group[i] = np.mean(status_for_group)
-                    
+                        prevalence_with_hiv_by_age_group[i] = np.mean(status_for_group[hiv_status_for_group])
+                        prevalence_without_hiv_by_age_group[i] = np.mean(status_for_group[~hiv_status_for_group])
+
+                # Replace NaNs with zeros
+                prevalence_by_age_group = np.nan_to_num(prevalence_by_age_group, nan=0.0)
+                prevalence_with_hiv_by_age_group = np.nan_to_num(prevalence_with_hiv_by_age_group, nan=0.0)
+                prevalence_without_hiv_by_age_group = np.nan_to_num(prevalence_without_hiv_by_age_group, nan=0.0)
+
                 disease_key = f'{disease}_prevalence_{label}'
                 self.results[disease_key][sim.ti, :] = prevalence_by_age_group
-                
-                
 
-    # def finalize(self):
-    #     super().finalize()
-    #     return
+                disease_with_hiv_key = f'{disease}_prevalence_with_HIV_{label}'
+                self.results[disease_with_hiv_key][sim.ti, :] = prevalence_with_hiv_by_age_group
+
+                disease_without_hiv_key = f'{disease}_prevalence_without_HIV_{label}'
+                self.results[disease_without_hiv_key][sim.ti, :] = prevalence_without_hiv_by_age_group
+
+                # Debugging print statement
+                print(f"Stored {disease_key}, {disease_with_hiv_key}, {disease_without_hiv_key} prevalence data for time index {sim.ti}")
+
+    def finalize(self):
+        super().finalize()
+        # Debugging print statement to inspect the stored results
+        print("Final stored results:")
+        for key, value in self.results.items():
+            print(f"{key}: {value}")
+        return
