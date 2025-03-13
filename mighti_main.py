@@ -194,7 +194,8 @@ if __name__ == '__main__':
     
     # hiv = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
     # t2d = mi.Type2Diabetes(init_prev=ss.bernoulli(get_prevalence_function('Type2Diabetes')))
-    interactions = mi.HIVType2DiabetesConnector()
+    # interactions = mi.HIVType2DiabetesConnector()
+    # interactions = mi.HIVObesityConnector()
     
     # Initialize the first simulation without connectors
     sim1 = ss.Sim(
@@ -229,34 +230,35 @@ if __name__ == '__main__':
     msim = ss.parallel(sim1, sim2)
     # msim.plot()
     
-# Plot the results for each simulation
+# # Plot the results for each simulation
 mi.plot_mean_prevalence_two_diseases_parallel(msim, ['HIV', 'Type2Diabetes'])
 
-sim = ss.Sim(
-    n_agents=n_agents,
-    networks=networks,
-    diseases=disease_objects,  
-    analyzers=[prevalence_analyzer],
-    start=inityear,
-    stop=endyear,
-    connectors=interactions,  
-    people=ppl,
-    demographics=[pregnancy, death],
-    copy_inputs=False
-)
+# sim = ss.Sim(
+#     n_agents=n_agents,
+#     networks=networks,
+#     diseases=disease_objects,  
+#     analyzers=[prevalence_analyzer],
+#     start=inityear,
+#     stop=endyear,
+#     connectors=interactions,  
+#     people=ppl,
+#     demographics=[pregnancy, death],
+#     copy_inputs=False
+# )
 
-sim.run()
+# sim.run()
+# mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Obesity')    
 
 # ---------------------------------------------------------------------
 # Generate Plots
 # ---------------------------------------------------------------------
 
 # Call the plotting function from `plot_functions.py`
-selected_diseases = ['HIV','Type2Diabetes','CervicalCancer']
-mi.plot_disease_prevalence(sim, prevalence_analyzer, selected_diseases, eswatini_hiv_data, age_bins)
+# selected_diseases = ['HIV','Type2Diabetes','CervicalCancer']
+# mi.plot_disease_prevalence(sim, prevalence_analyzer, selected_diseases, eswatini_hiv_data, age_bins)
 # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'CervicalCancer')
 # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ProstateCancer')
 # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes')
-mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV')
+# mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV')
 # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Hypertension')
 # mi.analyze_hiv_ncd_prevalence(sim, prevalence_analyzer, 'Type2Diabetes')
