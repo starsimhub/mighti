@@ -44,16 +44,14 @@ class PrevalenceAnalyzer(ss.Analyzer):
         
     def step(self):
         sim = self.sim  # Access the sim object from the Analyzer base class
-        # Print the age of a specific agent for debugging
-        # print(f'Age of agent 100: {sim.people.age[100]}, alive={sim.people.alive[100]}')
     
         # Extract ages of agents alive at this time step
         ages = sim.people.age[:]
+        is_male = sim.people.male[:]
 
         # Store single-age population distribution at each time step
         age_distribution = np.histogram(ages, bins=np.arange(0, 102, 1))  # Single-year resolution from 0 to 101
         self.results['population_age_distribution'][sim.ti, :] = age_distribution[0]
-        # print(f"Population age distribution at time step {sim.ti}: {age_distribution[0]}")
     
         # Existing logic for calculating and storing prevalence...
         for disease in self.diseases:
@@ -61,7 +59,6 @@ class PrevalenceAnalyzer(ss.Analyzer):
             
             # Set 'infected' for HIV, HPV, and Flu; 'affected' for all other diseases
             status_attr = 'infected' if disease in ['HIV', 'HPV', 'Flu'] else 'affected'
-            
             status_array = getattr(disease_obj, status_attr)
     
             for sex, label in zip([0, 1], ['male', 'female']):
@@ -69,11 +66,19 @@ class PrevalenceAnalyzer(ss.Analyzer):
     
                 for i, (start, end) in enumerate(self.age_groups[disease]):
                     age_mask = (ages >= start) if end == float('inf') else (ages >= start) & (ages < end)
+                    sex_mask = (is_male == sex)
+                    status_mask = age_mask & sex_mask
                     
-                    # Filter out relevant status values using the mask
-                    status_for_age_group = status_array[:][age_mask]
-                    if status_for_age_group.size > 0:
-                        prevalence_by_age_group[i] = np.mean(status_for_age_group)
-    
+                    status_for_group = status_array[:][status_mask]
+                    
+                    if status_for_group.size > 0:
+                        prevalence_by_age_group[i] = np.mean(status_for_group)
+                    
                 disease_key = f'{disease}_prevalence_{label}'
                 self.results[disease_key][sim.ti, :] = prevalence_by_age_group
+                
+                
+
+    # def finalize(self):
+    #     super().finalize()
+    #     return

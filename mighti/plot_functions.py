@@ -86,3 +86,52 @@ def plot_mean_prevalence_two_diseases(sim, prevalence_analyzer, diseases):
     
     plt.tight_layout()
     plt.show()
+    
+
+
+def plot_mean_prevalence_two_diseases_parallel(msim, diseases):
+    """
+    Plot mean prevalence over time for two diseases, each with male and female trends, for parallel simulations,
+    combining 'Separate' and 'Connector' simulations on the same panel.
+
+    Parameters:
+    - msim: The parallel simulation object containing multiple simulations
+    - diseases: List of two disease names (e.g., ['HIV', 'Type2Diabetes'])
+    """
+    if len(diseases) != 2:
+        print("[ERROR] Please provide exactly two diseases for comparison.")
+        return
+    
+    fig, axs = plt.subplots(1, 2, figsize=(15, 5))  # Two side-by-side panels for each disease
+    
+    for i, disease in enumerate(diseases):
+        for sim in msim.sims:
+            prevalence_analyzer = sim.analyzers[0]  # Access the prevalence analyzer for the current simulation
+            male_data = prevalence_analyzer.results.get(f'{disease}_prevalence_male', None)
+            female_data = prevalence_analyzer.results.get(f'{disease}_prevalence_female', None)
+            
+            # Ensure data exists
+            if male_data is None or female_data is None:
+                print(f"[ERROR] No prevalence data available for {disease} in {sim.label}.")
+                continue
+            
+            # Compute mean prevalence across all age groups
+            mean_prevalence_male = np.mean(male_data, axis=1) * 100  # Convert to percentage
+            mean_prevalence_female = np.mean(female_data, axis=1) * 100
+            
+            # Set line style based on simulation label
+            line_style = 'dotted' if 'Connector' in sim.label else 'solid'
+            
+            # Plot mean prevalence for males and females
+            axs[i].plot(sim.timevec, mean_prevalence_male, label=f'{sim.label} Male {disease.capitalize()}', linewidth=2, color='blue', linestyle=line_style)
+            axs[i].plot(sim.timevec, mean_prevalence_female, label=f'{sim.label} Female {disease.capitalize()}', linewidth=2, color='red', linestyle=line_style)
+            
+            # Labels and title
+            axs[i].set_xlabel('Year')
+            axs[i].set_ylabel('Prevalence (%)')
+            axs[i].set_title(f'Mean {disease.capitalize()} Prevalence Over Time')
+            axs[i].legend()
+            axs[i].grid()
+    
+    plt.tight_layout()
+    plt.show()

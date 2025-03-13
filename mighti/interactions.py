@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 class HIVType2DiabetesConnector(ss.Connector):
     def __init__(self, pars=None, **kwargs):
         super().__init__(label='HIV-Type2Diabetes')
-        self.define_pars(rel_sus=1.5)
+        self.define_pars(rel_sus=1.95)
         self.update_pars(pars, **kwargs)
         self.time = sc.autolist()
         self.rel_sus = sc.autolist()
@@ -27,13 +27,3 @@ class HIVType2DiabetesConnector(ss.Connector):
         self.hiv_prev += hiv.results.prevalence[self.sim.ti]
         return
 
-    def plot(self):
-        sc.options(dpi=200)
-        fig = plt.figure()
-        for key in ['rel_sus', 't2d_prev', 'hiv_prev']:
-            plt.plot(self.time, self[key], label=key)
-        plt.legend()
-        plt.title(self.sim.label)
-        plt.show()
-        return fig
-    

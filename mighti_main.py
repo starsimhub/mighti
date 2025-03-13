@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 # Define diseases
 ncd = ['Type2Diabetes'] 
 diseases = ['HIV'] + ncd  # List of diseases including HIV
-beta = 0.001  # Transmission probability for HIV
-n_agents = 5000  # Number of agents in the simulation
+beta = 0.0001  # Transmission probability for HIV
+n_agents = 50000  # Number of agents in the simulation
 inityear = 2007  # Simulation start year
-endyear = 2020
+endyear = 2030
 
 # Initialize prevalence data from a CSV file
 prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv', inityear=inityear)
@@ -105,10 +105,8 @@ if __name__ == '__main__':
     msim = ss.parallel(sim1, sim2)
     msim.plot()
     
-    # # Plot the results for each simulation
-    # for sim in msim.sims:
-    #     sim.analyzers[0].plot()
-
+# Plot the results for each simulation
+mi.plot_mean_prevalence_two_diseases_parallel(msim, ['HIV', 'Type2Diabetes'])
 
 # import starsim as ss
 # import mighti as mi  
@@ -196,4 +194,4 @@ if __name__ == '__main__':
 # sim.run()
 
 
-# mi.plot_mean_prevalence_two_diseases(sim, prevalence_analyzer, diseases)
+# mi.plot_mean_prevalence_two_diseases_parallel(msim, prevalence_analyzer, diseases)
