@@ -9,8 +9,8 @@ class Type2Diabetes(ss.NCD):
         super().__init__()
         self.define_pars(
             dur_condition=ss.lognorm_ex(5), 
-            incidence_prob=0.0315,
-            incidence=ss.bernoulli(0.0315),  
+            incidence_prob=0.015,
+            incidence=ss.bernoulli(0.015),  
             p_death=ss.bernoulli(0.0017),  
             init_prev=ss.bernoulli(0.2), 
             remission_rate=ss.bernoulli(0.0024), 
@@ -51,6 +51,8 @@ class Type2Diabetes(ss.NCD):
 
     def step(self):
         new_cases = self.pars.incidence.filter(self.susceptible.uids)
+        # new_cases = ss.bernoulli(p=self.rel_sus*self.p_incidence).filter()
+        # self.pars.incidence.set(p=self.rel_sus*self.p_incidence)
         self.set_prognoses(new_cases)
         return new_cases
     

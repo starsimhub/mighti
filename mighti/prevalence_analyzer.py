@@ -1,123 +1,123 @@
-import starsim as ss
+"""
+Generalized analyzers for disease prevalence analyses
+"""
+
+# %% Imports and settings
 import numpy as np
 import sciris as sc
+import starsim as ss
+import pandas as pd
+
+__all__ = ["PrevalenceAnalyzer"]
+
 
 class PrevalenceAnalyzer(ss.Analyzer):
-    """ Generalized analyzer to calculate disease prevalence over time by age group and sex """
+    @staticmethod
+    def cond_prob(numerator, denominator):
+        numer = len((denominator & numerator).uids)
+        denom = len(denominator.uids)
+        out = sc.safedivide(numer, denom)
+        return out
 
-    def __init__(self, prevalence_data, diseases, *args, **kwargs):
+    def __init__(self, prevalence_data, diseases=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = 'prevalence_analyzer'
         self.prevalence_data = prevalence_data
-        self.diseases = diseases  # List of disease names like ['HIV', 'depression', 'diabetes', ...]
+        self.diseases = diseases
 
-        # Initialize age bins for each disease
-        self.age_bins = {}
-        self.age_groups = {}
+        # Define age bins
+        self.age_bins = [(0, 15), (15, 21), (21, 26), (26, 31), (31, 36), (36, 41), (41, 46), 
+                         (46, 51), (51, 56), (56, 61), (61, 66), (66, 71), (71, 76), (76, 81), (80, float('inf'))]
 
-        # Iterate over each disease and assign age bins
+        self.results_defined = False
+        return
+
+    def init_results(self):
+        if self.results_defined:
+            return
+        results = sc.autolist()
         for disease in self.diseases:
-            self.age_bins[disease] = list(prevalence_data[disease]['male'].keys())
-            self.age_bins[disease].sort()  # Ensure age bins are sorted
-            # Create age groups with "inf" for the last bin (80+)
-            self.age_groups[disease] = list(zip(self.age_bins[disease][:-1], self.age_bins[disease][1:])) + [(self.age_bins[disease][-1], float('inf'))]
-
-        self.results = sc.objdict()
+            for i, (age_start, age_end) in enumerate(self.age_bins):
+                results += [
+                    ss.Result(f'{disease}_num_male_{i}', dtype=int),
+                    ss.Result(f'{disease}_den_male_{i}', dtype=int),
+                    ss.Result(f'{disease}_num_female_{i}', dtype=int),
+                    ss.Result(f'{disease}_den_female_{i}', dtype=int),
+                    ss.Result(f'{disease}_num_with_HIV_male_{i}', dtype=int),
+                    ss.Result(f'{disease}_den_with_HIV_male_{i}', dtype=int),
+                    ss.Result(f'{disease}_num_with_HIV_female_{i}', dtype=int),
+                    ss.Result(f'{disease}_den_with_HIV_female_{i}', dtype=int),
+                    ss.Result(f'{disease}_num_without_HIV_male_{i}', dtype=int),
+                    ss.Result(f'{disease}_den_without_HIV_male_{i}', dtype=int),
+                    ss.Result(f'{disease}_num_without_HIV_female_{i}', dtype=int),
+                    ss.Result(f'{disease}_den_without_HIV_female_{i}', dtype=int),
+                ]
+            results += [
+                ss.Result(f'{disease}_prev_no_hiv', dtype=float, scale=False),
+                ss.Result(f'{disease}_prev_has_hiv', dtype=float, scale=False),
+                ss.Result(f'{disease}_prev_no_hiv_f', dtype=float, scale=False),
+                ss.Result(f'{disease}_prev_has_hiv_f', dtype=float, scale=False),
+                ss.Result(f'{disease}_prev_no_hiv_m', dtype=float, scale=False),
+                ss.Result(f'{disease}_prev_has_hiv_m', dtype=float, scale=False),
+            ]
+        self.define_results(*results)
+        self.results_defined = True
+        return
 
     def init_pre(self, sim):
         super().init_pre(sim)
         npts = len(sim.t)  # Number of time points in the simulation
-
-        # Initialize result arrays for each disease: time x age groups
-        for disease in self.diseases:
-            self.results[f'{disease}_prevalence_male'] = np.zeros((npts, len(self.age_groups[disease])))
-            self.results[f'{disease}_prevalence_female'] = np.zeros((npts, len(self.age_groups[disease])))
-
-            # Initialize result arrays for people living with and without HIV
-            self.results[f'{disease}_prevalence_with_HIV_male'] = np.zeros((npts, len(self.age_groups[disease])))
-            self.results[f'{disease}_prevalence_with_HIV_female'] = np.zeros((npts, len(self.age_groups[disease])))
-            self.results[f'{disease}_prevalence_without_HIV_male'] = np.zeros((npts, len(self.age_groups[disease])))
-            self.results[f'{disease}_prevalence_without_HIV_female'] = np.zeros((npts, len(self.age_groups[disease])))
 
         # Initialize array to store population age distribution for each year (single-age resolution)
         self.results['population_age_distribution'] = np.zeros((npts, 101))  # 0 to 100 years (single-year resolution)
 
         print(f"Initialized prevalence array with {npts} time points for {self.diseases}.")
         return
-     
+
     def step(self):
-        sim = self.sim  # Access the sim object from the Analyzer base class
-    
-        # Extract ages of agents alive at this time step
-        ages = sim.people.age[:]
-        is_male = sim.people.male[:]
-        hiv_status = sim.people.hiv.infected[:]
-        
-        print(f"ages: {ages}")
-        print(f"uids: {is_male}")
-        print(f"hiv_status: {hiv_status}")
+        sim = self.sim
+        ti = self.ti
+        ppl = sim.people
+        hiv = sim.diseases.hiv
 
-        # Store single-age population distribution at each time step
-        age_distribution = np.histogram(ages, bins=np.arange(0, 102, 1))  # Single-year resolution from 0 to 101
-        self.results['population_age_distribution'][sim.ti, :] = age_distribution[0]
-    
-        # Existing logic for calculating and storing prevalence...
+        denom = (ppl.age >= 0)  # All individuals
+        has_hiv = denom & hiv.infected  # Individuals with HIV
+        no_hiv = denom & hiv.susceptible  # Individuals without HIV
+
         for disease in self.diseases:
-            disease_obj = getattr(sim.diseases, disease.lower())
-            
-            # Set 'infected' for HIV, HPV, and Flu; 'affected' for all other diseases
+            dis = getattr(sim.diseases, disease.lower())
             status_attr = 'infected' if disease in ['HIV', 'HPV', 'Flu'] else 'affected'
-            status_array = getattr(disease_obj, status_attr)
+            has_disease = denom & getattr(dis, status_attr)
 
-             # Identify the indices of entries that are not NaN in ages
-            valid_age_indices = np.where(~np.isnan(ages))[0]
-            print(f"np.where(~np.isnan(ages))[0]: {np.where(~np.isnan(ages))[0]}")
-            
-            # Use valid indices to filter ages, is_male, hiv_status, and uids
-            hiv_status_alive = hiv_status[valid_age_indices]
-            print(f"hiv_status_alive: {hiv_status_alive}")
-            print(f"valid_age_indices: {valid_age_indices}")
+            has_disease_f = has_disease & ppl.female  # Women with disease
+            has_disease_m = has_disease & ppl.male  # Men with disease
+            has_hiv_f = has_hiv & ppl.female  # Women with HIV
+            has_hiv_m = has_hiv & ppl.male  # Men with HIV
+            no_hiv_f = no_hiv & ppl.female  # Women without HIV
+            no_hiv_m = no_hiv & ppl.male  # Men without HIV
 
+            for i, (age_start, age_end) in enumerate(self.age_bins):
+                age_group = (ppl.age >= age_start) & (ppl.age < age_end)
+                self.results[f'{disease}_num_male_{i}'][ti] = np.sum(age_group & has_disease_m)
+                self.results[f'{disease}_den_male_{i}'][ti] = np.sum(age_group & ~has_disease_m)
+                self.results[f'{disease}_num_female_{i}'][ti] = np.sum(age_group & has_disease_f)
+                self.results[f'{disease}_den_female_{i}'][ti] = np.sum(age_group & ~has_disease_f)
 
-            for sex, label in zip([0, 1], ['male', 'female']):
-                prevalence_by_age_group = np.zeros(len(self.age_groups[disease]))
-                prevalence_with_hiv_by_age_group = np.zeros(len(self.age_groups[disease]))
-                prevalence_without_hiv_by_age_group = np.zeros(len(self.age_groups[disease]))
+                self.results[f'{disease}_num_with_HIV_male_{i}'][ti] = np.sum(age_group & has_disease_m & has_hiv)
+                self.results[f'{disease}_den_with_HIV_male_{i}'][ti] = np.sum(age_group & ~has_disease_m & has_hiv)
+                self.results[f'{disease}_num_with_HIV_female_{i}'][ti] = np.sum(age_group & has_disease_f & has_hiv)
+                self.results[f'{disease}_den_with_HIV_female_{i}'][ti] = np.sum(age_group & ~has_disease_f & has_hiv)
 
-                for i, (start, end) in enumerate(self.age_groups[disease]):
-                    age_mask = (ages >= start) if end == float('inf') else (ages >= start) & (ages < end)
-                    sex_mask = (is_male == sex)
-                    status_mask = age_mask & sex_mask
-                    
-                    status_for_group = status_array[:][status_mask]
-                    hiv_status_for_group = hiv_status[status_mask]
+                self.results[f'{disease}_num_without_HIV_male_{i}'][ti] = np.sum(age_group & has_disease_m & no_hiv)
+                self.results[f'{disease}_den_without_HIV_male_{i}'][ti] = np.sum(age_group & ~has_disease_m & no_hiv)
+                self.results[f'{disease}_num_without_HIV_female_{i}'][ti] = np.sum(age_group & has_disease_f & no_hiv)
+                self.results[f'{disease}_den_without_HIV_female_{i}'][ti] = np.sum(age_group & ~has_disease_f & no_hiv)
 
-                    if status_for_group.size > 0:
-                        prevalence_by_age_group[i] = np.mean(status_for_group)
-                        prevalence_with_hiv_by_age_group[i] = np.mean(status_for_group[hiv_status_for_group])
-                        prevalence_without_hiv_by_age_group[i] = np.mean(status_for_group[~hiv_status_for_group])
+            self.results[f'{disease}_prev_no_hiv'][ti] = self.cond_prob(has_disease, no_hiv)
+            self.results[f'{disease}_prev_has_hiv'][ti] = self.cond_prob(has_disease, has_hiv)
+            self.results[f'{disease}_prev_no_hiv_f'][ti] = self.cond_prob(has_disease_f, no_hiv_f)
+            self.results[f'{disease}_prev_has_hiv_f'][ti] = self.cond_prob(has_disease_f, has_hiv_f)
+            self.results[f'{disease}_prev_no_hiv_m'][ti] = self.cond_prob(has_disease_m, no_hiv_m)
+            self.results[f'{disease}_prev_has_hiv_m'][ti] = self.cond_prob(has_disease_m, has_hiv_m)
 
-                # Replace NaNs with zeros
-                prevalence_by_age_group = np.nan_to_num(prevalence_by_age_group, nan=0.0)
-                prevalence_with_hiv_by_age_group = np.nan_to_num(prevalence_with_hiv_by_age_group, nan=0.0)
-                prevalence_without_hiv_by_age_group = np.nan_to_num(prevalence_without_hiv_by_age_group, nan=0.0)
-
-                disease_key = f'{disease}_prevalence_{label}'
-                self.results[disease_key][sim.ti, :] = prevalence_by_age_group
-
-                disease_with_hiv_key = f'{disease}_prevalence_with_HIV_{label}'
-                self.results[disease_with_hiv_key][sim.ti, :] = prevalence_with_hiv_by_age_group
-
-                disease_without_hiv_key = f'{disease}_prevalence_without_HIV_{label}'
-                self.results[disease_without_hiv_key][sim.ti, :] = prevalence_without_hiv_by_age_group
-
-                # Debugging print statement
-                print(f"Stored {disease_key}, {disease_with_hiv_key}, {disease_without_hiv_key} prevalence data for time index {sim.ti}")
-
-    def finalize(self):
-        super().finalize()
-        # Debugging print statement to inspect the stored results
-        print("Final stored results:")
-        for key, value in self.results.items():
-            print(f"{key}: {value}")
         return

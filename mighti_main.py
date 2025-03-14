@@ -4,7 +4,9 @@ import mighti as mi
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
+# import sys
+# log_file = open("debug_output.txt", "w")
+# sys.stdout = log_file  # Redirects all print outputs to this file
 
 # Define diseases
 ncd = ['Type2Diabetes'] 
@@ -13,7 +15,7 @@ beta = 0.0001  # Transmission probability for HIV
 n_agents = 500000  # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2050
-
+# 
 # Initialize prevalence data from a CSV file
 prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv', inityear=inityear)
 
@@ -38,33 +40,7 @@ mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
 networks = [mf, maternal]
 
-if __name__ == '__main__':
-    
-    hiv = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
-    t2d = mi.Type2Diabetes(init_prev=ss.bernoulli(get_prevalence_function('Type2Diabetes')))
-    interactions = mi.HIVType2DiabetesConnector()
-    
-    # Initialize the simulation with connectors
-    sim = ss.Sim(
-        n_agents=n_agents,
-        networks=networks,
-        diseases=[hiv, t2d],
-        analyzers=[prevalence_analyzer],
-        start=inityear,
-        stop=endyear,
-        people=ppl,
-        demographics=[pregnancy, death],
-        connectors=interactions,
-        copy_inputs=False,
-        label='Connector'
-    )
 
-    # Run the simulation
-    sim.run()
-
-# Plot the results for each simulation
-mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')    
-    
     
 # if __name__ == '__main__':
     
@@ -109,3 +85,33 @@ mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')
 
 
 
+if __name__ == '__main__':
+    
+    hiv = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
+    t2d = mi.Type2Diabetes(init_prev=ss.bernoulli(get_prevalence_function('Type2Diabetes')))
+    interactions = mi.HIVType2DiabetesConnector()
+    
+    # Initialize the simulation with connectors
+    sim = ss.Sim(
+        n_agents=n_agents,
+        networks=networks,
+        diseases=[hiv, t2d],
+        analyzers=[prevalence_analyzer],
+        start=inityear,
+        stop=endyear,
+        people=ppl,
+        demographics=[pregnancy, death],
+        connectors=interactions,
+        copy_inputs=False,
+        label='Connector'
+    )
+
+    # Run the simulation
+    sim.run()
+
+# Plot the results for each simulation
+mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')    
+mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')    
+
+# mi.plot_numerator_denominator(sim, prevalence_analyzer, 'HIV')
+# mi.plot_numerator_denominator(sim, prevalence_analyzer, 'Type2Diabetes')
