@@ -81,6 +81,8 @@ networks = [mf, maternal]
 #     msim = ss.parallel(sim1, sim2)
 #     msim.plot()
     
+#     for sim in msim.sims:
+#         sim.analyzers[0].plot()
 
 
 

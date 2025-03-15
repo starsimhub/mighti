@@ -49,3 +49,13 @@ class HIVType2DiabetesConnector(ss.Connector):
         self.t2d_prev += t2d.results.prevalence[self.sim.ti]
         self.hiv_prev += hiv.results.prevalence[self.sim.ti]
         return
+    
+    def plot(self):
+        sc.options(dpi=200)
+        fig = plt.figure()
+        for key in ['rel_sus', 't2d_prev', 'hiv_prev']:
+            plt.plot(self.time, self[key], label=key)
+        plt.legend()
+        plt.title(self.sim.label)
+        plt.show()
+        return fig

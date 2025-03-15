@@ -92,37 +92,34 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     male_den_without_HIV = np.sum(extract_results('den_without_HIV_male'), axis=0)
     female_den_without_HIV = np.sum(extract_results('den_without_HIV_female'), axis=0)
 
-    # Ensure the arrays are the correct length (44)
-    sim_length = len(sim.timevec)
-    if len(male_num_with_HIV) != sim_length:
-        male_num_with_HIV = np.zeros(sim_length)
-    if len(female_num_with_HIV) != sim_length:
-        female_num_with_HIV = np.zeros(sim_length)
-    if len(male_den_with_HIV) != sim_length:
-        male_den_with_HIV = np.zeros(sim_length)
-    if len(female_den_with_HIV) != sim_length:
-        female_den_with_HIV = np.zeros(sim_length)
-    if len(male_num_without_HIV) != sim_length:
-        male_num_without_HIV = np.zeros(sim_length)
-    if len(female_num_without_HIV) != sim_length:
-        female_num_without_HIV = np.zeros(sim_length)
-    if len(male_den_without_HIV) != sim_length:
-        male_den_without_HIV = np.zeros(sim_length)
-    if len(female_den_without_HIV) != sim_length:
-        female_den_without_HIV = np.zeros(sim_length)
+    # Debugging print statements for values
+    print(f"Values for {disease} among PLHIV and those without HIV:")
+    print(f"Male numerator with HIV: {male_num_with_HIV}")
+    print(f"Female numerator with HIV: {female_num_with_HIV}")
+    print(f"Male denominator with HIV: {male_den_with_HIV}")
+    print(f"Female denominator with HIV: {female_den_with_HIV}")
+    print(f"Male numerator without HIV: {male_num_without_HIV}")
+    print(f"Female numerator without HIV: {female_num_without_HIV}")
+    print(f"Male denominator without HIV: {male_den_without_HIV}")
+    print(f"Female denominator without HIV: {female_den_without_HIV}")
 
-    # Debugging print statements for lengths
-    print(f"Lengths of arrays for {disease} among PLHIV and those without HIV:")
-    print(f"Male numerator with HIV length: {len(male_num_with_HIV)}, Female numerator with HIV length: {len(female_num_with_HIV)}")
-    print(f"Male denominator with HIV length: {len(male_den_with_HIV)}, Female denominator with HIV length: {len(female_den_with_HIV)}")
-    print(f"Male numerator without HIV length: {len(male_num_without_HIV)}, Female numerator without HIV length: {len(female_num_without_HIV)}")
-    print(f"Male denominator without HIV length: {len(male_den_without_HIV)}, Female denominator without HIV length: {len(female_den_without_HIV)}")
+    # Check for division by zero
+    male_den_with_HIV[male_den_with_HIV == 0] = 1
+    female_den_with_HIV[female_den_with_HIV == 0] = 1
+    male_den_without_HIV[male_den_without_HIV == 0] = 1
+    female_den_without_HIV[female_den_without_HIV == 0] = 1
 
     # Compute mean prevalence across all age groups
     mean_prevalence_male_with_HIV = np.nan_to_num(male_num_with_HIV / male_den_with_HIV) * 100
     mean_prevalence_female_with_HIV = np.nan_to_num(female_num_with_HIV / female_den_with_HIV) * 100
     mean_prevalence_male_without_HIV = np.nan_to_num(male_num_without_HIV / male_den_without_HIV) * 100
     mean_prevalence_female_without_HIV = np.nan_to_num(female_num_without_HIV / female_den_without_HIV) * 100
+
+    print(f"Mean prevalence for {disease} among PLHIV and those without HIV:")
+    print(f"Male prevalence with HIV: {mean_prevalence_male_with_HIV}")
+    print(f"Female prevalence with HIV: {mean_prevalence_female_with_HIV}")
+    print(f"Male prevalence without HIV: {mean_prevalence_male_without_HIV}")
+    print(f"Female prevalence without HIV: {mean_prevalence_female_without_HIV}")
 
     # Create figure
     plt.figure(figsize=(10, 5))
@@ -155,12 +152,12 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease):
 
     # Extract male and female prevalence numerators and denominators
     def extract_results(key_pattern):
-        return np.mean([prevalence_analyzer.results.get(f'{disease}_{key_pattern}_{i}', np.zeros(len(sim.timevec))) for i in range(len(prevalence_analyzer.age_bins))], axis=0)
+        return [prevalence_analyzer.results.get(f'{disease}_{key_pattern}_{i}', np.zeros(len(sim.timevec))) for i in range(len(prevalence_analyzer.age_bins))]
 
-    male_num = extract_results('num_male')
-    female_num = extract_results('num_female')
-    male_den = extract_results('den_male')
-    female_den = extract_results('den_female')
+    male_num = np.sum(extract_results('num_male'), axis=0)
+    female_num = np.sum(extract_results('num_female'), axis=0)
+    male_den = np.sum(extract_results('den_male'), axis=0)
+    female_den = np.sum(extract_results('den_female'), axis=0)
 
     # Ensure the arrays are the correct length (44)
     sim_length = len(sim.timevec)
@@ -173,19 +170,22 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease):
     if len(female_den) != sim_length:
         female_den = np.zeros(sim_length)
 
-    # Ensure data exists
-    if male_num is None or female_num is None or male_den is None or female_den is None:
-        print(f"[ERROR] No prevalence data available for {disease}.")
-        return
-
     # Debugging print statements for lengths
     print(f"Lengths of arrays for {disease}:")
     print(f"Male numerator length: {len(male_num)}, Female numerator length: {len(female_num)}")
     print(f"Male denominator length: {len(male_den)}, Female denominator length: {len(female_den)}")
 
+    # Check for division by zero
+    male_den[male_den == 0] = 1
+    female_den[female_den == 0] = 1
+
     # Compute mean prevalence across all age groups
-    mean_prevalence_male = np.mean(np.nan_to_num(male_num / male_den), axis=0) * 100
-    mean_prevalence_female = np.mean(np.nan_to_num(female_num / female_den), axis=0) * 100
+    mean_prevalence_male = np.nan_to_num(male_num / male_den) * 100
+    mean_prevalence_female = np.nan_to_num(female_num / female_den) * 100
+
+    print(f"Mean prevalence for {disease}:")
+    print(f"Male prevalence: {mean_prevalence_male}")
+    print(f"Female prevalence: {mean_prevalence_female}")
 
     # Create figure
     plt.figure(figsize=(10, 5))
