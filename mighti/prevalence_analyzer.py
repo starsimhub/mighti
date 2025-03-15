@@ -1,8 +1,3 @@
-"""
-Generalized analyzers for disease prevalence analyses
-"""
-
-# %% Imports and settings
 import numpy as np
 import sciris as sc
 import starsim as ss
