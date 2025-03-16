@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 # sys.stdout = log_file  # Redirects all print outputs to this file
 
 # Define diseases
-ncd = ['Type2Diabetes'] 
+ncd = ['Type2Diabetes','ChronicKidneyDisease'] 
 diseases = ['HIV'] + ncd  # List of diseases including HIV
 beta = 0.0001  # Transmission probability for HIV
-n_agents = 500000  # Number of agents in the simulation
+n_agents = 5000  # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2050
 # 
@@ -41,63 +41,35 @@ maternal = ss.MaternalNet()
 networks = [mf, maternal]
 
 
-    
-# if __name__ == '__main__':
-    
-#     hiv = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
-#     t2d = mi.Type2Diabetes(init_prev=ss.bernoulli(get_prevalence_function('Type2Diabetes')))
-#     interactions = mi.HIVType2DiabetesConnector()
-    
-#     # Initialize the first simulation without connectors
-#     sim1 = ss.Sim(
-#         n_agents=n_agents,
-#         networks=networks,
-#         diseases=[hiv, t2d],
-#         analyzers=[prevalence_analyzer],
-#         start=inityear,
-#         stop=endyear,
-#         people=ppl,
-#         demographics=[pregnancy, death],
-#         copy_inputs=False,
-#         label='Separate'
-#     )
-
-#     # Initialize the second simulation with connectors
-#     sim2 = ss.Sim(
-#         n_agents=n_agents,
-#         networks=networks,
-#         diseases=[hiv, t2d],
-#         analyzers=[prevalence_analyzer],
-#         start=inityear,
-#         stop=endyear,
-#         people=ppl,
-#         demographics=[pregnancy, death],
-#         connectors=interactions,
-#         copy_inputs=False,
-#         label='Connector'
-#     )
-
-#     # Run the simulations in parallel
-#     msim = ss.parallel(sim1, sim2)
-#     msim.plot()
-    
-#     for sim in msim.sims:
-#         sim.analyzers[0].plot()
-
-
-
-
 if __name__ == '__main__':
     
-    hiv = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
-    t2d = mi.Type2Diabetes(init_prev=ss.bernoulli(get_prevalence_function('Type2Diabetes')))
-    interactions = mi.HIVType2DiabetesConnector()
+    hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
+    
+    # Automatically create disease objects for NCDs
+    disease_objects = []
+    for disease in ncd:
+        init_prev = ss.bernoulli(get_prevalence_function(disease))
+        
+        # Dynamically get the disease class from `mi` module
+        disease_class = getattr(mi, disease, None)
+        
+        if disease_class:
+            disease_obj = disease_class(init_prev=init_prev)  # Instantiate dynamically
+            disease_objects.append(disease_obj)
+        else:
+            print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
+    
+    # Combine all disease objects including HIV
+    disease_objects.append(hiv_disease)
+    
+    interactions = [mi.Type2DiabetesHIVConnector(),
+                    mi.CKDHIVConnector()]
     
     # Initialize the simulation with connectors
     sim = ss.Sim(
         n_agents=n_agents,
         networks=networks,
-        diseases=[hiv, t2d],
+        diseases=disease_objects,
         analyzers=[prevalence_analyzer],
         start=inityear,
         stop=endyear,
@@ -111,9 +83,6 @@ if __name__ == '__main__':
     # Run the simulation
     sim.run()
 
-# Plot the results for each simulation
-mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')    
-mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')    
-
-# mi.plot_numerator_denominator(sim, prevalence_analyzer, 'HIV')
-# mi.plot_numerator_denominator(sim, prevalence_analyzer, 'Type2Diabetes')
+# # Plot the results for each simulation
+mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
+mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')  
