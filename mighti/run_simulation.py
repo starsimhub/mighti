@@ -2,6 +2,7 @@ import pandas as pd
 import starsim as ss
 import mighti as mi
 import matplotlib.pyplot as plt
+import streamlit as st
 
 def run_simulation(prevalence_data, demographics_data, fertility_data, mortality_data, init_year, end_year, population_size):
     # Initialize prevalence data
