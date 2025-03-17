@@ -2,7 +2,6 @@ import starsim as ss
 import sciris as sc
 import mighti as mi
 import pandas as pd
-import matplotlib.pyplot as plt
 
 # Define diseases
 ncd = ['Type2Diabetes', 'ChronicKidneyDisease'] 

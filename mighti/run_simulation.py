@@ -1,15 +1,9 @@
 import pandas as pd
 import starsim as ss
 import mighti as mi
+import matplotlib.pyplot as plt
 
-def run_simulation(prevalence_file, demographics_file, fertility_file, mortality_file, init_year, end_year, population_size):
-    # Function to load CSV files
-    def load_csv(file):
-        return pd.read_csv(file)
-
-    prevalence_data = load_csv(prevalence_file)
-    demographics_data = load_csv(demographics_file)
-
+def run_simulation(prevalence_data, demographics_data, fertility_data, mortality_data, init_year, end_year, population_size):
     # Initialize prevalence data
     prevalence_data, age_bins = mi.initialize_prevalence_data(['HIV', 'Type2Diabetes', 'ChronicKidneyDisease'], prevalence_data, init_year)
 
@@ -21,9 +15,9 @@ def run_simulation(prevalence_file, demographics_file, fertility_file, mortality
     prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=['HIV', 'Type2Diabetes', 'ChronicKidneyDisease'])
 
     # Create demographics
-    fertility_rates = {'fertility_rate': pd.read_csv(fertility_file)}
+    fertility_rates = {'fertility_rate': fertility_data}
     pregnancy = ss.Pregnancy(pars=fertility_rates)
-    death_rates = {'death_rate': pd.read_csv(mortality_file), 'rate_units': 1}
+    death_rates = {'death_rate': mortality_data, 'rate_units': 1}
     death = ss.Deaths(death_rates)
     ppl = ss.People(population_size, age_data=demographics_data)
 
@@ -32,20 +26,43 @@ def run_simulation(prevalence_file, demographics_file, fertility_file, mortality
     maternal = ss.MaternalNet()
     networks = [mf, maternal]
 
-    # Initialize diseases
-    hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=0.0001)
-    t2d_disease = mi.Type2Diabetes(init_prev=ss.bernoulli(get_prevalence_function('Type2Diabetes')))
-    ckd_disease = mi.ChronicKidneyDisease(init_prev=ss.bernoulli(get_prevalence_function('ChronicKidneyDisease')))
+    # Define diseases
+    hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=0.0001)  # Example beta value
+    ncd = ['Type2Diabetes', 'ChronicKidneyDisease'] 
 
-    # Read interaction data and create connectors dynamically
-    rel_sus = mi.read_interactions('../mighti/data/rel_sus.csv')
-    interactions = mi.create_connectors(rel_sus)
-
+    # Automatically create disease objects for NCDs
+    disease_objects = []
+    for disease in ncd:
+        init_prev = ss.bernoulli(get_prevalence_function(disease))
+        
+        # Dynamically get the disease class from `mi` module
+        disease_class = getattr(mi, disease, None)
+        
+        if disease_class:
+            disease_obj = disease_class(init_prev=init_prev)  # Instantiate dynamically
+            disease_objects.append(disease_obj)
+        else:
+            print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
+    
+    # Combine all disease objects including HIV
+    disease_objects.append(hiv_disease)
+    
+    # Initialize interaction objects for HIV-NCD interactions
+    interactions = [mi.Type2DiabetesHIVConnector(),
+                    mi.CKDHIVConnector()]
+    
+    # Load NCD-NCD interactions
+    ncd_interactions = mi.read_interactions("mighti/data/rel_sus.csv")  # Reads rel_sus.csv
+    connectors = mi.create_connectors(ncd_interactions)
+    
+    # Add NCD-NCD connectors to interactions
+    interactions.extend(connectors)
+ 
     # Initialize the simulation with connectors
     sim = ss.Sim(
         n_agents=population_size,
         networks=networks,
-        diseases=[hiv_disease, t2d_disease, ckd_disease],
+        diseases=disease_objects,
         analyzers=[prevalence_analyzer],
         start=init_year,
         stop=end_year,
@@ -62,8 +79,10 @@ def run_simulation(prevalence_file, demographics_file, fertility_file, mortality
 
 def plot_results(sim, prevalence_analyzer, outcome):
     if outcome == "Mean Prevalence":
-        mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')
-        mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
+        fig1 = mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')
+        fig2 = mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
+        st.pyplot(fig1)
+        st.pyplot(fig2)
     elif outcome == "Population":
         st.write("Population outcome is not implemented yet.")
     elif outcome == "Sex-Dependent Prevalence":

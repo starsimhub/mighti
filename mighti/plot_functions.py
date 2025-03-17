@@ -98,24 +98,25 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     mean_prevalence_female_without_HIV = np.nan_to_num(female_num_without_HIV / female_den_without_HIV) * 100
 
     # Create figure
-    plt.figure(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(10, 5))
 
     # Plot mean prevalence for males and females
-    plt.plot(sim.timevec, mean_prevalence_male_with_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV+)', linewidth=2, color='blue', linestyle='solid')
-    plt.plot(sim.timevec, mean_prevalence_female_with_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV+)', linewidth=2, color='red', linestyle='solid')
-    plt.plot(sim.timevec, mean_prevalence_male_without_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV-)', linewidth=2, color='blue', linestyle='dashed')
-    plt.plot(sim.timevec, mean_prevalence_female_without_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV-)', linewidth=2, color='red', linestyle='dashed')
+    ax.plot(sim.timevec, mean_prevalence_male_with_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV+)', linewidth=2, color='blue', linestyle='solid')
+    ax.plot(sim.timevec, mean_prevalence_female_with_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV+)', linewidth=2, color='red', linestyle='solid')
+    ax.plot(sim.timevec, mean_prevalence_male_without_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV-)', linewidth=2, color='blue', linestyle='dashed')
+    ax.plot(sim.timevec, mean_prevalence_female_without_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV-)', linewidth=2, color='red', linestyle='dashed')
 
     # Labels and title
-    plt.xlabel('Year')
-    plt.ylabel(f'{disease.capitalize()} Prevalence (%)')
-    plt.title(f'Mean {disease.capitalize()} Prevalence Over Time (All Ages)')
-    plt.legend()
-    plt.grid()
-    
-    plt.yticks(np.arange(0, 101, 20))
+    ax.set_xlabel('Year')
+    ax.set_ylabel(f'{disease.capitalize()} Prevalence (%)')
+    ax.set_title(f'Mean {disease.capitalize()} Prevalence Over Time (All Ages)')
+    ax.legend()
+    ax.grid()
 
-    plt.show()
+    # Set y-axis ticks
+    ax.set_yticks(np.arange(0, 101, 20))
+
+    return fig
 
 
 def plot_mean_prevalence(sim, prevalence_analyzer, disease):
