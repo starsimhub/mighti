@@ -4,21 +4,16 @@ import mighti as mi
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# import sys
-# log_file = open("debug_output.txt", "w")
-# sys.stdout = log_file  # Redirects all print outputs to this file
-
 # Define diseases
-ncd = ['Type2Diabetes','ChronicKidneyDisease'] 
+ncd = ['Type2Diabetes', 'ChronicKidneyDisease'] 
 diseases = ['HIV'] + ncd  # List of diseases including HIV
 beta = 0.0001  # Transmission probability for HIV
-n_agents = 5000  # Number of agents in the simulation
+n_agents = 50000  # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2050
-# 
+
 # Initialize prevalence data from a CSV file
 prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv', inityear=inityear)
-
 
 # Define a function for disease-specific prevalence
 def get_prevalence_function(disease):
@@ -26,7 +21,6 @@ def get_prevalence_function(disease):
 
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
-
 
 # Create demographics
 fertility_rates = {'fertility_rate': pd.read_csv(sc.thispath() / 'mighti/data/eswatini_asfr.csv')}
@@ -39,7 +33,6 @@ ppl = ss.People(n_agents, age_data=pd.read_csv('mighti/data/eswatini_age_2023.cs
 mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
 networks = [mf, maternal]
-
 
 if __name__ == '__main__':
     
@@ -62,8 +55,16 @@ if __name__ == '__main__':
     # Combine all disease objects including HIV
     disease_objects.append(hiv_disease)
     
+    # # Initialize interaction objects for HIV-NCD interactions
     interactions = [mi.Type2DiabetesHIVConnector(),
                     mi.CKDHIVConnector()]
+    
+    # Load NCD-NCD interactions
+    ncd_interactions = mi.read_interactions("mighti/data/rel_sus.csv")  # Reads rel_sus.csv
+    connectors = mi.create_connectors(ncd_interactions)
+    
+    # # Add NCD-NCD connectors to interactions
+    interactions.extend(connectors)
     
     # Initialize the simulation with connectors
     sim = ss.Sim(
@@ -83,6 +84,6 @@ if __name__ == '__main__':
     # Run the simulation
     sim.run()
 
-# # Plot the results for each simulation
-mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
-mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')  
+    # Plot the results for each simulation
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')

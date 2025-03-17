@@ -10,7 +10,7 @@ class Type2Diabetes(ss.NCD):
         super().__init__()
         self.define_pars(
             dur_condition=lognorm(s=0.5, scale=np.exp(1.5)),  # Log-normal distribution for duration
-            incidence_prob=0.0315,
+            incidence_prob=0.02,
             p_death=bernoulli(0.0017),  # Define p_death as a Bernoulli distribution
             init_prev=0.2,
             remission_rate=bernoulli(0.0024),  # Define remission_rate as a Bernoulli distribution
@@ -19,7 +19,7 @@ class Type2Diabetes(ss.NCD):
 
         # Define disease parameters
         self.define_pars(
-            p_acquire=0.0315,  # Probability of acquisition per timestep
+            p_acquire=0.02,  # Probability of acquisition per timestep
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_acquire * self.rel_sus[uids])
