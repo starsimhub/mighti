@@ -1,13 +1,61 @@
 import streamlit as st
-import mighti as mi
 import pandas as pd
+import mighti as mi
+
+# Custom CSS
+st.markdown(
+    """
+    <style>
+    .main {
+        background-color: #F0F2F6;
+    }
+    .css-18e3th9 {
+        padding-top: 2rem;
+    }
+    .stButton>button {
+        background-color: #57068c;
+        color: #FFFFFF;
+        font-weight: bold;
+    }
+    .custom-upload-title {
+        font-size: 30px;
+        color: #57068c; /* NYU violet */
+        font-weight: bold;
+        margin-bottom: 0px;
+    }
+    .custom-upload-box {
+        margin-top: -30px; /* Adjust this value to increase space between upload box and next title */
+        margin-bottom: 30px; /* Adjust this value to increase space between upload box and next title */
+    }
+    .custom-title {
+        color: #57068c;
+    }
+    .sidebar .sidebar-content {
+        width: 350px; /* Adjust the width as needed */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # Sidebar for file uploads
 st.sidebar.title("Upload Files")
-prevalence_file = st.sidebar.file_uploader("Upload Age-Sex Dependent Prevalence Data", type="csv", key="prevalence_file_key")
-mortality_file = st.sidebar.file_uploader("Upload Mortality Data", type="csv", key="mortality_file_key")
-fertility_file = st.sidebar.file_uploader("Upload Fertility Data", type="csv", key="fertility_file_key")
-demographics_file = st.sidebar.file_uploader("Upload Demographics Data", type="csv", key="demographics_file_key")
+
+st.sidebar.markdown('<p class="custom-upload-title">Age-Sex Dependent Prevalence Data</p>', unsafe_allow_html=True)
+prevalence_file = st.sidebar.file_uploader("", type="csv", key="prevalence_file_key")
+st.sidebar.markdown('<div class="custom-upload-box"></div>', unsafe_allow_html=True)  # Add space after upload box
+
+st.sidebar.markdown('<p class="custom-upload-title">Mortality Data</p>', unsafe_allow_html=True)
+mortality_file = st.sidebar.file_uploader("", type="csv", key="mortality_file_key")
+st.sidebar.markdown('<div class="custom-upload-box"></div>', unsafe_allow_html=True)  # Add space after upload box
+
+st.sidebar.markdown('<p class="custom-upload-title">Fertility Data</p>', unsafe_allow_html=True)
+fertility_file = st.sidebar.file_uploader("", type="csv", key="fertility_file_key")
+st.sidebar.markdown('<div class="custom-upload-box"></div>', unsafe_allow_html=True)  # Add space after upload box
+
+st.sidebar.markdown('<p class="custom-upload-title">Demographics Data</p>', unsafe_allow_html=True)
+demographics_file = st.sidebar.file_uploader("", type="csv", key="demographics_file_key")
+st.sidebar.markdown('<div class="custom-upload-box"></div>', unsafe_allow_html=True)  # Add space after upload box
 
 # Sidebar for simulation parameters
 st.sidebar.title("Simulation Parameters")
@@ -21,7 +69,17 @@ st.sidebar.title("Outcomes")
 outcome = st.sidebar.selectbox("Select Outcome", ["Mean Prevalence", "Population", "Sex-Dependent Prevalence"], key="outcome_key")
 
 # Main section
-st.title("MIGHTI Simulation")
+st.markdown('<h1 class="custom-title">MIGHTI Simulation</h1>', unsafe_allow_html=True)
+st.write(
+    """
+    Please upload the required data files and set the simulation parameters 
+    in the sidebar. Once you have done so, click the "Run Simulation" button 
+    to see the results here.
+    """
+)
+
+# Placeholder for results
+results_placeholder = st.empty()
 
 if st.sidebar.button("Run Simulation"):
     if prevalence_file and demographics_file and mortality_file and fertility_file:
@@ -34,15 +92,3 @@ if st.sidebar.button("Run Simulation"):
         mi.plot_results(sim, prevalence_analyzer, outcome)
     else:
         st.error("Please upload all required files.")
-        
-        
-        
-# source streamlit_env/bin/activate
-
-# # Install Streamlit and dependencies
-# pip install --upgrade pip
-# pip install streamlit
-# pip install pyarrow
-
-# # Run the Streamlit app
-# streamlit run app.py           
