@@ -87,17 +87,18 @@ if __name__ == '__main__':
     # Combine all disease objects including HIV
     disease_objects.append(hiv_disease)
     
-    # # Initialize interaction objects for HIV-NCD interactions
-    interactions = [mi.Type2DiabetesHIVConnector(),
-                    mi.CKDHIVConnector()]
+    # Initialize interaction objects for HIV-NCD interactions
+    ncd_hiv_rel_sus = {disease: 2.0 for disease in ncds}  # Example relative susceptibility values for all NCDs
+    ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
+    interactions = [ncd_hiv_connector]
     
     # Load NCD-NCD interactions
     ncd_interactions = mi.read_interactions("mighti/data/rel_sus.csv")  # Reads rel_sus.csv
     connectors = mi.create_connectors(ncd_interactions)
     
-    # # Add NCD-NCD connectors to interactions
+    # Add NCD-NCD connectors to interactions
     interactions.extend(connectors)
-    
+     
     # Initialize the simulation with connectors
     sim = ss.Sim(
         n_agents=n_agents,
