@@ -94,6 +94,51 @@ mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
 networks = [mf, maternal]
 
+# # Load the CSV file
+# csv_path = 'mighti/data/eswatini_parameters.csv'
+# df = pd.read_csv(csv_path)
+
+# # Ensure column names are trimmed to remove extra spaces
+# df.columns = df.columns.str.strip()
+
+# # Filter based on `disease_class`
+# ncds = df[df["disease_class"] == "ncd"]["condition"].tolist()   # List of NCDs
+# communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()  # List of communicable diseases
+
+# # Define diseases
+# conditions = ncds + communicable_diseases  # List of all diseases
+
+# healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease'] 
+# diseases = ['HIV'] + healthconditions #+conditions # List of diseases including HIV
+
+
+
+# # Load prevalence data from the CSV file
+# prevalence_data_csv_path = 'mighti/data/prevalence_data_eswatini.csv'
+# prevalence_data_df = pd.read_csv(prevalence_data_csv_path)
+
+# # Initialize prevalence data from the DataFrame
+# prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, prevalence_data=prevalence_data_df, inityear=inityear)
+
+# # Define a function for disease-specific prevalence
+# def get_prevalence_function(disease):
+#     return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
+
+# # Initialize the PrevalenceAnalyzer
+# prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
+
+# # Create demographics
+# fertility_rates = {'fertility_rate': pd.read_csv( 'mighti/data/eswatini_asfr.csv')}
+# pregnancy = ss.Pregnancy(pars=fertility_rates)
+# death_rates = {'death_rate': pd.read_csv('mighti/data/eswatini_deaths.csv'), 'rate_units': 1}
+# death = ss.Deaths(death_rates)
+# ppl = ss.People(n_agents, age_data=pd.read_csv('mighti/data/eswatini_age_2023.csv'))
+
+# # Create the networks - sexual and maternal
+# mf = ss.MFNet(duration=1/24, acts=80)
+# maternal = ss.MaternalNet()
+# networks = [mf, maternal]
+
 hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 
 # Automatically create disease objects for all diseases
