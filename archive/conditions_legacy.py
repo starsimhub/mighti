@@ -3,79 +3,48 @@ from scipy.stats import bernoulli, lognorm
 import starsim as ss
 import pandas as pd
 
-__all__ = ['Type2Diabetes', 'ChronicKidneyDisease']
-
-def get_disease_parameters(disease_name, csv_path):
-    df = pd.read_csv(csv_path)
-    df.columns = df.columns.str.strip()  # Remove extra spaces
-
-    if "condition" not in df.columns:
-        raise KeyError(f"Column 'condition' not found in {csv_path}. Available columns: {df.columns}")
-
-    row = df[df["condition"] == disease_name]
-    if row.empty:
-        raise ValueError(f"Disease '{disease_name}' not found in {csv_path}.")
-
-    # Extract and handle NaNs
-    params = {
-        "p_death": row["p_death"].values[0] if pd.notna(row["p_death"].values[0]) else 0.0001,
-        "incidence": row["incidence"].values[0] if pd.notna(row["incidence"].values[0]) else 0.1,
-        "dur_condition": row["dur_condition"].values[0] if pd.notna(row["dur_condition"].values[0]) else 10,  # Default 10 if missing
-        "init_prev": row["init_prev"].values[0] if pd.notna(row["init_prev"].values[0]) else 0.1,
-        "rel_sus": row["rel_sus"].values[0] if pd.notna(row["rel_sus"].values[0]) else 1.0,
-        "remission_rate": row["remmision_rate"].values[0] if pd.notna(row["remmision_rate"].values[0]) else 0.0,
-        "max_disease_duration": row["max_disease_duration"].values[0] if pd.notna(row["max_disease_duration"].values[0]) else 30
-    }
-
-    return params
-
-
 # Define Type2Diabetes condition
 class Type2Diabetes(ss.NCD):
-    
-    def __init__(self, disease_name='Type2Diabetes', csv_path=None, pars=None, **kwargs):
-            super().__init__()
-            self.disease_name = disease_name
-            self.csv_path = csv_path
-            disease_params = get_disease_parameters(disease_name, csv_path)
-    
-            # Calculate the mean in log-space (mu)
-            sigma = 0.5
-            mu = np.log(disease_params["dur_condition"]) - (sigma**2) / 2
-    
-            # Define parameters using extracted values
-            self.define_pars(
-                dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
-                incidence_prob=disease_params["incidence"],
-                p_death=bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
-                init_prev=ss.bernoulli(disease_params["init_prev"]),
-                remission_rate=bernoulli(disease_params["remission_rate"]),  # Define remission_rate as a Bernoulli distribution
-                max_disease_duration=disease_params["max_disease_duration"]
-            )
-    
-            # Define disease parameters
-            self.define_pars(
-                p_acquire=disease_params["incidence"],  # Probability of acquisition per timestep
-            )
-    
-            self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_acquire * self.rel_sus[uids])
-            self.p_death = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_death.mean())  # Use mean to match Bernoulli
-            self.p_remission = ss.bernoulli(p=lambda self, sim, uids: self.pars.remission_rate.mean())  # Use mean to match Bernoulli
-    
-            self.update_pars(pars, **kwargs)
-    
-            self.define_states(
-                ss.State('susceptible', default=True),
-                ss.State('affected'),
-                ss.State('reversed'),  # New state for diabetes remission
-                ss.FloatArr('ti_affected'),
-                ss.FloatArr('ti_reversed'),
-                ss.FloatArr('ti_dead'),
-                ss.FloatArr('rel_sus', default=1.0),  # Relative susceptibility
-                ss.FloatArr('rel_death', default=1.0),  # Relative mortality
-            )
-            return
 
+    def __init__(self, pars=None, **kwargs):
+        super().__init__()
+        
+        # Calculate the mean in log-space (mu)
+        sigma = 0.5
+        mu = np.log(15.028971) - (sigma**2) / 2
+        
+        self.define_pars(
+            dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
+            incidence_prob=0.010125,
+            p_death=bernoulli(0.004315),  # Define p_death as a Bernoulli distribution
+            init_prev=ss.bernoulli(13.50683346/100),
+            remission_rate=bernoulli(0.0024),  # Define remission_rate as a Bernoulli distribution
+            max_disease_duration=20,
+        )
+
+        # Define disease parameters
+        self.define_pars(
+            p_acquire=0.010125,  # Probability of acquisition per timestep
+        )
+
+        self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_acquire * self.rel_sus[uids])
+        self.p_death = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_death.mean())  # Use mean to match Bernoulli
+        self.p_remission = ss.bernoulli(p=lambda self, sim, uids: self.pars.remission_rate.mean())  # Use mean to match Bernoulli
+
+        self.update_pars(pars, **kwargs)
+
+        self.define_states(
+            ss.State('susceptible', default=True),
+            ss.State('affected'),
+            ss.State('reversed'),  # New state for diabetes remission
+            ss.FloatArr('ti_affected'),
+            ss.FloatArr('ti_reversed'),
+            ss.FloatArr('ti_dead'),
+            ss.FloatArr('rel_sus', default=1.0),  # Relative susceptibility
+            ss.FloatArr('rel_death', default=1.0),  # Relative mortality
+        )
+        return
+  
     def init_post(self):
         initial_cases = self.pars.init_prev.filter()
         self.set_prognoses(initial_cases)
@@ -157,36 +126,27 @@ class Type2Diabetes(ss.NCD):
 
 # Define Chronic Kidney Disease condition
 class ChronicKidneyDisease(ss.NCD):
-    
-    def __init__(self, disease_name='ChronicKidneyDisease', csv_path=None, pars=None, **kwargs):
+
+    def __init__(self, pars=None, **kwargs):
         super().__init__()
-        self.disease_name = disease_name
-        self.csv_path = csv_path
-        disease_params = get_disease_parameters(disease_name, csv_path)
-    
-        # Calculate the mean in log-space (mu)
-        sigma = 0.5
-        mu = np.log(disease_params["dur_condition"]) - (sigma**2) / 2
-    
-        # Define parameters using extracted values
         self.define_pars(
-            dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
-            incidence_prob=disease_params["incidence"],
-            p_death=bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
-            init_prev=ss.bernoulli(disease_params["init_prev"]),
-            max_disease_duration=disease_params["max_disease_duration"]
+            dur_condition=lognorm(s=0.5, scale=np.exp(1.5)),  # Log-normal distribution for duration
+            incidence_prob=0.015,  # Lower incidence probability than T2D
+            p_death=bernoulli(0.005),  # Higher probability of death than T2D
+            init_prev=0.1,
+            max_disease_duration=30,
         )
-    
+
         # Define disease parameters
         self.define_pars(
-            p_acquire=disease_params["incidence"],  # Probability of acquisition per timestep
+            p_acquire=0.015,  # Probability of acquisition per timestep
         )
-    
+
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_acquire * self.rel_sus[uids])
         self.p_death = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_death.mean())  # Use mean to match Bernoulli
-    
+
         self.update_pars(pars, **kwargs)
-    
+
         self.define_states(
             ss.State('susceptible', default=True),
             ss.State('affected'),
@@ -196,6 +156,7 @@ class ChronicKidneyDisease(ss.NCD):
             ss.FloatArr('rel_death', default=1.0),  # Relative mortality
         )
         return
+    
 
     def init_post(self):
         initial_cases = self.pars.init_prev.filter()

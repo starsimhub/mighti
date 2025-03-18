@@ -3,16 +3,34 @@ import sciris as sc
 import mighti as mi
 import pandas as pd
 
+# Load the CSV file
+csv_path = sc.thispath() / 'mighti/data/eswatini_parameters.csv'
+df = pd.read_csv(csv_path)
+
+# Ensure column names are trimmed to remove extra spaces
+df.columns = df.columns.str.strip()
+
+# Filter based on `disease_class`
+ncds = df[df["disease_class"] == "ncd"]["condition"].tolist()   # List of NCDs
+communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()  # List of communicable diseases
+
 # Define diseases
+conditions = ncds + communicable_diseases  # List of all diseases
+
 ncd = ['Type2Diabetes', 'ChronicKidneyDisease'] 
-diseases = ['HIV'] + ncd  # List of diseases including HIV
+diseases = ['HIV'] + ncd #+conditions # List of diseases including HIV
+
 beta = 0.0001  # Transmission probability for HIV
-n_agents = 50000  # Number of agents in the simulation
+n_agents = 5000  # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2050
 
-# Initialize prevalence data from a CSV file
-prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, csv_file_path='mighti/data/prevalence_data_eswatini.csv', inityear=inityear)
+# Load prevalence data from the CSV file
+prevalence_data_csv_path = sc.thispath() / 'mighti/data/prevalence_data_eswatini.csv'
+prevalence_data_df = pd.read_csv(prevalence_data_csv_path)
+
+# Initialize prevalence data from the DataFrame
+prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, prevalence_data=prevalence_data_df, inityear=inityear)
 
 # Define a function for disease-specific prevalence
 def get_prevalence_function(disease):
@@ -37,20 +55,35 @@ if __name__ == '__main__':
     
     hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
     
-    # Automatically create disease objects for NCDs
+    # # Automatically create disease objects for NCDs
+    # disease_objects = []
+    # for disease in ncd:
+    #     init_prev = ss.bernoulli(get_prevalence_function(disease))
+        
+    #     # Dynamically get the disease class from `mi` module
+    #     disease_class = getattr(mi, disease, None)
+        
+    #     if disease_class:
+    #         disease_obj = disease_class(init_prev=init_prev)  # Instantiate dynamically
+    #         disease_objects.append(disease_obj)
+    #     else:
+    #         print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
+    
+    # Automatically create disease objects for all diseases
     disease_objects = []
-    for disease in ncd:
+    for disease in conditions:
         init_prev = ss.bernoulli(get_prevalence_function(disease))
         
         # Dynamically get the disease class from `mi` module
         disease_class = getattr(mi, disease, None)
         
         if disease_class:
-            disease_obj = disease_class(init_prev=init_prev)  # Instantiate dynamically
+            disease_obj = disease_class(disease_name=disease, csv_path=csv_path, pars={"init_prev": init_prev})  # Instantiate dynamically and pass csv_path
             disease_objects.append(disease_obj)
         else:
             print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
-    
+
+
     # Combine all disease objects including HIV
     disease_objects.append(hiv_disease)
     
@@ -85,4 +118,4 @@ if __name__ == '__main__':
 
     # Plot the results for each simulation
     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
