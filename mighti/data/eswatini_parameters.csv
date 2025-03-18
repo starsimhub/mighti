@@ -5,7 +5,7 @@ Type2Diabetes,0.004315,0.010125,15.028971,13.50683346,1.95,0.024,30,remitting,nc
 Hypertension,0.031625,0.0066,,0.530333333,0.93,,,chronic,ncd,both
 Obesity,,,,0.1221,1.83,,,chronic,ncd,both
 CardiovascularDiseases,,0.0222,6.91139678,6.714704143,1,,,chronic,ncd,both
-ChronicKidneyDisease,,0.015,38.8542472,17.58621416,1.58,,,chronic,ncd,both
+ChronicKidneyDisease,,,38.8542472,17.58621416,1.58,,,chronic,ncd,both
 Hyperlipidemia,,,,,1,,,chronic,ncd,both
 CervicalCancer,0.062,0.0001,3.1960396,0.123850573,6.07,,,chronic,ncd,female
 ColorectalCancer,0.07,0.0015,2.87574671,0.110017543,1,,,chronic,ncd,both

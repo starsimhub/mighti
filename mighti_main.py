@@ -20,7 +20,7 @@ conditions = ncds + communicable_diseases  # List of all diseases
 ncd = ['Type2Diabetes', 'ChronicKidneyDisease'] 
 diseases = ['HIV'] + ncd #+conditions # List of diseases including HIV
 
-beta = 0.0001  # Transmission probability for HIV
+beta = 0.001  # Transmission probability for HIV
 n_agents = 5000  # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2050
@@ -88,7 +88,7 @@ if __name__ == '__main__':
     disease_objects.append(hiv_disease)
     
     # Initialize interaction objects for HIV-NCD interactions
-    ncd_hiv_rel_sus = {disease: 2.0 for disease in ncds}  # Example relative susceptibility values for all NCDs
+    ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
     ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
     interactions = [ncd_hiv_connector]
     

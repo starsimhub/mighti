@@ -114,7 +114,7 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     ax.grid()
 
     # Set y-axis ticks
-    ax.set_yticks(np.arange(0, 101, 20))
+    # ax.set_yticks(np.arange(0, 101, 20))
 
     return fig
 
