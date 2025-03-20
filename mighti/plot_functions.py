@@ -61,9 +61,6 @@ def plot_numerator_denominator(sim, prevalence_analyzer, disease):
     plt.show()
 
 
-import numpy as np
-import matplotlib.pyplot as plt
-
 def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     """
     Plot mean prevalence over time for a given disease and both sexes.
@@ -299,3 +296,94 @@ def plot_mean_prevalence_two_diseases_parallel(msim, diseases):
     
     plt.tight_layout()
     plt.show()
+    
+
+
+def plot_age_dependent_prevalence(sim, prevalence_analyzer, disease, age_bins):
+    """
+    Plot age-dependent prevalence over time for a given disease and both sexes.
+
+    Parameters:
+    - sim: The simulation object (provides `sim.timevec`)
+    - prevalence_analyzer: The prevalence analyzer with stored results
+    - disease: Name of the disease (e.g., 'HIV', 'Type2Diabetes')
+    - age_bins: List of age bin categories for plotting
+    """
+
+    # Ensure age_bins is a valid list of numbers
+    if not age_bins or not isinstance(age_bins, (list, np.ndarray)):
+        print("[ERROR] age_bins is empty or not a valid list. Using default values.")
+        age_bins_list = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
+    else:
+        try:
+            age_bins_list = [int(age) for age in age_bins if str(age).isdigit()]
+        except ValueError:
+            print("[ERROR] age_bins contains non-numeric values. Using default values.")
+            age_bins_list = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
+
+    # Ensure age_bins_list has valid elements
+    if len(age_bins_list) < 2:
+        print("[ERROR] age_bins_list is too short. Using default values.")
+        age_bins_list = [0, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
+
+    # Create age group labels
+    age_group_labels = [f'{left}-{right-1}' for left, right in zip(age_bins_list[:-1], age_bins_list[1:])]
+    if age_bins_list[-1] == 80:
+        age_group_labels.append('80+')
+
+    # Define color mapping for age groups
+    cmap = plt.get_cmap('tab20', len(age_group_labels))
+    age_bin_colors = {label: cmap(i) for i, label in enumerate(age_group_labels)}
+
+    # Set up the figure with 4 panels
+    fig, axs = plt.subplots(2, 2, figsize=(18, 12), sharex=True, sharey=True)
+    plt.subplots_adjust(hspace=0.3, wspace=0.2)
+
+    # Extract prevalence data
+    def extract_results(key_pattern):
+        return [prevalence_analyzer.results.get(f'{disease}_{key_pattern}_{i}', np.zeros(len(sim.timevec))) for i in range(len(prevalence_analyzer.age_bins))]
+
+    male_with_HIV = extract_results('num_with_HIV_male')
+    female_with_HIV = extract_results('num_with_HIV_female')
+    male_without_HIV = extract_results('num_without_HIV_male')
+    female_without_HIV = extract_results('num_without_HIV_female')
+    male_with_HIV_den = extract_results('den_with_HIV_male')
+    female_with_HIV_den = extract_results('den_with_HIV_female')
+    male_without_HIV_den = extract_results('den_without_HIV_male')
+    female_without_HIV_den = extract_results('den_without_HIV_female')
+
+    # Plot male PLHIV
+    for i, label in enumerate(age_group_labels):
+        axs[0, 0].plot(sim.timevec, np.nan_to_num(male_with_HIV[i] / male_with_HIV_den[i]) * 100, label=label, color=age_bin_colors[label])
+    axs[0, 0].set_title(f'Male {disease.capitalize()} Prevalence (HIV+)', fontsize=24)
+    axs[0, 0].set_ylabel('Prevalence (%)', fontsize=20)
+    axs[0, 0].grid(True)
+
+    # Plot female PLHIV
+    for i, label in enumerate(age_group_labels):
+        axs[0, 1].plot(sim.timevec, np.nan_to_num(female_with_HIV[i] / female_with_HIV_den[i]) * 100, label=label, color=age_bin_colors[label])
+    axs[0, 1].set_title(f'Female {disease.capitalize()} Prevalence (HIV+)', fontsize=24)
+    axs[0, 1].grid(True)
+
+    # Plot male without HIV
+    for i, label in enumerate(age_group_labels):
+        axs[1, 0].plot(sim.timevec, np.nan_to_num(male_without_HIV[i] / male_without_HIV_den[i]) * 100, label=label, color=age_bin_colors[label])
+    axs[1, 0].set_title(f'Male {disease.capitalize()} Prevalence (HIV-)', fontsize=24)
+    axs[1, 0].set_xlabel('Year', fontsize=20)
+    axs[1, 0].set_ylabel('Prevalence (%)', fontsize=20)
+    axs[1, 0].grid(True)
+
+    # Plot female without HIV
+    for i, label in enumerate(age_group_labels):
+        axs[1, 1].plot(sim.timevec, np.nan_to_num(female_without_HIV[i] / female_without_HIV_den[i]) * 100, label=label, color=age_bin_colors[label])
+    axs[1, 1].set_title(f'Female {disease.capitalize()} Prevalence (HIV-)', fontsize=24)
+    axs[1, 1].set_xlabel('Year', fontsize=20)
+    axs[1, 1].grid(True)
+
+    # Add a common legend
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, title='Age Groups', loc='lower center', bbox_to_anchor=(0.5, -0.05), ncol=len(age_group_labels) // 2, fontsize=18)
+
+    return fig   
+    
+    

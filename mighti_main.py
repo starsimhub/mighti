@@ -12,7 +12,7 @@ import pandas as pd
 beta = 0.001
 n_agents = 5000  # Number of agents in the simulation
 inityear = 2017  # Simulation start year
-endyear = 2050
+endyear = 2030
 
 # ---------------------------------------------------------------------
 # Specify data file paths
@@ -164,10 +164,12 @@ if __name__ == '__main__':
     sim.run()
 
     # Plot the results for each simulation
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')  
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')      
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HPV')  
-    
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')  
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')      
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')  
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
+    mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', age_bins)
+    mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'HIV', age_bins)
     
 # if __name__ == '__main__':
 

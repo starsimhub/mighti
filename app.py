@@ -79,7 +79,13 @@ if page == "Run Simulation":
     # Sidebar for outcomes
     st.sidebar.title("Outcomes")
     outcome = st.sidebar.selectbox("Select Outcome", ["Mean Prevalence", "Population", "Sex-Dependent Prevalence"], key="outcome_key")
-    disease = st.sidebar.selectbox("Select Disease to Plot", ["HIV", "Type2Diabetes", "ChronicKidneyDisease"], key="disease")
+
+    # Load the parameters data to get the list of diseases
+    csv_path_params = 'mighti/data/eswatini_parameters.csv'
+    df = pd.read_csv(csv_path_params)
+    healthconditions = df['condition'].unique().tolist()
+    
+    disease = st.sidebar.selectbox("Select Disease to Plot", healthconditions, key="disease")
 
     # Main section
     st.markdown('<h1 class="custom-title">MIGHTI Simulation</h1>', unsafe_allow_html=True)
@@ -101,10 +107,11 @@ if page == "Run Simulation":
             fertility_data = pd.read_csv(fertility_file)
             mortality_data = pd.read_csv(mortality_file)
             # parameter_data = pd.read_csv(parameters_file)
-            
+            age_bins = [(0, 15), (15, 21), (21, 26), (26, 31), (31, 36), (36, 41), (41, 46), 
+                        (46, 51), (51, 56), (56, 61), (61, 66), (66, 71), (71, 76), (76, 81), (80, float('inf'))]
     
             sim, prevalence_analyzer = mi.run_simulation(prevalence_data, demographics_data, fertility_data, mortality_data, init_year, end_year, population_size)
-            mi.plot_results(sim, prevalence_analyzer, outcome, disease)
+            mi.plot_results(sim, prevalence_analyzer, outcome, disease, age_bins)
         else:
             st.error("Please upload all required files.")
         
