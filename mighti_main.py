@@ -46,19 +46,25 @@ df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
 # Extract all conditions except HIV
-# healthconditions = [condition for condition in df_params.index if condition != "HIV"]
-healthconditions = ['Type2Diabetes','ChronicKidneyDisease']
+healthconditions = [condition for condition in df.condition if condition != "HIV"]
+# healthconditions = ['Type2Diabetes']
 # 
 # Combine with HIV
 diseases = ["HIV"] + healthconditions
 
-# Ensure column names are trimmed to remove extra spaces
-df = pd.read_csv(csv_path_params)
-df.columns = df.columns.str.strip()
+# Filter the DataFrame for disease_class being 'ncd'
+ncd_df = df[df["disease_class"] == "ncd"]
 
-# Extract disease categories
-ncds = df[df["disease_class"] == "ncd"]["condition"].tolist()
+# Extract disease categories from the filtered DataFrame
+chronic = ncd_df[ncd_df["disease_type"] == "chronic"]["condition"].tolist()
+acute = ncd_df[ncd_df["disease_type"] == "acute"]["condition"].tolist()
+remitting = ncd_df[ncd_df["disease_type"] == "remitting"]["condition"].tolist()
+
+# Extract communicable diseases with disease_class as 'sis'
 communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
+
+# Initialize disease models with preloaded data
+mi.initialize_conditions(df, chronic, acute, remitting, communicable_diseases)
 
 # ---------------------------------------------------------------------
 # Initialize conditions, prevalence analyzer, and interactions
@@ -74,7 +80,9 @@ def get_prevalence_function(disease):
     return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
 
 # Initialize the PrevalenceAnalyzer
-prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
+prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=healthconditions, 
+                                            communicable_diseases = communicable_diseases)
+
 
 # -------------------------
 # Demographics
@@ -94,54 +102,14 @@ mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
 networks = [mf, maternal]
 
-# # Load the CSV file
-# csv_path = 'mighti/data/eswatini_parameters.csv'
-# df = pd.read_csv(csv_path)
 
-# # Ensure column names are trimmed to remove extra spaces
-# df.columns = df.columns.str.strip()
-
-# # Filter based on `disease_class`
-# ncds = df[df["disease_class"] == "ncd"]["condition"].tolist()   # List of NCDs
-# communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()  # List of communicable diseases
-
-# # Define diseases
-# conditions = ncds + communicable_diseases  # List of all diseases
-
-# healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease'] 
-# diseases = ['HIV'] + healthconditions #+conditions # List of diseases including HIV
-
-
-
-# # Load prevalence data from the CSV file
-# prevalence_data_csv_path = 'mighti/data/prevalence_data_eswatini.csv'
-# prevalence_data_df = pd.read_csv(prevalence_data_csv_path)
-
-# # Initialize prevalence data from the DataFrame
-# prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, prevalence_data=prevalence_data_df, inityear=inityear)
-
-# # Define a function for disease-specific prevalence
-# def get_prevalence_function(disease):
-#     return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
-
-# # Initialize the PrevalenceAnalyzer
-# prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
-
-# # Create demographics
-# fertility_rates = {'fertility_rate': pd.read_csv( 'mighti/data/eswatini_asfr.csv')}
-# pregnancy = ss.Pregnancy(pars=fertility_rates)
-# death_rates = {'death_rate': pd.read_csv('mighti/data/eswatini_deaths.csv'), 'rate_units': 1}
-# death = ss.Deaths(death_rates)
-# ppl = ss.People(n_agents, age_data=pd.read_csv('mighti/data/eswatini_age_2023.csv'))
-
-# # Create the networks - sexual and maternal
-# mf = ss.MFNet(duration=1/24, acts=80)
-# maternal = ss.MaternalNet()
-# networks = [mf, maternal]
+# -------------------------
+# Disease Conditions
+# -------------------------
 
 hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 
-# Automatically create disease objects for all diseases
+# Automatically create disease objects
 disease_objects = []
 for disease in healthconditions:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
@@ -150,14 +118,18 @@ for disease in healthconditions:
     disease_class = getattr(mi, disease, None)
     
     if disease_class:
-        disease_obj = disease_class(disease_name=disease, csv_path=csv_path_params, pars={"init_prev": init_prev})  # Instantiate dynamically and pass csv_path
+        disease_obj = disease_class(init_prev=init_prev)  # Instantiate dynamically
         disease_objects.append(disease_obj)
     else:
         print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
-
-
+        
 # Combine all disease objects including HIV
 disease_objects.append(hiv_disease)
+
+
+# -------------------------
+# Disease Interactions
+# -------------------------
 
 # Initialize interaction objects for HIV-NCD interactions
 ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
@@ -166,7 +138,7 @@ interactions = [ncd_hiv_connector]
 
 # Load NCD-NCD interactions
 ncd_interactions = mi.read_interactions(csv_path_interactions)  # Reads rel_sus.csv
-connectors = mi.create_connectors(ncd_interactions)
+connectors = mi.create_connectors(ncd_interactions, communicable_diseases)
 
 # Add NCD-NCD connectors to interactions
 interactions.extend(connectors)
@@ -192,9 +164,9 @@ if __name__ == '__main__':
     sim.run()
 
     # Plot the results for each simulation
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')  
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')      
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')  
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')  
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')      
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HPV')  
     
     
 # if __name__ == '__main__':
