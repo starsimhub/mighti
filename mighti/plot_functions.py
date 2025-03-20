@@ -61,6 +61,9 @@ def plot_numerator_denominator(sim, prevalence_analyzer, disease):
     plt.show()
 
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     """
     Plot mean prevalence over time for a given disease and both sexes.
@@ -84,7 +87,6 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     male_den_without_HIV = np.sum(extract_results('den_without_HIV_male'), axis=0)
     female_den_without_HIV = np.sum(extract_results('den_without_HIV_female'), axis=0)
 
-  
     # Check for division by zero
     male_den_with_HIV[male_den_with_HIV == 0] = 1
     female_den_with_HIV[female_den_with_HIV == 0] = 1
@@ -97,20 +99,23 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     mean_prevalence_male_without_HIV = np.nan_to_num(male_num_without_HIV / male_den_without_HIV) * 100
     mean_prevalence_female_without_HIV = np.nan_to_num(female_num_without_HIV / female_den_without_HIV) * 100
 
+    # Set font size for the plot
+    plt.rcParams.update({'font.size': 16})
+
     # Create figure
-    fig, ax = plt.subplots(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(14, 7))
 
     # Plot mean prevalence for males and females
-    ax.plot(sim.timevec, mean_prevalence_male_with_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV+)', linewidth=2, color='blue', linestyle='solid')
-    ax.plot(sim.timevec, mean_prevalence_female_with_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV+)', linewidth=2, color='red', linestyle='solid')
-    ax.plot(sim.timevec, mean_prevalence_male_without_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV-)', linewidth=2, color='blue', linestyle='dashed')
-    ax.plot(sim.timevec, mean_prevalence_female_without_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV-)', linewidth=2, color='red', linestyle='dashed')
+    ax.plot(sim.timevec, mean_prevalence_male_with_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV+)', linewidth=4, color='blue', linestyle='solid')
+    ax.plot(sim.timevec, mean_prevalence_female_with_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV+)', linewidth=4, color='red', linestyle='solid')
+    ax.plot(sim.timevec, mean_prevalence_male_without_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV-)', linewidth=4, color='blue', linestyle='dashed')
+    ax.plot(sim.timevec, mean_prevalence_female_without_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV-)', linewidth=4, color='red', linestyle='dashed')
 
     # Labels and title
-    ax.set_xlabel('Year')
-    ax.set_ylabel(f'{disease.capitalize()} Prevalence (%)')
-    ax.set_title(f'Mean {disease.capitalize()} Prevalence Over Time (All Ages)')
-    ax.legend()
+    ax.set_xlabel('Year', fontsize=20)
+    ax.set_ylabel(f'{disease.capitalize()} Prevalence (%)', fontsize=20)
+    ax.set_title(f'Mean {disease.capitalize()} Prevalence Over Time (All Ages)', fontsize=24)
+    ax.legend(fontsize=16)
     ax.grid()
 
     # Set y-axis ticks
