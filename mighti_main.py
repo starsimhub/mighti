@@ -1,7 +1,7 @@
 import starsim as ss
 import mighti as mi
 import pandas as pd
-
+import matplotlib.pyplot as plt
 
 ### TO DO
 
@@ -143,6 +143,35 @@ connectors = mi.create_connectors(ncd_interactions, communicable_diseases)
 # Add NCD-NCD connectors to interactions
 interactions.extend(connectors)
 
+# if __name__ == '__main__':
+    
+#     # Initialize the simulation with connectors
+#     sim = ss.Sim(
+#         n_agents=n_agents,
+#         networks=networks,
+#         diseases=disease_objects,
+#         analyzers=[prevalence_analyzer],
+#         start=inityear,
+#         stop=endyear,
+#         people=ppl,
+#         demographics=[pregnancy, death],
+#         connectors=interactions,
+#         copy_inputs=False,
+#         label='Connector'
+#     )
+
+#     # Run the simulation
+#     sim.run()
+
+#     # Plot the results for each simulation
+#     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')  
+#     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')      
+#     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')  
+#     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
+#     mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', age_bins)
+#     mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'HIV', age_bins)
+
+
 if __name__ == '__main__':
     
     # Initialize the simulation with connectors
@@ -163,13 +192,23 @@ if __name__ == '__main__':
     # Run the simulation
     sim.run()
 
-    # Plot the results for each simulation
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')  
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')      
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')  
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
-    mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', age_bins)
-    mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'HIV', age_bins)
+    # # Plot the results for each simulation
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')  
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')      
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')  
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
+    # mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', age_bins)
+    # mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'HIV', age_bins)
+
+    # Perform CEA if needed
+    cost_data_path = 'mighti/data/cost_data.csv'
+    utility_data_path = 'mighti/data/utility_data.csv'
+    cost_data = pd.read_csv(cost_data_path)
+    utility_data = pd.read_csv(utility_data_path)
+    
+    # Perform CEA
+    cea_results = mi.cea.perform_cea(prevalence_analyzer, cost_data, utility_data)
+    mi.plot_cea_results(cea_results)
     
 # if __name__ == '__main__':
 
