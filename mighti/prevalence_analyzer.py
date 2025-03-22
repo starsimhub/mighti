@@ -20,6 +20,8 @@ class PrevalenceAnalyzer(ss.Analyzer):
         self.prevalence_data = prevalence_data
         self.diseases = diseases
         self.communicable_diseases = communicable_diseases
+        self.yearly_deaths = {}  # Dictionary to store yearly death counts
+        self.cumulative_deaths = {}  # Dictionary to store cumulative deaths for each individual
 
         # Define age bins
         self.age_bins = [(0, 15), (15, 21), (21, 26), (26, 31), (31, 36), (36, 41), (41, 46), 
@@ -76,34 +78,50 @@ class PrevalenceAnalyzer(ss.Analyzer):
         ti = self.ti
         ppl = sim.people
         hiv = sim.diseases.hiv
-
+    
         denom = (ppl.age >= 0)  # All individuals
         has_hiv = denom & hiv.infected  # Individuals with HIV
         no_hiv = denom & hiv.susceptible  # Individuals without HIV
-
+    
         for disease in self.diseases:
             dis = getattr(sim.diseases, disease.lower(), None)
             if dis is None:
                 print(f"[WARNING] {disease} not found in sim.diseases, skipping...")
                 continue  # Skip if the disease object does not exist
-
+    
             # Get disease parameters
             disease_params = mi.get_disease_parameters(disease)
             affected_sex = disease_params.get("affected_sex", "both")  # Default to both
-
+    
             # Determine the correct status attribute: 'infected' for SIS diseases, 'affected' for NCDs
             status_attr = 'infected' if disease in self.communicable_diseases else 'affected'
             if not hasattr(dis, status_attr):
                 continue  # Skip if the disease object does not have the required attribute
-
+    
+            # Filter individuals based on affected sex
+            if affected_sex == "female":
+                denom = denom & ppl.female
+            elif affected_sex == "male":
+                denom = denom & ppl.male
+    
             has_disease = denom & getattr(dis, status_attr)
-
+    
             has_disease_f = has_disease & ppl.female  # Women with disease
             has_disease_m = has_disease & ppl.male  # Men with disease
             has_hiv_f = has_hiv & ppl.female  # Women with HIV
             has_hiv_m = has_hiv & ppl.male  # Men with HIV
             no_hiv_f = no_hiv & ppl.female  # Women without HIV
             no_hiv_m = no_hiv & ppl.male  # Men without HIV
+    
+            # Print detailed logging information
+            print(f"Disease: {disease}")
+            print(f"has_disease_f: {np.sum(has_disease_f)}")
+            print(f"has_disease_m: {np.sum(has_disease_m)}")
+            print(f"has_hiv_f: {np.sum(has_hiv_f)}")
+            print(f"has_hiv_m: {np.sum(has_hiv_m)}")
+            print(f"no_hiv_f: {np.sum(no_hiv_f)}")
+            print(f"no_hiv_m: {np.sum(no_hiv_m)}")
+
 
             total_num_with_HIV = 0
             total_den_with_HIV = 0
@@ -140,6 +158,11 @@ class PrevalenceAnalyzer(ss.Analyzer):
                     total_num_with_HIV += num_with_HIV
                     total_den_with_HIV += den_with_HIV
 
+                    # # Print detailed logging information
+                    # print(f"Disease: {disease}, Age Group: {age_start}-{age_end}, Sex: {label}")
+                    # print(f"  With HIV: num = {num_with_HIV}, den = {den_with_HIV}")
+                    # print(f"  Without HIV: num = {num_without_HIV}, den = {den_without_HIV}")
+
             self.results[f'{disease}_prev_no_hiv'][ti] = self.cond_prob(has_disease, no_hiv)
             self.results[f'{disease}_prev_has_hiv'][ti] = self.cond_prob(has_disease, has_hiv)
             self.results[f'{disease}_prev_no_hiv_f'][ti] = self.cond_prob(has_disease_f, no_hiv_f)
@@ -151,5 +174,34 @@ class PrevalenceAnalyzer(ss.Analyzer):
 
             # Calculate total prevalence
             total_prevalence_with_HIV = (total_num_with_HIV / total_den_with_HIV) * 100 if total_den_with_HIV != 0 else 0
-            
+        
+        # Call analyze method during each simulation step to track yearly deaths
+        self.analyze(sim)
+        
         return
+
+    def analyze(self, sim):
+        # Use 't' for the current simulation time step
+        current_time_step = sim.t.now()
+        year = int(current_time_step)  # Assuming each time step represents one year
+        if year not in self.yearly_deaths:
+            self.yearly_deaths[year] = 0
+
+        # Count the number of deaths in the current year
+        num_deaths = np.sum(sim.people.dead == 1)
+        # print(f'num_deaths is {num_deaths}')
+        self.yearly_deaths[year] += num_deaths
+
+        # Track cumulative deaths for each individual
+        dead_uids = sim.people.dead.uids
+        for uid in dead_uids:
+            if uid not in self.cumulative_deaths:
+                self.cumulative_deaths[uid] = (sim.people.age[uid], year)  # Store both age and year of death
+
+        # Remove dead individuals from the population
+        sim.people.remove_dead()  # Ensure this is set correctly
+
+        return
+
+    def get_yearly_deaths(self):
+        return self.yearly_deaths

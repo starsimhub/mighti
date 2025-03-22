@@ -7,6 +7,7 @@ from .prevalence_analyzer import *
 from .plot_functions import *
 from .run_simulation import *
 from .cea import *
+from .life_expectancy import *
 
 
 # Set the root directory for the codebase

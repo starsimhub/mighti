@@ -1,4 +1,5 @@
 ﻿condition,p_death,incidence,dur_condition,init_prev,rel_sus,remmision_rate,max_disease_duration,disease_type,disease_class,affected_sex
+HIV,,,,,,,,chronic,,
 Type1Diabetes,,,27.3970433,0.318872567,1,,,chronic,ncd,both
 Type2Diabetes,0.004315,0.010125,15.028971,13.50683346,1.95,0.024,30,remitting,ncd,both
 Hypertension,0.031625,0.0066,,0.530333333,0.93,,,chronic,ncd,both
@@ -26,4 +27,3 @@ ParkinsonsDisease,0.0301875,0.0005,6.69425511,0.208179273,1,,,chronic,ncd,both
 ViralHepatitis,0.03030313,,,,,,,acute,sis,both
 HPV,,,,,,0.01,,remitting,sis,both
 Flu,0.004815,0.15,,,5.7,,,acute,sis,both
-TB,,,,,,,,chronic,,both

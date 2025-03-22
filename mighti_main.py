@@ -3,7 +3,15 @@ import mighti as mi
 import pandas as pd
 import matplotlib.pyplot as plt
 
+# import sys
+# log_file = open("debug_output.txt", "w")
+# sys.stdout = log_file  # Redirects all print outputs to this file
+
 ### TO DO
+# Life expectancy
+# Check cervical cancer PLHIV and without
+# add more print statement to confirm male/female
+# Risk factors 
 
 
 # ---------------------------------------------------------------------
@@ -12,7 +20,7 @@ import matplotlib.pyplot as plt
 beta = 0.001
 n_agents = 5000  # Number of agents in the simulation
 inityear = 2017  # Simulation start year
-endyear = 2030
+endyear = 2050
 
 # ---------------------------------------------------------------------
 # Specify data file paths
@@ -185,30 +193,48 @@ if __name__ == '__main__':
         people=ppl,
         demographics=[pregnancy, death],
         connectors=interactions,
-        copy_inputs=False,
-        label='Connector'
-    )
+        copy_inputs=False
+        )
 
     # Run the simulation
     sim.run()
+    
+    # # Validate life expectancy
+    # predicted_life_expectancy = mi.calculate_life_expectancy(sim, prevalence_analyzer)
+    # # print("Life Expectancy:")
+    # print(predicted_life_expectancy)
+
+    # # Actual life expectancy data for comparison (example values)
+    # actual_life_expectancy = {
+    #     'men': 76.1,
+    #     'women': 81.1,
+    #     'all': 78.6
+    # }
+
+    # # Calculate SSE
+    # sse = mi.compare_life_expectancy(predicted_life_expectancy, actual_life_expectancy)
+    # print(f"Sum of Squared Errors (SSE): {sse}")
+
+    # # Plot survival curves
+    # mi.plot_survival_curves(predicted_life_expectancy, actual_life_expectancy)
 
     # # Plot the results for each simulation
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')  
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')      
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')  
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')  
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')      
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')  
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
     # mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', age_bins)
     # mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'HIV', age_bins)
 
-    # Perform CEA if needed
-    cost_data_path = 'mighti/data/cost_data.csv'
-    utility_data_path = 'mighti/data/utility_data.csv'
-    cost_data = pd.read_csv(cost_data_path)
-    utility_data = pd.read_csv(utility_data_path)
+    # # Perform CEA if needed
+    # cost_data_path = 'mighti/data/cost_data.csv'
+    # utility_data_path = 'mighti/data/utility_data.csv'
+    # cost_data = pd.read_csv(cost_data_path)
+    # utility_data = pd.read_csv(utility_data_path)
     
-    # Perform CEA
-    cea_results = mi.cea.perform_cea(prevalence_analyzer, cost_data, utility_data)
-    mi.plot_cea_results(cea_results)
+    # # Perform CEA
+    # cea_results = mi.cea.perform_cea(prevalence_analyzer, cost_data, utility_data)
+    # mi.plot_cea_results(cea_results)
     
 # if __name__ == '__main__':
 
@@ -247,4 +273,6 @@ if __name__ == '__main__':
 
     
 # # # Plot the results for each simulation
-# mi.plot_mean_prevalence_two_diseases_parallel(msim, ['HIV','Type2Diabetes'])    
+# mi.plot_mean_prevalence_two_diseases_parallel(msim, ['HIV','Type2Diabetes'])   
+
+

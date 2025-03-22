@@ -14,6 +14,7 @@ chronic = []
 acute = []
 remitting = []
 communicable_diseases = []
+df_params = None
 
 def initialize_conditions(df, chronic_list, acute_list, remitting_list, sis_list):
     """ Load disease parameters and categories from `mighti_main.py`. """
@@ -113,9 +114,9 @@ def get_disease_parameters(disease_name):
         "rel_sus": row["rel_sus"].values[0] if pd.notna(row["rel_sus"].values[0]) else 1.0,
         "remission_rate": row["remmision_rate"].values[0] if pd.notna(row["remmision_rate"].values[0]) else 0.0,
         "max_disease_duration": row["max_disease_duration"].values[0] if pd.notna(row["max_disease_duration"].values[0]) else None,
-        "affected_sex": row["affected_sex"].values[0] if "affected_sex" in row else "both",
-        "disease_type": row["disease_type"].values[0] if "disease_type" in row else "chronic",
-        "disease_class": row["disease_class"].values[0] if "disease_class" in row else "NCD"
+        "affected_sex": row["affected_sex"].values[0] if "affected_sex" in row and pd.notna(row["affected_sex"].values[0]) else "both",
+        "disease_type": row["disease_type"].values[0] if "disease_type" in row and pd.notna(row["disease_type"].values[0]) else "chronic",
+        "disease_class": row["disease_class"].values[0] if "disease_class" in row and pd.notna(row["disease_class"].values[0]) else "NCD"
     }
 
 # Define Chronic Disease class
@@ -138,7 +139,9 @@ class ChronicDisease(ss.NCD):
             incidence_prob=disease_params["incidence"],
             p_death=bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
             init_prev=ss.bernoulli(disease_params["init_prev"]),
-            max_disease_duration=disease_params["max_disease_duration"]
+            max_disease_duration=disease_params["max_disease_duration"],
+            rel_sus_hiv=disease_params["rel_sus"],  # Store HIV relative risk
+            affected_sex=disease_params["affected_sex"]
         )
 
         # Define disease parameters
@@ -146,7 +149,23 @@ class ChronicDisease(ss.NCD):
             p_acquire=disease_params["incidence"],  # Probability of acquisition per timestep
         )
 
-        self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_acquire * self.rel_sus[uids])
+       # Define the lambda function to calculate acquisition probability
+        def calculate_p_acquire(self, sim, uids):
+            # Start with base probability
+            p = np.full(len(uids), self.pars.p_acquire)
+            
+            # Apply sex-specific filtering
+            if self.pars.affected_sex == "female":
+                # Set probability to 0 for males
+                p[sim.people.male[uids]] = 0
+            elif self.pars.affected_sex == "male":
+                # Set probability to 0 for females
+                p[sim.people.female[uids]] = 0
+            
+            return p * self.rel_sus[uids]
+
+        # Use our custom function for p_acquire
+        self.p_acquire = ss.bernoulli(p=calculate_p_acquire)
         self.p_death = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_death.mean())  # Use mean to match Bernoulli
 
         self.update_pars(pars, **kwargs)
@@ -159,6 +178,11 @@ class ChronicDisease(ss.NCD):
             ss.FloatArr('rel_sus', default=1.0),  # Relative susceptibility
             ss.FloatArr('rel_death', default=1.0),  # Relative mortality
         )
+        
+        # Debug output for sex-specific diseases
+        if disease_params["affected_sex"] in ["female", "male"]:
+            print(f"Initialized {disease_name} with affected_sex={disease_params['affected_sex']}")
+            
         return
 
     def init_post(self):
@@ -236,7 +260,9 @@ class RemittingDisease(ss.NCD):
             p_death=bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
             init_prev=ss.bernoulli(disease_params["init_prev"]),
             remission_rate=bernoulli(disease_params["remission_rate"]),  # Define remission_rate as a Bernoulli distribution
-            max_disease_duration=disease_params["max_disease_duration"]
+            max_disease_duration=disease_params["max_disease_duration"],
+            rel_sus_hiv=disease_params["rel_sus"],  # Store HIV relative risk
+            affected_sex=disease_params["affected_sex"]
         )
 
         # Define disease parameters
@@ -244,7 +270,23 @@ class RemittingDisease(ss.NCD):
             p_acquire=disease_params["incidence"],  # Probability of acquisition per timestep
         )
 
-        self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_acquire * self.rel_sus[uids])
+       # Define the lambda function to calculate acquisition probability
+        def calculate_p_acquire(self, sim, uids):
+            # Start with base probability
+            p = np.full(len(uids), self.pars.p_acquire)
+            
+            # Apply sex-specific filtering
+            if self.pars.affected_sex == "female":
+                # Set probability to 0 for males
+                p[sim.people.male[uids]] = 0
+            elif self.pars.affected_sex == "male":
+                # Set probability to 0 for females
+                p[sim.people.female[uids]] = 0
+            
+            return p * self.rel_sus[uids]
+
+        # Use our custom function for p_acquire
+        self.p_acquire = ss.bernoulli(p=calculate_p_acquire)
         self.p_death = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_death.mean())  # Use mean to match Bernoulli
         self.p_remission = ss.bernoulli(p=lambda self, sim, uids: self.pars.remission_rate.mean())  # Use mean to match Bernoulli
 
@@ -260,6 +302,11 @@ class RemittingDisease(ss.NCD):
             ss.FloatArr('rel_sus', default=1.0),  # Relative susceptibility
             ss.FloatArr('rel_death', default=1.0),  # Relative mortality
         )
+        
+        # Debug output for Type2Diabetes
+        if disease_name == "Type2Diabetes":
+            print(f"Initialized {disease_name} with remitting class, rel_sus_hiv={disease_params['rel_sus']}")
+            
         return
 
     def init_post(self):
@@ -341,7 +388,7 @@ class RemittingDisease(ss.NCD):
 
         return new_cases
 
-        # Define Acute Disease class
+# Define Acute Disease class
 class AcuteDisease(ss.NCD):
     """ Base class for all acute diseases. """
 
@@ -360,7 +407,9 @@ class AcuteDisease(ss.NCD):
             incidence_prob=disease_params["incidence"],
             p_death=bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
             init_prev=ss.bernoulli(disease_params["init_prev"]),
-            max_disease_duration=disease_params["max_disease_duration"]
+            max_disease_duration=disease_params["max_disease_duration"],
+            rel_sus_hiv=disease_params["rel_sus"],  # Store HIV relative risk
+            affected_sex=disease_params["affected_sex"]
         )
 
         # Define disease parameters
@@ -368,7 +417,23 @@ class AcuteDisease(ss.NCD):
             p_acquire=disease_params["incidence"],  # Probability of acquisition per timestep
         )
 
-        self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_acquire * self.rel_sus[uids])
+       # Define the lambda function to calculate acquisition probability
+        def calculate_p_acquire(self, sim, uids):
+            # Start with base probability
+            p = np.full(len(uids), self.pars.p_acquire)
+            
+            # Apply sex-specific filtering
+            if self.pars.affected_sex == "female":
+                # Set probability to 0 for males
+                p[sim.people.male[uids]] = 0
+            elif self.pars.affected_sex == "male":
+                # Set probability to 0 for females
+                p[sim.people.female[uids]] = 0
+            
+            return p * self.rel_sus[uids]
+
+        # Use our custom function for p_acquire
+        self.p_acquire = ss.bernoulli(p=calculate_p_acquire)
         self.p_death = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_death.mean())  # Use mean to match Bernoulli
 
         self.update_pars(pars, **kwargs)
@@ -386,9 +451,10 @@ class AcuteDisease(ss.NCD):
 class GenericSIS(ss.SIS):
     """ Base class for communicable diseases using the SIS model. """
 
-    def __init__(self, disease_name, csv_path, pars=None, **kwargs):
+    def __init__(self, disease_name='GenericSIS', csv_path=None, pars=None, **kwargs):
         super().__init__()
         self.disease_name = disease_name
+        self.csv_path = csv_path
 
         # Fetch disease parameters from the globally stored DataFrame
         disease_params = get_disease_parameters(disease_name)
@@ -397,81 +463,64 @@ class GenericSIS(ss.SIS):
         self.define_pars(
             dur_condition=ss.lognorm_ex(disease_params["dur_condition"]),
             incidence_prob=disease_params["incidence"],
-            incidence=ss.bernoulli(disease_params["incidence"]),
             p_death=ss.bernoulli(disease_params["p_death"]),
             init_prev=ss.bernoulli(disease_params["init_prev"]),
-            recovery_prob=ss.bernoulli(disease_params.get("recovery_prob", 0.1)),  # Use CSV if available
+            recovery_prob=0.1,  # Default recovery probability
+            rel_sus_hiv=disease_params["rel_sus"],  # Store HIV relative risk
+            affected_sex=disease_params["affected_sex"]
         )
+
+        self.define_pars(
+            p_acquire=disease_params["incidence"],  # Probability of acquisition per timestep
+        )
+        
+       # Define the lambda function to calculate acquisition probability
+        def calculate_p_acquire(self, sim, uids):
+            # Start with base probability
+            p = np.full(len(uids), self.pars.p_acquire)
+            
+            # Apply sex-specific filtering
+            if self.pars.affected_sex == "female":
+                # Set probability to 0 for males
+                p[sim.people.male[uids]] = 0
+            elif self.pars.affected_sex == "male":
+                # Set probability to 0 for females
+                p[sim.people.female[uids]] = 0
+            
+            return p * self.rel_sus[uids]
+
+        # Use bernoulli with our custom function for incidence
+        self.incidence = ss.bernoulli(p=calculate_p_acquire, strict=False)
+        
+        # Use bernoulli for recovery probability
+        self.p_recover = ss.bernoulli(p=lambda self, sim, uids: self.pars.recovery_prob)
 
         self.define_states(
             ss.State('susceptible', default=True),
             ss.State('infected'),
             ss.FloatArr('ti_infected'),
             ss.FloatArr('ti_dead'),
+            ss.FloatArr('rel_sus', default=1.0),  # Relative susceptibility
         )
 
         self.update_pars(pars, **kwargs)
+        
+        return
 
     def step_state(self):
         """Handles transitions between states in an SIS model (new infections & recoveries)."""
-        new_cases = self.pars.incidence.filter(self.susceptible.uids)
-        recovered_cases = self.pars.recovery_prob.filter(self.infected.uids)
-
         # Process recoveries
+        recovered_cases = self.p_recover.filter(self.infected.uids)
         self.susceptible[recovered_cases] = True
         self.infected[recovered_cases] = False
 
         # Process new infections
+        new_cases = self.incidence.filter(self.susceptible.uids)
         self.susceptible[new_cases] = False
         self.infected[new_cases] = True
         self.ti_infected[new_cases] = self.ti  # Track infection time
-
         
+        return new_cases
+
 # Dictionary to store dynamically created disease classes
 disease_classes = {}
-
-# Create chronic classes dynamically
-for disease in chronic:
-    disease_class = type(
-        disease,  # Class name (e.g., "Type2Diabetes")
-        (ChronicDisease,),  # Base class (NCD)
-        {"__init__": lambda self, pars=None, disease=disease, **kwargs: 
-            super(self.__class__, self).__init__(disease, pars, **kwargs)}
-    )
-    globals()[disease] = disease_class  # Add to global namespace
-    disease_classes[disease] = disease_class  # Store in dictionary
-
-# Create remitting classes dynamically
-for disease in remitting:
-    disease_class = type(
-        disease,  # Class name (e.g., "Type2Diabetes")
-        (RemittingDisease,),  # Base class (NCD)
-        {"__init__": lambda self, pars=None, disease=disease, **kwargs: 
-            super(self.__class__, self).__init__(disease, pars, **kwargs)}
-    )
-    globals()[disease] = disease_class  # Add to global namespace
-    disease_classes[disease] = disease_class  # Store in dictionary
-
-
-# Create acute classes dynamically
-for disease in acute:
-    disease_class = type(
-        disease,  # Class name (e.g., "Type2Diabetes")
-        (AcuteDisease,),  # Base class (NCD)
-        {"__init__": lambda self, pars=None, disease=disease, **kwargs: 
-            super(self.__class__, self).__init__(disease, pars, **kwargs)}
-    )
-    globals()[disease] = disease_class  # Add to global namespace
-    disease_classes[disease] = disease_class  # Store in dictionary
-
-# Create SIS (communicable disease) classes dynamically
-for disease in communicable_diseases:
-    disease_class = type(
-        disease,  # Class name (e.g., "Flu")
-        (GenericSIS,),  # Base class for communicable diseases (to be defined)
-        {"__init__": lambda self, pars=None, disease=disease, **kwargs: 
-            super(self.__class__, self).__init__(disease, pars, **kwargs)}
-    )
-    globals()[disease] = disease_class  # Add to global namespace
-    disease_classes[disease] = disease_class  # Store in dictionary
-    
