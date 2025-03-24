@@ -27,6 +27,9 @@ class NCDHIVConnector(ss.Connector):
                 self.rel_sus[ncd].append(ncd_obj.rel_sus.mean())
                 self.ncd_prev[ncd].append(ncd_obj.results.prevalence[self.sim.ti])
                 
+                # print(f"Relative susceptibility for {ncd} due to HIV: {ncd_obj.rel_sus[hiv.infected.uids]}")
+
+                
         self.time.append(self.sim.t)
         self.hiv_prev.append(hiv.results.prevalence[self.sim.ti])
         return
@@ -72,20 +75,20 @@ def read_interactions(datafile=None):
     return rel_sus
 
 # Function to create connectors for each pair of conditions
-def create_connectors(rel_sus, communicable_diseases):
+def create_connectors(rel_sus):
     connectors = []
     for condition1, interactions in rel_sus.items():
         for condition2, rel_sus_val in interactions.items():
-            connector = create_dynamic_connector(condition1, condition2, rel_sus_val, communicable_diseases)
+            connector = create_dynamic_connector(condition1, condition2, rel_sus_val)
             connectors.append(connector)
     return connectors
 
 # Function to create a dynamic connector with unique class name
-def create_dynamic_connector(condition1, condition2, rel_sus_val, communicable_diseases):
+def create_dynamic_connector(condition1, condition2, rel_sus_val):
     class_name = f"{condition1}_{condition2}_Connector"
     DynamicConnector = type(class_name, (ss.Connector,), {
         '__init__': lambda self, pars=None, **kwargs: super(DynamicConnector, self).__init__(label=f'{condition1}-{condition2}'),
-        'step': lambda self: step_function(self, condition1, condition2, rel_sus_val, communicable_diseases),
+        'step': lambda self: step_function(self, condition1, condition2, rel_sus_val),
         'plot': plot_function,
         'define_pars': lambda self, rel_sus=rel_sus_val: setattr(self, 'pars', sc.objdict(rel_sus=rel_sus)),
         'update_pars': ss.Connector.update_pars,
@@ -96,25 +99,28 @@ def create_dynamic_connector(condition1, condition2, rel_sus_val, communicable_d
     })
     return DynamicConnector()
 
-def step_function(self, condition1, condition2, rel_sus_val, communicable_diseases):
+def step_function(self, condition1, condition2, rel_sus_val):
     condition1_obj = self.sim.diseases.get(condition1.lower(), None)
     condition2_obj = self.sim.diseases.get(condition2.lower(), None)
     
     if condition1_obj is None or condition2_obj is None:
-        print(f"Error: {condition1} or {condition2} not found in simulation diseases.")
+        # print(f"Error: {condition1} or {condition2} not found in simulation diseases.")
         return
-
-    # Determine the state attribute based on disease class
-    condition1_attr = 'infected' if condition1 in communicable_diseases else 'affected'
-    condition2_attr = 'infected' if condition2 in communicable_diseases else 'affected'
-
-    condition2_obj.rel_sus[getattr(condition1_obj, condition1_attr).uids] = rel_sus_val
-
-    # Collecting data for analysis
-    self.time.append(self.sim.t)
-    self.rel_sus.append(condition2_obj.rel_sus.mean())
-    self.condition1_prev.append(condition1_obj.results.prevalence[self.sim.ti])
-    self.condition2_prev.append(condition2_obj.results.prevalence[self.sim.ti])
+    
+    # Get affected people for condition1, handling both NCD and SIS models
+    if hasattr(condition1_obj, 'affected'):
+        # For NCD diseases that use 'affected' state
+        affected_uids = condition1_obj.affected.uids
+    elif hasattr(condition1_obj, 'infected'):
+        # For communicable diseases that use 'infected' state (SIS model)
+        affected_uids = condition1_obj.infected.uids
+    else:
+        # Can't determine affected people
+        # print(f"Error: Can't determine affected people for {condition1}.")
+        return
+    
+    # Apply relative susceptibility to condition2 for people affected by condition1
+    condition2_obj.rel_sus[affected_uids] = rel_sus_val
 
 def plot_function(self):
     sc.options(dpi=200)
@@ -125,3 +131,4 @@ def plot_function(self):
     plt.title(self.sim.label)
     plt.show()
     return fig
+
