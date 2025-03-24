@@ -54,8 +54,8 @@ df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
 # Extract all conditions except HIV
-healthconditions = [condition for condition in df.condition if condition != "HIV"]
-# healthconditions = ['Type2Diabetes']
+# healthconditions = [condition for condition in df.condition if condition != "HIV"]
+healthconditions = ['Type2Diabetes','ChronicKidneyDisease']
 # 
 # Combine with HIV
 diseases = ["HIV"] + healthconditions
@@ -68,11 +68,12 @@ chronic = ncd_df[ncd_df["disease_type"] == "chronic"]["condition"].tolist()
 acute = ncd_df[ncd_df["disease_type"] == "acute"]["condition"].tolist()
 remitting = ncd_df[ncd_df["disease_type"] == "remitting"]["condition"].tolist()
 
+
 # Extract communicable diseases with disease_class as 'sis'
 communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
 
 # Initialize disease models with preloaded data
-mi.initialize_conditions(df, chronic, acute, remitting, communicable_diseases)
+# mi.initialize_conditions(df, chronic, acute, remitting, communicable_diseases)
 
 # ---------------------------------------------------------------------
 # Initialize conditions, prevalence analyzer, and interactions
@@ -88,8 +89,7 @@ def get_prevalence_function(disease):
     return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
 
 # Initialize the PrevalenceAnalyzer
-prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=healthconditions, 
-                                            communicable_diseases = communicable_diseases)
+prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=healthconditions)
 
 
 # -------------------------
@@ -117,7 +117,7 @@ networks = [mf, maternal]
 
 hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 
-# Automatically create disease objects
+# Automatically create disease objects for all diseases
 disease_objects = []
 for disease in healthconditions:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
@@ -126,14 +126,13 @@ for disease in healthconditions:
     disease_class = getattr(mi, disease, None)
     
     if disease_class:
-        disease_obj = disease_class(init_prev=init_prev)  # Instantiate dynamically
+        disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})  # Instantiate dynamically and pass csv_path
         disease_objects.append(disease_obj)
     else:
         print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
-        
+
 # Combine all disease objects including HIV
 disease_objects.append(hiv_disease)
-
 
 # -------------------------
 # Disease Interactions
@@ -145,8 +144,8 @@ ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
 interactions = [ncd_hiv_connector]
 
 # Load NCD-NCD interactions
-ncd_interactions = mi.read_interactions(csv_path_interactions)  # Reads rel_sus.csv
-connectors = mi.create_connectors(ncd_interactions, communicable_diseases)
+ncd_interactions = mi.read_interactions("mighti/data/rel_sus.csv")  # Reads rel_sus.csv
+connectors = mi.create_connectors(ncd_interactions)
 
 # Add NCD-NCD connectors to interactions
 interactions.extend(connectors)
@@ -219,7 +218,7 @@ if __name__ == '__main__':
     # mi.plot_survival_curves(predicted_life_expectancy, actual_life_expectancy)
 
     # # Plot the results for each simulation
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')  
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')  
     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')      
     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')  
     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
