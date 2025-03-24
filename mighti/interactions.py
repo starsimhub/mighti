@@ -27,6 +27,9 @@ class NCDHIVConnector(ss.Connector):
                 self.rel_sus[ncd].append(ncd_obj.rel_sus.mean())
                 self.ncd_prev[ncd].append(ncd_obj.results.prevalence[self.sim.ti])
                 
+                # print(f"Relative susceptibility for {ncd} due to HIV: {ncd_obj.rel_sus[hiv.infected.uids]}")
+
+                
         self.time.append(self.sim.t)
         self.hiv_prev.append(hiv.results.prevalence[self.sim.ti])
         return
@@ -101,11 +104,13 @@ def step_function(self, condition1, condition2, rel_sus_val):
     condition2_obj = self.sim.diseases.get(condition2.lower(), None)
     
     if condition1_obj is None or condition2_obj is None:
-        print(f"Error: {condition1} or {condition2} not found in simulation diseases.")
+        # print(f"Error: {condition1} or {condition2} not found in simulation diseases.")
         return
         
     condition2_obj.rel_sus[condition1_obj.affected.uids] = rel_sus_val
 
+
+    # print(f"Relative susceptibility for {condition2} due to {condition1}: {condition2_obj.rel_sus[condition1_obj.affected.uids]}")
 
     # Collecting data for analysis
     self.time.append(self.sim.t)

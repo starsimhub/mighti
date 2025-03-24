@@ -9,7 +9,7 @@ import pandas as pd
 # ---------------------------------------------------------------------
 beta = 0.001
 n_agents = 5000  # Number of agents in the simulation
-inityear = 2007  # Simulation start year
+inityear = 2017  # Simulation start year
 endyear = 2050
 
 # ---------------------------------------------------------------------
@@ -41,7 +41,7 @@ df.columns = df.columns.str.strip()
 # Define diseases
 # conditions = ncds + communicable_diseases  # List of all diseases
 
-ncd = ['Type2Diabetes', 'ChronicKidneyDisease'] 
+ncd = ['Type2Diabetes', 'ChronicKidneyDisease','CervicalCancer','ProstateCancer'] 
 diseases = ['HIV'] + ncd #+conditions # List of diseases including HIV
 
 
@@ -140,7 +140,9 @@ if __name__ == '__main__':
 
     # Plot the results for each simulation
     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
     
     
 # import starsim as ss
