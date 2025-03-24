@@ -1,3 +1,4 @@
+#Exact copy of minimal_mighti
 import matplotlib.pyplot as plt
 import numpy as np
 
