@@ -84,7 +84,7 @@ class PrevalenceAnalyzer(ss.Analyzer):
 
         for disease in self.diseases:
             dis = getattr(sim.diseases, disease.lower())
-            status_attr = 'infected' if disease in ['HIV', 'HPV', 'Flu', 'ViralHepatitis', 'TB'] else 'affected'
+            status_attr = 'infected' if disease in ['HIV', 'HPV', 'Flu'] else 'affected'
             has_disease = denom & getattr(dis, status_attr)
 
             has_disease_f = has_disease & ppl.female  # Women with disease

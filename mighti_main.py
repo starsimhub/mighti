@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 beta = 0.001
-n_agents = 5000  # Number of agents in the simulation
+n_agents = 50000  # Number of agents in the simulation
 inityear = 2017  # Simulation start year
 endyear = 2050
 
@@ -55,7 +55,7 @@ df.columns = df.columns.str.strip()
 
 # Extract all conditions except HIV
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
-healthconditions = ['Type2Diabetes','ChronicKidneyDisease']
+healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease','CervicalCancer','ProstateCancer'] 
 # 
 # Combine with HIV
 diseases = ["HIV"] + healthconditions
