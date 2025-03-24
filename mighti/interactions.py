@@ -1,3 +1,4 @@
+# Exact copy of minimal_mighti
 import starsim as ss
 import sciris as sc
 import pandas as pd

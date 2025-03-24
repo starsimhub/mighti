@@ -1,3 +1,4 @@
+# Exact copy of minimal_mighti
 import mighti as mi
 import numpy as np
 import sciris as sc

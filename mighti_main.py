@@ -115,72 +115,45 @@ networks = [mf, maternal]
 # Disease Conditions
 # -------------------------
 
-hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
-
-# Automatically create disease objects for all diseases
-disease_objects = []
-for disease in healthconditions:
-    init_prev = ss.bernoulli(get_prevalence_function(disease))
+if __name__ == '__main__':
     
-    # Dynamically get the disease class from `mi` module
-    disease_class = getattr(mi, disease, None)
+    hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
     
-    if disease_class:
-        disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})  # Instantiate dynamically and pass csv_path
-        disease_objects.append(disease_obj)
-    else:
-        print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
-
-# Combine all disease objects including HIV
-disease_objects.append(hiv_disease)
+    # Automatically create disease objects for all diseases
+    disease_objects = []
+    for disease in healthconditions:
+        init_prev = ss.bernoulli(get_prevalence_function(disease))
+        
+        # Dynamically get the disease class from `mi` module
+        disease_class = getattr(mi, disease, None)
+        
+        if disease_class:
+            disease_obj = disease_class(disease_name=disease, csv_path=csv_path_params, pars={"init_prev": init_prev})  # Instantiate dynamically and pass csv_path
+            disease_objects.append(disease_obj)
+        else:
+            print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
+    
+    # Combine all disease objects including HIV
+    disease_objects.append(hiv_disease)
 
 # -------------------------
 # Disease Interactions
 # -------------------------
 
-# Initialize interaction objects for HIV-NCD interactions
-ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
-ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
-interactions = [ncd_hiv_connector]
 
-# Load NCD-NCD interactions
-ncd_interactions = mi.read_interactions("mighti/data/rel_sus.csv")  # Reads rel_sus.csv
-connectors = mi.create_connectors(ncd_interactions)
 
-# Add NCD-NCD connectors to interactions
-interactions.extend(connectors)
-
-# if __name__ == '__main__':
+    # Initialize interaction objects for HIV-NCD interactions
+    ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
+    ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
+    interactions = [ncd_hiv_connector]
     
-#     # Initialize the simulation with connectors
-#     sim = ss.Sim(
-#         n_agents=n_agents,
-#         networks=networks,
-#         diseases=disease_objects,
-#         analyzers=[prevalence_analyzer],
-#         start=inityear,
-#         stop=endyear,
-#         people=ppl,
-#         demographics=[pregnancy, death],
-#         connectors=interactions,
-#         copy_inputs=False,
-#         label='Connector'
-#     )
-
-#     # Run the simulation
-#     sim.run()
-
-#     # Plot the results for each simulation
-#     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'HIV')  
-#     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')      
-#     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')  
-#     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
-#     mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', age_bins)
-#     mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'HIV', age_bins)
-
-
-if __name__ == '__main__':
+    # Load NCD-NCD interactions
+    ncd_interactions = mi.read_interactions("mighti/data/rel_sus.csv")  # Reads rel_sus.csv
+    connectors = mi.create_connectors(ncd_interactions)
     
+    # Add NCD-NCD connectors to interactions
+    interactions.extend(connectors)
+     
     # Initialize the simulation with connectors
     sim = ss.Sim(
         n_agents=n_agents,
@@ -192,86 +165,18 @@ if __name__ == '__main__':
         people=ppl,
         demographics=[pregnancy, death],
         connectors=interactions,
-        copy_inputs=False
-        )
-
+        copy_inputs=False,
+        label='Connector'
+    )
+ 
     # Run the simulation
     sim.run()
-    
-    # # Validate life expectancy
-    # predicted_life_expectancy = mi.calculate_life_expectancy(sim, prevalence_analyzer)
-    # # print("Life Expectancy:")
-    # print(predicted_life_expectancy)
-
-    # # Actual life expectancy data for comparison (example values)
-    # actual_life_expectancy = {
-    #     'men': 76.1,
-    #     'women': 81.1,
-    #     'all': 78.6
-    # }
-
-    # # Calculate SSE
-    # sse = mi.compare_life_expectancy(predicted_life_expectancy, actual_life_expectancy)
-    # print(f"Sum of Squared Errors (SSE): {sse}")
-
-    # # Plot survival curves
-    # mi.plot_survival_curves(predicted_life_expectancy, actual_life_expectancy)
-
-    # # Plot the results for each simulation
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')  
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')      
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')  
+ 
+    # Plot the results for each simulation
     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
-    # mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', age_bins)
-    # mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, 'HIV', age_bins)
-
-    # # Perform CEA if needed
-    # cost_data_path = 'mighti/data/cost_data.csv'
-    # utility_data_path = 'mighti/data/utility_data.csv'
-    # cost_data = pd.read_csv(cost_data_path)
-    # utility_data = pd.read_csv(utility_data_path)
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
     
-    # # Perform CEA
-    # cea_results = mi.cea.perform_cea(prevalence_analyzer, cost_data, utility_data)
-    # mi.plot_cea_results(cea_results)
-    
-# if __name__ == '__main__':
-
-    
-#     # Initialize the first simulation without connectors
-#     sim1 = ss.Sim(
-#         n_agents=n_agents,
-#         networks=networks,
-#         diseases=disease_objects,
-#         analyzers=[prevalence_analyzer],
-#         start=inityear,
-#         stop=endyear,
-#         people=ppl,
-#         demographics=[pregnancy, death],
-#         copy_inputs=False,
-#         label='Separate'
-#     )
-
-#     # Initialize the second simulation with connectors
-#     sim2 = ss.Sim(
-#         n_agents=n_agents,
-#         networks=networks,
-#         diseases=disease_objects,
-#         analyzers=[prevalence_analyzer],
-#         start=inityear,
-#         stop=endyear,
-#         people=ppl,
-#         demographics=[pregnancy, death],
-#         connectors=interactions,
-#         copy_inputs=False,
-#         label='Connector'
-#     )
-
-#     # Run the simulations in parallel
-#     msim = ss.parallel(sim1, sim2)
-
-    
-# # # Plot the results for each simulation
-# mi.plot_mean_prevalence_two_diseases_parallel(msim, ['HIV','Type2Diabetes'])   
-
-
+     
+     
