@@ -55,7 +55,8 @@ df.columns = df.columns.str.strip()
 
 # Extract all conditions except HIV
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
-healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease','CervicalCancer','ProstateCancer'] 
+# healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
+healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease','CervicalCancer','ProstateCancer','RoadInjuries','DomesticViolence'] 
 # 
 # Combine with HIV
 diseases = ["HIV"] + healthconditions
@@ -68,6 +69,7 @@ chronic = ncd_df[ncd_df["disease_type"] == "chronic"]["condition"].tolist()
 acute = ncd_df[ncd_df["disease_type"] == "acute"]["condition"].tolist()
 remitting = ncd_df[ncd_df["disease_type"] == "remitting"]["condition"].tolist()
 
+# ncd = chronic + acute + remitting
 
 # Extract communicable diseases with disease_class as 'sis'
 communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
@@ -114,46 +116,44 @@ networks = [mf, maternal]
 # -------------------------
 # Disease Conditions
 # -------------------------
+    
+hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 
-if __name__ == '__main__':
+# Automatically create disease objects for all diseases
+disease_objects = []
+for disease in healthconditions:
+    init_prev = ss.bernoulli(get_prevalence_function(disease))
     
-    hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
+    # Dynamically get the disease class from `mi` module
+    disease_class = getattr(mi, disease, None)
     
-    # Automatically create disease objects for all diseases
-    disease_objects = []
-    for disease in healthconditions:
-        init_prev = ss.bernoulli(get_prevalence_function(disease))
-        
-        # Dynamically get the disease class from `mi` module
-        disease_class = getattr(mi, disease, None)
-        
-        if disease_class:
-            disease_obj = disease_class(disease_name=disease, csv_path=csv_path_params, pars={"init_prev": init_prev})  # Instantiate dynamically and pass csv_path
-            disease_objects.append(disease_obj)
-        else:
-            print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
-    
-    # Combine all disease objects including HIV
-    disease_objects.append(hiv_disease)
+    if disease_class:
+        disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})  # Instantiate dynamically and pass csv_path
+        disease_objects.append(disease_obj)
+    else:
+        print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
+
+# Combine all disease objects including HIV
+disease_objects.append(hiv_disease)
 
 # -------------------------
 # Disease Interactions
 # -------------------------
 
+# Initialize interaction objects for HIV-NCD interactions
+ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
+ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
+interactions = [ncd_hiv_connector]
+
+# Load NCD-NCD interactions
+ncd_interactions = mi.read_interactions("mighti/data/rel_sus.csv")  # Reads rel_sus.csv
+connectors = mi.create_connectors(ncd_interactions)
+
+# Add NCD-NCD connectors to interactions
+interactions.extend(connectors)
 
 
-    # Initialize interaction objects for HIV-NCD interactions
-    ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
-    ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
-    interactions = [ncd_hiv_connector]
-    
-    # Load NCD-NCD interactions
-    ncd_interactions = mi.read_interactions("mighti/data/rel_sus.csv")  # Reads rel_sus.csv
-    connectors = mi.create_connectors(ncd_interactions)
-    
-    # Add NCD-NCD connectors to interactions
-    interactions.extend(connectors)
-     
+if __name__ == '__main__':     
     # Initialize the simulation with connectors
     sim = ss.Sim(
         n_agents=n_agents,
@@ -174,9 +174,9 @@ if __name__ == '__main__':
  
     # Plot the results for each simulation
     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
     
      
      
