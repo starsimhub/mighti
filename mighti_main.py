@@ -9,16 +9,13 @@ import matplotlib.pyplot as plt
 
 ### TO DO
 # Life expectancy
-# Check cervical cancer PLHIV and without
-# add more print statement to confirm male/female
-# Risk factors 
-
+# Check: Adding diseases change the results a lot especially Cervical Cancer
 
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 beta = 0.001
-n_agents = 50000  # Number of agents in the simulation
+n_agents = 5000  # Number of agents in the simulation
 inityear = 2017  # Simulation start year
 endyear = 2050
 
@@ -172,11 +169,30 @@ if __name__ == '__main__':
     # Run the simulation
     sim.run()
  
-    # Plot the results for each simulation
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
+    # # Plot the results for each simulation
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
     
-     
+    # Calculate life expectancy
+    life_expectancy = mi.calculate_life_expectancy(sim, prevalence_analyzer)
+    
+    # Print the life expectancy results
+    print("Life Expectancy:")
+    print(life_expectancy)
+    
+    # Define actual life expectancy data for comparison
+    actual_life_expectancy = {
+        'men': 75.0,
+        'women': 80.0,
+        'all': 77.5
+    }
+    
+    # Compare predicted life expectancy with actual data
+    sse = mi.compare_life_expectancy(life_expectancy, actual_life_expectancy)
+    print(f"Sum of Squared Errors (SSE): {sse}")
+    
+    # Plot survival curves
+    mi.plot_survival_curves(life_expectancy, actual_life_expectancy)     
      
