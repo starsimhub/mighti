@@ -1,18 +1,64 @@
 import numpy as np
 import pandas as pd
+import starsim as ss
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
+
+class CustomDeaths(ss.Deaths):
+    def __init__(self, pars=None, metadata=None, **kwargs):
+        super().__init__(pars, metadata, **kwargs)
+        self.cumulative_deaths = 0
+
+    def step(self):
+        """ Select people to die and track cumulative deaths """
+        death_uids = self.pars.death_rate.filter()
+        self.sim.people.request_death(death_uids)
+        self.n_deaths = len(death_uids)
+        self.cumulative_deaths += self.n_deaths
+        return self.n_deaths
+
+    def get_cumulative_deaths(self):
+        return self.cumulative_deaths
+
+    def finalize(self):
+        super().finalize()
+        self.results.cumulative[:] = np.cumsum(self.results.new)
+        return
+    
+class CustomPeople(ss.People):
+    def __init__(self, n_agents, age_data):
+        super().__init__(n_agents, age_data)  # Initialize the parent class
+
+    def calculate_life_expectancy(self, cumulative_deaths):
+        """
+        Calculate life expectancy based on cumulative deaths.
+        """
+        age_groups = np.arange(0, 101)
+        l_x = np.zeros_like(age_groups, dtype=float)  # Number of people alive at the beginning of each age group
+        d_x = np.zeros_like(age_groups, dtype=float)  # Number of deaths in each age group
+
+        for age in age_groups:
+            l_x[age] = np.sum(self.age >= age)
+            d_x[age] = cumulative_deaths.get(age, 0)
+
+        L_x = (l_x[:-1] + l_x[1:]) / 2  # Total number of person-years lived within the age interval
+        T_x = np.cumsum(L_x[::-1])[::-1]  # Total number of person-years lived by the cohort after age x
+        e_x = T_x / l_x[:-1]  # Life expectancy at each age
+
+        life_table = pd.DataFrame({
+            'Age': age_groups[:-1],
+            'l(x)': l_x[:-1],
+            'd(x)': d_x[:-1],
+            'L(x)': L_x,
+            'T(x)': T_x,
+            'e(x)': e_x
+        })
+
+        return life_table
+
+# Helper functions
 def calculate_life_table(mortality_rates):
-    """
-    Calculate the life table based on mortality rates.
-
-    Parameters:
-    - mortality_rates: Dictionary containing mortality rates for each age
-
-    Returns:
-    - life_table: DataFrame containing the life table
-    """
     ages = sorted(mortality_rates.keys())
     n = len(ages)
     
@@ -64,16 +110,6 @@ def calculate_life_table(mortality_rates):
     return life_table
 
 def extract_mortality_rates(sim, prevalence_analyzer):
-    """
-    Extract mortality rates from the simulation results.
-
-    Parameters:
-    - sim: The simulation object
-    - prevalence_analyzer: The prevalence analyzer object
-
-    Returns:
-    - mortality_rates: Dictionary containing mortality rates for each age
-    """
     mortality_rates = {}
     ages = np.arange(0, 101)  # Assuming age range from 0 to 100
 
@@ -107,16 +143,6 @@ def extract_mortality_rates(sim, prevalence_analyzer):
     return mortality_rates
 
 def calculate_life_expectancy(sim, prevalence_analyzer):
-    """
-    Calculate life expectancy based on the simulation results.
-
-    Parameters:
-    - sim: The simulation object
-    - prevalence_analyzer: The prevalence analyzer object
-
-    Returns:
-    - life_expectancy: DataFrame containing the life expectancy for each age
-    """
     mortality_rates = extract_mortality_rates(sim, prevalence_analyzer)
     life_table = calculate_life_table(mortality_rates)
     
@@ -131,29 +157,12 @@ def calculate_life_expectancy(sim, prevalence_analyzer):
     return life_table[['Age', 'e(x)']]
 
 def compare_life_expectancy(predicted, actual):
-    """
-    Compare predicted life expectancy with actual data and calculate SSE.
-
-    Parameters:
-    - predicted: Dictionary containing predicted life expectancy data
-    - actual: Dictionary containing actual life expectancy data
-
-    Returns:
-    - sse: Sum of squared errors (SSE)
-    """
     predicted_life_expectancy = np.array([predicted['e(x)'].iloc[0], predicted['e(x)'].iloc[0], predicted['e(x)'].iloc[0]])
     actual_life_expectancy_values = np.array(list(actual.values()))
     sse = np.sum((predicted_life_expectancy - actual_life_expectancy_values) ** 2)
     return sse
 
 def plot_survival_curves(predicted, actual):
-    """
-    Plot survival curves for predicted and actual life expectancy.
-
-    Parameters:
-    - predicted: Dictionary containing predicted life expectancy data
-    - actual: Dictionary containing actual life expectancy data
-    """
     plt.figure(figsize=(12, 8))
     plt.plot(predicted['Age'], predicted['e(x)'], label='Predicted Life Expectancy')
     plt.axhline(y=actual['men'], color='b', linestyle='--', label='Actual Men')

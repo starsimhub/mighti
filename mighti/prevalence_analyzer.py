@@ -19,7 +19,6 @@ class PrevalenceAnalyzer(ss.Analyzer):
         self.name = 'prevalence_analyzer'
         self.prevalence_data = prevalence_data
         self.diseases = diseases
-        self.cumulative_deaths = {}  # Dictionary to store cumulative deaths (uid: (death_age, death_year))
 
         # Define age bins
         self.age_bins = [(0, 15), (15, 21), (21, 26), (26, 31), (31, 36), (36, 41), (41, 46), 
@@ -153,14 +152,4 @@ class PrevalenceAnalyzer(ss.Analyzer):
             # print(f"Time index {ti}, Disease: {disease}, Total numerator with HIV: {total_num_with_HIV}, Total denominator with HIV: {total_den_with_HIV}")
             # print(f"Time index {ti}, Disease: {disease}, Total prevalence with HIV: {total_prevalence_with_HIV:.2f}%")
 
-        return
-
-    def finalize(self):
-        sim = self.sim
-        ppl = sim.people
-        for person in ppl:
-            if person.dead:
-                death_age = person.age
-                death_year = sim.ti  # Assuming ti is the current time index
-                self.cumulative_deaths[person.uid] = (death_age, death_year)
         return

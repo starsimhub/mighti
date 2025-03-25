@@ -27,7 +27,7 @@ class NCDHIVConnector(ss.Connector):
                 self.rel_sus[ncd].append(ncd_obj.rel_sus.mean())
                 self.ncd_prev[ncd].append(ncd_obj.results.prevalence[self.sim.ti])
                 
-                print(f"Relative susceptibility for {ncd} due to HIV: {ncd_obj.rel_sus[hiv.infected.uids]}")
+                # print(f"Relative susceptibility for {ncd} due to HIV: {ncd_obj.rel_sus[hiv.infected.uids]}")
 
                 
         self.time.append(self.sim.t)

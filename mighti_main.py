@@ -24,7 +24,7 @@ endyear = 2050
 # ---------------------------------------------------------------------
 
 # Parameters
-csv_path_params =  'mighti/data/eswatini_parameters.csv'
+csv_path_params = 'mighti/data/eswatini_parameters.csv'
 
 # Relative Risks
 csv_path_interactions = "mighti/data/rel_sus.csv"
@@ -53,7 +53,7 @@ df.columns = df.columns.str.strip()
 # Extract all conditions except HIV
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
-healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease','CervicalCancer','ProstateCancer','RoadInjuries','DomesticViolence'] 
+healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
 # 
 # Combine with HIV
 diseases = ["HIV"] + healthconditions
@@ -90,7 +90,6 @@ def get_prevalence_function(disease):
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=healthconditions)
 
-
 # -------------------------
 # Demographics
 # -------------------------
@@ -98,8 +97,14 @@ prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, dis
 fertility_rates = {'fertility_rate': pd.read_csv(csv_path_fertility)}
 pregnancy = ss.Pregnancy(pars=fertility_rates)
 death_rates = {'death_rate': pd.read_csv(csv_path_death), 'rate_units': 1}
-death = ss.Deaths(death_rates)
-ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
+# death = ss.Deaths(death_rates)
+# ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
+
+# Initialize people with the custom class
+ppl = mi.CustomPeople(n_agents, age_data=pd.read_csv(csv_path_age))
+
+# Initialize deaths with the custom class
+death = mi.CustomDeaths(death_rates)
 
 # -------------------------
 # Networks
@@ -108,7 +113,6 @@ ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
 mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
 networks = [mf, maternal]
-
 
 # -------------------------
 # Disease Conditions
@@ -149,8 +153,11 @@ connectors = mi.create_connectors(ncd_interactions)
 # Add NCD-NCD connectors to interactions
 interactions.extend(connectors)
 
+if __name__ == '__main__':
+    # Ensure that the `people` key is registered in the simulation
+    ppl.name = 'custompeople'
+    death.name = 'customdeaths'
 
-if __name__ == '__main__':     
     # Initialize the simulation with connectors
     sim = ss.Sim(
         n_agents=n_agents,
@@ -176,23 +183,6 @@ if __name__ == '__main__':
     # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
     
     # Calculate life expectancy
-    life_expectancy = mi.calculate_life_expectancy(sim, prevalence_analyzer)
-    
-    # Print the life expectancy results
-    print("Life Expectancy:")
-    print(life_expectancy)
-    
-    # Define actual life expectancy data for comparison
-    actual_life_expectancy = {
-        'men': 75.0,
-        'women': 80.0,
-        'all': 77.5
-    }
-    
-    # Compare predicted life expectancy with actual data
-    sse = mi.compare_life_expectancy(life_expectancy, actual_life_expectancy)
-    print(f"Sum of Squared Errors (SSE): {sse}")
-    
-    # Plot survival curves
-    mi.plot_survival_curves(life_expectancy, actual_life_expectancy)     
-     
+    cumulative_deaths = death.get_cumulative_deaths()
+    life_table = ppl.calculate_life_expectancy(cumulative_deaths)
+    print(life_table)
