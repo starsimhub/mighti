@@ -1,7 +1,39 @@
 #Exact copy of minimal_mighti
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd 
 
+def plot_mortality_rates(death_csv_path, sim_mortality_rates):
+    # Load actual mortality data
+    death_data = pd.read_csv(death_csv_path)
+    
+    # Filter for the year 2020
+    death_data_2020 = death_data[death_data['Time'] == 2020]
+    
+    # Extract data for males and females
+    male_data = death_data_2020[death_data_2020['Sex'] == 'Male']
+    female_data = death_data_2020[death_data_2020['Sex'] == 'Female']
+    
+    # Extract mortality rates for ages 0 to 80 from the simulation
+    ages = range(81)
+    sim_mortality_rates_0_80 = {age: sim_mortality_rates.get(age, 0) for age in ages}
+    
+    # Plot mortality rates
+    plt.figure(figsize=(10, 6))
+    
+    # Plot actual data
+    plt.scatter(male_data['AgeGrpStart'], male_data['mx'], color='blue', label='Male (Actual)', alpha=0.6)
+    plt.scatter(female_data['AgeGrpStart'], female_data['mx'], color='red', label='Female (Actual)', alpha=0.6)
+    
+    # Plot simulated data
+    plt.plot(ages, [sim_mortality_rates_0_80[age] for age in ages], color='green', label='Simulated Mortality Rates')
+    
+    plt.xlabel('Age')
+    plt.ylabel('Mortality Rate')
+    plt.title('Mortality Rates by Age for 2020')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
 def plot_numerator_denominator(sim, prevalence_analyzer, disease):
     """
