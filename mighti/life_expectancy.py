@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 def calculate_life_table(mortality_rates):
     """
@@ -76,13 +77,24 @@ def extract_mortality_rates(sim, prevalence_analyzer):
     mortality_rates = {}
     ages = np.arange(0, 101)  # Assuming age range from 0 to 100
 
-    for age in ages:
-        print(f"sim.people.age is  {sim.people.age}")
-        print(f"Age to loop is: {age}")
+    # Initialize data structures to store life and death counts at each time step
+    alive_counts = defaultdict(lambda: np.zeros(len(ages)))
+    dead_counts = defaultdict(lambda: np.zeros(len(ages)))
 
-        age_mask = (sim.people.age >= age) & (sim.people.age < age + 1)
-        num_alive = np.sum(age_mask)
-        num_dead = sum(1 for uid, (death_age, death_year) in prevalence_analyzer.cumulative_deaths.items() if death_age == age)
+    # Determine the number of time steps using timevec
+    num_time_steps = len(sim.timevec)
+
+    # Track life and death counts for each time step
+    for t in range(num_time_steps):
+        for age in ages:
+            age_mask = (sim.people.age >= age) & (sim.people.age < age + 1)
+            alive_counts[t][age] = np.sum(age_mask)
+            dead_counts[t][age] = sum(1 for uid, (death_age, death_year) in prevalence_analyzer.cumulative_deaths.items() if death_age == age and death_year == t)
+
+    # Calculate mortality rates for each age
+    for age in ages:
+        num_alive = np.sum([alive_counts[t][age] for t in range(num_time_steps)])
+        num_dead = np.sum([dead_counts[t][age] for t in range(num_time_steps)])
         if num_alive > 0:
             mortality_rate = num_dead / num_alive
         else:
