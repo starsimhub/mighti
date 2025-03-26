@@ -107,8 +107,17 @@ def step_function(self, condition1, condition2, rel_sus_val):
         # print(f"Error: {condition1} or {condition2} not found in simulation diseases.")
         return
         
-    condition2_obj.rel_sus[condition1_obj.affected.uids] = rel_sus_val
-
+    # Determine if the first condition uses 'infected' or 'affected'
+        if hasattr(condition1_obj, 'infected'):
+            condition1_uids = condition1_obj.infected.uids
+        elif hasattr(condition1_obj, 'affected'):
+            condition1_uids = condition1_obj.affected.uids
+        else:
+            raise AttributeError(f"{self.condition1} does not have 'infected' or 'affected' attribute.")
+        
+        # Apply the susceptibility adjustment to condition2 based on condition1
+        condition2_obj.rel_sus[condition1_uids] = self.relative_risk
+        return
 
     # print(f"Relative susceptibility for {condition2} due to {condition1}: {condition2_obj.rel_sus[condition1_obj.affected.uids]}")
 

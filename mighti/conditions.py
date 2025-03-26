@@ -755,38 +755,38 @@ class ParkinsonsDisease(ChronicDisease):
         )
         return
 
-# class ViralHepatitis(AcuteDisease):
-#     def __init__(self, csv_path, pars=None, **kwargs):
-#         self.disease_name = 'ViralHepatitis'
-#         super().__init__(csv_path, pars, **kwargs)
-#         self.define_pars(
-#             label = 'ViralHepatitis'
-#         )
-#         return
+class ViralHepatitis(AcuteDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'ViralHepatitis'
+        super().__init__(csv_path, pars, **kwargs)
+        self.define_pars(
+            label = 'ViralHepatitis'
+        )
+        return
 
-# class HPV(GenericSIS):
-#     def __init__(self, csv_path, pars=None, **kwargs):
-#         self.disease_name = 'HPV'
-#         super().__init__(csv_path, pars, **kwargs)
-#         self.define_pars(
-#             label = 'HPV'
-#         )
-#         return
+class HPV(GenericSIS):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'HPV'
+        super().__init__(csv_path, pars, **kwargs)
+        self.define_pars(
+            label = 'HPV'
+        )
+        return
 
-# class Flu(GenericSIS):
-#     def __init__(self, csv_path, pars=None, **kwargs):
-#         self.disease_name = 'Flu'
-#         super().__init__(csv_path, pars, **kwargs)
-#         self.define_pars(
-#             label = 'Flu'
-#         )
-#         return
+class Flu(GenericSIS):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'Flu'
+        super().__init__(csv_path, pars, **kwargs)
+        self.define_pars(
+            label = 'Flu'
+        )
+        return
 
-# class TB(GenericSIS):
-#     def __init__(self, csv_path, pars=None, **kwargs):
-#         self.disease_name = 'TB'
-#         super().__init__(csv_path, pars, **kwargs)
-#         self.define_pars(
-#             label = 'TB'
-#         )
-#         return
+class TB(GenericSIS):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'TB'
+        super().__init__(csv_path, pars, **kwargs)
+        self.define_pars(
+            label = 'TB'
+        )
+        return

@@ -3,37 +3,69 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd 
 
-def plot_mortality_rates(death_csv_path, sim_mortality_rates):
+def plot_mortality_rates(death_csv_path, sim_mortality_rates, year):
     # Load actual mortality data
     death_data = pd.read_csv(death_csv_path)
     
-    # Filter for the year 2020
-    death_data_2020 = death_data[death_data['Time'] == 2020]
+    # Filter for the specified year
+    death_data_year = death_data[death_data['Time'] == 2020]
     
     # Extract data for males and females
-    male_data = death_data_2020[death_data_2020['Sex'] == 'Male']
-    female_data = death_data_2020[death_data_2020['Sex'] == 'Female']
+    male_data = death_data_year[death_data_year['Sex'] == 'Male']
+    female_data = death_data_year[death_data_year['Sex'] == 'Female']
     
     # Extract mortality rates for ages 0 to 80 from the simulation
-    ages = range(81)
-    sim_mortality_rates_0_80 = {age: sim_mortality_rates.get(age, 0) for age in ages}
+    ages = range(91)
+    sim_mortality_rates_male = {age: sim_mortality_rates['male'].get(age, 0) for age in ages}
+    sim_mortality_rates_female = {age: sim_mortality_rates['female'].get(age, 0) for age in ages}
     
     # Plot mortality rates
     plt.figure(figsize=(10, 6))
     
-    # Plot actual data
-    plt.scatter(male_data['AgeGrpStart'], male_data['mx'], color='blue', label='Male (Actual)', alpha=0.6)
-    plt.scatter(female_data['AgeGrpStart'], female_data['mx'], color='red', label='Female (Actual)', alpha=0.6)
+    # # Plot actual data
+    plt.scatter(male_data['AgeGrpStart'], male_data['mx'], color='blue', label='Male (Actual)', alpha=1)
+    plt.scatter(female_data['AgeGrpStart'], female_data['mx'], color='red', label='Female (Actual)', alpha=1)
     
     # Plot simulated data
-    plt.plot(ages, [sim_mortality_rates_0_80[age] for age in ages], color='green', label='Simulated Mortality Rates')
+    plt.plot(ages, [sim_mortality_rates_male[age] for age in ages], color='blue', label='Male (Simulated)', alpha=0.6)
+    plt.plot(ages, [sim_mortality_rates_female[age] for age in ages], color='red', label='Female (Simulated)', alpha=0.6)
     
     plt.xlabel('Age')
     plt.ylabel('Mortality Rate')
-    plt.title('Mortality Rates by Age for 2020')
+    plt.title(f'Mortality Rates by Age for {year}')
     plt.legend()
     plt.grid(True)
     plt.show()
+    
+
+def plot_life_expectancy(lifeexpectancy_csv_path, simulated_male, simulated_female):
+    # Load actual life expectancy data
+    real_data = pd.read_csv(lifeexpectancy_csv_path)
+    
+    # Extract data for males and females
+    male_data = real_data[real_data['sex'] == 'male']
+    female_data = real_data[real_data['sex'] == 'female']
+    
+    # Plot life expectancy
+    plt.figure(figsize=(12, 8))
+    
+    # Plot real data for males and females
+    plt.scatter(male_data['age'], male_data['value'], label='Real Male', linestyle='--', color='blue')
+    plt.scatter(female_data['age'], female_data['value'], label='Real Female', linestyle='--', color='red')
+    
+    # Plot simulated data for males and females
+    plt.plot(simulated_male['Age'], simulated_male['e(x)'], label='Simulated Male', linestyle='-', color='blue')
+    plt.plot(simulated_female['Age'], simulated_female['e(x)'], label='Simulated Female', linestyle='-', color='red')
+    
+    plt.xlabel('Age')
+    plt.ylabel('Life Expectancy')
+    plt.title('Life Expectancy: Real vs Simulated')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+    plt.show()
+
 
 def plot_numerator_denominator(sim, prevalence_analyzer, disease):
     """
