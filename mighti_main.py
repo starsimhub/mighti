@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 # sys.stdout = log_file  # Redirects all print outputs to this file
 
 ### TO DO
-# Life expectancy
+# Life expectancya
 # Check: Adding diseases change the results a lot especially Cervical Cancer
 # Check: how birth and death data are retrieved, especially when there are multiple years
 
