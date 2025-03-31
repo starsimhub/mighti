@@ -35,18 +35,18 @@ def print_age_distribution(sim, prevalence_data, age_bins):
     ages = sim.people.age
     bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
     age_distribution, _ = np.histogram(ages, bins)
-    print("Age Distribution:")
-    for i in range(len(bins) - 1):
-        print(f"{bins[i]}-{bins[i+1]}: {age_distribution[i]}")
+    # print("Age Distribution:")
+    # for i in range(len(bins) - 1):
+        # print(f"{bins[i]}-{bins[i+1]}: {age_distribution[i]}")
 
-    # Debug: Print the structure of prevalence_data
-    print("Prevalence Data Structure:")
-    for disease, data in prevalence_data.items():
-        print(f"Disease: {disease}")
-        for sex, age_data in data.items():
-            print(f"  Sex: {sex}")
-            for age, value in age_data.items():
-                print(f"    Age: {age}, Value: {value}")
+    # # Debug: Print the structure of prevalence_data
+    # print("Prevalence Data Structure:")
+    # for disease, data in prevalence_data.items():
+    #     print(f"Disease: {disease}")
+    #     for sex, age_data in data.items():
+    #         print(f"  Sex: {sex}")
+    #         for age, value in age_data.items():
+    #             print(f"    Age: {age}, Value: {value}")
 
     # Calculate mean prevalence for each age group
     prevalence_means = []
@@ -73,9 +73,9 @@ def print_age_distribution(sim, prevalence_data, age_bins):
         mean_prevalence = np.mean(prevalence_values) if prevalence_values else 0
         prevalence_means.append(mean_prevalence)
 
-    print("Mean Prevalence for each Age Group:")
-    for i in range(len(bins) - 1):
-        print(f"{bins[i]}-{bins[i+1]}: {prevalence_means[i]:.6f}")
+    # print("Mean Prevalence for each Age Group:")
+    # for i in range(len(bins) - 1):
+    #     print(f"{bins[i]}-{bins[i+1]}: {prevalence_means[i]:.6f}")
 
 # Define Type2Diabetes condition
 class Type2Diabetes(ss.NCD):
@@ -108,11 +108,11 @@ class Type2Diabetes(ss.NCD):
         # Check if init_prev was provided in pars
             if pars is not None and 'init_prev' in pars:
                 # Use the age-sex dependent prevalence from pars
-                print(f"Using age-sex dependent prevalence for {disease_name}")
+                # print(f"Using age-sex dependent prevalence for {disease_name}")
                 param_dict['init_prev'] = pars['init_prev']
             else:
                 # Fallback to static value from CSV
-                print(f"Using static prevalence for {disease_name} from CSV: {disease_params['init_prev']}")
+                # print(f"Using static prevalence for {disease_name} from CSV: {disease_params['init_prev']}")
                 param_dict['init_prev'] = ss.bernoulli(disease_params["init_prev"])
             
             # Define all parameters at once
@@ -167,61 +167,61 @@ class Type2Diabetes(ss.NCD):
             )
             return
 
-    # def init_post(self):
-    #     initial_cases = self.pars.init_prev.filter()
-    #     self.set_prognoses(initial_cases)
-    #     return initial_cases
+    def init_post(self):
+        initial_cases = self.pars.init_prev.filter()
+        self.set_prognoses(initial_cases)
+        return initial_cases
 
     
-    def init_post(self):
-        print("\n=== CUSTOM TYPE2DIABETES INITIALIZATION ===")
-        sim = self.sim
+    # def init_post(self):
+    #     print("\n=== CUSTOM TYPE2DIABETES INITIALIZATION ===")
+    #     sim = self.sim
         
-        # Ensure age_bins is available
-        age_bins = getattr(self.pars.init_prev.pars, 'age_bins', None)
-        if age_bins is None:
-            # Provide default age bins if not available
-            age_bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-            print("Warning: age_bins not found in parameters. Using default age bins.")
+    #     # Ensure age_bins is available
+    #     age_bins = getattr(self.pars.init_prev.pars, 'age_bins', None)
+    #     if age_bins is None:
+    #         # Provide default age bins if not available
+    #         age_bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    #         print("Warning: age_bins not found in parameters. Using default age bins.")
         
-        # Print age distribution and mean prevalence
-        print_age_distribution(sim, self.pars.init_prev.pars.p, age_bins)
+    #     # Print age distribution and mean prevalence
+    #     print_age_distribution(sim, self.pars.init_prev.pars.p, age_bins)
         
-        # Get all people
-        n_people = len(sim.people)
-        all_uids = np.arange(n_people)
+    #     # Get all people
+    #     n_people = len(sim.people)
+    #     all_uids = np.arange(n_people)
         
-        # Get the prevalence function
-        init_func = self.pars.init_prev.pars.p
+    #     # Get the prevalence function
+    #     init_func = self.pars.init_prev.pars.p
         
-        # Convert to UIDs for the function call
-        uids_obj = ss.uids(all_uids)
+    #     # Convert to UIDs for the function call
+    #     uids_obj = ss.uids(all_uids)
         
-        # Calculate probabilities
-        probs = init_func(self, sim, uids_obj)
-        mean_prob = np.mean(probs)
-        print(f"Probability stats: mean={mean_prob:.6f}, min={np.min(probs):.6f}, max={np.max(probs):.6f}")
+    #     # Calculate probabilities
+    #     probs = init_func(self, sim, uids_obj)
+    #     mean_prob = np.mean(probs)
+    #     print(f"Probability stats: mean={mean_prob:.6f}, min={np.min(probs):.6f}, max={np.max(probs):.6f}")
         
-        # Expected cases based on mean probability
-        expected_cases = int(mean_prob * n_people)
-        print(f"Expected number of cases based on probabilities: {expected_cases} ({mean_prob*100:.4f}%)")
+    #     # Expected cases based on mean probability
+    #     expected_cases = int(mean_prob * n_people)
+    #     print(f"Expected number of cases based on probabilities: {expected_cases} ({mean_prob*100:.4f}%)")
         
-        # Instead of using random numbers, force exactly the expected number of cases
-        # Sort probabilities from highest to lowest
-        sorted_indices = np.argsort(-probs)  # Negative sign for descending order
+    #     # Instead of using random numbers, force exactly the expected number of cases
+    #     # Sort probabilities from highest to lowest
+    #     sorted_indices = np.argsort(-probs)  # Negative sign for descending order
         
-        # Take the top N indices as initial cases
-        initial_case_indices = sorted_indices[:expected_cases]
-        initial_cases = ss.uids(initial_case_indices)
+    #     # Take the top N indices as initial cases
+    #     initial_case_indices = sorted_indices[:expected_cases]
+    #     initial_cases = ss.uids(initial_case_indices)
         
-        # Debug: Print initial cases
-        print(f"Initial cases (deterministic): {len(initial_cases)} out of {n_people} ({len(initial_cases)/n_people*100:.4f}%)")
-        print(f"Initial case indices: {initial_case_indices[:10]} (first 10 cases)")
+    #     # Debug: Print initial cases
+    #     print(f"Initial cases (deterministic): {len(initial_cases)} out of {n_people} ({len(initial_cases)/n_people*100:.4f}%)")
+    #     print(f"Initial case indices: {initial_case_indices[:10]} (first 10 cases)")
 
-        # Set prognoses for these cases
-        self.set_prognoses(initial_cases)
+    #     # Set prognoses for these cases
+    #     self.set_prognoses(initial_cases)
         
-        return initial_cases
+    #     return initial_cases
     
     
     def set_prognoses(self, uids):
@@ -571,7 +571,7 @@ class ProstateCancer(ss.NCD):
             affected_sex=disease_params["affected_sex"]  # Prostate Cancer affects only males
         )
         
-        print(f"affected_sex is: {self.pars.affected_sex}")
+        # print(f"affected_sex is: {self.pars.affected_sex}")
     
         # Define disease parameters
         self.define_pars(
@@ -592,7 +592,7 @@ class ProstateCancer(ss.NCD):
                 p[sim.people.female[uids]] = 0
                 
             # Print base probabilities
-            print(f"Base probabilities (p): {p}")
+            # print(f"Base probabilities (p): {p}")
             
             # Filter out invalid indices for HIV-specific relative susceptibility
             valid_uids = [uid for uid in uids if uid in sim.people.hiv]

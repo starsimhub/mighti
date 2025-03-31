@@ -1,5 +1,7 @@
 from .version import __version__, __versiondate__, __license__
 from .utils import *
+from .death_tracker import *
+from .life_expectancy import *
 from .conditions import *
 from .interactions import *
 
@@ -16,4 +18,3 @@ rootdir = pathlib.Path(__file__).parent
 
 # Import the version and print the license
 print(__license__)
-

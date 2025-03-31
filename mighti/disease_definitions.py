@@ -140,11 +140,4 @@ def age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size):
         if ages[i] >= disease_age_bins[-1]:  # For ages at or above highest bin
             prevalence[i] = prevalence_data[disease][sex][disease_age_bins[-1]]
     
-    # Debug: Print calculated prevalence values for the first few individuals
-    print(f"Calculated prevalence values for disease {disease}: {prevalence[:200]} (first 200 individuals)")
-    print(f"Calculated prevalence mean for disease {disease}: {np.mean(prevalence[:200])} (first 200 individuals)")
-
-    print(f"Corresponding ages: {ages[:200]}")
-    print(f"Corresponding sexes (0 for male, 1 for female): {females[:200]}")
-
     return prevalence
