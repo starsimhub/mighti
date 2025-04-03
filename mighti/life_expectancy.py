@@ -3,118 +3,49 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
-def calculate_mortality_rates(death_tracker, year=None, age_groups=None, use_mid_year_pop=True):
+def calculate_mortality_rates(deaths_module, year=None, max_age=100):
     """
-    Calculate mortality rates from death tracker data
-    
-    Args:
-        death_tracker: DeathTracker instance
-        year: Specific year to calculate for (None for cumulative)
-        age_groups: List of age group start values for grouping
-        use_mid_year_pop: Use mid-year population estimation for better rates
-        
-    Returns:
-        DataFrame with mortality rates by age group and sex
+    Calculate mortality rates from death counts and population for each year of age.
     """
-    sim = death_tracker.sim
-    
-    # Default age groups if not provided
-    if age_groups is None:
-        age_groups = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95]
-    
-    # Get death counts for the specified year
-    death_counts = death_tracker.get_death_counts(year)
-    
-    # For mid-year population approximation, we need to add half of deaths back
-    # to the current population to estimate the average population during the year
-    correction = 0.5 if use_mid_year_pop else 0.0
-    
-    # Get current population state
+    sim = deaths_module.sim
+
     ages = sim.people.age
     females = sim.people.female
     alive = sim.people.alive
-    
-    # Count population by age and sex
-    population = {'Male': defaultdict(int), 'Female': defaultdict(int)}
-    
-    # Only count alive people
+
+    print(f"Alive array (first 10): {alive[:10]}")  # Debug print
+    print(f"Ages array (first 10): {ages[:10]}")  # Debug print
+    print(f"Females array (first 10): {females[:10]}")  # Debug print
+
+    population = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
     alive_indices = np.where(alive)[0]
-    
+
     for idx in alive_indices:
         age = int(ages[idx])
+        if age > max_age:
+            continue
         sex = 'Female' if females[idx] else 'Male'
-        
-        # Find the appropriate age group
-        for i in range(len(age_groups)):
-            if i == len(age_groups) - 1 or (age >= age_groups[i] and age < age_groups[i+1]):
-                age_group = age_groups[i]
-                break
-                
-        population[sex][age_group] += 1
-    
-    # Calculate deaths by age group
-    deaths_by_group = {'Male': defaultdict(int), 'Female': defaultdict(int)}
-    
-    for sex in ['Male', 'Female']:
-        for age, count in death_counts[sex].items():
-            # Find the appropriate age group
-            for i in range(len(age_groups)):
-                if i == len(age_groups) - 1 or (age >= age_groups[i] and age < age_groups[i+1]):
-                    age_group = age_groups[i]
-                    break
-                    
-            deaths_by_group[sex][age_group] += count
-    
-    # Calculate mid-year population adjustment if requested
-    if use_mid_year_pop:
-        # Add back half of the deaths to estimate mid-year population
-        adjusted_population = {'Male': {}, 'Female': {}}
-        for sex in ['Male', 'Female']:
-            for age_group in age_groups:
-                deaths = deaths_by_group[sex][age_group] 
-                pop = population[sex].get(age_group, 0)
-                # Add back half of deaths to estimate mid-year population
-                adjusted_population[sex][age_group] = pop + deaths * correction
-    else:
-        adjusted_population = population
-    
-    # Calculate mortality rates
-    data = []
-    
-    current_year = int(sim.t.year) if year is None else year
-    
-    for sex in ['Male', 'Female']:
-        for age_group in age_groups:
-            deaths = deaths_by_group[sex][age_group]
-            pop = adjusted_population[sex].get(age_group, 0)
-            
-            # Calculate mortality rate (avoid division by zero)
-            mx = deaths / pop if pop > 0 else 0
-            
-            # Add to data
-            data.append({
-                'Time': current_year,
-                'Sex': sex,
-                'AgeGrpStart': age_group,
-                'mx': mx
-            })
-    
-    # Create DataFrame
-    mortality_rates = pd.DataFrame(data)
-    
-    # Print summary for debugging
-    print("\nMortality rates calculated using", "mid-year" if use_mid_year_pop else "end-year", "population:")
-    for sex in ['Male', 'Female']:
-        sex_rates = mortality_rates[mortality_rates['Sex'] == sex]
-        for age_group in [0, 15, 65]:
-            rate = sex_rates[sex_rates['AgeGrpStart'] == age_group]['mx'].values[0]
-            deaths = deaths_by_group[sex][age_group]
-            pop_end = population[sex].get(age_group, 0)
-            pop_mid = adjusted_population[sex].get(age_group, 0)
-            print(f"{sex} age {age_group}+: deaths={deaths}, end-year pop={pop_end}, mid-year pop={pop_mid}, rate={rate:.4f}")
-    
-    return mortality_rates
+        population[sex][age] += 1
 
+    print(f"Population after counting (first 10 ages): {[(age, population['Male'][age], population['Female'][age]) for age in range(10)]}")  # Debug print
+
+    deaths_by_age = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
+    for sex in deaths_module.death_tracking:
+        for age in range(max_age + 1):
+            deaths_by_age[sex][age] = deaths_module.death_tracking[sex][age]
+
+    print(f"Deaths by age after counting (first 10 ages): {[(age, deaths_by_age['Male'][age], deaths_by_age['Female'][age]) for age in range(10)]}")  # Debug print
+
+    mortality_rates = []
+    for age in range(max_age + 1):
+        for sex in ['Male', 'Female']:
+            pop = population[sex][age]
+            deaths = deaths_by_age[sex][age]
+            rate = deaths / pop if pop > 0 else 0
+            mortality_rates.append({'Time': year if year is not None else int(sim.t.year), 'Age': age, 'Sex': sex, 'mx': rate})
+            print(f" age: {age}, pop: {pop}, death: {deaths}, rate: {rate}")
+
+    return pd.DataFrame(mortality_rates)
 
 def calculate_life_table(mortality_rates, sex='Total', max_age=100):
     """
@@ -167,8 +98,6 @@ def calculate_life_table(mortality_rates, sex='Total', max_age=100):
         
         # Calculate probability of dying at this age
         prob_dying = 1 - np.exp(-mort_rate)
-        
-        
         
         # Check for invalid probability
         if prob_dying < 0 or prob_dying > 1:
@@ -361,79 +290,4 @@ class LifeExpectancyCalculator:
             year: Specific year to get population for
             
         Returns:
-            Dictionary with population counts by sex and age
-        """
-        # Get population from simulation
-        sim = self.death_tracker.sim
-        
-        # Get current population state
-        ages = sim.people.age
-        females = sim.people.female
-        alive = sim.people.alive
-        
-        # Count population by age and sex
-        population = {'Male': {}, 'Female': {}}
-        
-        # Only count alive people
-        alive_indices = np.where(alive)[0]
-        total_alive = len(alive_indices)
-        
-        print(f"Getting population counts: {total_alive} total alive individuals")
-        
-        for idx in alive_indices:
-            age = int(ages[idx])
-            sex = 'Female' if females[idx] else 'Male'
-            
-            if age not in population[sex]:
-                population[sex][age] = 0
-            
-            population[sex][age] += 1
-        
-        # Print population by age groups
-        print("\nPopulation by age groups:")
-        for sex in ['Male', 'Female']:
-            age_groups = [(0, 15), (15, 30), (30, 45), (45, 60), (60, 75), (75, 101)]
-            for start_age, end_age in age_groups:
-                group_pop = sum(population[sex].get(age, 0) for age in range(start_age, end_age))
-                print(f"{sex} ages {start_age}-{end_age-1}: {group_pop} people")
-        
-        return population
-    
-    def _calculate_mortality_rates(self, death_counts, population):
-        """
-        Calculate mortality rates (m_x) from death counts and population
-        
-        Args:
-            death_counts: Dictionary with death counts by sex and age
-            population: Dictionary with population counts by sex and age
-            
-        Returns:
-            Dictionary with mortality rates by sex and age
-        """
-        mortality_rates = {'Male': {}, 'Female': {}}
-        
-        print("\nCalculating mortality rates (showing rates > 0.1):")
-        print(f"{'Sex':<8}{'Age':<5}{'Deaths':<8}{'Pop':<8}{'Rate':<8}")
-        print("-" * 37)
-        
-        for sex in ['Male', 'Female']:
-            for age in range(101):
-                deaths = death_counts[sex].get(age, 0)
-                pop = population[sex].get(age, 0)
-                
-                # Avoid division by zero
-                if pop > 0:
-                    rate = deaths / pop
-                    mortality_rates[sex][age] = rate
-                    
-                    # Print high mortality rates for inspection
-                    if rate > 0.1:  # Rates above 0.1 are quite high
-                        print(f"{sex:<8}{age:<5}{deaths:<8.1f}{pop:<8}{rate:<8.4f}")
-                else:
-                    mortality_rates[sex][age] = 0.0
-                    
-                    # Print if there are deaths but no population (error condition)
-                    if deaths > 0:
-                        print(f"WARNING: {deaths} deaths but no population for {sex} age {age}")
-        
-        return mortality_rates
+            Dictionary with population counts by

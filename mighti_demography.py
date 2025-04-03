@@ -5,8 +5,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-from simulation_results import SimulationResults
-from starsim.demographics import Deaths  # Import the Deaths class
 
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
@@ -116,74 +114,19 @@ connectors = mi.create_connectors(ncd_interactions)
 # Add NCD-NCD connectors to interactions
 interactions.extend(connectors)
 
-# Initialize the DeathTracker
-death_tracker = mi.DeathTracker()
-
 def get_deaths_module(sim):
     for module in sim.modules:
         if isinstance(module, ss.Deaths):
             return module
     raise ValueError("Deaths module not found in the simulation.")
     
-def calculate_mortality_rates(self, year=None, max_age=100):
-    """
-    Calculate mortality rates from death counts and population for each year of age.
-    """
-    sim = self.sim
-
-    death_counts = self.results['new']
-    if year is not None:
-        death_counts = death_counts[self.sim.t.yearvec == year]
-
-    ages = sim.people.age
-    females = sim.people.female
-    alive = sim.people.alive
-
-    print(f"Alive array (first 10): {alive[:10]}")  # Debug print
-    print(f"Ages array (first 10): {ages[:10]}")  # Debug print
-    print(f"Females array (first 10): {females[:10]}")  # Debug print
-
-    population = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
-    alive_indices = np.where(alive)[0]
-    
-    for idx in alive_indices:
-        age = int(ages[idx])
-        if age > max_age:
-            continue
-        sex = 'Female' if females[idx] else 'Male'
-        population[sex][age] += 1
-
-    print(f"Population after counting (first 10 ages): {[(age, population['Male'][age], population['Female'][age]) for age in range(10)]}")  # Debug print
-
-    deaths_by_age = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
-    dead_indices = np.where(~alive)[0]
-    
-    for idx in dead_indices:
-        age = int(ages[idx])
-        if age > max_age:
-            continue
-        sex = 'Female' if females[idx] else 'Male'
-        deaths_by_age[sex][age] += 1
-
-    print(f"Deaths by age after counting (first 10 ages): {[(age, deaths_by_age['Male'][age], deaths_by_age['Female'][age]) for age in range(10)]}")  # Debug print
-
-    mortality_rates = []
-    for age in range(max_age + 1):
-        for sex in ['Male', 'Female']:
-            pop = population[sex][age]
-            deaths = deaths_by_age[sex][age]
-            rate = deaths / pop if pop > 0 else 0
-            mortality_rates.append({'Time': year if year is not None else int(sim.t.year), 'Age': age, 'Sex': sex, 'mx': rate})
-            print(f" age: {age}, pop: {pop}, death: {deaths}, rate: {rate}")
-
-    return pd.DataFrame(mortality_rates)
 
 if __name__ == '__main__':
     # Initialize the simulation with connectors and force=True
     sim = ss.Sim(
         n_agents=n_agents,
         networks=networks,
-        analyzers=[death_tracker, prevalence_analyzer],
+        analyzers=[prevalence_analyzer],
         diseases=disease_objects,
         start=inityear,
         stop=endyear,
@@ -199,48 +142,6 @@ if __name__ == '__main__':
     
     # Assuming you have a reference to the simulation object `sim`
     deaths_module = get_deaths_module(sim)
-    infant_deaths = deaths_module.infant_deaths
-    total_deaths = deaths_module.n_deaths
-    
-    print(f"Infant deaths: {infant_deaths}, Total deaths: {total_deaths}")
-    
-    mi.calculate_mortality_rates(sim,year=2021,max_age=100)
-    
-    # # # Calculate number of years for the simulation
-    # n_years = endyear - inityear + 1
-    
-    # # # Track initial population - use now() method for consistency
-    # # year = int(sim.t.now())
-    # # print(f"Tracking initial population for year {year}")
-    # # death_tracker.track_population()
-    
-    # # # Create and populate DataFrame
-    # df_results = create_results_dataframe(sim, n_years, n_agents)
-    # df_results.to_excel('df_results.xlsx',index=False)
-    # Calculate metrics
-    # df_metrics = calculate_metrics(df_results)
-
-    # # Plot metrics
-    # # mi.plot_metrics(df_metrics)
-    # mi.plot_population_over_time(df_results, inityear, endyear, age_groups=None, 
-    #                              nagent, observed_data_path='demography/eswatini_age_distribution.csv')
-
-    # observed_mortality_rates = pd.read_csv('demography/eswatini_mortality_rates.csv')
-    
-    # mi.plot_mortality_rates_comparison(df_results, observed_mortality_rates, observed_year=2009, year=2009, 
-    #                               log_scale=False,  figsize=(14, 10), title=None)
-    
-    # # Plot population changes over time by age group and sex
-    # fig, (ax1, ax2) = mi.plot_population_over_time(sim, inityear=2007, endyear=2023, observed_data_path='demography/eswatini_age_distribution.csv')
-    # plt.show()
-    
-    # # Plot mortality rates over time
-    # death.plot_mortality_rates(start_year=2007, end_year=2023)
-    
-    # death.plot_life_expectancy_by_age(year=2007)
-    
-    # # Calculate life expectancy for the year 2023
-    # life_expectancy_calculator = mi.LifeExpectancyCalculator(death_tracker=death_tracker)
-    # life_table = life_expectancy_calculator.calculate_from_death_tracker(year=2023)
-    # print(life_table)
-    # life_table.to_csv('life_table_2023.csv', index=False)
+    mortality_rates = mi.calculate_mortality_rates(deaths_module)
+    life_table = mi.calculate_life_table(mortality_rates)
+    print(life_table)

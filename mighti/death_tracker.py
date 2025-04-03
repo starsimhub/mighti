@@ -22,6 +22,9 @@ class DeathTracker(ss.Analyzer):
         sim = self.sim
         current_year = sim.t.now()  # Get current year at the beginning
         
+        # Add to DeathTracker.step() method
+        if getattr(self.sim.t, 'dt_year', 1) == 1:  # Only track once per year, with safe attribute access
+            self.track_population()
         # Get current state
         current_alive = sim.people.alive
         current_uids = sim.people.uid
@@ -106,9 +109,206 @@ class DeathTracker(ss.Analyzer):
             year_total = sum(self.yearly_death_data[year]['Male'].values()) + sum(self.yearly_death_data[year]['Female'].values())
             print(f"Getting death counts for year {year} - Deaths in this year: {year_total}")
         
-        return death_counts    
+        return death_counts  
     
+    def plot_age_distribution_over_time(self, inityear, endyear, age_groups=None):
+        """
+        Plot the age distribution of the population over time by sex and age group
+        
+        Args:
+            inityear: Start year of the simulation
+            endyear: End year of the simulation
+            age_groups: List of tuples (start_age, end_age, label)
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        if age_groups is None:
+            # Default age groups
+            age_groups = [
+                (0, 5, "0-4"),
+                (5, 15, "5-14"),
+                (15, 25, "15-24"),
+                (25, 35, "25-34"),
+                (35, 45, "35-44"),
+                (45, 55, "45-54"),
+                (55, 65, "55-64"),
+                (65, 75, "65-74"),
+                (75, 85, "75-84"),
+                (85, 101, "85+")
+            ]
+        
+        # Initialize dictionaries to store population data
+        population_data = {
+            'years': list(range(inityear, endyear + 1)),
+            'male': {group[2]: [] for group in age_groups},
+            'female': {group[2]: [] for group in age_groups},
+        }
+        
+        # Retrieve population data for each year
+        for year in population_data['years']:
+            total_population = self.population_by_year.get(year, {'Male': {}, 'Female': {}})
+            
+            for start_age, end_age, label in age_groups:
+                # Calculate male population in this age group
+                male_population = sum(total_population.get('Male', {}).get(age, 0) for age in range(start_age, end_age))
+                population_data['male'][label].append(male_population)
+                
+                # Calculate female population in this age group
+                female_population = sum(total_population.get('Female', {}).get(age, 0) for age in range(start_age, end_age))
+                population_data['female'][label].append(female_population)
+        
+        print(f"population_data male: {population_data['male']}")
+        print(f"population_data female: { population_data['female']}")
+        # Create figure with two panels
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+        
+        # Define a consistent color palette for age groups
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+        
+        # Plot male population data
+        for i, (label, counts) in enumerate(population_data['male'].items()):
+            if len(counts) == len(population_data['years']):
+                # Apply color consistently based on age group
+                color_idx = i % len(colors)
+                
+                # Plot population counts with solid line
+                ax1.plot(population_data['years'], counts, 
+                        linestyle='-', marker='o', markersize=5, 
+                        color=colors[color_idx], linewidth=2, label=label)
+        
+        # Plot female population data
+        for i, (label, counts) in enumerate(population_data['female'].items()):
+            if len(counts) == len(population_data['years']):
+                # Apply color consistently based on age group
+                color_idx = i % len(colors)
+                
+                # Plot population counts with solid line
+                ax2.plot(population_data['years'], counts,
+                        linestyle='-', marker='o', markersize=5,
+                        color=colors[color_idx], linewidth=2, label=label)
+        
+        # Configure male panel
+        ax1.set_title('Male Population by Age Group', fontsize=14)
+        ax1.set_ylabel('Population Count', fontsize=12)
+        ax1.grid(True, alpha=0.3)
+        ax1.legend(fontsize=10)
+        
+        # Configure female panel
+        ax2.set_title('Female Population by Age Group', fontsize=14)
+        ax2.set_xlabel('Year', fontsize=12)
+        ax2.set_ylabel('Population Count', fontsize=12)
+        ax2.grid(True, alpha=0.3)
+        ax2.legend(fontsize=10)
+        
+        # Improve layout
+        plt.tight_layout()
+        plt.suptitle('Population Age Distribution Over Time by Sex and Age Group', fontsize=16)
+        plt.subplots_adjust(top=0.93)
+        
+        plt.show()
+        return
     
+    def plot_mortality_rates_for_young_children(self, inityear, endyear):
+        """
+        Plot mortality rates for young children (0-4 age group) over time
+        
+        Args:
+            inityear: Start year of the simulation
+            endyear: End year of the simulation
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        # Initialize data to store mortality rates
+        mortality_rates = {
+            'years': list(range(inityear, endyear + 1)),
+            'male': [],
+            'female': []
+        }
+        population = {
+            'years': list(range(inityear, endyear + 1)),
+            'male': [],
+            'female': []
+        }
+        deaths = {
+            'years': list(range(inityear, endyear + 1)),
+            'male': [],
+            'female': []
+        }
+        births = {
+            'years': list(range(inityear, endyear + 1)),
+            'male': [],
+            'female': []
+        }
+        
+        # Track previous population for birth calculation
+        previous_population = {
+            'male': 0,
+            'female': 0
+        }
+        
+        # Retrieve mortality rates for each year
+        for year in mortality_rates['years']:
+            yearly_deaths = self.get_death_counts(year)
+            total_population = self.population_by_year.get(year, {'Male': {}, 'Female': {}})
+            
+            # Calculate mortality rate for male children (0-4 age group)
+            male_deaths = sum(yearly_deaths['Male'].get(age, 0) for age in range(0, 5))
+            male_population = sum(total_population.get('Male', {}).get(age, 0) for age in range(0, 5))
+            male_mortality_rate = male_deaths / male_population if male_population > 0 else 0
+            mortality_rates['male'].append(male_mortality_rate)
+            population['male'].append(male_population)
+            deaths['male'].append(male_deaths)
+            
+            # Calculate male births
+            current_population_male = sum(total_population.get('Male', {}).values())
+            male_births = max(0, current_population_male - previous_population['male'])
+            births['male'].append(male_births)
+            previous_population['male'] = current_population_male
+            
+            # Calculate mortality rate for female children (0-4 age group)
+            female_deaths = sum(yearly_deaths['Female'].get(age, 0) for age in range(0, 5))
+            female_population = sum(total_population.get('Female', {}).get(age, 0) for age in range(0, 5))
+            female_mortality_rate = female_deaths / female_population if female_population > 0 else 0
+            mortality_rates['female'].append(female_mortality_rate)
+            population['female'].append(female_population)
+            deaths['female'].append(female_deaths)
+            
+            # Calculate female births
+            current_population_female = sum(total_population.get('Female', {}).values())
+            female_births = max(0, current_population_female - previous_population['female'])
+            births['female'].append(female_births)
+            previous_population['female'] = current_population_female
+        
+        print(f"mortality_rates male: {mortality_rates['male']}")
+        print(f"mortality_rates female: {mortality_rates['female']}")
+        print(f"population male: {population['male']}")
+        print(f"population female: {population['female']}")
+        print(f"deaths male: {deaths['male']}")
+        print(f"deaths female: {deaths['female']}")
+        print(f"births male: {births['male']}")
+        print(f"births female: {births['female']}")
+        
+        # Create figure
+        fig, ax = plt.subplots(figsize=(14, 7))
+        
+        # Plot male and female mortality rates
+        ax.plot(mortality_rates['years'], mortality_rates['male'], linestyle='-', marker='o', color='blue', linewidth=2, label='Male')
+        ax.plot(mortality_rates['years'], mortality_rates['female'], linestyle='-', marker='o', color='red', linewidth=2, label='Female')
+        
+        # Configure plot
+        ax.set_title('Mortality Rates for Young Children (0-4 Age Group) Over Time', fontsize=14)
+        ax.set_xlabel('Year', fontsize=12)
+        ax.set_ylabel('Mortality Rate (Deaths per Population)', fontsize=12)
+        ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=10)
+        
+        # Improve layout
+        plt.tight_layout()
+        plt.show()
+        return 
+
     def plot_cum_death_counts(self, smoothing=3, age_interval=1, figsize=(12, 8)):
         """
         Plot the absolute number of deaths by age and sex
@@ -257,7 +457,204 @@ class DeathTracker(ss.Analyzer):
         plt.show()
         return 
 
+    def plot_sex_age_group_death_counts_over_time(self, inityear, endyear, age_groups=None):
+        """
+        Plot death counts over time by sex and age group
+        
+        Args:
+            inityear: Start year of the simulation
+            endyear: End year of the simulation
+            age_groups: List of tuples (start_age, end_age, label)
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        if age_groups is None:
+            # Default age groups
+            age_groups = [
+                (0, 5, "0-4"),
+                (5, 15, "5-14"),
+                (15, 25, "15-24"),
+                (25, 35, "25-34"),
+                (35, 45, "35-44"),
+                (45, 55, "45-54"),
+                (55, 65, "55-64"),
+                (65, 75, "65-74"),
+                (75, 85, "75-84"),
+                (85, 101, "85+")
+            ]
+        
+        # Initialize dictionaries to store death counts over time
+        death_data = {
+            'years': list(range(inityear, endyear + 1)),
+            'male': {group[2]: [] for group in age_groups},
+            'female': {group[2]: [] for group in age_groups},
+        }
+        
+        # Retrieve death counts for each year
+        for year in death_data['years']:
+            yearly_deaths = self.get_death_counts(year)
+            
+            for start_age, end_age, label in age_groups:
+                # Calculate male deaths in this age group
+                male_deaths = sum(yearly_deaths['Male'].get(age, 0) for age in range(start_age, end_age))
+                death_data['male'][label].append(male_deaths)
+                
+                # Calculate female deaths in this age group
+                female_deaths = sum(yearly_deaths['Female'].get(age, 0) for age in range(start_age, end_age))
+                death_data['female'][label].append(female_deaths)
+        
+        # Create figure with two panels
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+        
+        # Define a consistent color palette for age groups
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+        
+        # Plot male death counts data
+        for i, (label, counts) in enumerate(death_data['male'].items()):
+            if len(counts) == len(death_data['years']):
+                # Apply color consistently based on age group
+                color_idx = i % len(colors)
+                
+                # Plot death counts with solid line
+                ax1.plot(death_data['years'], counts, 
+                        linestyle='-', marker='o', markersize=5, 
+                        color=colors[color_idx], linewidth=2)
+        
+        # Plot female death counts data
+        for i, (label, counts) in enumerate(death_data['female'].items()):
+            if len(counts) == len(death_data['years']):
+                # Apply color consistently based on age group
+                color_idx = i % len(colors)
+                
+                # Plot death counts with solid line
+                ax2.plot(death_data['years'], counts,
+                        linestyle='-', marker='o', markersize=5,
+                        color=colors[color_idx], linewidth=2)
+        
+        # Configure male panel
+        ax1.set_title('Male Death Counts by Age Group', fontsize=14)
+        ax1.set_ylabel('Number of Deaths', fontsize=12)
+        ax1.grid(True, alpha=0.3)
+        
+        # Configure female panel
+        ax2.set_title('Female Death Counts by Age Group', fontsize=14)
+        ax2.set_xlabel('Year', fontsize=12)
+        ax2.set_ylabel('Number of Deaths', fontsize=12)
+        ax2.grid(True, alpha=0.3)
+        
+        # Improve layout
+        plt.tight_layout()
+        plt.suptitle('Death Counts Over Time by Age Group and Sex', fontsize=16)
+        plt.subplots_adjust(top=0.93)
+        
+        plt.show()
+        return fig, (ax1, ax2)
     
+    def plot_normalized_sex_age_group_annual_death_counts(self, inityear, endyear, age_groups=None):
+        """
+        Plot annual death counts normalized by total population by sex and age group for each year
+        
+        Args:
+            inityear: Start year of the simulation
+            endyear: End year of the simulation
+            age_groups: List of tuples (start_age, end_age, label)
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        if age_groups is None:
+            # Default age groups
+            age_groups = [
+                (0, 5, "0-4"),
+                (5, 15, "5-14"),
+                (15, 25, "15-24"),
+                (25, 35, "25-34"),
+                (35, 45, "35-44"),
+                (45, 55, "45-54"),
+                (55, 65, "55-64"),
+                (65, 75, "65-74"),
+                (75, 85, "75-84"),
+                (85, 101, "85+")
+            ]
+        
+        # Initialize dictionaries to store annual death counts
+        annual_death_data = {
+            'years': list(range(inityear, endyear + 1)),
+            'male': {group[2]: [] for group in age_groups},
+            'female': {group[2]: [] for group in age_groups},
+        }
+        
+        # Retrieve death counts and population data for each year
+        for year in annual_death_data['years']:
+            yearly_deaths = self.get_death_counts(year)
+            total_population = sum(self.population_by_year.get(year, {'Male': {}, 'Female': {}}).get('Male', {}).values()) + \
+                               sum(self.population_by_year.get(year, {'Male': {}, 'Female': {}}).get('Female', {}).values())
+            
+            for start_age, end_age, label in age_groups:
+                # Calculate male deaths in this age group normalized by total population
+                male_deaths = sum(yearly_deaths['Male'].get(age, 0) for age in range(start_age, end_age))
+                male_death_rate = male_deaths / total_population if total_population > 0 else 0
+                annual_death_data['male'][label].append(male_death_rate)
+                # Calculate female deaths in this age group normalized by total population
+                female_deaths = sum(yearly_deaths['Female'].get(age, 0) for age in range(start_age, end_age))
+                female_death_rate = female_deaths / total_population if total_population > 0 else 0
+                annual_death_data['female'][label].append(female_death_rate)
+
+        print(f"annual_death_data male: {annual_death_data['male']}")
+        print(f"annual_death_data female: {annual_death_data['female']}")
+
+ 
+        # Create figure with two panels
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+        
+        # Define a consistent color palette for age groups
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+        
+        # Plot male death rates data
+        for i, (label, counts) in enumerate(annual_death_data['male'].items()):
+            if len(counts) == len(annual_death_data['years']):
+                # Apply color consistently based on age group
+                color_idx = i % len(colors)
+                
+                # Plot death rates with solid line
+                ax1.plot(annual_death_data['years'], counts, 
+                        linestyle='-', marker='o', markersize=5, 
+                        color=colors[color_idx], linewidth=2, label=label)
+        
+        # Plot female death rates data
+        for i, (label, counts) in enumerate(annual_death_data['female'].items()):
+            if len(counts) == len(annual_death_data['years']):
+                # Apply color consistently based on age group
+                color_idx = i % len(colors)
+                
+                # Plot death rates with solid line
+                ax2.plot(annual_death_data['years'], counts,
+                        linestyle='-', marker='o', markersize=5,
+                        color=colors[color_idx], linewidth=2, label=label)
+        
+        # Configure male panel
+        ax1.set_title('Male Annual Death Rates by Age Group', fontsize=14)
+        ax1.set_ylabel('Death Rate (per Total Population)', fontsize=12)
+        ax1.grid(True, alpha=0.3)
+        ax1.legend(fontsize=10)
+        
+        # Configure female panel
+        ax2.set_title('Female Annual Death Rates by Age Group', fontsize=14)
+        ax2.set_xlabel('Year', fontsize=12)
+        ax2.set_ylabel('Death Rate (per Total Population)', fontsize=12)
+        ax2.grid(True, alpha=0.3)
+        ax2.legend(fontsize=10)
+        
+        # Improve layout
+        plt.tight_layout()
+        plt.suptitle('Annual Death Rates by Age Group and Sex (Normalized by Total Population)', fontsize=16)
+        plt.subplots_adjust(top=0.93)
+        
+        plt.show()
+        return fig, (ax1, ax2)
+  
+
     def plot_death_counts(self, year=None, smoothing=3, age_interval=1, figsize=(12, 8)):
         """
         Plot the absolute number of deaths by age and sex
@@ -427,8 +824,219 @@ class DeathTracker(ss.Analyzer):
         plt.show()
         return
     
-    
-
+    def plot_population_over_time(self, inityear, endyear, age_groups=None, observed_data_path='demography/eswatini_age_distribution.csv', normalize=True):
+        """
+        Plot population changes over time by age group and sex
+        
+        Args:
+            inityear: Start year of the simulation
+            endyear: End year of the simulation
+            age_groups: List of tuples defining age groups (start_age, end_age, label)
+            observed_data_path: Path to CSV file with observed age distribution
+            normalize: If True, normalize data as percentages of total population
+        """
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        
+        # Define age groups if not provided
+        if age_groups is None:
+            age_groups = [
+                (0, 5, "0-4"),
+                (5, 15, "5-14"),
+                (15, 25, "15-24"),
+                (25, 45, "25-44"),
+                (45, 65, "45-64"),
+                (65, 101, "65+")
+            ]
+        
+        # Define a consistent color palette for age groups
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+        
+        # Load observed data if path is provided
+        observed_data = None
+        if observed_data_path:
+            try:
+                observed_data = pd.read_csv(observed_data_path)
+                print(f"Loaded observed age distribution data from {observed_data_path}")
+            except Exception as e:
+                print(f"Could not load observed data: {str(e)}")
+        
+        # Initialize dictionaries to store population data
+        population_data = {
+            'years': list(range(inityear, endyear + 1)),
+            'male': {group[2]: [] for group in age_groups},
+            'female': {group[2]: [] for group in age_groups},
+            'total_male': [],
+            'total_female': []
+        }
+        
+        # Calculate population by age group for each year
+        for year in population_data['years']:
+            if year not in self.population_by_year:
+                continue
+                
+            # Calculate total population for this year
+            total_male = sum(self.population_by_year[year]['Male'].values())
+            total_female = sum(self.population_by_year[year]['Female'].values())
+            
+            population_data['total_male'].append(total_male)
+            population_data['total_female'].append(total_female)
+                
+            # Calculate for each age group
+            for start_age, end_age, label in age_groups:
+                # Calculate male population in this age group
+                male_count = sum(self.population_by_year[year]['Male'].get(age, 0) 
+                               for age in range(start_age, end_age))
+                population_data['male'][label].append(male_count)
+                
+                # Calculate female population in this age group
+                female_count = sum(self.population_by_year[year]['Female'].get(age, 0) 
+                                for age in range(start_age, end_age))
+                population_data['female'][label].append(female_count)
+        
+        # Create figure with two panels
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+        
+        # Define a simple function to construct the legend with both obs and sim entries
+        def add_legend_entries(ax):
+            # Add legend entries for line styles (sim vs obs)
+            from matplotlib.lines import Line2D
+            legend_elements = [
+                Line2D([0], [0], color='black', linestyle='-', marker='o', markersize=5, label='Simulated'),
+                Line2D([0], [0], color='black', linestyle='--', marker='s', markersize=5, label='Observed')
+            ]
+            # Add legend for colors (age groups)
+            for i, (_, _, label) in enumerate(age_groups):
+                if i < len(colors):
+                    legend_elements.append(Line2D([0], [0], color=colors[i], lw=2, label=label))
+            
+            ax.legend(handles=legend_elements, loc='upper left', ncol=2, fontsize=10)
+        
+        # Initialize dictionaries for observed data
+        obs_male = {}
+        obs_female = {}
+        obs_total_male = []
+        obs_total_female = []
+        obs_year_ints = []
+        
+        # Process observed data if available
+        if observed_data is not None:
+            observed_years = [str(y) for y in range(inityear, endyear + 1) if str(y) in observed_data.columns]
+            
+            if observed_years:
+                # Convert year strings to integers for plotting
+                obs_year_ints = [int(y) for y in observed_years]
+                
+                # Calculate total population for each year first
+                for year_str in observed_years:
+                    male_total = observed_data[observed_data['sex'] == 'Male'][year_str].sum()
+                    female_total = observed_data[observed_data['sex'] == 'Female'][year_str].sum()
+                    
+                    obs_total_male.append(male_total)
+                    obs_total_female.append(female_total)
+                
+                for start_age, end_age, label in age_groups:
+                    # Get male data for this age group by summing across ages
+                    male_rows = observed_data[(observed_data['sex'] == 'Male') & 
+                                             (observed_data['age'] >= start_age) & 
+                                             (observed_data['age'] < end_age)]
+                    
+                    # Get female data for this age group
+                    female_rows = observed_data[(observed_data['sex'] == 'Female') & 
+                                               (observed_data['age'] >= start_age) & 
+                                               (observed_data['age'] < end_age)]
+                    
+                    # Initialize data lists
+                    obs_male[label] = []
+                    obs_female[label] = []
+                    
+                    # Extract values for each year
+                    for i, year_str in enumerate(observed_years):
+                        # Sum populations for this age group and year
+                        male_pop = male_rows[year_str].sum()  # Raw value from data
+                        female_pop = female_rows[year_str].sum()  # Raw value from data
+                        
+                        # Normalize if requested
+                        if normalize:
+                            male_pop = 100 * male_pop / obs_total_male[i] if obs_total_male[i] > 0 else 0
+                            female_pop = 100 * female_pop / obs_total_female[i] if obs_total_female[i] > 0 else 0
+                        else:
+                            # If not normalizing, scale raw values (in thousands) to actual counts
+                            male_pop *= 1000
+                            female_pop *= 1000
+                        
+                        obs_male[label].append(male_pop)
+                        obs_female[label].append(female_pop)
+                
+                print(f"Added observed data for years: {', '.join(observed_years)}")
+            else:
+                print("No matching years found in observed data")
+        
+        # Plot male population data
+        for i, (label, counts) in enumerate(population_data['male'].items()):
+            if len(counts) == len(population_data['years']):
+                # Apply color consistently based on age group
+                color_idx = i % len(colors)
+                
+                # Normalize if requested
+                if normalize:
+                    counts = [100 * c / t for c, t in zip(counts, population_data['total_male'])]
+                
+                # Plot simulated data with solid line
+                ax1.plot(population_data['years'], counts, 
+                        linestyle='-', marker='o', markersize=5, 
+                        color=colors[color_idx], linewidth=2)
+                
+                # Plot observed data with the same color but dashed line
+                if label in obs_male and len(obs_year_ints) > 0:
+                    ax1.plot(obs_year_ints, obs_male[label],
+                            linestyle='--', marker='s', markersize=5,
+                            color=colors[color_idx], linewidth=2)
+        
+        # Plot female population data
+        for i, (label, counts) in enumerate(population_data['female'].items()):
+            if len(counts) == len(population_data['years']):
+                # Apply color consistently based on age group
+                color_idx = i % len(colors)
+                
+                # Normalize if requested
+                if normalize:
+                    counts = [100 * c / t for c, t in zip(counts, population_data['total_female'])]
+                
+                # Plot simulated data with solid line
+                ax2.plot(population_data['years'], counts,
+                        linestyle='-', marker='o', markersize=5,
+                        color=colors[color_idx], linewidth=2)
+                
+                # Plot observed data with the same color but dashed line
+                if label in obs_female and len(obs_year_ints) > 0:
+                    ax2.plot(obs_year_ints, obs_female[label],
+                            linestyle='--', marker='s', markersize=5,
+                            color=colors[color_idx], linewidth=2)
+        
+        # Add legends to both panels
+        add_legend_entries(ax1)
+        add_legend_entries(ax2)
+        
+        # Configure male panel
+        ax1.set_title('Male Population by Age Group', fontsize=14)
+        y_label = 'Percentage of Population' if normalize else 'Population Count'
+        ax1.set_ylabel(y_label, fontsize=12)
+        ax1.grid(True, alpha=0.3)
+        
+        # Configure female panel
+        ax2.set_title('Female Population by Age Group', fontsize=14)
+        ax2.set_xlabel('Year', fontsize=12)
+        ax2.set_ylabel(y_label, fontsize=12)
+        ax2.grid(True, alpha=0.3)
+        
+        # Improve layout
+        plt.tight_layout()
+        title = 'Population Structure Over Time by Age Group and Sex (Percentage)' if normalize else 'Population Changes Over Time by Age Group and Sex'
+        plt.suptitle(title, fontsize=16)
+        plt.subplots_adjust(top=0.93)
+        
+        return fig, (ax1, ax2) 
     
     
     def calculate_and_plot_mortality_rates(self, observed_data_path, year=None, 
@@ -521,31 +1129,70 @@ class DeathTracker(ss.Analyzer):
         print(f"Time {year}: Population tracked - Male: {total_male} (under 5: {young_male}), "
               f"Female: {total_female} (under 5: {young_female})")
         
-
-# In mighti/death_tracker.py
-
-# After your DeathTracker class...
+    def track_population(self):
+        """Track population by age and sex at the current timestep"""
+        if not hasattr(self, 'population_by_year'):
+            self.population_by_year = {}
+    
+        # Get current year and population state - Fixed the year access
+        year = int(self.sim.t.now())  # Use t.now() instead of t.year
+        ages = self.sim.people.age
+        females = self.sim.people.female
+        alive = self.sim.people.alive
+    
+        # Count population by age and sex
+        population = {'Male': defaultdict(int), 'Female': defaultdict(int)}
+    
+        # Only count alive people
+        alive_indices = np.where(alive)[0]
+    
+        for idx in alive_indices:
+            age = int(ages[idx])
+            sex = 'Female' if females[idx] else 'Male'
+            population[sex][age] = population[sex].get(age, 0) + 1
+    
+        # Store population for this year
+        self.population_by_year[year] = population
+    
+        # Print summary statistics
+        total_male = sum(population['Male'].values())
+        total_female = sum(population['Female'].values())
+        # print(f"Year {year} population: Male={total_male:,}, Female={total_female:,}, Total={total_male + total_female:,}")
+        # print(f"Population by age and sex: {population}")
 
 def check_child_mortality_parameters(sim):
     """Check if child mortality parameters are set correctly in the simulation"""
-    # This will depend on how mortality is implemented in your model
-    
     print("\nChecking child mortality parameters:")
     
-    # Check if there are specific mortality parameters for children
-    if hasattr(sim.pars, 'mortality_by_age') or hasattr(sim, 'mortality_by_age'):
-        mortality_pars = getattr(sim.pars, 'mortality_by_age', getattr(sim, 'mortality_by_age', None))
-        
-        if mortality_pars is not None:
-            # Print the mortality parameters for young ages
-            print("Mortality parameters for young ages:")
-            for age in range(6):
-                if age in mortality_pars:
-                    print(f"  Age {age}: {mortality_pars[age]}")
-                else:
-                    print(f"  Age {age}: Not specified")
+    # Check for parameters under deaths
+    if hasattr(sim.pars, 'deaths'):
+        deaths_pars = sim.pars.deaths
+        # print("\nDeath parameters:")
+        # if hasattr(deaths_pars, 'death_rate'):
+        #     print(f"  Death rate: {deaths_pars.death_rate}")
+        # if hasattr(deaths_pars, 'rel_death'):
+        #     print(f"  Relative death rate: {deaths_pars.rel_death}")
+            
+    # Inspect the death_rate_data attribute in the deaths module
+    # if hasattr(sim.demographics[1], 'death_rate_data'):
+    #     print(sim.demographics[1].death_rate_data.head())
+    #     print(sim.demographics[1].death_rate_data.index.names)
+    #     print(sim.demographics[1].death_rate_data.columns)
+    else:
+        print("death_rate_data attribute not found in the deaths module.")        
     
-    # Look for specific mortality rates
+    # Check for pregnancy parameters
+    # if hasattr(sim.pars, 'pregnancy'):
+    #     pregnancy_pars = sim.pars.pregnancy
+    #     print("\nPregnancy parameters:")
+    #     if hasattr(pregnancy_pars, 'p_neonatal_death'):
+    #         print(f"  Neonatal death probability: {pregnancy_pars.p_neonatal_death}")
+    #     if hasattr(pregnancy_pars, 'p_maternal_death'):
+    #         print(f"  Maternal death probability: {pregnancy_pars.p_maternal_death}")
+    #     if hasattr(pregnancy_pars, 'fertility_rate'):
+    #         print(f"  Fertility rate: {pregnancy_pars.fertility_rate}")
+    
+    # Check for mortality probabilities
     if hasattr(sim, 'people') and hasattr(sim.people, 'mort_probs'):
         print("\nMortality probabilities for young ages:")
         mort_probs = sim.people.mort_probs
@@ -571,7 +1218,7 @@ def check_child_mortality_parameters(sim):
                 female_probs = mort_probs[young_females]
                 print(f"  Age {age} Female: {len(young_females)} agents, avg mort_prob: {female_probs.mean():.4f}")
     
-    # Check if there are any specific disease parameters affecting children
+    # Check for disease parameters affecting children
     if hasattr(sim, 'diseases'):
         print("\nDisease parameters affecting children:")
         for disease_name, disease in sim.diseases.items():
@@ -582,17 +1229,16 @@ def check_child_mortality_parameters(sim):
                         child_related[param_name] = value
                 
                 if child_related:
-                    print(f"  {disease_name}: {child_related}")
+                    print(f"  {disease_name}:")
+                    for param_name, value in child_related.items():
+                        print(f"    {param_name}: {value}")
                     
-    # Look for demographic parameters that might affect children
+    # Check demographic parameters that might affect children
     print("\nDemographic parameters:")
     if hasattr(sim, 'pars'):
         for key, value in sim.pars.items():
             if isinstance(key, str) and ('child' in key.lower() or 'infant' in key.lower() or 'mortality' in key.lower()):
                 print(f"  {key}: {value}")
-
-
-# Add this to mighti/death_tracker.py or wherever is appropriate
 
 def analyze_mortality_implementation(sim, death_tracker):
     """
@@ -601,14 +1247,23 @@ def analyze_mortality_implementation(sim, death_tracker):
     """
     print("\n--- Mortality Implementation Analysis ---")
     
-    # Check for mortality calculation functions
+    # Check for mortality calculation functions in sim
     mortality_functions = []
     for attr_name in dir(sim):
         attr = getattr(sim, attr_name)
         if callable(attr) and ('mortality' in attr_name.lower() or 'death' in attr_name.lower()):
             mortality_functions.append(attr_name)
     
-    print(f"Potential mortality functions found: {mortality_functions}")
+    print(f"Potential mortality functions found in sim: {mortality_functions}")
+    
+    # Check for mortality calculation functions in death_tracker
+    mortality_functions = []
+    for attr_name in dir(death_tracker):
+        attr = getattr(death_tracker, attr_name)
+        if callable(attr) and ('mortality' in attr_name.lower() or 'death' in attr_name.lower()):
+            mortality_functions.append(attr_name)
+    
+    print(f"Potential mortality functions found in death_tracker: {mortality_functions}")
     
     # Check the people object for mortality-related attributes
     people_mortality_attrs = []
@@ -687,19 +1342,19 @@ def analyze_mortality_implementation(sim, death_tracker):
     # Try to identify the specific mortality calculation
     print("\nAttempting to trace mortality calculation process...")
     
-    # Look at a specific function that might be relevant
-    mortality_fn_names = ["update_mortality", "calculate_mortality", "apply_mortality", 
-                     "compute_deaths", "apply_deaths", "update_deaths"]
+    # Look at relevant functions in death_tracker
+    if hasattr(death_tracker, 'calculate_and_plot_mortality_rates'):
+        print("\nFound function: calculate_and_plot_mortality_rates")
+        # death_tracker.calculate_and_plot_mortality_rates()
     
-    for fn_name in mortality_fn_names:
-        if hasattr(sim, fn_name) and callable(getattr(sim, fn_name)):
-            fn = getattr(sim, fn_name)
-            print(f"\nFound mortality function: {fn_name}")
-            print(f"Function details: {fn.__doc__ if fn.__doc__ else 'No documentation available'}")
-            
-# Modified version of calculate_adjusted_mortality_rates function for death_tracker.py
-# This applies age-specific caps to mortality rates
-
+    if hasattr(death_tracker, 'get_death_counts'):
+        print("\nFound function: get_death_counts")
+        death_counts = death_tracker.get_death_counts()
+        print(f"Death counts: {death_counts}")
+    
+    if hasattr(death_tracker, 'record_death'):
+        print("\nFound function: record_death")
+ 
 def calculate_adjusted_mortality_rates(death_tracker, year=None, age_groups=None, max_rate=2.0):
     """
     Calculate mortality rates from death tracker data with age-appropriate safeguards
@@ -774,6 +1429,7 @@ def calculate_adjusted_mortality_rates(death_tracker, year=None, age_groups=None
     data = []
     
     current_year = sim.t.year if year is None else year
+    print(f"Current simulation year: {current_year}")
     
     for sex in ['Male', 'Female']:
         for age_group in age_groups:
