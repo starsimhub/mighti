@@ -10,9 +10,9 @@ import os
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 beta = 0.001
-n_agents = 50000  # Number of agents in the simulation
+n_agents = 500000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
-endyear = 2023
+endyear = 2012
 
 # ---------------------------------------------------------------------
 # Specify data file paths
@@ -119,6 +119,13 @@ def get_deaths_module(sim):
         if isinstance(module, ss.Deaths):
             return module
     raise ValueError("Deaths module not found in the simulation.")
+
+def get_pregnancy_module(sim):
+    for module in sim.modules:
+        if isinstance(module, ss.Pregnancy):
+            return module
+    raise ValueError("Pregnancy module not found in the simulation.")
+
     
 
 if __name__ == '__main__':
@@ -140,8 +147,92 @@ if __name__ == '__main__':
     # After initializing the simulation
     sim.run()
     
-    # Assuming you have a reference to the simulation object `sim`
+    # Get the modules
     deaths_module = get_deaths_module(sim)
-    mortality_rates = mi.calculate_mortality_rates(deaths_module)
-    life_table = mi.calculate_life_table(mortality_rates)
-    print(life_table)
+    pregnancy_module = get_pregnancy_module(sim)
+
+    # Initialize lists to store yearly data
+    years = list(range(inityear+1, endyear))
+    simulated_imr = []
+    
+    # Extract data for each year
+    for year in years:
+        # Retrieve the number of births and deaths for the year
+        births = pregnancy_module.get_births(year)
+        infant_deaths = deaths_module.infant_deaths
+
+        # Calculate the IMR for males and females
+        imr= (infant_deaths / births) if births > 0 else 0
+
+        # Append the IMR values to the lists
+        simulated_imr.append(imr)
+
+    # Store the data in a DataFrame
+    simulated_data = pd.DataFrame({
+        'Year': years,
+        'IMR': simulated_imr,
+    })
+
+    # Print the simulated data
+    print(simulated_data)
+    
+    mi.plot_imr('demography/eswatini_mortality_rates.csv', 'simulated_imr_data.csv', inityear, endyear)
+    
+
+
+    n_years = endyear - inityear + 1
+
+    # Create results DataFrame
+    df_results = mi.create_results_dataframe(sim, inityear, endyear, deaths_module)
+
+    # Calculate metrics
+    df_metrics = mi.calculate_metrics(df_results)
+
+    # Plot the mortality rates comparison
+    mi.plot_mortality_rates_comparison(df_metrics, 'demography/eswatini_mortality_rates.csv', observed_year=2011, year=2011)
+
+
+    # print(f"Infant deaths: {infant_deaths}, Total deaths: {total_deaths}")
+    
+    # # deaths_module = get_deaths_module(sim)
+    # # print("Final Death Tracking Data:")
+    # # print(deaths_module.death_tracking)
+    
+    # # Plot the death tracking data
+    # male_deaths = deaths_module.death_tracking['Male']
+    # female_deaths = deaths_module.death_tracking['Female']
+    # ages = range(len(male_deaths))
+    
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(ages, male_deaths, label='Male Deaths')
+    # plt.plot(ages, female_deaths, label='Female Deaths')
+    # plt.xlabel('Age')
+    # plt.ylabel('Number of Deaths')
+    # plt.title('Deaths by Age and Sex')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
+    
+    #
+    # mortality_rates = mi.calculate_mortality_rates(deaths_module)
+    # life_table = mi.calculate_life_table(mortality_rates)
+    # # print(life_table)
+    
+    # # Print the death tracking dictionary
+    # print("Death tracking data:")
+    # print(deaths_module.death_tracking)
+    
+    # # Plot the death tracking data
+    # male_deaths = deaths_module.death_tracking['Male']
+    # female_deaths = deaths_module.death_tracking['Female']
+    # ages = range(len(male_deaths))
+    
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(ages, male_deaths, label='Male Deaths')
+    # plt.plot(ages, female_deaths, label='Female Deaths')
+    # plt.xlabel('Age')
+    # plt.ylabel('Number of Deaths')
+    # plt.title('Deaths by Age and Sex')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()

@@ -1,13 +1,145 @@
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from collections import defaultdict
+import starsim as ss
+import sciris as sc
+import pandas as pd
 
-def calculate_mortality_rates(deaths_module, year=None, max_age=100):
+def create_results_dataframe(sim, inityear, endyear, deaths_module):
+    """
+    Create a DataFrame with simulation results.
+
+    Args:
+        sim: The simulation object.
+        inityear: Initial year of the simulation.
+        endyear: End year of the simulation.
+        deaths_module: Instance of the Deaths class to access death tracking data.
+
+    Returns:
+        DataFrame with columns: ['year', 'age', 'sex', 'pop', 'deaths']
+    """
+    data = {
+        'year': [],
+        'age': [],
+        'sex': [],
+        'pop': [],
+        'deaths': []
+    }
+
+    years = list(range(inityear, endyear + 1))
+    ages = list(range(101))  # Single ages from 0 to 100
+
+    for year in years:
+        sim.people.age = sim.people.age.astype(float)  # Ensure age is float for comparison
+        for age in ages:
+            for sex in ['Male', 'Female']:
+                if sex == 'Male':
+                    pop = np.sum((sim.people.age >= age) & (sim.people.male < age + 1))
+                    deaths = deaths_module.death_tracking['Male'][age] if age < len(deaths_module.death_tracking['Male']) else 0
+                else:
+                    pop = np.sum((sim.people.age >= age) & (sim.people.female < age + 1))
+                    deaths = deaths_module.death_tracking['Female'][age] if age < len(deaths_module.death_tracking['Female']) else 0
+                
+                data['year'].append(year)
+                data['age'].append(age)
+                data['sex'].append(sex)
+                data['pop'].append(pop)
+                data['deaths'].append(deaths)
+
+    df = pd.DataFrame(data)
+    return df
+
+
+
+def create_results_dataframe_agegroup(sim, inityear, endyear, deaths_module, age_groups=None):
+    """
+    Create a DataFrame with simulation results.
+
+    Args:
+        sim: The simulation object.
+        inityear: Initial year of the simulation.
+        endyear: End year of the simulation.
+        deaths_module: Instance of the Deaths class to access death tracking data.
+        age_groups: List of tuples defining age groups. Each tuple should have
+                    the form (start_age, end_age, label). If None, default age groups will be used.
+
+    Returns:
+        DataFrame with columns: ['year', 'age_group', 'sex', 'pop', 'deaths']
+    """
+    if age_groups is None:
+        # Default age groups
+        age_groups = [
+            (0, 5, "0-4"),
+            (5, 15, "5-14"),
+            (15, 25, "15-24"),
+            (25, 35, "25-34"),
+            (35, 45, "35-44"),
+            (45, 55, "45-54"),
+            (55, 65, "55-64"),
+            (65, 75, "65-74"),
+            (75, 85, "75-84"),
+            (85, 101, "85+")
+        ]
+
+    data = {
+        'year': [],
+        'age_group': [],
+        'sex': [],
+        'pop': [],
+        'deaths': []
+    }
+
+    years = list(range(inityear, endyear + 1))
+
+    for year in years:
+        sim.people.age = sim.people.age.astype(float)  # Ensure age is float for comparison
+        for (start_age, end_age, label) in age_groups:
+            for sex in ['Male', 'Female']:
+                if sex == 'Male':
+                    pop = np.sum((sim.people.age >= start_age) & (sim.people.age < end_age) & (sim.people.male))
+                    deaths = np.sum(deaths_module.death_tracking['Male'][start_age:end_age])
+                else:
+                    pop = np.sum((sim.people.age >= start_age) & (sim.people.age < end_age) & (sim.people.female))
+                    deaths = np.sum(deaths_module.death_tracking['Female'][start_age:end_age])
+                
+                data['year'].append(year)
+                data['age_group'].append(label)
+                data['sex'].append(sex)
+                data['pop'].append(pop)
+                data['deaths'].append(deaths)
+
+    df = pd.DataFrame(data)
+    return df
+
+
+def calculate_metrics(df):
+    """
+    Calculate metrics from the results DataFrame.
+
+    Args:
+        df: DataFrame with columns: ['year', 'age_group', 'sex', 'pop', 'deaths']
+
+    Returns:
+        DataFrame with calculated mortality rates (mx).
+    """
+    mx_values = []
+    for index, row in df.iterrows():
+        if row['pop'] == 0:
+            mx = 0  # Avoid division by zero
+        else:
+            mx = row['deaths'] / (row['pop'] + 0.5 * row['deaths'])
+        mx_values.append(mx)
+
+    df['mx'] = pd.Series(mx_values)
+    return df
+
+def calculate_mortality_rates(self, year=None, max_age=100):
     """
     Calculate mortality rates from death counts and population for each year of age.
     """
-    sim = deaths_module.sim
+    sim = self.sim
+
+    death_counts = self.results['new']
+    if year is not None:
+        death_counts = death_counts[self.sim.t.yearvec == year]
 
     ages = sim.people.age
     females = sim.people.female
@@ -30,9 +162,14 @@ def calculate_mortality_rates(deaths_module, year=None, max_age=100):
     print(f"Population after counting (first 10 ages): {[(age, population['Male'][age], population['Female'][age]) for age in range(10)]}")  # Debug print
 
     deaths_by_age = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
-    for sex in deaths_module.death_tracking:
-        for age in range(max_age + 1):
-            deaths_by_age[sex][age] = deaths_module.death_tracking[sex][age]
+    dead_indices = np.where(~alive)[0]
+
+    for idx in dead_indices:
+        age = int(ages[idx])
+        if age > max_age:
+            continue
+        sex = 'Female' if females[idx] else 'Male'
+        deaths_by_age[sex][age] += 1
 
     print(f"Deaths by age after counting (first 10 ages): {[(age, deaths_by_age['Male'][age], deaths_by_age['Female'][age]) for age in range(10)]}")  # Debug print
 
@@ -42,10 +179,12 @@ def calculate_mortality_rates(deaths_module, year=None, max_age=100):
             pop = population[sex][age]
             deaths = deaths_by_age[sex][age]
             rate = deaths / pop if pop > 0 else 0
-            mortality_rates.append({'Time': year if year is not None else int(sim.t.year), 'Age': age, 'Sex': sex, 'mx': rate})
+            current_year = year if year is not None else int(sim.t.yearvec[sim.t.ti])
+            mortality_rates.append({'Time': current_year, 'Age': age, 'Sex': sex, 'mx': rate})
             print(f" age: {age}, pop: {pop}, death: {deaths}, rate: {rate}")
 
     return pd.DataFrame(mortality_rates)
+
 
 def calculate_life_table(mortality_rates, sex='Total', max_age=100):
     """
@@ -89,8 +228,11 @@ def calculate_life_table(mortality_rates, sex='Total', max_age=100):
         mort_rate = mortality_rates.get(age, 0.0)
         
         # Print warning for very high mortality rates
-        # if mort_rate > 1.0:
-            # print(f"WARNING: Very high mortality rate at age {age}: {mort_rate:.4f}")
+        if isinstance(mort_rate, pd.Series):
+            if mort_rate.any() > 1.0:
+                print(f"WARNING: Very high mortality rate at age {age}: {mort_rate.max():.4f}")
+        elif mort_rate > 1.0:
+            print(f"WARNING: Very high mortality rate at age {age}: {mort_rate:.4f}")
         
         # Store age and mortality rate
         ages.append(age)
@@ -161,133 +303,3 @@ def calculate_life_table(mortality_rates, sex='Total', max_age=100):
     })
     
     return life_table
-
-class LifeExpectancyCalculator:
-    """Class to calculate life expectancy from death tracker data"""
-    
-    def __init__(self, death_tracker=None):
-        """
-        Initialize the life expectancy calculator
-        
-        Args:
-            death_tracker: DeathTracker instance to get mortality data from
-        """
-        self.death_tracker = death_tracker
-    
-    def calculate_from_death_tracker(self, year=None, by_sex=True):
-        """
-        Calculate life expectancy using data from the death tracker
-        
-        Args:
-            year: Specific year to calculate for (None for all years)
-            by_sex: Whether to calculate separately for males and females
-            
-        Returns:
-            Dictionary with life expectancy values by sex and/or a DataFrame with the full life table
-        """
-        if self.death_tracker is None:
-            raise ValueError("Death tracker not provided")
-        
-        print("\n====== CALCULATING LIFE EXPECTANCY ======")
-        print(f"Using data for year: {'All years (cumulative)' if year is None else year}")
-        
-        # Get death counts from the death tracker
-        if year is None:
-            # Get cumulative death counts
-            death_counts = self.death_tracker.get_death_counts()
-        else:
-            # Get death counts for specific year
-            death_counts = self.death_tracker.get_death_counts(year)
-        
-        # Print summary of death counts
-        total_male_deaths = sum(death_counts['Male'].values())
-        total_female_deaths = sum(death_counts['Female'].values())
-        print(f"Total deaths in data: Male={total_male_deaths}, Female={total_female_deaths}")
-        
-        # Get population counts by age and sex
-        population = self._get_population_counts(year)
-        
-        # Print summary of population
-        total_male_pop = sum(population['Male'].values())
-        total_female_pop = sum(population['Female'].values())
-        print(f"Total population: Male={total_male_pop}, Female={total_female_pop}")
-        
-        # Calculate mortality rates by age and sex
-        mortality_rates = self._calculate_mortality_rates(death_counts, population)
-        
-        # Print average mortality rates
-        avg_male_rate = sum(mortality_rates['Male'].values()) / len(mortality_rates['Male']) if mortality_rates['Male'] else 0
-        avg_female_rate = sum(mortality_rates['Female'].values()) / len(mortality_rates['Female']) if mortality_rates['Female'] else 0
-        print(f"Average mortality rates: Male={avg_male_rate:.4f}, Female={avg_female_rate:.4f}")
-        
-        # Calculate life tables
-        life_tables = {}
-        life_expectancy = {}
-        
-        if by_sex:
-            # Calculate separately for males and females
-            for sex in ['Male', 'Female']:
-                print(f"\n==== Calculating Life Table for {sex} ====")
-                life_tables[sex] = calculate_life_table(mortality_rates[sex], sex)
-                # Life expectancy at birth (age 0)
-                life_expectancy[sex] = life_tables[sex].loc[0, 'e(x)']
-                print(f"{sex} life expectancy at birth: {life_expectancy[sex]:.2f} years")
-                
-            # Calculate combined
-            combined_rates = {}
-            for age in range(101):
-                male_deaths = death_counts['Male'].get(age, 0)
-                female_deaths = death_counts['Female'].get(age, 0)
-                male_pop = population['Male'].get(age, 0)
-                female_pop = population['Female'].get(age, 0)
-                
-                total_deaths = male_deaths + female_deaths
-                total_pop = male_pop + female_pop
-                
-                if total_pop > 0:
-                    combined_rates[age] = total_deaths / total_pop
-                else:
-                    combined_rates[age] = 0
-            
-            print("\n==== Calculating Combined Life Table ====")
-            life_tables['Total'] = calculate_life_table(combined_rates, 'Total')
-            life_expectancy['Total'] = life_tables['Total'].loc[0, 'e(x)']
-            print(f"Combined life expectancy at birth: {life_expectancy['Total']:.2f} years")
-        else:
-            # Calculate only combined
-            combined_rates = {}
-            for age in range(101):
-                male_deaths = death_counts['Male'].get(age, 0)
-                female_deaths = death_counts['Female'].get(age, 0)
-                male_pop = population['Male'].get(age, 0)
-                female_pop = population['Female'].get(age, 0)
-                
-                total_deaths = male_deaths + female_deaths
-                total_pop = male_pop + female_pop
-                
-                if total_pop > 0:
-                    combined_rates[age] = total_deaths / total_pop
-                else:
-                    combined_rates[age] = 0
-            
-            life_tables['Total'] = calculate_life_table(combined_rates, 'Total')
-            life_expectancy['Total'] = life_tables['Total'].loc[0, 'e(x)']
-            print(f"Combined life expectancy at birth: {life_expectancy['Total']:.2f} years")
-        
-        # Print summary of life expectancy values
-        print("\n==== Life Expectancy Summary ====")
-        for sex, le in life_expectancy.items():
-            print(f"{sex}: {le:.2f} years")
-        print("=================================\n")
-        
-        return life_expectancy, life_tables
-    
-    def _get_population_counts(self, year=None):
-        """
-        Get population counts by age and sex from the simulation
-        
-        Args:
-            year: Specific year to get population for
-            
-        Returns:
-            Dictionary with population counts by
