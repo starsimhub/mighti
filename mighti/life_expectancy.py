@@ -303,3 +303,55 @@ def calculate_life_table(mortality_rates, sex='Total', max_age=100):
     })
     
     return life_table
+
+
+def extract_mortality_rates(df_metrics, year, sex):
+    """
+    Extract mortality rates from the df_metrics DataFrame for a given year and sex.
+    
+    Args:
+        df_metrics: DataFrame with mortality rates
+        year: Year to filter the data
+        sex: 'Male' or 'Female' to filter the data
+        
+    Returns:
+        Dictionary with age as key and mortality rate (m_x) as value
+    """
+    # Filter the DataFrame for the given year and sex
+    filtered_df = df_metrics[(df_metrics['year'] == year) & (df_metrics['sex'] == sex)]
+    
+    # Create a dictionary with age as key and mortality rate (m_x) as value
+    mortality_rates = filtered_df.set_index('age')['mx'].to_dict()
+    
+    return mortality_rates
+
+def create_life_table(df_metrics, year, max_age=100):
+    """
+    Create a life table from the df_metrics DataFrame for a given year.
+    
+    Args:
+        df_metrics: DataFrame with mortality rates
+        year: Year to filter the data
+        max_age: Maximum age to consider (default 100)
+        
+    Returns:
+        DataFrame containing the complete life table for males and females
+    """
+    # Extract mortality rates for males and females
+    male_mortality_rates = extract_mortality_rates(df_metrics, year, 'Male')
+    female_mortality_rates = extract_mortality_rates(df_metrics, year, 'Female')
+    
+    # Calculate life tables for males and females
+    male_life_table = calculate_life_table(male_mortality_rates, sex='Male', max_age=max_age)
+    female_life_table = calculate_life_table(female_mortality_rates, sex='Female', max_age=max_age)
+    
+    # Add columns for year and sex
+    male_life_table['year'] = year
+    male_life_table['sex'] = 'Male'
+    female_life_table['year'] = year
+    female_life_table['sex'] = 'Female'
+    
+    # Combine male and female life tables
+    life_table = pd.concat([male_life_table, female_life_table], ignore_index=True)
+    
+    return life_table

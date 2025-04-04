@@ -102,6 +102,38 @@ def calculate_mortality_rates(age_distribution_csv, mortality_deaths_csv, output
     # Save the results to CSV
     results_df.to_csv(output_csv, index=False)
     print(f"Mortality rates saved to {output_csv}")
+    
+    
+def process_life_expectancy_data(male_csv, female_csv, output_csv, country):
+    # Read life expectancy data
+    male_life_expectancy = pd.read_csv(male_csv)
+    female_life_expectancy = pd.read_csv(female_csv)
+    
+    # Handle non-finite values in the year column
+    male_life_expectancy['year'] = pd.to_numeric(male_life_expectancy['year'], errors='coerce').fillna(0).astype(int)
+    female_life_expectancy['year'] = pd.to_numeric(female_life_expectancy['year'], errors='coerce').fillna(0).astype(int)
+    
+    # Filter data for the specified country
+    male_life_expectancy = male_life_expectancy[(male_life_expectancy['region'] == country) & (male_life_expectancy['year'])]
+    female_life_expectancy = female_life_expectancy[(female_life_expectancy['region'] == country) & (female_life_expectancy['year'])]
+    
+    # Extract age-specific data and reorganize
+    age_range = range(0, 101)  # Age 0 to 100
+    years = sorted(female_life_expectancy['year'].unique())
+    
+    data = {
+        'age': list(age_range) * 2,
+        'sex': ['Male'] * len(age_range) + ['Female'] * len(age_range)
+    }
+    
+    for year in years:
+        data[str(year)] = list(male_life_expectancy[male_life_expectancy['year'] == year].iloc[:, 3:].values.flatten()) + list(female_life_expectancy[female_life_expectancy['year'] == year].iloc[:, 3:].values.flatten())
+    
+    # Create DataFrame and save to CSV
+    df = pd.DataFrame(data)
+    df.to_csv(output_csv, index=False)
+    print(f"Life expectancy data for {country} saved to {output_csv}")
+
 
 if __name__ == "__main__":
     # File paths
@@ -126,3 +158,9 @@ if __name__ == "__main__":
     output_csv = 'eswatini_mortality_rates.csv'
     
     calculate_mortality_rates(age_distribution_csv, mortality_deaths_csv, output_csv)
+    
+    male_LE_csv = 'life_expectancy_by_age_male.csv'
+    female_LE_csv = 'life_expectancy_by_age_female.csv'
+    output_LE_csv = 'eswatini_life_expectancy_by_age.csv'
+    country = 'Eswatini'
+    process_life_expectancy_data(male_LE_csv, female_LE_csv, output_LE_csv, country)

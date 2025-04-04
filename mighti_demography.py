@@ -192,6 +192,12 @@ if __name__ == '__main__':
     mi.plot_mortality_rates_comparison(df_metrics, 'demography/eswatini_mortality_rates.csv', observed_year=2011, year=2011)
 
 
+    life_table = mi.create_life_table(df_metrics, year=2007, max_age=100)
+    print(life_table)
+    # mx_2011 = df_metrics[df_metrics['year']==2011]
+    # life_table = mi.calculate_life_table(malemx,)
+    life_table = pd.read_csv('path_to_life_table.csv')  # Load your life table DataFrame
+    mi.plot_life_expectancy(life_table, year=2025, max_age=100, figsize=(14,10), title=None)
     # print(f"Infant deaths: {infant_deaths}, Total deaths: {total_deaths}")
     
     # # deaths_module = get_deaths_module(sim)

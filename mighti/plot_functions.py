@@ -387,6 +387,70 @@ def plot_death_counts_comparison(death_tracker, observed_death_csv, year, age_in
     return comparison_data
 
 
+def plot_life_expectancy(life_table, observed_data, year, max_age=100, figsize=(14, 10), title=None):
+    """
+    Plot life expectancy for each age for a given year in two panels: one for males and one for females.
+    Overlay observed life expectancy data with simulated data.
+    
+    Args:
+        life_table: DataFrame containing the complete life table
+        observed_data: DataFrame containing the observed life expectancy data
+        year: Year to filter the data
+        max_age: Maximum age to consider (default 100)
+        figsize: Figure size (width, height) in inches
+        title: Custom title for the plot
+        
+    Returns:
+        Figure and axes objects
+    """
+    # Filter the life table for the given year
+    if 'Time' in life_table.columns:
+        life_table = life_table[life_table['Time'] == year]
+    
+    # Separate life table by sex
+    male_life_table = life_table[life_table['sex'] == 'Male']
+    female_life_table = life_table[life_table['sex'] == 'Female']
+    
+    # Filter observed data for the given year
+    observed_data_year = observed_data[['age', 'sex', str(year)]].copy()
+    observed_male = observed_data_year[observed_data_year['sex'] == 'Male']
+    observed_female = observed_data_year[observed_data_year['sex'] == 'Female']
+    
+    # Create figure with two panels for male and female
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
+    
+    # Plot male life expectancy
+    ax1.plot(male_life_table['Age'], male_life_table['e(x)'], linestyle='-', linewidth=8, alpha=0.4, color='blue', label='Simulated')
+    ax1.plot(observed_male['age'], observed_male[str(year)], marker='s', linestyle='--', linewidth=2, markersize=8, color='blue', label='Observed')
+    ax1.set_title('Male', fontsize=28)
+    ax1.set_ylabel('Life Expectancy (years)', fontsize=24)
+    ax1.tick_params(axis='both', which='major', labelsize=20)
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(fontsize=24)
+    
+    # Plot female life expectancy
+    ax2.plot(female_life_table['Age'], female_life_table['e(x)'], linestyle='-', linewidth=8, alpha=0.4, color='red', label='Simulated')
+    ax2.plot(observed_female['age'], observed_female[str(year)], marker='s', linestyle='--', linewidth=2, markersize=8, color='red', label='Observed')
+    ax2.set_title('Female', fontsize=28)
+    ax2.set_xlabel('Age', fontsize=24)
+    ax2.set_ylabel('Life Expectancy (years)', fontsize=24)
+    ax2.tick_params(axis='both', which='major', labelsize=20)
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(fontsize=24)
+    
+    # Set overall title if provided
+    if title:
+        plt.suptitle(title, fontsize=24, y=0.98)
+    else:
+        plt.suptitle(f'Life Expectancy by Age for {year}', fontsize=24, y=0.98)
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.subplots_adjust(bottom=0.1)
+    plt.show()
+    
+    return fig, (ax1, ax2)
+
+
 def plot_imr(observed_data_path, simulated_data_path, start_year, end_year):
     # Load observed data
     observed_data = pd.read_csv(observed_data_path)
