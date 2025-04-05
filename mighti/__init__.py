@@ -1,12 +1,11 @@
 from .version import __version__, __versiondate__, __license__
 from .utils import *
-from .death_tracker import *
+from .demographics import *
 from .life_expectancy import *
 from .conditions import *
 from .interactions import *
 
 # Newly defined files
-# from .ncd_interactions import *  
 from .disease_definitions import *  
 from .prevalence_analyzer import *  
 from .plot_functions import *

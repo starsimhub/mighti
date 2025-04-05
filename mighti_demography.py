@@ -69,11 +69,11 @@ prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, dis
 
 
 death_rates = {'death_rate': pd.read_csv(csv_path_death), 'rate_units': 1}
-death = ss.Deaths(death_rates)  # Use normal StarSim Deaths implementation
+death = mi.Deaths(death_rates)  # Use normal StarSim Deaths implementation
 
 
 fertility_rate = {'fertility_rate': pd.read_csv(csv_path_fertility)}
-pregnancy = ss.Pregnancy(pars=fertility_rate)  # Use the correct parameter name
+pregnancy = mi.Pregnancy(pars=fertility_rate)  # Use the correct parameter name
 
 ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
 
@@ -116,13 +116,13 @@ interactions.extend(connectors)
 
 def get_deaths_module(sim):
     for module in sim.modules:
-        if isinstance(module, ss.Deaths):
+        if isinstance(module, mi.Deaths):
             return module
     raise ValueError("Deaths module not found in the simulation.")
 
 def get_pregnancy_module(sim):
     for module in sim.modules:
-        if isinstance(module, ss.Pregnancy):
+        if isinstance(module, mi.Pregnancy):
             return module
     raise ValueError("Pregnancy module not found in the simulation.")
 
