@@ -451,7 +451,7 @@ def plot_life_expectancy(life_table, observed_data, year, max_age=100, figsize=(
     return fig, (ax1, ax2)
 
 
-def plot_imr(observed_data_path, simulated_data_path, start_year, end_year):
+def plot_imr(observed_data_path, simulated_data, start_year, end_year):
     # Load observed data
     observed_data = pd.read_csv(observed_data_path)
 
@@ -469,7 +469,7 @@ def plot_imr(observed_data_path, simulated_data_path, start_year, end_year):
     observed_imr = get_average_observed_imr(observed_data_infants)
 
     # Load simulated data
-    simulated_data = pd.read_csv(simulated_data_path)
+    simulated_data = simulated_data
 
     # Plot IMR for both sexes
     plt.figure(figsize=(10, 5))

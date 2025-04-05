@@ -172,11 +172,8 @@ if __name__ == '__main__':
         'Year': years,
         'IMR': simulated_imr,
     })
-
-    # Print the simulated data
-    print(simulated_data)
     
-    mi.plot_imr('demography/eswatini_mortality_rates.csv', 'simulated_imr_data.csv', inityear, endyear)
+    mi.plot_imr('demography/eswatini_mortality_rates.csv', simulated_data, inityear, endyear)
     
 
 
@@ -194,51 +191,6 @@ if __name__ == '__main__':
 
     life_table = mi.create_life_table(df_metrics, year=2007, max_age=100)
     print(life_table)
-    # mx_2011 = df_metrics[df_metrics['year']==2011]
-    # life_table = mi.calculate_life_table(malemx,)
-    life_table = pd.read_csv('path_to_life_table.csv')  # Load your life table DataFrame
-    mi.plot_life_expectancy(life_table, year=2025, max_age=100, figsize=(14,10), title=None)
-    # print(f"Infant deaths: {infant_deaths}, Total deaths: {total_deaths}")
-    
-    # # deaths_module = get_deaths_module(sim)
-    # # print("Final Death Tracking Data:")
-    # # print(deaths_module.death_tracking)
-    
-    # # Plot the death tracking data
-    # male_deaths = deaths_module.death_tracking['Male']
-    # female_deaths = deaths_module.death_tracking['Female']
-    # ages = range(len(male_deaths))
-    
-    # plt.figure(figsize=(10, 6))
-    # plt.plot(ages, male_deaths, label='Male Deaths')
-    # plt.plot(ages, female_deaths, label='Female Deaths')
-    # plt.xlabel('Age')
-    # plt.ylabel('Number of Deaths')
-    # plt.title('Deaths by Age and Sex')
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
-    
-    #
-    # mortality_rates = mi.calculate_mortality_rates(deaths_module)
-    # life_table = mi.calculate_life_table(mortality_rates)
-    # # print(life_table)
-    
-    # # Print the death tracking dictionary
-    # print("Death tracking data:")
-    # print(deaths_module.death_tracking)
-    
-    # # Plot the death tracking data
-    # male_deaths = deaths_module.death_tracking['Male']
-    # female_deaths = deaths_module.death_tracking['Female']
-    # ages = range(len(male_deaths))
-    
-    # plt.figure(figsize=(10, 6))
-    # plt.plot(ages, male_deaths, label='Male Deaths')
-    # plt.plot(ages, female_deaths, label='Female Deaths')
-    # plt.xlabel('Age')
-    # plt.ylabel('Number of Deaths')
-    # plt.title('Deaths by Age and Sex')
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
+    observed_LE = pd.read_csv('demography/eswatini_life_expectancy_by_age.csv')  
+    mi.plot_life_expectancy(life_table, observed_LE, year=2023, max_age=100, figsize=(14, 10), title=None)    
+  
