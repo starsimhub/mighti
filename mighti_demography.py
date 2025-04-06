@@ -10,7 +10,7 @@ import os
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 beta = 0.001
-n_agents = 500000 # Number of agents in the simulation
+n_agents = 50000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2012
 
@@ -189,7 +189,7 @@ if __name__ == '__main__':
     mi.plot_mortality_rates_comparison(df_metrics, 'demography/eswatini_mortality_rates.csv', observed_year=2011, year=2011)
 
 
-    life_table = mi.create_life_table(df_metrics, year=2007, max_age=100)
+    life_table = mi.create_life_table(df_metrics, year=2007, max_age=100, n_agents=n_agents)
     print(life_table)
     observed_LE = pd.read_csv('demography/eswatini_life_expectancy_by_age.csv')  
     mi.plot_life_expectancy(life_table, observed_LE, year=2023, max_age=100, figsize=(14, 10), title=None)    
