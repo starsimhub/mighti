@@ -7,11 +7,33 @@ import streamlit as st
 def run_simulation(prevalence_data, demographics_data, fertility_data, mortality_data, init_year, end_year, population_size):
     beta = 0.001
 
-    # Specify data file paths
+
+    # # Parameters
     csv_path_params = 'mighti/data/eswatini_parameters.csv'
-    csv_path_interactions = "mighti/data/rel_sus.csv"
     
-    # Read disease parameter file and interactions file
+    # # Relative Risks
+    # csv_path_interactions = "mighti/data/rel_sus.csv"
+    
+    # # Prevalence data
+    # csv_prevalence = 'mighti/data/prevalence_data_eswatini.csv'
+    
+    # # Fertility data 
+    # csv_path_fertility = 'mighti/data/eswatini_asfr.csv'
+    
+    # # Death data
+    # csv_path_death = f'mighti/data/eswatini_mortality_rates_{init_year}.csv'
+    
+    # # Age distribution data
+    # csv_path_age = f'mighti/data/eswatini_age_distribution_{init_year}.csv'
+    
+
+    # Load the mortality rates and ensure correct format
+    mortality_rates_year = mortality_data
+    
+    # Load the age distribution data for the specified year
+    age_distribution_year = demographics_data
+    
+    # Load parameters
     df = pd.read_csv(csv_path_params)
     df.columns = df.columns.str.strip()
 
@@ -31,63 +53,56 @@ def run_simulation(prevalence_data, demographics_data, fertility_data, mortality
     communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
 
     # Initialize conditions
-    mi.initialize_conditions(df, chronic, acute, remitting, communicable_diseases)
+    # mi.initialize_conditions(df, chronic, acute, remitting, communicable_diseases)
 
     # Initialize prevalence data
-    prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, prevalence_data, init_year)
+    prevalence_data_df = prevalence_data
+    prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, prevalence_data_df, init_year)
 
     # Define a function for disease-specific prevalence
     def get_prevalence_function(disease):
         return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
 
     # Initialize the PrevalenceAnalyzer
-    prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=healthconditions, communicable_diseases=communicable_diseases)
+    prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=healthconditions)
 
-    # Demographics
-    fertility_rates = {'fertility_rate': fertility_data}
-    pregnancy = ss.Pregnancy(pars=fertility_rates)
+
     death_rates = {'death_rate': mortality_data, 'rate_units': 1}
-    death = ss.Deaths(death_rates)
+    death = mi.Deaths(death_rates)  # Use Demographics class implemented in mighti
+    fertility_rate = {'fertility_rate': fertility_data}
+    pregnancy = mi.Pregnancy(pars=fertility_rate)  
+    
     ppl = ss.People(population_size, age_data=demographics_data)
-
-    # Networks
+    
+    # Initialize networks
     mf = ss.MFNet(duration=1/24, acts=80)
     maternal = ss.MaternalNet()
     networks = [mf, maternal]
 
-    # Disease Conditions
+    # Initialize disease conditions
     hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
-
-    # Automatically create disease objects
     disease_objects = []
     for disease in healthconditions:
         init_prev = ss.bernoulli(get_prevalence_function(disease))
-        
-        # Dynamically get the disease class from `mi` module
         disease_class = getattr(mi, disease, None)
-        
         if disease_class:
-            disease_obj = disease_class(init_prev=init_prev)  # Instantiate dynamically
+            disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})
             disease_objects.append(disease_obj)
-        else:
-            print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
             
-    # Combine all disease objects including HIV
     disease_objects.append(hiv_disease)
-
-    # Disease Interactions
+    
     # Initialize interaction objects for HIV-NCD interactions
     ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
     ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
     interactions = [ncd_hiv_connector]
-
+    
     # Load NCD-NCD interactions
-    ncd_interactions = mi.read_interactions(csv_path_interactions)  # Reads rel_sus.csv
-    connectors = mi.create_connectors(ncd_interactions, communicable_diseases)
-
+    ncd_interactions = mi.read_interactions("mighti/data/rel_sus.csv") 
+    connectors = mi.create_connectors(ncd_interactions)
+    
     # Add NCD-NCD connectors to interactions
     interactions.extend(connectors)
-
+    
     # Initialize the simulation with connectors
     sim = ss.Sim(
         n_agents=population_size,
@@ -112,7 +127,6 @@ def plot_results(sim, prevalence_analyzer, outcome, disease, age_bins):
         fig = mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease)
         st.pyplot(fig)
     elif outcome == "Age-dependent Prevalence":
-        fig = mi.plot_age_dependent_prevalence(sim, prevalence_analyzer, disease, age_bins)
-        st.pyplot(fig)
-    elif outcome == "Sex-Dependent Prevalence":
-        st.write("Sex-dependent prevalence outcome is not implemented yet.", key="example_key", label_visibility="collapsed")
+        st.write("Age-dependent Prevalence is not implemented yet.")
+    elif outcome == "Life Expectancy":
+        st.write("Life Expectancy is not implemented yet.")

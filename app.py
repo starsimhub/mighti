@@ -71,14 +71,14 @@ if page == "Run Simulation":
     
     # Sidebar for simulation parameters
     st.sidebar.title("Simulation Parameters")
-    init_year = st.sidebar.number_input("Initial Year", value=2007, min_value=1900, max_value=2100, key="init_year_key")
-    end_year = st.sidebar.number_input("End Year", value=2050, min_value=1900, max_value=2100, key="end_year_key")
+    init_year = 2007  # Fixed initial year to 2007
+    end_year = st.sidebar.number_input("End Year", value=2030, min_value=1900, max_value=2100, key="end_year_key")
     population_size = st.sidebar.number_input("Population Size", value=5000, min_value=1, key="population_size_key")
     area = st.sidebar.text_input("Area (Country, City, State)", value="Eswatini", key="area_key")
     
     # Sidebar for outcomes
     st.sidebar.title("Outcomes")
-    outcome = st.sidebar.selectbox("Select Outcome", ["Mean Prevalence", "Population", "Sex-Dependent Prevalence"], key="outcome_key")
+    outcome = st.sidebar.selectbox("Select Outcome", ["Mean Prevalence", "Age-Dependent Prevalence", "Life Expectancy"], key="outcome_key")
 
     # Load the parameters data to get the list of diseases
     csv_path_params = 'mighti/data/eswatini_parameters.csv'
@@ -89,6 +89,7 @@ if page == "Run Simulation":
 
     # Main section
     st.markdown('<h1 class="custom-title">MIGHTI Simulation</h1>', unsafe_allow_html=True)
+    st.markdown('<h2>Model of Inter-Generational Health, Transmission, and Interventions (MIGHTI)</h2>', unsafe_allow_html=True)
     st.write(
         """
         Please upload the required data files and set the simulation parameters 
@@ -107,9 +108,10 @@ if page == "Run Simulation":
             fertility_data = pd.read_csv(fertility_file)
             mortality_data = pd.read_csv(mortality_file)
             # parameter_data = pd.read_csv(parameters_file)
-            age_bins = [(0, 15), (15, 21), (21, 26), (26, 31), (31, 36), (36, 41), (41, 46), 
-                        (46, 51), (51, 56), (56, 61), (61, 66), (66, 71), (71, 76), (76, 81), (80, float('inf'))]
-    
+            age_bins = [(0, 5, "0-4"), (5, 15, "5-14"), (15, 25, "15-24"), (25, 35, "25-34"),
+                        (35, 45, "35-44"), (45, 55, "45-54"), (55, 65, "55-64"), (65, 75, "65-74"),
+                        (75, 85, "75-84"), (85, 101, "85+")]
+
             sim, prevalence_analyzer = mi.run_simulation(prevalence_data, demographics_data, fertility_data, mortality_data, init_year, end_year, population_size)
             mi.plot_results(sim, prevalence_analyzer, outcome, disease, age_bins)
         else:
@@ -118,14 +120,14 @@ if page == "Run Simulation":
 elif page == "Run Demo":
     # Sidebar for simulation parameters
     st.sidebar.title("Simulation Parameters")
-    init_year = st.sidebar.number_input("Initial Year", value=2007, min_value=1900, max_value=2100, key="init_year_key")
-    end_year = st.sidebar.number_input("End Year", value=2050, min_value=1900, max_value=2100, key="end_year_key")
+    init_year = 2007  # Fixed initial year to 2007
+    end_year = st.sidebar.number_input("End Year", value=2030, min_value=1900, max_value=2100, key="end_year_key")
     population_size = st.sidebar.number_input("Population Size", value=5000, min_value=1, key="population_size_key")
-    area = st.sidebar.text_input("Area (Country, City, State)", value="Eswatini", key="area_key")
+    #area = st.sidebar.text_input("Area (Country, City, State)", value="Eswatini", key="area_key")
     
     # Sidebar for outcomes
     st.sidebar.title("Outcomes")
-    outcome = st.sidebar.selectbox("Select Outcome", ["Mean Prevalence", "Population", "Sex-Dependent Prevalence"], key="outcome_key")
+    outcome = st.sidebar.selectbox("Select Outcome", ["Mean Prevalence", "Age-Dependent Prevalence", "Life Expectancy"], key="outcome_key")
 
     # Load the parameters data to get the list of diseases
     csv_path_params = 'mighti/data/eswatini_parameters.csv'
@@ -135,10 +137,12 @@ elif page == "Run Demo":
     disease = st.sidebar.selectbox("Select Disease to Plot", healthconditions, key="disease")
 
     # Main section
-    st.markdown('<h1 class="custom-title">MIGHTI Demo Simulation</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="custom-title">MIGHTI Simulation</h1>', unsafe_allow_html=True)
+    st.markdown('<h2>Model of Inter-Generational Health, Transmission, and Interventions (MIGHTI)</h2>', unsafe_allow_html=True)
     st.write(
         """
-        Please set the simulation parameters in the sidebar. Once you have done so, click the "Run Demo" button 
+        Please upload the required data files and set the simulation parameters 
+        in the sidebar. Once you have done so, click the "Run Simulation" button 
         to see the results here.
         """
     )
@@ -149,11 +153,12 @@ elif page == "Run Demo":
     if st.sidebar.button("Run Demo"):
         # Load predefined data for the demo
         prevalence_data = pd.read_csv('mighti/data/prevalence_data_eswatini.csv')
-        demographics_data = pd.read_csv('mighti/data/eswatini_age_2023.csv')
+        demographics_data = pd.read_csv('mighti/data/eswatini_age_distribution_2007.csv')
         fertility_data = pd.read_csv('mighti/data/eswatini_asfr.csv')
-        mortality_data = pd.read_csv('mighti/data/eswatini_deaths.csv')
-        age_bins = [(0, 15), (15, 21), (21, 26), (26, 31), (31, 36), (36, 41), (41, 46), 
-                    (46, 51), (51, 56), (56, 61), (61, 66), (66, 71), (71, 76), (76, 81), (80, float('inf'))]
+        mortality_data = pd.read_csv('mighti/data/eswatini_mortality_rates_2007.csv')
+        age_bins = [(0, 5, "0-4"), (5, 15, "5-14"), (15, 25, "15-24"), (25, 35, "25-34"),
+                    (35, 45, "35-44"), (45, 55, "45-54"), (55, 65, "55-64"), (65, 75, "65-74"),
+                    (75, 85, "75-84"), (85, 101, "85+")]
 
         sim, prevalence_analyzer = mi.run_simulation(prevalence_data, demographics_data, fertility_data, mortality_data, init_year, end_year, population_size)
         mi.plot_results(sim, prevalence_analyzer, outcome, disease, age_bins)
