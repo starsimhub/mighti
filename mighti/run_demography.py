@@ -4,8 +4,11 @@ import mighti as mi
 import matplotlib.pyplot as plt
 import streamlit as st
 
-def run_simulation(prevalence_data, demographics_data, fertility_data, mortality_data, init_year, end_year, population_size):
+def run_demography(region, init_year, end_year, population_size):
     beta = 0.001
+
+# 1. call prepare_data and extract date 
+# 2. Read in relevant data
 
     # Parameters
     csv_path_params = 'mighti/data/eswatini_parameters.csv'
@@ -112,12 +115,39 @@ def run_simulation(prevalence_data, demographics_data, fertility_data, mortality
     # Run the simulation
     sim.run()
 
-    return sim, prevalence_analyzer
+    # Get the modules
+    deaths_module = get_deaths_module(sim)
+    pregnancy_module = get_pregnancy_module(sim)
 
-def plot_results(sim, prevalence_analyzer, outcome, disease, age_bins):
-    if outcome == "Mean Prevalence":
-        fig = mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease)
+    # Initialize lists to store yearly data
+    years = list(range(init_year+1, end_year))
+
+       # Create results DataFrame
+    df_results = mi.create_results_dataframe(sim, init_year, end_year, deaths_module)
+
+    # Calculate metrics
+    df_metrics = mi.calculate_metrics(df_results)
+
+    # Plot the mortality rates comparison
+    mi.plot_mortality_rates_comparison(df_metrics, mortality_data, observed_year=end_year, year=end_year)
+
+    # Create life table
+    life_table = mi.create_life_table(df_metrics, year=end_year, max_age=100)
+
+    # Load observed life expectancy data
+    observed_LE = demographics_data
+
+    # Plot life expectancy
+    mi.plot_life_expectancy(life_table, observed_LE, year=end_year, max_age=100, figsize=(14, 10), title=None)
+
+    return sim, df_metrics, life_table
+
+def plot_demography(outcome, df_metrics, life_table, df):
+    if outcome == "Mortality Rates":
+        fig = mi.plot_mortality_rates_comparison(df_metrics, df, observed_year=2011, year=2011)
         st.pyplot(fig)
-    elif outcome == "Age-dependent Prevalence":
-        st.markdown('<p style="color:red; font-size:24px;">Age-dependent Prevalence is not implemented yet.</p>', unsafe_allow_html=True)
+    elif outcome == "Life Expectancy":
+        fig = mi.plot_life_expectancy(life_table, df, year=2023, max_age=100, figsize=(14, 10), title=None)   
+        st.pyplot(fig)
+
    

@@ -9,7 +9,7 @@ def prepare_data_for_year(year):
     # Check if the files already exist
     if not os.path.exists(csv_path_death):
         # Load the mortality rates data
-        mortality_rates = pd.read_csv('eswatini_mortality_rates.csv')
+        mortality_rates = pd.read_csv('demography/eswatini_mortality_rates.csv')
         
         # Extract rows for the specified year
         mortality_rates_year = mortality_rates[mortality_rates['Time'] == year]
@@ -22,7 +22,7 @@ def prepare_data_for_year(year):
 
     if not os.path.exists(csv_path_age):
         # Load the age distribution data
-        age_distribution = pd.read_csv('eswatini_age_distribution.csv')
+        age_distribution = pd.read_csv('demography/eswatini_age_distribution.csv')
         
         # Extract rows for the specified year
         age_distribution_year = age_distribution[['age', 'sex', str(year)]]

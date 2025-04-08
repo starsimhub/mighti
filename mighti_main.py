@@ -1,4 +1,5 @@
 import starsim as ss
+import stisim
 import sciris as sc
 import mighti as mi
 import pandas as pd
@@ -108,7 +109,7 @@ networks = [mf, maternal]
 # -------------------------
 
 # Initialize disease conditions
-hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
+hiv_disease = stisim.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 disease_objects = []
 for disease in healthconditions:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
