@@ -10,9 +10,9 @@ import os
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 beta = 0.001
-n_agents = 50000 # Number of agents in the simulation
-inityear = 2007  # Simulation start year
-endyear = 2012
+n_agents = 10000 # Number of agents in the simulation
+inityear = 1999  # Simulation start year
+endyear = 2024
 
 # ---------------------------------------------------------------------
 # Specify data file paths
@@ -22,7 +22,7 @@ endyear = 2012
 csv_path_params = 'mighti/data/eswatini_parameters.csv'
 
 # Relative Risks
-csv_path_interactions = "mighti/data/rel_sus_0.csv"
+csv_path_interactions = "mighti/data/rel_sus.csv"
 
 # Prevalence data
 csv_prevalence = 'mighti/data/prevalence_data_eswatini.csv'
@@ -181,7 +181,9 @@ if __name__ == '__main__':
         'IMR': simulated_imr,
     })
     
-    mi.plot_imr('demography/eswatini_mortality_rates.csv', simulated_data, inityear, endyear)
+    observed_death_data = pd.read_csv('demography/eswatini_mortality_rates.csv')
+
+    mi.plot_imr(observed_death_data, simulated_data, inityear, endyear)
     
 
 
@@ -194,11 +196,13 @@ if __name__ == '__main__':
     df_metrics = mi.calculate_metrics(df_results)
 
     # Plot the mortality rates comparison
-    mi.plot_mortality_rates_comparison(df_metrics, 'demography/eswatini_mortality_rates.csv', observed_year=2011, year=2011)
+    mi.plot_mortality_rates_comparison(df_metrics, observed_death_data, observed_year=2023, year=2023)
 
 
-    life_table = mi.create_life_table(df_metrics, year=2007, max_age=100)
+    life_table = mi.create_life_table(df_metrics, year=2023, max_age=100)
     print(life_table)
     observed_LE = pd.read_csv('demography/eswatini_life_expectancy_by_age.csv')  
     mi.plot_life_expectancy(life_table, observed_LE, year=2023, max_age=100, figsize=(14, 10), title=None)    
+    
+    mi.print_life_expectancy_statement(life_table)
   

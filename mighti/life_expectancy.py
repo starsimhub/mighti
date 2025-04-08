@@ -186,7 +186,7 @@ def calculate_mortality_rates(self, year=None, max_age=100):
     return pd.DataFrame(mortality_rates)
 
 
-def calculate_life_table(mortality_rates, sex='Total', max_age=100):
+def calculate_life_table(mortality_rates, n_agents = 100000, sex='Total', max_age=100):
     """
     Calculate a complete life table based on age-specific mortality rates
     
@@ -209,7 +209,7 @@ def calculate_life_table(mortality_rates, sex='Total', max_age=100):
     e_x = []  # Life expectancy at age x
     
     # Set the radix of the life table (starting population)
-    radix = 100000
+    radix = n_agents
     
     # Fill in any missing ages with zero mortality rate
     for age in range(max_age + 1):
@@ -325,7 +325,7 @@ def extract_mortality_rates(df_metrics, year, sex):
     
     return mortality_rates
 
-def create_life_table(df_metrics, year, max_age=100):
+def create_life_table(df_metrics, year,  n_agents, max_age=100):
     """
     Create a life table from the df_metrics DataFrame for a given year.
     
@@ -342,8 +342,8 @@ def create_life_table(df_metrics, year, max_age=100):
     female_mortality_rates = extract_mortality_rates(df_metrics, year, 'Female')
     
     # Calculate life tables for males and females
-    male_life_table = calculate_life_table(male_mortality_rates, sex='Male', max_age=max_age)
-    female_life_table = calculate_life_table(female_mortality_rates, sex='Female', max_age=max_age)
+    male_life_table = calculate_life_table(male_mortality_rates,  n_agents, sex='Male', max_age=max_age)
+    female_life_table = calculate_life_table(female_mortality_rates,  n_agents, sex='Female', max_age=max_age)
     
     # Add columns for year and sex
     male_life_table['year'] = year
@@ -355,3 +355,16 @@ def create_life_table(df_metrics, year, max_age=100):
     life_table = pd.concat([male_life_table, female_life_table], ignore_index=True)
     
     return life_table
+
+def extract_life_expectancy(life_table, sex):
+    e0 = life_table.loc[(life_table['Age'] == 0) & (life_table['sex'] == sex), 'e(x)'].values[0]
+    return e0
+
+def print_life_expectancy_statement(life_table):
+    male_e0 = extract_life_expectancy(life_table, 'Male')
+    female_e0 = extract_life_expectancy(life_table, 'Female')
+    general_e0 = (male_e0 + female_e0) / 2  # Assuming equal population for simplicity
+    
+    statement = (f"The model predicted a life expectancy of {general_e0:.2f} years "
+                 f"({female_e0:.2f} years for females, {male_e0:.2f} years for males).")
+    print(statement)
