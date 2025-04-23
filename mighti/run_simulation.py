@@ -114,10 +114,12 @@ def run_simulation(prevalence_data, demographics_data, fertility_data, mortality
 
     return sim, prevalence_analyzer
 
-def plot_results(sim, prevalence_analyzer, outcome, disease, age_bins):
+def plot_results(sim, prevalence_analyzer, outcome, disease, age_bins, prevalence_data, init_year, end_year):
     if outcome == "Mean Prevalence":
         fig = mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease)
         st.pyplot(fig)
     elif outcome == "Age-dependent Prevalence":
+        # fig = mi.plot_age_group_prevalence(sim, prevalence_analyzer, disease, prevalence_data, init_year, end_year)
+        # st.pyplot(fig)
         st.markdown('<p style="color:red; font-size:24px;">Age-dependent Prevalence is not implemented yet.</p>', unsafe_allow_html=True)
    

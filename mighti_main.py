@@ -1,5 +1,5 @@
 import starsim as ss
-import stisim
+import stisim as sti
 import sciris as sc
 import mighti as mi
 import pandas as pd
@@ -11,7 +11,7 @@ import os
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 beta = 0.001
-n_agents = 5000 # Number of agents in the simulation
+n_agents = 10000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2020
 
@@ -109,7 +109,7 @@ networks = [mf, maternal]
 # -------------------------
 
 # Initialize disease conditions
-hiv_disease = stisim.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
+hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 disease_objects = []
 for disease in healthconditions:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     
     # # # Plot the results for each simulation
     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
     
