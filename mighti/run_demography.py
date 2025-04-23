@@ -1,27 +1,28 @@
 import pandas as pd
 import starsim as ss
 import mighti as mi
-import matplotlib.pyplot as plt
 import streamlit as st
 
-def run_demography(region, init_year, end_year, population_size):
+def run_demography(population_csv, fertility_csv, mortality_rates_csv, life_expectancy_csv, extracted_life_expectancy_csv, region, init_year, end_year, population_size):
     beta = 0.001
 
-# 1. call prepare_data and extract date 
-# 2. Read in relevant data
+    population_csv =  f'app/{region}_age_distribution_{init_year}.csv'
+    fertility_csv = f'app/{region}_asfr_{init_year}.csv'
+    mortality_rates_csv = f'app/{region}_mortality_rates_{init_year}.csv'
 
-    # Parameters
-    csv_path_params = 'mighti/data/eswatini_parameters.csv'
 
-    # Load the mortality rates and ensure correct format
-    mortality_rates_year = mortality_data
-
-    # Load the age distribution data for the specified year
-    age_distribution_year = demographics_data
 
     # Load parameters
+    csv_path_params = "mighti/data/eswatini_parameters.csv"
     df = pd.read_csv(csv_path_params)
     df.columns = df.columns.str.strip()
+    
+    
+    # Load data from CSVs
+    demographics_data = pd.read_csv(population_csv)
+    fertility_data = pd.read_csv(fertility_csv)
+    mortality_rates_data = pd.read_csv(mortality_rates_csv)
+    # life_expectancy_data = pd.read_csv(life_expectancy_csv)
 
     # Extract all conditions except HIV
     healthconditions = [condition for condition in df.condition if condition != "HIV"]
@@ -39,19 +40,23 @@ def run_demography(region, init_year, end_year, population_size):
     communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
 
     # Initialize prevalence data
-    prevalence_data_df = prevalence_data
-    prevalence_data, age_bins = mi.initialize_prevalence_data(diseases, prevalence_data_df, init_year)
+    prevalence_data_df = pd.read_csv("mighti/data/prevalence_data_eswatini.csv")
+    prevalence_data, age_bins = mi.initialize_prevalence_data(
+        diseases, prevalence_data_df, init_year
+    )
 
     # Define a function for disease-specific prevalence
     def get_prevalence_function(disease):
-        return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
+        return lambda module, sim, size: mi.age_sex_dependent_prevalence(
+            disease, prevalence_data, age_bins, sim, size
+        )
 
     def get_deaths_module(sim):
         for module in sim.modules:
             if isinstance(module, mi.Deaths):
                 return module
         raise ValueError("Deaths module not found in the simulation.")
-    
+
     def get_pregnancy_module(sim):
         for module in sim.modules:
             if isinstance(module, mi.Pregnancy):
@@ -59,34 +64,55 @@ def run_demography(region, init_year, end_year, population_size):
         raise ValueError("Pregnancy module not found in the simulation.")
 
     # Initialize the PrevalenceAnalyzer
-    prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=healthconditions)
+    prevalence_analyzer = mi.PrevalenceAnalyzer(
+        prevalence_data=prevalence_data, diseases=healthconditions
+    )
 
-    death_rates = {'death_rate': mortality_data, 'rate_units': 1}
-    death = mi.Deaths(death_rates)  # Use Demographics class implemented in mighti
-    fertility_rate = {'fertility_rate': fertility_data}
+     # Extract rows corresponding to the init_year
+    print(f'here is mortality: {mortality_rates_csv}')
+    mortality_rates = mortality_rates_data[mortality_rates_data['Time'] == init_year]
+    
+    # Check if the data for init_year exists
+    if mortality_rates.empty:
+        raise ValueError(f"No mortality rates data found for the initial year {init_year}.")
+
+    # Initialize Death and Fertility modules
+    death_rates = {"death_rate": mortality_rates, "rate_units": 1}
+    death = mi.Deaths(death_rates)
+    fertility_rate = {"fertility_rate": fertility_data}
     pregnancy = mi.Pregnancy(pars=fertility_rate)
+    
+    # Load the processed population data
+    
+    # Sum male and female values for each age
+    age_data = demographics_data.groupby('age')['value'].sum().reset_index()
+    
+    # Use the summed age_data for the ss.People initialization
+    ppl = ss.People(population_size, age_data=age_data)
 
-    ppl = ss.People(population_size, age_data=demographics_data)
-
-    # Initialize networks
-    mf = ss.MFNet(duration=1/24, acts=80)
+    # Create the networks - sexual and maternal
+    mf = ss.MFNet(duration=1 / 24, acts=80)
     maternal = ss.MaternalNet()
     networks = [mf, maternal]
 
     # Initialize disease conditions
-    hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
+    hiv_disease = ss.HIV(
+        init_prev=ss.bernoulli(get_prevalence_function("HIV")), beta=beta
+    )
     disease_objects = []
     for disease in healthconditions:
         init_prev = ss.bernoulli(get_prevalence_function(disease))
         disease_class = getattr(mi, disease, None)
         if disease_class:
-            disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})
+            disease_obj = disease_class(
+                csv_path=csv_path_params, pars={"init_prev": init_prev}
+            )
             disease_objects.append(disease_obj)
 
     disease_objects.append(hiv_disease)
 
     # Initialize interaction objects for HIV-NCD interactions
-    ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
+    ncd_hiv_rel_sus = df.set_index("condition")["rel_sus"].to_dict()
     ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
     interactions = [ncd_hiv_connector]
 
@@ -109,7 +135,7 @@ def run_demography(region, init_year, end_year, population_size):
         demographics=[pregnancy, death],
         connectors=interactions,
         copy_inputs=False,
-        label='Connector'
+        label="Connector Simulation",
     )
 
     # Run the simulation
@@ -119,35 +145,50 @@ def run_demography(region, init_year, end_year, population_size):
     deaths_module = get_deaths_module(sim)
     pregnancy_module = get_pregnancy_module(sim)
 
-    # Initialize lists to store yearly data
-    years = list(range(init_year+1, end_year))
+    # Extract data for each year
+    years = list(range(init_year + 1, end_year))
+    simulated_imr = []
 
-       # Create results DataFrame
+    for year in years:
+        # Retrieve the number of births and deaths for the year
+        births = pregnancy_module.get_births(year)
+        infant_deaths = deaths_module.infant_deaths
+
+        # Calculate the IMR for males and females
+        imr = (infant_deaths / births) if births > 0 else 0
+
+        # Append the IMR values to the lists
+        simulated_imr.append(imr)
+
+    # Store the data in a DataFrame
+    simulated_data = pd.DataFrame(
+        {
+            "Year": years,
+            "IMR": simulated_imr,
+        }
+    )
+
+    # Create results DataFrame
     df_results = mi.create_results_dataframe(sim, init_year, end_year, deaths_module)
 
     # Calculate metrics
     df_metrics = mi.calculate_metrics(df_results)
 
-    # Plot the mortality rates comparison
-    mi.plot_mortality_rates_comparison(df_metrics, mortality_data, observed_year=end_year, year=end_year)
-
     # Create life table
-    life_table = mi.create_life_table(df_metrics, year=end_year, max_age=100)
-
-    # Load observed life expectancy data
-    observed_LE = demographics_data
-
-    # Plot life expectancy
-    mi.plot_life_expectancy(life_table, observed_LE, year=end_year, max_age=100, figsize=(14, 10), title=None)
+    life_table = mi.create_life_table(df_metrics, year=end_year, n_agents = population_size, max_age=100)
 
     return sim, df_metrics, life_table
 
-def plot_demography(outcome, df_metrics, life_table, df):
+def plot_demography(outcome, df_metrics, mortality_csv, life_table, extracted_life_expectancy_csv, year):
+    
     if outcome == "Mortality Rates":
-        fig = mi.plot_mortality_rates_comparison(df_metrics, df, observed_year=2011, year=2011)
+        # Plot mortality rates
+        observed_data = pd.read_csv(mortality_csv)
+        fig = mi.plot_mortality_rates_comparison_app(df_metrics, observed_data, observed_year=year, year=year)
         st.pyplot(fig)
+        
     elif outcome == "Life Expectancy":
-        fig = mi.plot_life_expectancy(life_table, df, year=2023, max_age=100, figsize=(14, 10), title=None)   
+        # Plot life expectancy
+        observed_data = pd.read_csv(extracted_life_expectancy_csv)
+        fig = mi.plot_life_expectancy_app(life_table, observed_data, year=year, max_age=100)
         st.pyplot(fig)
-
-   

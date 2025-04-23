@@ -1,4 +1,5 @@
 import starsim as ss
+import stisim as sti
 import sciris as sc
 import mighti as mi
 import pandas as pd
@@ -6,12 +7,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+
+# Life expectancy simulation results too low -> HIV treatment?
+# Implement HIV in stisim 
+# Incidence rate estimation 
+# Relative Risk implementation 
+
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 beta = 0.001
-n_agents = 10000 # Number of agents in the simulation
-inityear = 1999  # Simulation start year
+n_agents = 100000 # Number of agents in the simulation
+inityear = 2007  # Simulation start year
 endyear = 2024
 
 # ---------------------------------------------------------------------
@@ -50,8 +57,8 @@ df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
 # Define diseases
-healthconditions = [condition for condition in df.condition if condition != "HIV"]
-# healthconditions = ['Type2Diabetes']
+# healthconditions = [condition for condition in df.condition if condition != "HIV"]
+healthconditions = ['Type2Diabetes']
 diseases = ['HIV'] + healthconditions
 
 # Load prevalence data from the CSV file
@@ -91,7 +98,7 @@ networks = [mf, maternal]
 # -------------------------
 
 # Initialize disease conditions
-hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
+hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 
 # Automatically create disease objects for all diseases
 disease_objects = []
@@ -158,9 +165,9 @@ if __name__ == '__main__':
     # Get the modules
     deaths_module = get_deaths_module(sim)
     pregnancy_module = get_pregnancy_module(sim)
-
+    
     # Initialize lists to store yearly data
-    years = list(range(inityear+1, endyear))
+    years = list(range(inityear + 1, endyear))
     simulated_imr = []
     
     # Extract data for each year
@@ -168,41 +175,37 @@ if __name__ == '__main__':
         # Retrieve the number of births and deaths for the year
         births = pregnancy_module.get_births(year)
         infant_deaths = deaths_module.infant_deaths
-
+    
         # Calculate the IMR for males and females
-        imr= (infant_deaths / births) if births > 0 else 0
-
+        imr = (infant_deaths / births) if births > 0 else 0
+    
         # Append the IMR values to the lists
         simulated_imr.append(imr)
-
+    
     # Store the data in a DataFrame
     simulated_data = pd.DataFrame({
         'Year': years,
         'IMR': simulated_imr,
     })
     
+    # Load observed mortality rate data
     observed_death_data = pd.read_csv('demography/eswatini_mortality_rates.csv')
-
-    mi.plot_imr(observed_death_data, simulated_data, inityear, endyear)
     
-
-
-    n_years = endyear - inityear + 1
-
-    # Create results DataFrame
-    df_results = mi.create_results_dataframe(sim, inityear, endyear, deaths_module)
-
-    # Calculate metrics
-    df_metrics = mi.calculate_metrics(df_results)
+    # Calculate mortality rates using `calculate_mortality_rates`
+    df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=2021, max_age=100, radix=n_agents)
 
     # Plot the mortality rates comparison
-    mi.plot_mortality_rates_comparison(df_metrics, observed_death_data, observed_year=2023, year=2023)
-
-
-    life_table = mi.create_life_table(df_metrics, year=2023, max_age=100)
-    print(life_table)
-    observed_LE = pd.read_csv('demography/eswatini_life_expectancy_by_age.csv')  
-    mi.plot_life_expectancy(life_table, observed_LE, year=2023, max_age=100, figsize=(14, 10), title=None)    
+    mi.plot_mortality_rates_comparison(df_mortality_rates, observed_death_data, observed_year=2021, year=2021)
     
+    # Create the life table
+    life_table = mi.create_life_table(df_mortality_rates, year=2021, n_agents=n_agents, max_age=100)
+    print(life_table)
+    
+    # Load observed life expectancy data
+    observed_LE = pd.read_csv('demography/eswatini_life_expectancy_by_age.csv')
+    
+    # Plot life expectancy comparison
+    mi.plot_life_expectancy(life_table, observed_LE, year=2021, max_age=100, figsize=(14, 10), title=None)
+    
+    # Print life expectancy statement
     mi.print_life_expectancy_statement(life_table)
-  

@@ -10,6 +10,8 @@ from .disease_definitions import *
 from .prevalence_analyzer import *  
 from .plot_functions import *
 from .run_simulation import *
+from .run_demography import *
+
 
 # Set the root directory for the codebase
 import pathlib

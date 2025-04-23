@@ -1,3 +1,134 @@
+# import numpy as np
+# import pandas as pd
+
+
+# def calculate_mortality_rates(sim, year=None, max_age=100):
+#     """
+#     Calculate mortality rates from death counts and population for each year of age.
+#     """
+#     death_counts = sim.results['new']
+#     if year is not None:
+#         death_counts = death_counts[sim.t.yearvec == year]
+
+#     ages = sim.people.age
+#     females = sim.people.female
+#     alive = sim.people.alive
+
+#     population = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
+#     alive_indices = np.where(alive)[0]
+
+#     for idx in alive_indices:
+#         age = int(ages[idx])
+#         if age > max_age:
+#             continue
+#         sex = 'Female' if females[idx] else 'Male'
+#         population[sex][age] += 1
+
+#     deaths_by_age = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
+#     dead_indices = np.where(~alive)[0]
+
+#     for idx in dead_indices:
+#         age = int(ages[idx])
+#         if age > max_age:
+#             continue
+#         sex = 'Female' if females[idx] else 'Male'
+#         deaths_by_age[sex][age] += 1
+
+#     mortality_rates = []
+#     for age in range(max_age + 1):
+#         for sex in ['Male', 'Female']:
+#             pop = population[sex][age]
+#             deaths = deaths_by_age[sex][age]
+#             rate = deaths / pop if pop > 0 else 0
+#             current_year = year if year is not None else int(sim.t.yearvec[sim.t.ti])
+#             mortality_rates.append({'Time': current_year, 'Age': age, 'Sex': sex, 'mx': rate})
+
+#     return pd.DataFrame(mortality_rates)
+
+
+# def extract_mortality_rates(df_metrics, year, sex):
+#     """
+#     Extract mortality rates from the df_metrics DataFrame for a given year and sex.
+#     """
+#     filtered_df = df_metrics[(df_metrics['Time'] == year) & (df_metrics['Sex'] == sex)]
+#     return filtered_df.set_index('Age')['mx'].to_dict()
+
+
+# def calculate_life_table(mortality_rates, n_agents=100000, sex='Total', max_age=100):
+#     ages, l_x, d_x, q_x, m_x, L_x, T_x, e_x = [], [], [], [], [], [], [], []
+#     radix = n_agents
+
+#     for age in range(max_age + 1):
+#         if age not in mortality_rates:
+#             mortality_rates[age] = 0.0
+
+#     current_l_x = radix
+
+#     for age in range(max_age + 1):
+#         mort_rate = mortality_rates.get(age, 0.0)
+#         prob_dying = 1 - np.exp(-mort_rate)
+#         prob_dying = min(max(0, prob_dying), 1)
+
+#         ages.append(age)
+#         m_x.append(mort_rate)
+#         q_x.append(prob_dying)
+#         l_x.append(current_l_x)
+
+#         deaths = current_l_x * prob_dying
+#         d_x.append(deaths)
+#         next_l_x = current_l_x * np.exp(-mort_rate)
+#         L_x_value = next_l_x + 0.5 * deaths
+#         L_x.append(L_x_value)
+#         current_l_x = next_l_x
+
+#     T_x_value = 0
+#     for i in range(max_age, -1, -1):
+#         T_x_value += L_x[i]
+#         T_x.insert(0, T_x_value)
+#         e_x.insert(0, T_x_value / l_x[i] if l_x[i] > 0 else 0)
+
+#     life_table = pd.DataFrame({
+#         'Age': ages,
+#         'l(x)': l_x,
+#         'd(x)': d_x,
+#         'q(x)': q_x,
+#         'm(x)': m_x,
+#         'L(x)': L_x,
+#         'T(x)': T_x,
+#         'e(x)': e_x
+#     })
+
+#     return life_table
+
+
+# def create_life_table(df_metrics, year, n_agents, max_age=100):
+#     male_mx = extract_mortality_rates(df_metrics, year, 'Male')
+#     female_mx = extract_mortality_rates(df_metrics, year, 'Female')
+
+#     male_life = calculate_life_table(male_mx, n_agents, sex='Male', max_age=max_age)
+#     female_life = calculate_life_table(female_mx, n_agents, sex='Female', max_age=max_age)
+
+#     male_life['year'] = year
+#     male_life['sex'] = 'Male'
+#     female_life['year'] = year
+#     female_life['sex'] = 'Female'
+
+#     return pd.concat([male_life, female_life], ignore_index=True)
+
+
+# def extract_life_expectancy(life_table, sex):
+#     return life_table.loc[(life_table['Age'] == 0) & (life_table['sex'] == sex), 'e(x)'].values[0]
+
+
+# def print_life_expectancy_statement(life_table):
+#     male_e0 = extract_life_expectancy(life_table, 'Male')
+#     female_e0 = extract_life_expectancy(life_table, 'Female')
+#     general_e0 = (male_e0 + female_e0) / 2
+
+#     print(f"The model predicted a life expectancy of {general_e0:.2f} years "
+#           f"({female_e0:.2f} years for females, {male_e0:.2f} years for males).")
+
+
 import numpy as np
 import starsim as ss
 import sciris as sc
@@ -131,57 +262,61 @@ def calculate_metrics(df):
     df['mx'] = pd.Series(mx_values)
     return df
 
-def calculate_mortality_rates(self, year=None, max_age=100):
-    """
-    Calculate mortality rates from death counts and population for each year of age.
-    """
-    sim = self.sim
+def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=100000):
 
-    death_counts = self.results['new']
-    if year is not None:
-        death_counts = death_counts[self.sim.t.yearvec == year]
+    # Initialize survivorship function l(x)
+    survivorship = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
+    survivorship['Male'][0] = radix/2
+    survivorship['Female'][0] = radix/2
 
-    ages = sim.people.age
-    females = sim.people.female
-    alive = sim.people.alive
-
-    print(f"Alive array (first 10): {alive[:10]}")  # Debug print
-    print(f"Ages array (first 10): {ages[:10]}")  # Debug print
-    print(f"Females array (first 10): {females[:10]}")  # Debug print
-
-    population = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
-    alive_indices = np.where(alive)[0]
-
-    for idx in alive_indices:
-        age = int(ages[idx])
-        if age > max_age:
-            continue
-        sex = 'Female' if females[idx] else 'Male'
-        population[sex][age] += 1
-
-    print(f"Population after counting (first 10 ages): {[(age, population['Male'][age], population['Female'][age]) for age in range(10)]}")  # Debug print
-
+    # Initialize deaths and person-years lived by age and sex
     deaths_by_age = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
-    dead_indices = np.where(~alive)[0]
+    person_years = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
 
-    for idx in dead_indices:
-        age = int(ages[idx])
-        if age > max_age:
-            continue
-        sex = 'Female' if females[idx] else 'Male'
-        deaths_by_age[sex][age] += 1
 
-    print(f"Deaths by age after counting (first 10 ages): {[(age, deaths_by_age['Male'][age], deaths_by_age['Female'][age]) for age in range(10)]}")  # Debug print
-
-    mortality_rates = []
+    # Populate deaths by age and sex using deaths_module.death_tracking
     for age in range(max_age + 1):
         for sex in ['Male', 'Female']:
-            pop = population[sex][age]
+            if sex == 'Male':
+                deaths_by_age[sex][age] = (
+                    deaths_module.death_tracking['Male'][age] 
+                    if age < len(deaths_module.death_tracking['Male']) else 0
+                )
+            else:
+                deaths_by_age[sex][age] = (
+                    deaths_module.death_tracking['Female'][age] 
+                    if age < len(deaths_module.death_tracking['Female']) else 0
+                )
+    
+    # Calculate survivorship, person-years, and mortality rates
+    mortality_rates = []
+    for age in range(max_age):
+        for sex in ['Male', 'Female']:
+            # Compute d(x)
             deaths = deaths_by_age[sex][age]
-            rate = deaths / pop if pop > 0 else 0
+            
+            # Compute l(x+1) using l(x) and deaths
+            survivorship[sex][age + 1] = survivorship[sex][age] - deaths
+            # Compute L(x)
+            Lx = survivorship[sex][age + 1] + 0.5 * deaths
+            person_years[sex][age] = Lx
+
+            # Compute m(x)
+            mx = deaths / Lx if Lx > 0 else 0
+            print(f"age: {age}, sex: {sex}, deaths: {deaths}, Lx: {Lx} ")
+            # Record mortality rate
             current_year = year if year is not None else int(sim.t.yearvec[sim.t.ti])
-            mortality_rates.append({'Time': current_year, 'Age': age, 'Sex': sex, 'mx': rate})
-            print(f" age: {age}, pop: {pop}, death: {deaths}, rate: {rate}")
+            mortality_rates.append({'year': current_year, 'age': age, 'sex': sex, 'mx': mx})
+            
+
+
+    # Handle the last age group (open interval)
+    for sex in ['Male', 'Female']:
+        age = max_age
+        deaths = deaths_by_age[sex][age]
+        Lx = person_years[sex][age - 1]
+        mx = deaths / Lx if Lx > 0 else 0
+        mortality_rates.append({'year': current_year, 'age': age, 'sex': sex, 'mx': mx})
 
     return pd.DataFrame(mortality_rates)
 
@@ -263,7 +398,7 @@ def calculate_life_table(mortality_rates, n_agents = 100000, sex='Total', max_ag
         if age == 0:
             # For age 0, often use a different factor (e.g., 0.3 instead of 0.5)
             # due to higher mortality in the first months of life
-            L_x_value = next_l_x + 0.3 * deaths
+            L_x_value = next_l_x + 0.5 * deaths
         else:
             L_x_value = next_l_x + 0.5 * deaths
         
@@ -366,5 +501,5 @@ def print_life_expectancy_statement(life_table):
     general_e0 = (male_e0 + female_e0) / 2  # Assuming equal population for simplicity
     
     statement = (f"The model predicted a life expectancy of {general_e0:.2f} years "
-                 f"({female_e0:.2f} years for females, {male_e0:.2f} years for males).")
+                  f"({female_e0:.2f} years for females, {male_e0:.2f} years for males).")
     print(statement)

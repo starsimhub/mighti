@@ -309,12 +309,7 @@ def plot_age_group_prevalence(sim, prevalence_analyzer, disease, prevalence_data
 ##### Plot fucntions for demography related plots #####
     
 def plot_metrics(df):
-    """
-    Plot age-group and sex-dependent birth and death rates over time.
-    
-    Args:
-        df (pd.DataFrame): DataFrame containing the simulation results with calculated metrics.
-    """
+
     # Define age groups and colors
     age_groups = {
         '0': '0 year old',
@@ -356,21 +351,7 @@ def plot_metrics(df):
 
 
 def plot_life_expectancy(life_table, observed_data, year, max_age=100, figsize=(14, 10), title=None):
-    """
-    Plot life expectancy for each age for a given year in two panels: one for males and one for females.
-    Overlay observed life expectancy data with simulated data.
-    
-    Args:
-        life_table: DataFrame containing the complete life table
-        observed_data: DataFrame containing the observed life expectancy data
-        year: Year to filter the data
-        max_age: Maximum age to consider (default 100)
-        figsize: Figure size (width, height) in inches
-        title: Custom title for the plot
-        
-    Returns:
-        Figure and axes objects
-    """
+
     # Filter the life table for the given year
     if 'Time' in life_table.columns:
         life_table = life_table[life_table['Time'] == year]
@@ -420,6 +401,58 @@ def plot_life_expectancy(life_table, observed_data, year, max_age=100, figsize=(
     
     return fig, (ax1, ax2)
 
+def plot_life_expectancy_app(life_table, observed_data, year, max_age=100, figsize=(14, 10), title=None):
+
+    # Filter the life table for the given year
+    if 'Time' in life_table.columns:
+        life_table = life_table[life_table['Time'] == year]
+    
+    # Separate life table by sex
+    male_life_table = life_table[life_table['sex'] == 'Male']
+    female_life_table = life_table[life_table['sex'] == 'Female']
+    
+    # Filter observed data for the given year
+    observed_data_year = observed_data[['age', 'sex', 'year']].copy()
+    observed_male = observed_data_year[observed_data_year['sex'] == 'Male']
+    print(observed_male)
+    observed_female = observed_data_year[observed_data_year['sex'] == 'Female']
+    print(observed_female)
+
+    # Create figure with two panels for male and female
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
+    
+    # Plot male life expectancy
+    ax1.plot(male_life_table['Age'], male_life_table['e(x)'], linestyle='-', linewidth=8, alpha=0.4, color='blue', label='Simulated')
+    ax1.plot(observed_male['age'], observed_male['year'], marker='s', linestyle='--', linewidth=2, markersize=2, color='blue', label='Observed')
+    ax1.set_title('Male', fontsize=28)
+    ax1.set_ylabel('Life Expectancy (years)', fontsize=24)
+    ax1.tick_params(axis='both', which='major', labelsize=20)
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(fontsize=24)
+    
+    # Plot female life expectancy
+    ax2.plot(female_life_table['Age'], female_life_table['e(x)'], linestyle='-', linewidth=8, alpha=0.4, color='red', label='Simulated')
+    ax2.plot(observed_female['age'], observed_female['year'], marker='s', linestyle='--', linewidth=2, markersize=2, color='red', label='Observed')
+    ax2.set_title('Female', fontsize=28)
+    ax2.set_xlabel('Age', fontsize=24)
+    ax2.set_ylabel('Life Expectancy (years)', fontsize=24)
+    ax2.tick_params(axis='both', which='major', labelsize=20)
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(fontsize=24)
+    
+    # Set overall title if provided
+    if title:
+        plt.suptitle(title, fontsize=24, y=0.98)
+    else:
+        plt.suptitle(f'Life Expectancy by Age for {year}', fontsize=24, y=0.98)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.subplots_adjust(bottom=0.1)
+    plt.show()
+    
+    # plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    return fig
+
 
 def plot_imr(observed_data, simulated_data, start_year, end_year):
 
@@ -453,22 +486,7 @@ def plot_imr(observed_data, simulated_data, start_year, end_year):
     
 def plot_mortality_rates_comparison(df_metrics, observed_data, observed_year=None, year=None, 
                                     log_scale=True, figsize=(14, 10), title=None):
-    """
-    Plot comparison between simulated and observed mortality rates
-    
-    Args:
-        df_metrics: DataFrame with calculated mortality rates (mx)
-        observed_data_path: Path to the CSV file with observed mortality rates
-                            (columns: Time, Sex, AgeGrpStart, mx)
-        observed_year: Year to filter observed data (if None, will use simulated year)
-        year: Year to filter simulated data (if None, will use Time column from data)
-        log_scale: Whether to use log scale for mortality rates
-        figsize: Figure size (width, height) in inches
-        title: Custom title for the plot
-        
-    Returns:
-        Figure and axes objects
-    """
+
     # Load observed data
     observed_rates = observed_data
 
@@ -560,21 +578,145 @@ def plot_mortality_rates_comparison(df_metrics, observed_data, observed_year=Non
     plt.subplots_adjust(bottom=0.15)
     plt.show()
     
-    return fig, (ax1, ax2)
+    return fig, (ax1, ax2)    
+    
+def plot_mortality_rates_comparison_app(df_metrics, observed_data, observed_year=None, year=None,
+                                    log_scale=True, figsize=(14, 10), title=None):
 
+    # Helper function to transform observed data
+    def transform_observed_rates(observed_rates, observed_year):
+        age_groups = [
+            (0, 5, "0-4"),
+            (5, 15, "5-14"),
+            (15, 25, "15-24"),
+            (25, 35, "25-34"),
+            (35, 45, "35-44"),
+            (45, 55, "45-54"),
+            (55, 65, "55-64"),
+            (65, 75, "65-74"),
+            (75, 85, "75-84"),
+            (85, 101, "85+")
+        ]
+
+        # Ensure observed_year exists in columns
+        if str(observed_year) not in observed_rates.columns:
+            raise ValueError(f"Year {observed_year} is not available in the observed_rates dataset.")
+
+        # Rename observed_year to 'rate' for consistency
+        observed_rates = observed_rates.rename(columns={str(observed_year): 'rate'})
+
+        # Initialize list to store transformed data
+        transformed_data = []
+
+        # Group data into age groups
+        for start, end, label in age_groups:
+            age_group_data = observed_rates[(observed_rates['age'] >= start) & (observed_rates['age'] < end)]
+            grouped = (
+                age_group_data.groupby('sex')['rate']
+                .mean()
+                .reset_index()
+                .rename(columns={'sex': 'Sex', 'rate': 'mx'})
+            )
+            grouped['AgeGrpStart'] = label
+            grouped['AgeStart'] = start  # Add numerical starting age for sorting
+            grouped['Time'] = observed_year
+            transformed_data.append(grouped)
+
+        # Concatenate all age groups into a single DataFrame and sort by AgeStart
+        return pd.concat(transformed_data, ignore_index=True).sort_values(by='AgeStart')
+
+    # Align simulated data to the provided year
+    if year is not None:
+        simulated_rates = df_metrics[df_metrics['year'] == year].copy()
+    else:
+        years = df_metrics['year'].unique()
+        if len(years) == 1:
+            year = years[0]
+        simulated_rates = df_metrics[df_metrics['year'] == year].copy()
+
+    # Align observed data to the observed_year
+    if observed_year is None and year is not None:
+        observed_year = year
+
+    # Transform observed_data into age groups
+    transformed_observed = transform_observed_rates(observed_data, observed_year)
+
+    # Map continuous ages in simulated data to age groups
+    def map_age_to_group(age):
+        for start, end, label in [
+            (0, 5, "0-4"),
+            (5, 15, "5-14"),
+            (15, 25, "15-24"),
+            (25, 35, "25-34"),
+            (35, 45, "35-44"),
+            (45, 55, "45-54"),
+            (55, 65, "55-64"),
+            (65, 75, "65-74"),
+            (75, 85, "75-84"),
+            (85, 101, "85+")
+        ]:
+            if start <= age < end:
+                return label, start
+        return None, None
+
+    simulated_rates[['AgeGrpStart', 'AgeStart']] = simulated_rates['age'].apply(
+        lambda x: pd.Series(map_age_to_group(x))
+    )
+    aligned_simulated = (
+        simulated_rates.groupby(['AgeGrpStart', 'AgeStart', 'sex'])['mx']
+        .mean()
+        .reset_index()
+        .rename(columns={'sex': 'Sex'})
+        .sort_values(by='AgeStart')
+    )
+
+    # Create figure and subplots
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
+
+    # Plot Male Data
+    male_sim = aligned_simulated[aligned_simulated['Sex'] == 'Male']
+    male_obs = transformed_observed[transformed_observed['Sex'] == 'Male']
+    ax1.plot(male_sim['AgeGrpStart'], male_sim['mx'], 'b-', linewidth=6, alpha=0.5, label='Simulated Male')
+    ax1.plot(male_obs['AgeGrpStart'], male_obs['mx'], 'b--', marker='s', markersize=8, linewidth=2, label='Observed Male')
+
+    # Plot Female Data
+    female_sim = aligned_simulated[aligned_simulated['Sex'] == 'Female']
+    female_obs = transformed_observed[transformed_observed['Sex'] == 'Female']
+    ax2.plot(female_sim['AgeGrpStart'], female_sim['mx'], 'r-', linewidth=6, alpha=0.5, label='Simulated Female')
+    ax2.plot(female_obs['AgeGrpStart'], female_obs['mx'], 'r--', marker='s', markersize=8, linewidth=2, label='Observed Female')
+
+    # Set log scale if specified
+    if log_scale:
+        ax1.set_yscale('log')
+        ax2.set_yscale('log')
+
+    # Set labels and grids
+    ax1.set_title('Male Mortality Rates', fontsize=20)
+    ax1.set_ylabel('Mortality Rate (mx)', fontsize=16)
+    ax1.grid(True, which='both', alpha=0.3)
+
+    ax2.set_title('Female Mortality Rates', fontsize=20)
+    ax2.set_xlabel('Age Groups', fontsize=16)
+    ax2.set_ylabel('Mortality Rate (mx)', fontsize=16)
+    ax2.grid(True, which='both', alpha=0.3)
+
+    # Unified legend
+    handles, labels = [], []
+    for ax in [ax1, ax2]:
+        for handle, label in zip(*ax.get_legend_handles_labels()):
+            if label not in labels:
+                handles.append(handle)
+                labels.append(label)
+    fig.legend(handles, labels, loc='lower center', ncol=2, fontsize=14)
+
+    # Add title if provided
+    if title:
+        fig.suptitle(title, fontsize=24)
+
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    return fig
 
 def plot_population_over_time(df, inityear, endyear, age_groups=None, nagent=50000, observed_data_path='demography/eswatini_age_distribution.csv'):
-    """
-    Plot population changes over time by age group and sex
-    
-    Args:
-        df: DataFrame containing results with columns for population, birth rates, and death rates by age and sex
-        inityear: Start year of the simulation
-        endyear: End year of the simulation
-        age_groups: List of tuples defining age groups (start_age, end_age, label)
-        observed_data_path: Path to CSV file with observed age distribution
-    """
-    import pandas as pd
     
     if age_groups is None:
         # Default age groups
