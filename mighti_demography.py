@@ -7,12 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-
-# Life expectancy simulation results too low -> HIV treatment?
-# Implement HIV in stisim 
-# Incidence rate estimation 
-# Relative Risk implementation 
-
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
