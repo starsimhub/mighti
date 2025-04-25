@@ -2,6 +2,129 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+def plot_mean_prevalence_with_standardization(
+    sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year, reference_population
+):
+    """
+    Plot age-standardized mean prevalence over time for a given disease and both sexes, including observed data points.
+    Calculate and print the mean prevalence over the specified range of years.
+
+    Parameters:
+    - sim: The simulation object (provides `sim.timevec`)
+    - prevalence_analyzer: The prevalence analyzer with stored results
+    - disease: Name of the disease (e.g., 'HIV', 'Type2Diabetes')
+    - prevalence_data_df: The DataFrame containing observed prevalence data
+    - init_year: The initial year of the simulation
+    - end_year: The end year of the simulation
+    - reference_population: A dictionary with age-sex bin proportions for standardization
+    """
+
+    # Extract male and female prevalence numerators and denominators
+    def extract_results(key_pattern):
+        """
+        Helper function to extract results for all age bins for a given key pattern.
+        Returns a list of arrays, one for each age bin.
+        """
+        return [
+            np.array(prevalence_analyzer.results.get(f'{disease}_{key_pattern}_{i}', np.zeros(len(sim.timevec))))
+            for i in range(len(prevalence_analyzer.age_bins))
+        ]
+
+    male_num = extract_results('num_male')  # List of arrays (one per age bin)
+    female_num = extract_results('num_female')
+    male_den = extract_results('den_male')
+    female_den = extract_results('den_female')
+
+    # Initialize arrays for age-standardized prevalence
+    standardized_prevalence_male = np.zeros(len(sim.timevec))
+    standardized_prevalence_female = np.zeros(len(sim.timevec))
+
+    # Calculate age-standardized prevalence
+    for age_bin, weight in reference_population['male'].items():
+        # Ensure no division by zero
+        denominator = np.maximum(male_den[age_bin], 1)
+        prevalence = male_num[age_bin] / denominator
+        weighted_prevalence = prevalence * weight
+        standardized_prevalence_male += weighted_prevalence
+
+    for age_bin, weight in reference_population['female'].items():
+        # Ensure no division by zero
+        denominator = np.maximum(female_den[age_bin], 1)
+        prevalence = female_num[age_bin] / denominator
+        weighted_prevalence = prevalence * weight
+        standardized_prevalence_female += weighted_prevalence
+
+    # Convert to percentages
+    standardized_prevalence_male *= 100
+    standardized_prevalence_female *= 100
+
+    # Debugging: Print standardized prevalence for the first few years
+    print("\nChecking age-standardized prevalence values:")
+    for t in range(3):  # First 3 time points for debugging
+        year = init_year + t
+        print(f"Year {year}: Male prevalence = {standardized_prevalence_male[t]:.2f}%, Female prevalence = {standardized_prevalence_female[t]:.2f}%")
+
+    # Filter the data based on init_year and end_year
+    mask = (sim.timevec >= init_year) & (sim.timevec <= end_year)
+
+    # Calculate the mean prevalence over the specified range of years
+    mean_prevalence_male_over_years = np.mean(standardized_prevalence_male[mask])
+    mean_prevalence_female_over_years = np.mean(standardized_prevalence_female[mask])
+    print(f"Mean Male Prevalence for {disease} from {init_year} to {end_year}: {mean_prevalence_male_over_years:.2f}% (age-standardized)")
+    print(f"Mean Female Prevalence for {disease} from {init_year} to {end_year}: {mean_prevalence_female_over_years:.2f}% (age-standardized)")
+
+    # Create figure
+    plt.figure(figsize=(10, 5))
+
+    # Plot mean prevalence for males and females
+    plt.plot(sim.timevec[mask], standardized_prevalence_male[mask], label=f'Male {disease.capitalize()} Prevalence (Standardized)', linewidth=2, color='blue')
+    plt.plot(sim.timevec[mask], standardized_prevalence_female[mask], label=f'Female {disease.capitalize()} Prevalence (Standardized)', linewidth=2, color='red')
+
+    # Plot observed prevalence data if available
+    if prevalence_data_df is not None:
+        male_col = f'{disease}_male'
+        female_col = f'{disease}_female'
+
+        # Check if columns for observed male and female prevalence exist
+        if male_col in prevalence_data_df.columns:
+            # Drop NaN values from both Year and male prevalence data
+            observed_male_data = prevalence_data_df[['Year', male_col]].dropna()
+            observed_male_data = observed_male_data.groupby('Year', as_index=False).mean()
+            observed_male_data[male_col] *= 100
+            print(f"Observed Male Data for {disease}:\n", observed_male_data)
+
+            # Filter observed data based on init_year and end_year
+            observed_male_data = observed_male_data[(observed_male_data['Year'] >= init_year) & (observed_male_data['Year'] <= end_year)]
+
+            # Plot observed male data
+            plt.scatter(observed_male_data['Year'], observed_male_data[male_col], 
+                        color='blue', marker='o', edgecolor='black', s=100, 
+                        label='Observed Male Prevalence')
+
+        if female_col in prevalence_data_df.columns:
+            # Drop NaN values from both Year and female prevalence data
+            observed_female_data = prevalence_data_df[['Year', female_col]].dropna()
+            observed_female_data = observed_female_data.groupby('Year', as_index=False).mean()
+            observed_female_data[female_col] *= 100
+
+            # Filter observed data based on init_year and end_year
+            observed_female_data = observed_female_data[(observed_female_data['Year'] >= init_year) & (observed_female_data['Year'] <= end_year)]
+
+            # Plot observed female data
+            plt.scatter(observed_female_data['Year'], observed_female_data[female_col], 
+                        color='red', marker='o', edgecolor='black', s=100, 
+                        label='Observed Female Prevalence')
+            
+    # Labels and title
+    plt.legend()
+    plt.xlabel('Year')
+    plt.ylabel(f'{disease.capitalize()} Prevalence (%)')
+    plt.title(f'Age-Standardized {disease.capitalize()} Prevalence Over Time')
+    plt.grid()
+
+    # Show plot
+    plt.show()
+    
 def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year):
     """
     Plot mean prevalence over time for a given disease and both sexes, including observed data points.
