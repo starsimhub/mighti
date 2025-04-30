@@ -171,57 +171,6 @@ class Type2Diabetes(ss.NCD):
         initial_cases = self.pars.init_prev.filter()
         self.set_prognoses(initial_cases)
         return initial_cases
-
-    
-    # def init_post(self):
-    #     print("\n=== CUSTOM TYPE2DIABETES INITIALIZATION ===")
-    #     sim = self.sim
-        
-    #     # Ensure age_bins is available
-    #     age_bins = getattr(self.pars.init_prev.pars, 'age_bins', None)
-    #     if age_bins is None:
-    #         # Provide default age bins if not available
-    #         age_bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-    #         print("Warning: age_bins not found in parameters. Using default age bins.")
-        
-    #     # Print age distribution and mean prevalence
-    #     print_age_distribution(sim, self.pars.init_prev.pars.p, age_bins)
-        
-    #     # Get all people
-    #     n_people = len(sim.people)
-    #     all_uids = np.arange(n_people)
-        
-    #     # Get the prevalence function
-    #     init_func = self.pars.init_prev.pars.p
-        
-    #     # Convert to UIDs for the function call
-    #     uids_obj = ss.uids(all_uids)
-        
-    #     # Calculate probabilities
-    #     probs = init_func(self, sim, uids_obj)
-    #     mean_prob = np.mean(probs)
-    #     print(f"Probability stats: mean={mean_prob:.6f}, min={np.min(probs):.6f}, max={np.max(probs):.6f}")
-        
-    #     # Expected cases based on mean probability
-    #     expected_cases = int(mean_prob * n_people)
-    #     print(f"Expected number of cases based on probabilities: {expected_cases} ({mean_prob*100:.4f}%)")
-        
-    #     # Instead of using random numbers, force exactly the expected number of cases
-    #     # Sort probabilities from highest to lowest
-    #     sorted_indices = np.argsort(-probs)  # Negative sign for descending order
-        
-    #     # Take the top N indices as initial cases
-    #     initial_case_indices = sorted_indices[:expected_cases]
-    #     initial_cases = ss.uids(initial_case_indices)
-        
-    #     # Debug: Print initial cases
-    #     print(f"Initial cases (deterministic): {len(initial_cases)} out of {n_people} ({len(initial_cases)/n_people*100:.4f}%)")
-    #     print(f"Initial case indices: {initial_case_indices[:10]} (first 10 cases)")
-
-    #     # Set prognoses for these cases
-    #     self.set_prognoses(initial_cases)
-        
-    #     return initial_cases
     
     
     def set_prognoses(self, uids):

@@ -10,7 +10,7 @@ import os
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 beta = 0.001
-n_agents = 50000 # Number of agents in the simulation
+n_agents = 100000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2012
 
