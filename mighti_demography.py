@@ -69,6 +69,8 @@ def get_prevalence_function(disease):
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 
+survivorship_analyzer = mi.SurvivorshipAnalyzer()
+
 
 # -------------------------
 # Demographics
@@ -142,7 +144,7 @@ if __name__ == '__main__':
     sim = ss.Sim(
         n_agents=n_agents,
         networks=networks,
-        analyzers=[prevalence_analyzer],
+        analyzers=[prevalence_analyzer, survivorship_analyzer],
         diseases=disease_objects,
         start=inityear,
         stop=endyear,
