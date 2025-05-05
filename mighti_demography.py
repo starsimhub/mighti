@@ -165,7 +165,7 @@ if __name__ == '__main__':
     # Load observed mortality rate data
     observed_death_data = pd.read_csv('demography/eswatini_mortality_rates.csv')
     
-    # Calculate mortality rates using `calculate_mortality_rates`
+    # Calculate mortality rates using `calculate_mortality_rates
     df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=year, max_age=100, radix=n_agents)
 
     # Plot the mortality rates comparison
