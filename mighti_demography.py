@@ -51,8 +51,8 @@ df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
 # Define diseases
-# healthconditions = [condition for condition in df.condition if condition != "HIV"]
-healthconditions = ['Type2Diabetes']
+healthconditions = [condition for condition in df.condition if condition != "HIV"]
+# healthconditions = ['Type2Diabetes']
 diseases = ['HIV'] + healthconditions
 
 # Load prevalence data from the CSV file
