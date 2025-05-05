@@ -94,6 +94,7 @@ class Births(Demographics):
         scaled_birth_prob = np.clip(scaled_birth_prob, a_min=0, a_max=1)
         
         n_new = np.random.binomial(n=sim.people.alive.count(), p=scaled_birth_prob) # Not CRN safe, see issue #404
+        print(f"Number of new births: {n_new}")
         
         return n_new
 
@@ -188,6 +189,8 @@ class Deaths(Demographics):
         if isinstance(death_rate, (pd.Series, pd.DataFrame)):
             death_rate = death_rate.unstack(level='age')
             assert not death_rate.isna().any(axis=None) # For efficiency, we assume that the age bins are the same for all years in the input dataset
+            print("Death rate data (after unstacking and checking for NaNs):")
+            print(death_rate)
         return death_rate
 
     @staticmethod # Needs to be static since called externally, although it sure looks like a class method!
@@ -259,7 +262,8 @@ class Deaths(Demographics):
         self.infant_deaths = len([uid for uid in death_uids if self.sim.people.age[uid] < 1])        
         self.track_deaths_by_age_sex(death_uids)
         return self.n_deaths
-    
+
+### Added to track deaths    
     def track_deaths_by_age_sex(self, death_uids):
         people = self.sim.people
         age_sex_deaths = {}
