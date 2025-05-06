@@ -191,7 +191,7 @@ if __name__ == '__main__':
     df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=2021, max_age=100, radix=n_agents)
 
     # Plot the mortality rates comparison
-    mi.plot_mortality_rates_comparison(df_mortality_rates, observed_death_data, observed_year=2021, year=2021)
+    mi.plot_mortality_rates_comparison_single_age(df_mortality_rates, observed_death_data, observed_year=2021, year=2021)
     
     # Create the life table
     life_table = mi.create_life_table(df_mortality_rates, year=2021, n_agents=n_agents, max_age=100)
