@@ -68,8 +68,8 @@ def get_prevalence_function(disease):
 
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
-
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
+deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
 
 # -------------------------
@@ -77,9 +77,9 @@ survivorship_analyzer = mi.SurvivorshipAnalyzer()
 # -------------------------
 
 death_rates = {'death_rate': pd.read_csv(csv_path_death), 'rate_units': 1}
-death = mi.Deaths(death_rates)  # Use Demographics class implemented in mighti
+death = ss.Deaths(death_rates)  # Use Demographics class implemented in mighti
 fertility_rate = {'fertility_rate': pd.read_csv(csv_path_fertility)}
-pregnancy = mi.Pregnancy(pars=fertility_rate)  
+pregnancy = ss.Pregnancy(pars=fertility_rate)
 
 ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
 
@@ -127,13 +127,13 @@ interactions.extend(connectors)
 
 def get_deaths_module(sim):
     for module in sim.modules:
-        if isinstance(module, mi.Deaths):
+        if isinstance(module, mi.DeathsByAgeSexAnalyzer):
             return module
     raise ValueError("Deaths module not found in the simulation.")
 
 def get_pregnancy_module(sim):
     for module in sim.modules:
-        if isinstance(module, mi.Pregnancy):
+        if isinstance(module, ss.Pregnancy):
             return module
     raise ValueError("Pregnancy module not found in the simulation.")
 
@@ -163,14 +163,14 @@ if __name__ == '__main__':
     pregnancy_module = get_pregnancy_module(sim)
     
     # Initialize lists to store yearly data
-    years = list(range(inityear + 1, endyear))
+    # years = list(range(inityear + 1, endyear))
     simulated_imr = []
     
     # Extract data for each year
-    for year in years:
+    for i, year in enumerate(sim.t.timevec):
         # Retrieve the number of births and deaths for the year
-        births = pregnancy_module.get_births(year)
-        infant_deaths = deaths_module.infant_deaths
+        births = pregnancy_module.results.births[i]
+        infant_deaths = deaths_module.results.infant_deaths[i]
     
         # Calculate the IMR for males and females
         imr = (infant_deaths / births) if births > 0 else 0
@@ -180,7 +180,7 @@ if __name__ == '__main__':
     
     # Store the data in a DataFrame
     simulated_data = pd.DataFrame({
-        'Year': years,
+        'Year': sim.t.timevec,
         'IMR': simulated_imr,
     })
     

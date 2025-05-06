@@ -157,18 +157,15 @@ def create_results_dataframe(sim, inityear, endyear, deaths_module):
 
     years = list(range(inityear, endyear + 1))
     ages = list(range(101))  # Single ages from 0 to 100
+    people = sim.people
 
     for year in years:
-        sim.people.age = sim.people.age.astype(float)  # Ensure age is float for comparison
+        people.age = people.age.astype(float)  # Ensure age is float for comparison
         for age in ages:
-            for sex in ['Male', 'Female']:
-                if sex == 'Male':
-                    pop = np.sum((sim.people.age >= age) & (sim.people.male < age + 1))
-                    deaths = deaths_module.death_tracking['Male'][age] if age < len(deaths_module.death_tracking['Male']) else 0
-                else:
-                    pop = np.sum((sim.people.age >= age) & (sim.people.female < age + 1))
-                    deaths = deaths_module.death_tracking['Female'][age] if age < len(deaths_module.death_tracking['Female']) else 0
-                
+            for sex in ['male', 'female']:
+                pop = np.sum( (people.age >= age) & (people.age < age + 1) & (people.female == (sex=='female')) )
+                deaths = sim.results[f'{sex}_deaths_by_age'][age] if age < len(sim.results[f'{sex}_deaths_by_age']) else 0
+
                 data['year'].append(year)
                 data['age'].append(age)
                 data['sex'].append(sex)
@@ -276,17 +273,15 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
 
     # Populate deaths by age and sex using deaths_module.death_tracking
     for age in range(max_age + 1):
-        for sex in ['Male', 'Female']:
-            if sex == 'Male':
-                deaths_by_age[sex][age] = (
-                    deaths_module.death_tracking['Male'][age] 
-                    if age < len(deaths_module.death_tracking['Male']) else 0
-                )
-            else:
-                deaths_by_age[sex][age] = (
-                    deaths_module.death_tracking['Female'][age] 
-                    if age < len(deaths_module.death_tracking['Female']) else 0
-                )
+            deaths_by_age['Male'][age] = (
+                deaths_module.results.male_deaths_by_age[age]
+                    if age < len(deaths_module.results.male_deaths_by_age) else 0
+            )
+
+            deaths_by_age['Female'][age] = (
+                deaths_module.results.female_deaths_by_age[age]
+                    if age < len(deaths_module.results.female_deaths_by_age) else 0
+            )
     
     # Calculate survivorship, person-years, and mortality rates
     mortality_rates = []
