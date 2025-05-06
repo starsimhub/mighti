@@ -13,7 +13,7 @@ import os
 beta = 0.001
 n_agents = 100000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
-endyear = 2024
+endyear = 2010
 
 # ---------------------------------------------------------------------
 # Specify data file paths
@@ -51,8 +51,8 @@ df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
 # Define diseases
-# healthconditions = [condition for condition in df.condition if condition != "HIV"]
-healthconditions = ['Type2Diabetes']
+healthconditions = [condition for condition in df.condition if condition != "HIV"]
+# healthconditions = ['Type2Diabetes']
 diseases = ['HIV'] + healthconditions
 
 # Load prevalence data from the CSV file
@@ -184,24 +184,34 @@ if __name__ == '__main__':
         'IMR': simulated_imr,
     })
     
+    year = 2009
+    
     # Load observed mortality rate data
     observed_death_data = pd.read_csv('demography/eswatini_mortality_rates.csv')
     
-    # Calculate mortality rates using `calculate_mortality_rates`
-    df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=2021, max_age=100, radix=n_agents)
+    # Calculate mortality rates using `calculate_mortality_rates
+    df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=year, max_age=100, radix=n_agents)
 
     # Plot the mortality rates comparison
-    mi.plot_mortality_rates_comparison(df_mortality_rates, observed_death_data, observed_year=2021, year=2021)
+    # mi.plot_mortality_rates_comparison(df_mortality_rates, observed_death_data, observed_year=year, year=year)
     
+    mi.plot_mortality_rates_comparison(
+        df_metrics=df_mortality_rates, 
+        observed_data=observed_death_data, 
+        observed_year=year, 
+        year=year, 
+        log_scale=True, 
+        title="Single-Age Mortality Rates Comparison"
+    )
     # Create the life table
-    life_table = mi.create_life_table(df_mortality_rates, year=2021, n_agents=n_agents, max_age=100)
+    life_table = mi.create_life_table(df_mortality_rates, year=year, n_agents=n_agents, max_age=100)
     print(life_table)
     
     # Load observed life expectancy data
     observed_LE = pd.read_csv('demography/eswatini_life_expectancy_by_age.csv')
     
     # Plot life expectancy comparison
-    mi.plot_life_expectancy(life_table, observed_LE, year=2021, max_age=100, figsize=(14, 10), title=None)
+    mi.plot_life_expectancy(life_table, observed_LE, year=year, max_age=100, figsize=(14, 10), title=None)
     
-    # Print life expectancy statement
-    mi.print_life_expectancy_statement(life_table)
+    # # Print life expectancy statement
+    # mi.print_life_expectancy_statement(life_table)
