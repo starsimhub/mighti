@@ -1,6 +1,5 @@
 from .version import __version__, __versiondate__, __license__
 from .utils import *
-from .demographics import *
 from .life_expectancy import *
 from .conditions import *
 from .interactions import *
