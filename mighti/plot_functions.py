@@ -581,16 +581,15 @@ def plot_mortality_rates_comparison(df_metrics, observed_data, observed_year=Non
     return fig, (ax1, ax2)    
 
 
-def plot_mortality_rates_comparison_single_age(df_metrics, observed_data, observed_year=None, year=None, 
+def plot_mortality_rates_comparison_single_age(df_metrics, observed_data, observed_year=None,
                                                log_scale=True, figsize=(14, 10), title=None):
     """
     Compare simulated and observed mortality rates using single-age data.
 
     Args:
-        df_metrics (pd.DataFrame): Simulated data with columns ['year', 'sex', 'age', 'mx'].
+        df_metrics (pd.DataFrame): Simulated data with columns ['sex', 'age', 'mx'].
         observed_data (pd.DataFrame): Observed data with columns ['Time', 'Sex', 'Age', 'mx'].
         observed_year (int, optional): Year of observed data to filter. Defaults to None.
-        year (int, optional): Year of simulated data to filter. Defaults to None.
         log_scale (bool, optional): Whether to use a logarithmic scale for mortality rates. Defaults to True.
         figsize (tuple, optional): Figure size for the plots. Defaults to (14, 10).
         title (str, optional): Custom title for the plot. Defaults to None.
@@ -601,20 +600,7 @@ def plot_mortality_rates_comparison_single_age(df_metrics, observed_data, observ
     # Load observed data
     observed_rates = observed_data
 
-    # Filter simulated data if year provided
-    if year is not None:
-        simulated_rates = df_metrics[df_metrics['year'] == year].copy()
-    else:
-        # Try to get year from the data
-        years = df_metrics['year'].unique()
-        if len(years) == 1:
-            year = years[0]
-        simulated_rates = df_metrics[df_metrics['year'] == year].copy()
-    
     # Filter observed data by year
-    if observed_year is None and year is not None:
-        observed_year = year
-        
     if observed_year is not None:
         observed_rates = observed_rates[observed_rates['Time'] == observed_year].copy()
 
@@ -627,7 +613,7 @@ def plot_mortality_rates_comparison_single_age(df_metrics, observed_data, observ
     plt.yticks(fontsize=20)
     
     # Plot male data
-    male_sim = simulated_rates[simulated_rates['sex'] == 'Male'].sort_values('age')
+    male_sim = df_metrics[df_metrics['sex'] == 'Male'].sort_values('age')
     male_obs = observed_rates[observed_rates['Sex'] == 'Male'].sort_values('Age')
     
     # Plot male mortality rates
@@ -637,7 +623,7 @@ def plot_mortality_rates_comparison_single_age(df_metrics, observed_data, observ
              linewidth=2, label='Observed Male')
     
     # Plot female data
-    female_sim = simulated_rates[simulated_rates['sex'] == 'Female'].sort_values('age')
+    female_sim = df_metrics[df_metrics['sex'] == 'Female'].sort_values('age')
     female_obs = observed_rates[observed_rates['Sex'] == 'Female'].sort_values('Age')
     
     # Plot female mortality rates
@@ -688,8 +674,7 @@ def plot_mortality_rates_comparison_single_age(df_metrics, observed_data, observ
     plt.subplots_adjust(bottom=0.15)
     plt.show()
     
-    return fig, (ax1, ax2) 
-
+    return fig, (ax1, ax2)
     
 def plot_mortality_rates_comparison_app(df_metrics, observed_data, observed_year=None, year=None,
                                     log_scale=True, figsize=(14, 10), title=None):
