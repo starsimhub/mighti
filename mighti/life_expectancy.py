@@ -4,7 +4,7 @@ import sciris as sc
 import pandas as pd
 
 
-def calculate_mortality_rates(sim, year=None, max_age=100, radix=100000):
+def calculate_mortality_rates(sim, max_age=100, radix=100000):
     """
     Calculate age-specific mortality rates using the SurvivorshipAnalyzer from the sim object.
 
@@ -22,14 +22,17 @@ def calculate_mortality_rates(sim, year=None, max_age=100, radix=100000):
     survivorship = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
     survivorship['Male'][0] = radix / 2
     survivorship['Female'][0] = radix / 2
+    death = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
 
     # Get survivorship data from the analyzer
     survivorship_data = sim.analyzers.survivorship_analyzer.survivorship_data
+    death_data = sim.analyzers.death_analyzer.death_data
 
     # Populate survivorship using survivorship_data
     for sex in ['Male', 'Female']:
         for age in range(max_age + 1):
             survivorship[sex][age] = survivorship_data[sex][age] if age < len(survivorship_data[sex]) else 0
+            death[sex][age] = death_data[sex][age] if age <len(death_data[sex]) else 0
 
     # Initialize container for mortality rates
     mortality_rates = []
@@ -38,104 +41,186 @@ def calculate_mortality_rates(sim, year=None, max_age=100, radix=100000):
     for age in range(max_age):
         for sex in ['Male', 'Female']:
             # Compute deaths (d(x)) as the difference in survivorship between ages
-            deaths = survivorship[sex][age] - survivorship[sex][age + 1]
+            deaths = death[sex][age] 
 
-            # Compute person-years (L(x)) as the average of l(x) and l(x+1)
-            Lx = (survivorship[sex][age] + survivorship[sex][age + 1]) / 2
+            # # Compute person-years (L(x)) as the average of l(x) and l(x+1)
+            # Lx = (survivorship[sex][age] + survivorship[sex][age + 1]) / 2
 
             # Compute mortality rate (m(x))
-            mx = deaths / Lx if Lx > 0 else 0
+            mx = deaths / (survivorship[sex][age + 1] + 0.5 * deaths) 
 
             # Debugging output
-            print(f"Age: {age}, Sex: {sex}, Deaths: {deaths}, Survivorship[x]: {survivorship[sex][age]}, "
-                  f"Survivorship[x+1]: {survivorship[sex][age + 1]}, Lx: {Lx}, mx: {mx}")
+            print(f"Age: {age}, Sex: {sex}, Deaths[x]: {deaths}, Survivorship[x]: {survivorship[sex][age]}, "
+                  f"Survivorship[x+1]: {survivorship[sex][age + 1]}, mx: {mx}")
 
             # Record mortality rate
-            current_year = year if year is not None else int(sim.t.yearvec[sim.t.ti])
-            mortality_rates.append({'year': current_year, 'age': age, 'sex': sex, 'mx': mx})
+            mortality_rates.append({'age': age, 'sex': sex, 'mx': mx})
 
     # Handle the last age group (open interval)
     for sex in ['Male', 'Female']:
         age = max_age
-        deaths = survivorship[sex][age - 1]  # Assume all remaining population dies
-        Lx = survivorship[sex][age - 1] / 2  # Assume half of the population contributes to person-years
-        mx = deaths / Lx if Lx > 0 else 0
-        mortality_rates.append({'year': current_year, 'age': age, 'sex': sex, 'mx': mx})
+        deaths = death[sex][age - 1]  # Assume all remaining population dies
+        # Lx = survivorship[sex][age - 1] / 2  # Assume half of the population contributes to person-years
+        mx = deaths / (survivorship[sex][age] + 0.5 * deaths) 
+        mortality_rates.append({'age': age, 'sex': sex, 'mx': mx})
 
     return pd.DataFrame(mortality_rates)
 
 
-def calculate_life_table(df_mortality_rates, n_agents=100000, sex='Female', max_age=100):
+# def calculate_life_table(df_mortality_rates, year = 2009, n_agents=100000, sex='Female', max_age=100):
+#     """
+#     Calculate a complete life table based on age-specific mortality rates.
+    
+#     Args:
+#         mortality_rates: Dictionary with age as key and mortality rate (m_x) as value.
+#         n_agents: Number of agents in the cohort (starting population, default 100,000).
+#         sex: 'Male', 'Female', for labeling.
+#         max_age: Maximum age to consider (default 100).
+        
+#     Returns:
+#         DataFrame containing the complete life table.
+#     """
+
+#     # Filter the DataFrame by sex
+#     df_filtered = df_mortality_rates[df_mortality_rates['sex'] == sex]
+
+#     # Convert to a dictionary with age as the key and mortality rate (m(x)) as the value
+#     age_to_mx = dict(zip(df_filtered['age'], df_filtered['mx']))
+
+#     # Fill in any missing ages with zero mortality rate
+#     for age in range(max_age + 1):
+#         if age not in age_to_mx:
+#             age_to_mx[age] = 0.0
+
+#     # Initialize lists to store life table columns
+#     ages = []
+#     l_x = []  # Survivorship function (number of persons alive at age x)
+#     d_x = []  # Number of deaths between age x and x+1
+#     q_x = []  # Probability of dying at age x
+#     m_x = []  # Mortality rate at age x
+#     L_x = []  # Person-years lived between age x and x+1
+#     T_x = []  # Person-years lived from age x until all members of the cohort have died
+#     e_x = []  # Life expectancy at age x
+
+#     # Set the radix of the life table (starting population)
+#     current_l_x = n_agents
+
+#     # Calculate life table columns
+#     for age in range(max_age + 1):
+#         # Get mortality rate for this age
+#         mort_rate = age_to_mx[age]
+
+#         # Store age and mortality rate
+#         ages.append(age)
+#         m_x.append(mort_rate)
+
+#         # Calculate probability of dying at this age
+#         prob_dying = 1 - np.exp(-mort_rate)
+#         q_x.append(prob_dying)
+
+#         # Store current survivorship value
+#         l_x.append(current_l_x)
+
+#         # Calculate deaths in this interval
+#         deaths = current_l_x * prob_dying
+#         d_x.append(deaths)
+
+#         # Calculate survivorship for next age
+#         next_l_x = current_l_x - deaths
+
+#         # Calculate person-years lived in this interval
+#         if age == 0:
+#             # For age 0, use a factor like 0.3 instead of 0.5
+#             L_x_value = 0.3 * current_l_x + 0.7 * next_l_x
+#         else:
+#             L_x_value = 0.5 * (current_l_x + next_l_x)
+#         L_x.append(L_x_value)
+
+#         # Update current_l_x for next iteration
+#         current_l_x = next_l_x
+
+#     # Calculate T_x (backwards) and life expectancy
+#     T_x_value = 0
+#     for i in range(max_age, -1, -1):
+#         T_x_value += L_x[i]
+#         T_x.insert(0, T_x_value)  # Insert at beginning since we're going backwards
+
+#         # Calculate life expectancy
+#         e_x_value = T_x_value / l_x[i] if l_x[i] > 0 else 0
+#         e_x.insert(0, e_x_value)
+
+#     # Create data frame with life table
+#     life_table = pd.DataFrame({
+#         'Age': ages,
+#         'l(x)': l_x,
+#         'd(x)': d_x,
+#         'q(x)': q_x,
+#         'm(x)': m_x,
+#         'L(x)': L_x,
+#         'T(x)': T_x,
+#         'e(x)': e_x
+#     })
+
+#     return life_table
+
+
+def calculate_life_table_with_survivorship(sim, n_agents=100000, sex='Female', max_age=100):
     """
-    Calculate a complete life table based on age-specific mortality rates.
+    Calculate a complete life table using survivorship data from the simulation.
     
     Args:
-        mortality_rates: Dictionary with age as key and mortality rate (m_x) as value.
-        n_agents: Number of agents in the cohort (starting population, default 100,000).
-        sex: 'Male', 'Female', for labeling.
+        sim: The simulation object with a SurvivorshipAnalyzer attached.
+        n_agents: Number of agents in the cohort (default 100,000).
+        sex: 'Male' or 'Female', for labeling.
         max_age: Maximum age to consider (default 100).
         
     Returns:
         DataFrame containing the complete life table.
     """
-
-    # Filter the DataFrame by sex
-    df_filtered = df_mortality_rates[df_mortality_rates['sex'] == sex]
-
-    # Convert to a dictionary with age as the key and mortality rate (m(x)) as the value
-    age_to_mx = dict(zip(df_filtered['age'], df_filtered['mx']))
-
-    # Fill in any missing ages with zero mortality rate
-    for age in range(max_age + 1):
-        if age not in age_to_mx:
-            age_to_mx[age] = 0.0
+    # Retrieve survivorship data from the analyzer
+    survivorship_data = sim.analyzers.survivorship_analyzer.survivorship_data
+    l_x_data = survivorship_data[sex]
 
     # Initialize lists to store life table columns
     ages = []
     l_x = []  # Survivorship function (number of persons alive at age x)
     d_x = []  # Number of deaths between age x and x+1
     q_x = []  # Probability of dying at age x
-    m_x = []  # Mortality rate at age x
     L_x = []  # Person-years lived between age x and x+1
     T_x = []  # Person-years lived from age x until all members of the cohort have died
     e_x = []  # Life expectancy at age x
 
-    # Set the radix of the life table (starting population)
-    current_l_x = n_agents
-
-    # Calculate life table columns
+    # Populate l_x using survivorship data
     for age in range(max_age + 1):
-        # Get mortality rate for this age
-        mort_rate = age_to_mx[age]
-
-        # Store age and mortality rate
         ages.append(age)
-        m_x.append(mort_rate)
+        l_x_value = l_x_data[age] if age < len(l_x_data) else 0
+        l_x.append(l_x_value)
 
-        # Calculate probability of dying at this age
-        prob_dying = 1 - np.exp(-mort_rate)
-        q_x.append(prob_dying)
-
-        # Store current survivorship value
-        l_x.append(current_l_x)
-
-        # Calculate deaths in this interval
-        deaths = current_l_x * prob_dying
+    # Calculate the rest of the life table columns
+    for age in range(max_age + 1):
+        # Calculate number of deaths between age x and x+1
+        if age < max_age:
+            deaths = l_x[age] - l_x[age + 1]
+        else:
+            deaths = l_x[age]
         d_x.append(deaths)
 
-        # Calculate survivorship for next age
-        next_l_x = current_l_x - deaths
+        # Calculate probability of dying at age x
+        if l_x[age] > 0:
+            prob_dying = deaths / l_x[age]
+        else:
+            prob_dying = 0
+        q_x.append(prob_dying)
 
         # Calculate person-years lived in this interval
         if age == 0:
             # For age 0, use a factor like 0.3 instead of 0.5
-            L_x_value = 0.3 * current_l_x + 0.7 * next_l_x
+            L_x_value = 0.3 * l_x[age] + 0.7 * (l_x[age + 1] if age < max_age else 0)
+        elif age < max_age:
+            L_x_value = 0.5 * (l_x[age] + l_x[age + 1])
         else:
-            L_x_value = 0.5 * (current_l_x + next_l_x)
+            L_x_value = l_x[age] / 2  # Open interval for the last age
         L_x.append(L_x_value)
-
-        # Update current_l_x for next iteration
-        current_l_x = next_l_x
 
     # Calculate T_x (backwards) and life expectancy
     T_x_value = 0
@@ -144,16 +229,18 @@ def calculate_life_table(df_mortality_rates, n_agents=100000, sex='Female', max_
         T_x.insert(0, T_x_value)  # Insert at beginning since we're going backwards
 
         # Calculate life expectancy
-        e_x_value = T_x_value / l_x[i] if l_x[i] > 0 else 0
+        if l_x[i] > 0:
+            e_x_value = T_x_value / l_x[i]
+        else:
+            e_x_value = 0
         e_x.insert(0, e_x_value)
 
-    # Create data frame with life table
+    # Create DataFrame with life table
     life_table = pd.DataFrame({
         'Age': ages,
         'l(x)': l_x,
         'd(x)': d_x,
         'q(x)': q_x,
-        'm(x)': m_x,
         'L(x)': L_x,
         'T(x)': T_x,
         'e(x)': e_x
@@ -161,9 +248,7 @@ def calculate_life_table(df_mortality_rates, n_agents=100000, sex='Female', max_
 
     return life_table
 
-
-
-def create_life_table(df_mortality_rates, year,  n_agents, max_age=100):
+def create_life_table(sim, year, n_agents, max_age=100):
     """
     Create a life table from the df_metrics DataFrame for a given year.
     
@@ -177,8 +262,8 @@ def create_life_table(df_mortality_rates, year,  n_agents, max_age=100):
     """
     
     # Calculate life tables for males and females
-    male_life_table = calculate_life_table(df_mortality_rates,  n_agents, sex='Male', max_age=max_age)
-    female_life_table = calculate_life_table(df_mortality_rates,  n_agents, sex='Female', max_age=max_age)
+    male_life_table = calculate_life_table_with_survivorship(sim,  n_agents, sex='Male', max_age=max_age)
+    female_life_table = calculate_life_table_with_survivorship(sim,  n_agents, sex='Female', max_age=max_age)
     
     # Add columns for year and sex
     male_life_table['year'] = year
