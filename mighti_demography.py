@@ -129,7 +129,7 @@ def get_deaths_module(sim):
     for module in sim.modules:
         if isinstance(module, mi.DeathsByAgeSexAnalyzer):
             return module
-    raise ValueError("Deaths module not found in the simulation.")
+    raise ValueError("Deaths module not found in the simulation. Make sure you've added the DeathsByAgeSexAnalyzer to your simulation configuration")
 
 def get_pregnancy_module(sim):
     for module in sim.modules:
@@ -144,7 +144,7 @@ if __name__ == '__main__':
     sim = ss.Sim(
         n_agents=n_agents,
         networks=networks,
-        analyzers=[prevalence_analyzer, survivorship_analyzer],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
         start=inityear,
         stop=endyear,
