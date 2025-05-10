@@ -85,26 +85,25 @@ def calculate_mortality_rates(age_distribution_csv, mortality_deaths_csv, output
             age_data = age_distribution[(age_distribution['sex'] == sex)]
             death_data = mortality_deaths[(mortality_deaths['sex'] == sex)]
             
-            # # Iterate over each age group
-            # for age_start in age_groups:
-            #     age_end = age_start + 5
-            #     # Filter data for the given age group
-            #     age_group_data = age_data[(age_data['age'] >= age_start) & (age_data['age'] < age_end)]
-            #     death_group_data = death_data[(death_data['age'] >= age_start) & (death_data['age'] < age_end)]
+    #         # Iterate over each age group
+    #         for age_start in age_groups:
+    #             age_end = age_start + 5
+    #             # Filter data for the given age group
+    #             age_group_data = age_data[(age_data['age'] >= age_start) & (age_data['age'] < age_end)]
+    #             death_group_data = death_data[(death_data['age'] >= age_start) & (death_data['age'] < age_end)]
                 
-            #     # Calculate l(x), d(x), L(x), and m(x)
-            #     lx = age_group_data[year].sum()
-            #     dx = death_group_data[year].sum()
-            #     Lx = lx - dx + 0.5 * dx
-            #     mx = dx / Lx if Lx > 0 else 0
+    #             # Calculate l(x), d(x), L(x), and m(x)
+    #             lx = age_group_data[year].sum()
+    #             dx = death_group_data[year].sum()
+    #             Lx = lx - dx + 0.5 * dx
+    #             mx = dx / Lx if Lx > 0 else 0
                 
-            #     # Append the results
-            #     results.append([year, sex, age_start, mx])
-        
+    #             # Append the results
+    #             results.append([year, sex, age_start, mx])
+    
     # # Create a DataFrame to store the results
     # results_df = pd.DataFrame(results, columns=['Time', 'Sex', 'AgeGrpStart', 'mx'])
-
-               
+    
             # # Iterate over each age
             for age in ages:
                 # Filter data for the current age and the next age
@@ -123,11 +122,10 @@ def calculate_mortality_rates(age_distribution_csv, mortality_deaths_csv, output
                 
                 # Append the results
                 results.append([year, sex, age, mx])
-        
+    
     # Create a DataFrame to store the results
     results_df = pd.DataFrame(results, columns=['Time', 'Sex', 'Age', 'mx'])
 
-    
     # Save the results to CSV
     results_df.to_csv(output_csv, index=False)
     print(f"Mortality rates saved to {output_csv}")
