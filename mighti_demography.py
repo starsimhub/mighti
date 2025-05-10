@@ -10,9 +10,9 @@ import os
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 beta = 0.001
-n_agents = 100_000 # Number of agents in the simulation
+n_agents = 100000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
-endyear = 2009
+endyear = 2010
 
 # ---------------------------------------------------------------------
 # Specify data file paths
@@ -67,10 +67,8 @@ def get_prevalence_function(disease):
 
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
-
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
-
-death_analyzer = mi.DeathAnalyzer()
+deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
 
 # -------------------------
@@ -80,7 +78,7 @@ death_analyzer = mi.DeathAnalyzer()
 death_rates = {'death_rate': pd.read_csv(csv_path_death), 'rate_units': 1}
 death = ss.Deaths(death_rates)  # Use Demographics class implemented in mighti
 fertility_rate = {'fertility_rate': pd.read_csv(csv_path_fertility)}
-pregnancy = ss.Pregnancy(pars=fertility_rate)  
+pregnancy = ss.Pregnancy(pars=fertility_rate)
 
 ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
 
@@ -126,13 +124,26 @@ connectors = mi.create_connectors(ncd_interactions)
 # Add NCD-NCD connectors to interactions
 interactions.extend(connectors)
 
+def get_deaths_module(sim):
+    for module in sim.modules:
+        if isinstance(module, mi.DeathsByAgeSexAnalyzer):
+            return module
+    raise ValueError("Deaths module not found in the simulation. Make sure you've added the DeathsByAgeSexAnalyzer to your simulation configuration")
+
+def get_pregnancy_module(sim):
+    for module in sim.modules:
+        if isinstance(module, ss.Pregnancy):
+            return module
+    raise ValueError("Pregnancy module not found in the simulation.")
+
+    
 
 if __name__ == '__main__':
     # Initialize the simulation with connectors and force=True
     sim = ss.Sim(
         n_agents=n_agents,
         networks=networks,
-        analyzers=[prevalence_analyzer, survivorship_analyzer, death_analyzer],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
         start=inityear,
         stop=endyear,
@@ -145,35 +156,36 @@ if __name__ == '__main__':
     
     # After initializing the simulation
     sim.run()
-
-
-    ##### Analyze mortality and life expectancy #####
+    
+    # Get the modules
+    deaths_module = get_deaths_module(sim)
+    pregnancy_module = get_pregnancy_module(sim)
+    
     year = 2009
+    
     # Load observed mortality rate data
     observed_death_data = pd.read_csv('demography/eswatini_mortality_rates.csv')
     
     # Calculate mortality rates using `calculate_mortality_rates
-    df_mortality_rates = mi.calculate_mortality_rates(sim, max_age=100, radix=n_agents)
+    df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=year, max_age=100, radix=n_agents)
 
-    # Plot the mortality rates comparison
-    # mi.plot_mortality_rates_comparison(df_mortality_rates, observed_death_data, observed_year=year, year=year)
     
-    mi.plot_mortality_rates_comparison_single_age(
+    mi.plot_mortality_rates_comparison(
         df_metrics=df_mortality_rates, 
         observed_data=observed_death_data, 
         observed_year=year, 
+        year=year, 
         log_scale=True, 
         title="Single-Age Mortality Rates Comparison"
     )
     # Create the life table
-    life_table = mi.create_life_table(sim, year, n_agents=n_agents, max_age=100)
+    life_table = mi.create_life_table(df_mortality_rates, year=year, n_agents=n_agents, max_age=100)
     print(life_table)
     
     # Load observed life expectancy data
-    # observed_LE = pd.read_csv('demography/eswatini_life_expectancy_by_age.csv')
+    observed_LE = pd.read_csv('demography/eswatini_life_expectancy_by_age.csv')
     
     # Plot life expectancy comparison
-    # mi.plot_life_expectancy(life_table, observed_LE, year=year, max_age=100, figsize=(14, 10), title=None)
+    mi.plot_life_expectancy(life_table, observed_LE, year=year, max_age=100, figsize=(14, 10), title=None)
     
-    # # Print life expectancy statement
-    # mi.print_life_expectancy_statement(life_table)
+   
