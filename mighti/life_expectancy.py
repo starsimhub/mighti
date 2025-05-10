@@ -36,7 +36,6 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
             deaths = deaths_by_age[sex][age]
             
             # Compute l(x+1) using l(x) and deaths
-            # survivorship[sex][age + 1] = survivorship[sex][age] - deaths
             survivorship[sex][age + 1] = sim.analyzers.survivorship_analyzer.survivorship_data[sex][age]
             # Compute L(x)
             Lx = survivorship[sex][age + 1] + 0.5 * deaths

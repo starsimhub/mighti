@@ -18,7 +18,7 @@ class RemittingDisease(ss.NCD):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             incidence_prob=disease_params["incidence"],
-            p_death=bernoulli(0.1),#bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
+            p_death=bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
             init_prev=ss.bernoulli(disease_params["init_prev"]),
             remission_rate=bernoulli(disease_params["remission_rate"]),  # Define remission_rate as a Bernoulli distribution
             max_disease_duration=disease_params["max_disease_duration"],
@@ -192,7 +192,7 @@ class ChronicDisease(ss.NCD):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             incidence_prob=disease_params["incidence"],
-            p_death=bernoulli(0.1),#bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
+            p_death=bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
             init_prev=ss.bernoulli(disease_params["init_prev"]),
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  # Store HIV relative risk
@@ -341,7 +341,7 @@ class AcuteDisease(ss.NCD):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             incidence_prob=disease_params["incidence"],
-            p_death=bernoulli(0.1),#bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
+            p_death=bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
             init_prev=ss.bernoulli(disease_params["init_prev"]),
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  # Store HIV relative risk
@@ -489,7 +489,7 @@ class GenericSIS(ss.SIS):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             incidence_prob=disease_params["incidence"],
-            p_death=bernoulli(0.1),#bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
+            p_death=bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
             init_prev=ss.bernoulli(disease_params["init_prev"]),
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  # Store HIV relative risk

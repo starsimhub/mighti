@@ -62,52 +62,13 @@ def process_mortality_data(male_csv, female_csv, output_csv, country):
     df.to_csv(output_csv, index=False)
     print(f"Mortality data saved to {output_csv}")
 
-# def calculate_mortality_rates(age_distribution_csv, mortality_deaths_csv, output_csv):
-#     # Load the age distribution and mortality data
-#     age_distribution = pd.read_csv(age_distribution_csv)
-#     mortality_deaths = pd.read_csv(mortality_deaths_csv)
-    
-#     # Define age groups (5-year bins)
-#     age_groups = range(0, 101, 5)
-    
-#     # Initialize an empty list to store the results
-#     results = []
-    
-#     # Iterate over each year and sex
-#     for year in age_distribution.columns[2:]:
-#         for sex in ['Male', 'Female']:
-#             # Filter data for the given year and sex
-#             age_data = age_distribution[(age_distribution['sex'] == sex)]
-#             death_data = mortality_deaths[(mortality_deaths['sex'] == sex)]
-            
-#             # Iterate over each age group
-#             for age_start in age_groups:
-#                 age_end = age_start + 5
-#                 # Filter data for the given age group
-#                 age_group_data = age_data[(age_data['age'] >= age_start) & (age_data['age'] < age_end)]
-#                 death_group_data = death_data[(death_data['age'] >= age_start) & (death_data['age'] < age_end)]
-                
-#                 # Calculate l(x), d(x), L(x), and m(x)
-#                 lx = age_group_data[year].sum()
-#                 dx = death_group_data[year].sum()
-#                 Lx = lx - dx + 0.5 * dx
-#                 mx = dx / Lx if Lx > 0 else 0
-                
-#                 # Append the results
-#                 results.append([year, sex, age_start, mx])
-    
-#     # Create a DataFrame to store the results
-#     results_df = pd.DataFrame(results, columns=['Time', 'Sex', 'AgeGrpStart', 'mx'])
-    
-#     # Save the results to CSV
-#     results_df.to_csv(output_csv, index=False)
-#     print(f"Mortality rates saved to {output_csv}")
-  
-
 def calculate_mortality_rates(age_distribution_csv, mortality_deaths_csv, output_csv):
     # Load the age distribution and mortality data
     age_distribution = pd.read_csv(age_distribution_csv)
     mortality_deaths = pd.read_csv(mortality_deaths_csv)
+    
+    # Define age groups (5-year bins)
+    age_groups = range(0, 101, 5)
     
     # Get the range of ages from the data
     min_age = age_distribution['age'].min()
@@ -117,50 +78,43 @@ def calculate_mortality_rates(age_distribution_csv, mortality_deaths_csv, output
     # Initialize an empty list to store the results
     results = []
     
-    # # Iterate over each year and sex
-    # for year in age_distribution.columns[2:]:  # Assuming year data starts from the 3rd column
-    #     for sex in ['Male', 'Female']:
-    #         # Filter data for the given year and sex
-    #         age_data = age_distribution[age_distribution['sex'] == sex]
-    #         death_data = mortality_deaths[mortality_deaths['sex'] == sex]
-            
-    #         # Iterate over each single age
-    #         for age in ages:
-    #             # Filter data for the current age and the next age
-    #             age_row_data = age_data[age_data['age'] == age]
-    #             next_age_row_data = age_data[age_data['age'] == age + 1]  # l(x+1)
-    #             death_row_data = death_data[death_data['age'] == age]
-                
-    #             # Extract values for l(x), l(x+1), and d(x)
-    #             lx = age_row_data[year].values[0] if not age_row_data.empty else 0  # Population at age x
-    #             lx_next = next_age_row_data[year].values[0] if not next_age_row_data.empty else 0  # Population at age x+1
-    #             dx = death_row_data[year].values[0] if not death_row_data.empty else 0  # Deaths at age x
-                
-    #             # Calculate L(x) and m(x)
-    #             Lx = lx_next + 0.5 * dx  # Correct L(x) calculation
-    #             mx = dx / Lx if Lx > 0 else 0  # Mortality rate
-                
-    #             # Append the results
-    #             results.append([year, sex, age, mx])
-    
     # Iterate over each year and sex
-    for year in age_distribution.columns[2:]:  # Assuming year data starts from the 3rd column
+    for year in age_distribution.columns[2:]:
         for sex in ['Male', 'Female']:
             # Filter data for the given year and sex
-            survivor_data = age_distribution[age_distribution['sex'] == sex]
-            death_data = mortality_deaths[mortality_deaths['sex'] == sex]
+            age_data = age_distribution[(age_distribution['sex'] == sex)]
+            death_data = mortality_deaths[(mortality_deaths['sex'] == sex)]
             
-            # Iterate over each single age
+    #         # Iterate over each age group
+    #         for age_start in age_groups:
+    #             age_end = age_start + 5
+    #             # Filter data for the given age group
+    #             age_group_data = age_data[(age_data['age'] >= age_start) & (age_data['age'] < age_end)]
+    #             death_group_data = death_data[(death_data['age'] >= age_start) & (death_data['age'] < age_end)]
+                
+    #             # Calculate l(x), d(x), L(x), and m(x)
+    #             lx = age_group_data[year].sum()
+    #             dx = death_group_data[year].sum()
+    #             Lx = lx - dx + 0.5 * dx
+    #             mx = dx / Lx if Lx > 0 else 0
+                
+    #             # Append the results
+    #             results.append([year, sex, age_start, mx])
+    
+    # # Create a DataFrame to store the results
+    # results_df = pd.DataFrame(results, columns=['Time', 'Sex', 'AgeGrpStart', 'mx'])
+    
+            # # Iterate over each age
             for age in ages:
                 # Filter data for the current age and the next age
-                age_row_data = survivor_data[survivor_data['age'] == age]
-                next_age_row_data = survivor_data[survivor_data['age'] == age + 1]  # l(x+1)
+                age_row_data = age_data[age_data['age'] == age]
+                next_age_row_data = age_data[age_data['age'] == age + 1]  # l(x+1)
                 death_row_data = death_data[death_data['age'] == age]
                 
                 # Extract values for l(x), l(x+1), and d(x)
                 lx = age_row_data[year].values[0] if not age_row_data.empty else 0  # Population at age x
                 lx_next = next_age_row_data[year].values[0] if not next_age_row_data.empty else 0  # Population at age x+1
-                dx = death_row_data[year].values[0]*1000 if not death_row_data.empty else 0  # Deaths at age x
+                dx = death_row_data[year].values[0] if not death_row_data.empty else 0  # Deaths at age x
                 
                 # Calculate L(x) and m(x)
                 Lx = lx_next + 0.5 * dx  # Correct L(x) calculation
@@ -171,10 +125,11 @@ def calculate_mortality_rates(age_distribution_csv, mortality_deaths_csv, output
     
     # Create a DataFrame to store the results
     results_df = pd.DataFrame(results, columns=['Time', 'Sex', 'Age', 'mx'])
-    
+
     # Save the results to CSV
     results_df.to_csv(output_csv, index=False)
-    print(f"Single-age mortality rates saved to {output_csv}")
+    print(f"Mortality rates saved to {output_csv}")
+    
     
 def process_life_expectancy_data(male_csv, female_csv, output_csv, country):
     # Read life expectancy data
@@ -208,32 +163,21 @@ def process_life_expectancy_data(male_csv, female_csv, output_csv, country):
 
 
 if __name__ == "__main__":
-    # Population distribution
+    # File paths
     male_csv = 'population_single_age_male.csv'
     female_csv = 'population_single_age_female.csv'
     output_csv = 'eswatini_age_distribution.csv'
     
     process_population_data(male_csv, female_csv, output_csv, country ='Eswatini')
-
-    # Survivor distribution
-    male_csv = 'survivor_single_age_male.csv'
-    female_csv = 'survivor_single_age_female.csv'
-    output_csv = 'eswatini_survivor_distribution.csv'
     
-    process_population_data(male_csv, female_csv, output_csv, country ='Eswatini')
-    
-    
-    # Death counts
     male_csv = 'death_single_age_male.csv'
     female_csv = 'death_single_age_female.csv'
     output_csv = 'eswatini_deaths.csv'
     
     process_mortality_data(male_csv, female_csv, output_csv, country ='Eswatini')
     
-    
-    ##### Calculating mortality rates
     # Load the age distribution data
-    age_distribution_csv = 'eswatini_survivor_distribution.csv'
+    age_distribution_csv = 'eswatini_age_distribution.csv'
     
     # Load the mortality data
     mortality_deaths_csv = 'eswatini_deaths.csv'
