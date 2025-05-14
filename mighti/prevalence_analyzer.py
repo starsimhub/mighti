@@ -18,8 +18,8 @@ class PrevalenceAnalyzer(ss.Analyzer):
         self.diseases = diseases
 
         # Define age bins
-        self.age_bins = [(0, 15), (15, 21), (21, 26), (26, 31), (31, 36), (36, 41), (41, 46), 
-                         (46, 51), (51, 56), (56, 61), (61, 66), (66, 71), (71, 76), (76, 81), (80, float('inf'))]
+        self.age_bins = [(0, 15), (15, 20), (20, 25), (25, 30), (30, 35), (35, 40), (40, 45),
+                         (45, 50), (50, 55), (55, 60), (60, 65), (65, 70), (70, 75), (75, 80), (80, float('inf'))]
 
         self.results_defined = False
         # print(f"Initialized PrevalenceAnalyzer with diseases: {self.diseases}")
@@ -99,9 +99,9 @@ class PrevalenceAnalyzer(ss.Analyzer):
             for i, (age_start, age_end) in enumerate(self.age_bins):
                 age_group = (ppl.age >= age_start) & (ppl.age < age_end)
                 num_male = np.sum(age_group & has_disease_m)
-                den_male = np.sum(age_group & ~has_disease_m & ppl.male)
+                den_male = np.sum(age_group & ppl.male)
                 num_female = np.sum(age_group & has_disease_f)
-                den_female = np.sum(age_group & ~has_disease_f & ppl.female)
+                den_female = np.sum(age_group & ppl.female)
                 num_with_HIV_male = np.sum(age_group & has_disease_m & has_hiv)
                 den_with_HIV_male = np.sum(age_group & has_hiv & ppl.male)
                 num_with_HIV_female = np.sum(age_group & has_disease_f & has_hiv)
