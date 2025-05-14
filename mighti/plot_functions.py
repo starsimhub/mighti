@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from collections import Counter
+
 def plot_mean_prevalence_with_standardization(
     sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year, reference_population
 ):
@@ -184,34 +186,78 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
         male_col = f'{disease}_male'
         female_col = f'{disease}_female'
 
-        # Check if columns for observed male and female prevalence exist
-        if male_col in prevalence_data_df.columns:
-            # Drop NaN values from both Year and male prevalence data
-            observed_male_data = prevalence_data_df[['Year', male_col]].dropna()
-            observed_male_data = observed_male_data.groupby('Year', as_index=False).mean()
-            observed_male_data[male_col] *= 100
+        plot_colors = {'male': 'blue',
+                       'female': 'red'}
 
-            # Filter observed data based on init_year and end_year
-            observed_male_data = observed_male_data[(observed_male_data['Year'] >= init_year) & (observed_male_data['Year'] <= end_year)]
+        for sex in ['male', 'female']:
+            col = f'{disease}_{sex}'
+            if col in prevalence_data_df.columns:
+                observed_data = prevalence_data_df[['Year', col]].dropna()
+                age_bins = [agetuple[0] for agetuple in sim.analyzers.prevalence_analyzer.age_bins]
+                weights = dict(Counter(np.digitize(sim.people.age[sim.people[sex]], age_bins) - 1))
 
-            # Plot observed male data
-            plt.scatter(observed_male_data['Year'], observed_male_data[male_col], 
-                        color='blue', marker='o', edgecolor='black', s=100, 
-                        label='Observed Male Prevalence')
+                # arithmetic mean -- not accurate for populations of non-uniform ages
+                # observed_data = observed_data.groupby('Year', as_index=False).mean()
 
-        if female_col in prevalence_data_df.columns:
-            # Drop NaN values from both Year and female prevalence data
-            observed_female_data = prevalence_data_df[['Year', female_col]].dropna()
-            observed_female_data = observed_female_data.groupby('Year', as_index=False).mean()
-            observed_female_data[female_col] *= 100
+                # weighted mean -- adjusted by the simulated population's age structure
+                observed_data = observed_data.groupby('Year', as_index=False).apply(
+                    lambda x: np.average(x[col], weights=list(weights.values()))).rename(columns={None: col})
 
-            # Filter observed data based on init_year and end_year
-            observed_female_data = observed_female_data[(observed_female_data['Year'] >= init_year) & (observed_female_data['Year'] <= end_year)]
+                observed_data[col] *= 100
 
-            # Plot observed female data
-            plt.scatter(observed_female_data['Year'], observed_female_data[female_col], 
-                        color='red', marker='o', edgecolor='black', s=100, 
-                        label='Observed Female Prevalence')
+                # Filter observed data based on init_year and end_year
+                observed_data = observed_data[
+                    (observed_data['Year'] >= init_year) & (observed_data['Year'] <= end_year)]
+
+                # Plot observed male data
+                plt.scatter(observed_data['Year'], observed_data[col],
+                            color=plot_colors[sex], marker='o', edgecolor='black', s=100,
+                            label=f'Observed {sex.capitalize()} Prevalence')
+
+            #
+            # # Check if columns for observed male and female prevalence exist
+            # if male_col in prevalence_data_df.columns:
+            #     # Drop NaN values from both Year and male prevalence data
+            #     observed_male_data = prevalence_data_df[['Year', male_col]].dropna()
+            #
+            #     # Get the pop size by age bin to use as weights for the mean
+            #     age_bins = [agetuple[0] for agetuple in sim.analyzers.prevalence_analyzer.age_bins]
+            #     weights = dict(Counter(np.digitize(sim.people.age[sim.people.male], age_bins)-1))
+            #
+            #     # arithmetic mean -- not accurate for populations of non-uniform ages
+            #     # observed_male_data = observed_male_data.groupby('Year', as_index=False).mean()
+            #
+            #     # weighted mean -- adjusted by the simulated population's age structure
+            #     observed_male_data = observed_male_data.groupby('Year', as_index=False).apply(lambda x: np.average(x[male_col], weights=list(weights.values()))).rename(columns={None:male_col})
+            #
+            #     observed_male_data[male_col] *= 100
+            #
+            #     # Filter observed data based on init_year and end_year
+            #     observed_male_data = observed_male_data[(observed_male_data['Year'] >= init_year) & (observed_male_data['Year'] <= end_year)]
+            #
+            #     # Plot observed male data
+            #     plt.scatter(observed_male_data['Year'], observed_male_data[male_col],
+            #                 color='blue', marker='o', edgecolor='black', s=100,
+            #                 label='Observed Male Prevalence')
+            #
+            # if female_col in prevalence_data_df.columns:
+            #     # Drop NaN values from both Year and female prevalence data
+            #     observed_female_data = prevalence_data_df[['Year', female_col]].dropna()
+            #
+            #
+            #     observed_female_data = observed_female_data.groupby('Year', as_index=False).mean()
+            #
+            #     observed_male_data = observed_male_data.groupby('Year', as_index=False).apply(lambda x: np.average(x[male_col], weights=list(weights.values()))).rename(columns={None:male_col})
+            #
+            #     observed_female_data[female_col] *= 100
+            #
+            #     # Filter observed data based on init_year and end_year
+            #     observed_female_data = observed_female_data[(observed_female_data['Year'] >= init_year) & (observed_female_data['Year'] <= end_year)]
+            #
+            #     # Plot observed female data
+            #     plt.scatter(observed_female_data['Year'], observed_female_data[female_col],
+            #                 color='red', marker='o', edgecolor='black', s=100,
+            #                 label='Observed Female Prevalence')
         
     # Labels and title
     plt.legend()
