@@ -12,14 +12,14 @@ import os
 beta = 0.001
 n_agents = 100000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
-endyear = 2010
+endyear = 2024
 
 # ---------------------------------------------------------------------
 # Specify data file paths
 # ---------------------------------------------------------------------
 
 # Parameters
-csv_path_params = 'mighti/data/eswatini_parameters.csv'
+csv_path_params = 'mighti/data/eswatini_parameters_gbd.csv'
 
 # Relative Risks
 csv_path_interactions = "mighti/data/rel_sus.csv"
@@ -51,7 +51,7 @@ df.columns = df.columns.str.strip()
 
 # Define diseases
 healthconditions = [condition for condition in df.condition if condition != "HIV"]
-# healthconditions = ['Type2Diabetes']
+# healthconditions = []
 diseases = ['HIV'] + healthconditions
 
 # Load prevalence data from the CSV file
@@ -70,7 +70,6 @@ prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, dis
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
-
 # -------------------------
 # Demographics
 # -------------------------
@@ -86,7 +85,6 @@ ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
 mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
 networks = [mf, maternal]
-
 
 # -------------------------
 # Diseases
@@ -161,7 +159,7 @@ if __name__ == '__main__':
     deaths_module = get_deaths_module(sim)
     pregnancy_module = get_pregnancy_module(sim)
     
-    year = 2009
+    year = 2023
     
     # Load observed mortality rate data
     observed_death_data = pd.read_csv('demography/eswatini_mortality_rates.csv')

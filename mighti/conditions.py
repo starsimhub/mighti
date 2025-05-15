@@ -2,6 +2,8 @@ import pandas as pd
 from scipy.stats import bernoulli, lognorm
 import starsim as ss
 import numpy as np
+import sciris as sc
+
 
 class RemittingDisease(ss.NCD):
     def __init__(self, csv_path, pars=None, **kwargs):
@@ -870,3 +872,4 @@ class TB(GenericSIS):
             label = 'TB'
         )
         return
+    
