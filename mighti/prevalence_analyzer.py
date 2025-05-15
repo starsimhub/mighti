@@ -1,10 +1,6 @@
-import mighti as mi
+import starsim as ss
 import numpy as np
 import sciris as sc
-import starsim as ss
-import pandas as pd
-
-__all__ = ["PrevalenceAnalyzer"]
 
 class PrevalenceAnalyzer(ss.Analyzer):
     @staticmethod
@@ -12,6 +8,7 @@ class PrevalenceAnalyzer(ss.Analyzer):
         numer = len((denominator & numerator).uids)
         denom = len(denominator.uids)
         out = sc.safedivide(numer, denom)
+        # print(f"Conditional Probability: Numerator={numer}, Denominator={denom}, Result={out}")
         return out
 
     def __init__(self, prevalence_data, diseases=None, *args, **kwargs):
@@ -21,10 +18,11 @@ class PrevalenceAnalyzer(ss.Analyzer):
         self.diseases = diseases
 
         # Define age bins
-        self.age_bins = [(0, 15), (15, 21), (21, 26), (26, 31), (31, 36), (36, 41), (41, 46), 
-                         (46, 51), (51, 56), (56, 61), (61, 66), (66, 71), (71, 76), (76, 81), (80, float('inf'))]
+        self.age_bins = [(0, 15), (15, 20), (20, 25), (25, 30), (30, 35), (35, 40), (40, 45),
+                         (45, 50), (50, 55), (55, 60), (60, 65), (65, 70), (70, 75), (75, 80), (80, float('inf'))]
 
         self.results_defined = False
+        # print(f"Initialized PrevalenceAnalyzer with diseases: {self.diseases}")
         return
 
     def init_results(self):
@@ -59,6 +57,7 @@ class PrevalenceAnalyzer(ss.Analyzer):
             ]
         self.define_results(*results)
         self.results_defined = True
+        print(f"Results initialized for diseases: {self.diseases}")
         return
 
     def init_pre(self, sim):
@@ -67,8 +66,7 @@ class PrevalenceAnalyzer(ss.Analyzer):
 
         # Initialize array to store population age distribution for each year (single-age resolution)
         self.results['population_age_distribution'] = np.zeros((npts, 101))  # 0 to 100 years (single-year resolution)
-
-        # print(f"Initialized prevalence array with {npts} time points for {self.diseases}.")
+        print(f"Initialized population age distribution array with shape: {self.results['population_age_distribution'].shape}")
         return
 
     def step(self):
@@ -80,6 +78,8 @@ class PrevalenceAnalyzer(ss.Analyzer):
         denom = (ppl.age >= 0)  # All individuals
         has_hiv = denom & hiv.infected  # Individuals with HIV
         no_hiv = denom & hiv.susceptible  # Individuals without HIV
+
+        # print(f"Step {ti}: Processing diseases for time step {ti}")
 
         for disease in self.diseases:
             dis = getattr(sim.diseases, disease.lower())
@@ -99,9 +99,9 @@ class PrevalenceAnalyzer(ss.Analyzer):
             for i, (age_start, age_end) in enumerate(self.age_bins):
                 age_group = (ppl.age >= age_start) & (ppl.age < age_end)
                 num_male = np.sum(age_group & has_disease_m)
-                den_male = np.sum(age_group & ~has_disease_m & ppl.male)
+                den_male = np.sum(age_group & ppl.male)
                 num_female = np.sum(age_group & has_disease_f)
-                den_female = np.sum(age_group & ~has_disease_f & ppl.female)
+                den_female = np.sum(age_group & ppl.female)
                 num_with_HIV_male = np.sum(age_group & has_disease_m & has_hiv)
                 den_with_HIV_male = np.sum(age_group & has_hiv & ppl.male)
                 num_with_HIV_female = np.sum(age_group & has_disease_f & has_hiv)
@@ -113,6 +113,8 @@ class PrevalenceAnalyzer(ss.Analyzer):
 
                 total_num_with_HIV += num_with_HIV_male + num_with_HIV_female
                 total_den_with_HIV += den_with_HIV_male + den_with_HIV_female
+
+                print(f"Age group {age_start}-{age_end}: num_male={num_male}, den_male={den_male}, num_female={num_female}, den_female={den_female}")
 
                 self.results[f'{disease}_num_male_{i}'][ti] = num_male
                 self.results[f'{disease}_den_male_{i}'][ti] = den_male
@@ -127,15 +129,6 @@ class PrevalenceAnalyzer(ss.Analyzer):
                 self.results[f'{disease}_num_without_HIV_female_{i}'][ti] = num_without_HIV_female
                 self.results[f'{disease}_den_without_HIV_female_{i}'][ti] = den_without_HIV_female
 
-                # # Print statements for debugging
-                # print(f"Time index {ti}, Age group {i}, Disease: {disease}")
-                # print(f" Male numerator: {num_male}, Male denominator: {den_male}")
-                # print(f" Female numerator: {num_female}, Female denominator: {den_female}")
-                # print(f" Male numerator with HIV: {num_with_HIV_male}, Male denominator with HIV: {den_with_HIV_male}")
-                # print(f" Female numerator with HIV: {num_with_HIV_female}, Female denominator with HIV: {den_with_HIV_female}")
-                # print(f" Male numerator without HIV: {num_without_HIV_male}, Male denominator without HIV: {den_without_HIV_male}")
-                # print(f" Female numerator without HIV: {num_without_HIV_female}, Female denominator without HIV: {den_without_HIV_female}")
-
             self.results[f'{disease}_prev_no_hiv'][ti] = self.cond_prob(has_disease, no_hiv)
             self.results[f'{disease}_prev_has_hiv'][ti] = self.cond_prob(has_disease, has_hiv)
             self.results[f'{disease}_prev_no_hiv_f'][ti] = self.cond_prob(has_disease_f, no_hiv_f)
@@ -145,11 +138,6 @@ class PrevalenceAnalyzer(ss.Analyzer):
             self.results[f'{disease}_num_total'][ti] = total_num_with_HIV
             self.results[f'{disease}_den_total'][ti] = total_den_with_HIV
 
-            # Calculate total prevalence
-            total_prevalence_with_HIV = (total_num_with_HIV / total_den_with_HIV) * 100 if total_den_with_HIV != 0 else 0
-
-            # # Print statements for total values
-            # print(f"Time index {ti}, Disease: {disease}, Total numerator with HIV: {total_num_with_HIV}, Total denominator with HIV: {total_den_with_HIV}")
-            # print(f"Time index {ti}, Disease: {disease}, Total prevalence with HIV: {total_prevalence_with_HIV:.2f}%")
+            # print(f"Total with HIV: num={total_num_with_HIV}, den={total_den_with_HIV}")
 
         return
