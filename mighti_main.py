@@ -148,11 +148,14 @@ interactions.extend(connectors)
 # -------------------------
 
 # Define the years and corresponding coverage
-years = [2010, 2015, 2020]
+years = np.array([2010, 2015, 2020])
 coverage = [0.5, 0.75, 0.9]  # 20%, 50%, 75%, 90% coverage
 
+df = sc.dataframe(years=years, p_art=coverage)
+df = df.set_index('years')
+
 # Instantiate the ART class
-art_intervention = sti.ART(future_coverage=dict(year=years, prop=coverage))
+art_intervention = sti.ART(coverage_data=df)
 
 def get_deaths_module(sim):
     for module in sim.modules:
@@ -178,7 +181,7 @@ if __name__ == '__main__':
         demographics=[pregnancy, death],
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
-        # interventions = [art_intervention],
+        interventions = [art_intervention],
         connectors=interactions,
         copy_inputs=False,
         label='Connector'
