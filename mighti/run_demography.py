@@ -1,7 +1,7 @@
 import pandas as pd
 import starsim as ss
 import mighti as mi
-import streamlit as st
+# import streamlit as st
 
 def run_demography(population_csv, fertility_csv, mortality_rates_csv, life_expectancy_csv, extracted_life_expectancy_csv, region, init_year, end_year, population_size):
     beta = 0.001
