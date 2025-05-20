@@ -152,7 +152,7 @@ years = [2010, 2015, 2020]
 coverage = [0.5, 0.75, 0.9]  # 20%, 50%, 75%, 90% coverage
 
 # Instantiate the ART class
-art_intervention = ss.ART(year=years, coverage=coverage)
+art_intervention = sti.ART(future_coverage=dict(year=years, prop=coverage))
 
 def get_deaths_module(sim):
     for module in sim.modules:
