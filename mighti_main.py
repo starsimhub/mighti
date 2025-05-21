@@ -1,5 +1,4 @@
 import starsim as ss
-import stisim as sti
 import sciris as sc
 import mighti as mi
 import pandas as pd
@@ -17,9 +16,9 @@ import os
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 beta = 0.001
-n_agents = 100_000 # Number of agents in the simulation
+n_agents = 10_000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
-endyear = 2008
+endyear = 2030
 
 # ---------------------------------------------------------------------
 # Specify data file paths
@@ -143,16 +142,6 @@ connectors = mi.create_connectors(ncd_interactions)
 # Add NCD-NCD connectors to interactions
 interactions.extend(connectors)
 
-# -------------------------
-# Intervention
-# -------------------------
-
-# Define the years and corresponding coverage
-years = [2010, 2015, 2020]
-coverage = [0.5, 0.75, 0.9]  # 20%, 50%, 75%, 90% coverage
-
-# Instantiate the ART class
-art_intervention = ss.ART(year=years, coverage=coverage)
 
 def get_deaths_module(sim):
     for module in sim.modules:
@@ -178,7 +167,6 @@ if __name__ == '__main__':
         demographics=[pregnancy, death],
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
-        # interventions = [art_intervention],
         connectors=interactions,
         copy_inputs=False,
         label='Connector'
@@ -188,22 +176,22 @@ if __name__ == '__main__':
     sim.run()
     
     # # Plot the results for each simulation
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
     
     # Plot the results for each simulation
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear)  
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ChronicKidneyDisease', prevalence_data_df, init_year = inityear, end_year = endyear)
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'CervicalCancer', prevalence_data_df, init_year = inityear, end_year = endyear)
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ProstateCancer', prevalence_data_df, init_year = inityear, end_year = endyear)
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ChronicKidneyDisease', prevalence_data_df, init_year = inityear, end_year = endyear)
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'CervicalCancer', prevalence_data_df, init_year = inityear, end_year = endyear)
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ProstateCancer', prevalence_data_df, init_year = inityear, end_year = endyear)
    
-    # Example usage:
-    mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear) 
-    mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'ChronicKidneyDisease', prevalence_data_df, init_year = inityear, end_year = endyear) 
-    mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'CervicalCancer', prevalence_data_df, init_year = inityear, end_year = endyear) 
-    mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'ProstateCancer', prevalence_data_df, init_year = inityear, end_year = endyear) 
+    # # Example usage:
+    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear) 
+    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'ChronicKidneyDisease', prevalence_data_df, init_year = inityear, end_year = endyear) 
+    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'CervicalCancer', prevalence_data_df, init_year = inityear, end_year = endyear) 
+    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'ProstateCancer', prevalence_data_df, init_year = inityear, end_year = endyear) 
     
     
     
