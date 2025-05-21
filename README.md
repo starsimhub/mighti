@@ -13,9 +13,9 @@ To install locally, clone this repository, then run ``pip install -e .`` in this
 Usage and documentation
 -----------------------
 
-To run demography-related modules (e.g., life expectancy, mortality): mighti_demography.py
+To run demography-related modules (e.g., life expectancy, mortality): ``mighti_demography.py``
 
-To run disease-related simulations: python mighti_main.py
+To run disease-related simulations: ``mighti_main.py``
 
 
 Disclaimer
