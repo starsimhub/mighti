@@ -114,7 +114,7 @@ class PrevalenceAnalyzer(ss.Analyzer):
                 total_num_with_HIV += num_with_HIV_male + num_with_HIV_female
                 total_den_with_HIV += den_with_HIV_male + den_with_HIV_female
 
-                print(f"Age group {age_start}-{age_end}: num_male={num_male}, den_male={den_male}, num_female={num_female}, den_female={den_female}")
+                # print(f"Age group {age_start}-{age_end}: num_male={num_male}, den_male={den_male}, num_female={num_female}, den_female={den_female}")
 
                 self.results[f'{disease}_num_male_{i}'][ti] = num_male
                 self.results[f'{disease}_den_male_{i}'][ti] = den_male

@@ -257,9 +257,13 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
                 # arithmetic mean -- not accurate for populations of non-uniform ages
                 # observed_data = observed_data.groupby('Year', as_index=False).mean()
 
-                # weighted mean -- adjusted by the simulated population's age structure
                 observed_data = observed_data.groupby('Year', as_index=False).apply(
-                    lambda x: np.average(x[col], weights=list(weights.values()))).rename(columns={None: col})
+                    lambda x: np.average(
+                        x[col],
+                        weights=[weights.get(i, 0) for i in x.index]
+                        if sum(weights.get(i, 0) for i in x.index) > 0 else None
+                    )
+                ).rename(columns={None: col})
 
                 observed_data[col] *= 100
 
@@ -271,51 +275,6 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
                 plt.scatter(observed_data['Year'], observed_data[col],
                             color=plot_colors[sex], marker='o', edgecolor='black', s=100,
                             label=f'Observed {sex.capitalize()} Prevalence')
-
-            #
-            # # Check if columns for observed male and female prevalence exist
-            # if male_col in prevalence_data_df.columns:
-            #     # Drop NaN values from both Year and male prevalence data
-            #     observed_male_data = prevalence_data_df[['Year', male_col]].dropna()
-            #
-            #     # Get the pop size by age bin to use as weights for the mean
-            #     age_bins = [agetuple[0] for agetuple in sim.analyzers.prevalence_analyzer.age_bins]
-            #     weights = dict(Counter(np.digitize(sim.people.age[sim.people.male], age_bins)-1))
-            #
-            #     # arithmetic mean -- not accurate for populations of non-uniform ages
-            #     # observed_male_data = observed_male_data.groupby('Year', as_index=False).mean()
-            #
-            #     # weighted mean -- adjusted by the simulated population's age structure
-            #     observed_male_data = observed_male_data.groupby('Year', as_index=False).apply(lambda x: np.average(x[male_col], weights=list(weights.values()))).rename(columns={None:male_col})
-            #
-            #     observed_male_data[male_col] *= 100
-            #
-            #     # Filter observed data based on init_year and end_year
-            #     observed_male_data = observed_male_data[(observed_male_data['Year'] >= init_year) & (observed_male_data['Year'] <= end_year)]
-            #
-            #     # Plot observed male data
-            #     plt.scatter(observed_male_data['Year'], observed_male_data[male_col],
-            #                 color='blue', marker='o', edgecolor='black', s=100,
-            #                 label='Observed Male Prevalence')
-            #
-            # if female_col in prevalence_data_df.columns:
-            #     # Drop NaN values from both Year and female prevalence data
-            #     observed_female_data = prevalence_data_df[['Year', female_col]].dropna()
-            #
-            #
-            #     observed_female_data = observed_female_data.groupby('Year', as_index=False).mean()
-            #
-            #     observed_male_data = observed_male_data.groupby('Year', as_index=False).apply(lambda x: np.average(x[male_col], weights=list(weights.values()))).rename(columns={None:male_col})
-            #
-            #     observed_female_data[female_col] *= 100
-            #
-            #     # Filter observed data based on init_year and end_year
-            #     observed_female_data = observed_female_data[(observed_female_data['Year'] >= init_year) & (observed_female_data['Year'] <= end_year)]
-            #
-            #     # Plot observed female data
-            #     plt.scatter(observed_female_data['Year'], observed_female_data[female_col],
-            #                 color='red', marker='o', edgecolor='black', s=100,
-            #                 label='Observed Female Prevalence')
         
     # Labels and title
     plt.legend()

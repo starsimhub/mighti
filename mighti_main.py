@@ -1,4 +1,5 @@
 import starsim as ss
+import stisim as sti
 import sciris as sc
 import mighti as mi
 import pandas as pd
@@ -15,7 +16,7 @@ import os
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
-beta = 0.001
+beta = 0.01
 n_agents = 10_000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2030
@@ -58,10 +59,11 @@ df.columns = df.columns.str.strip()
 
 # Extract all conditions except HIV
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
-healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
-# healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
+# healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
+healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
 # 
 # Combine with HIV
+# healthconditions = []
 diseases = ["HIV"] + healthconditions
 
 # Filter the DataFrame for disease_class being 'ncd'
@@ -110,16 +112,18 @@ pregnancy = ss.Pregnancy(pars=fertility_rate)
 ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
 
 # Initialize networks
-mf = ss.MFNet(duration=1/24, acts=80)
+# mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
-networks = [mf, maternal]
+structuredsexual = sti.StructuredSexual()
+networks = [maternal, structuredsexual]
 
 # -------------------------
 # Diseases
 # -------------------------
 
 # Initialize disease conditions
-hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
+hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),init_prev_data=None,  beta={'structuredsexual': [0.01, 0.01], 'maternal': [0.01, 0.01]})
+# hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 disease_objects = []
 for disease in healthconditions:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
@@ -160,6 +164,7 @@ def get_pregnancy_module(sim):
 if __name__ == '__main__':
     # Initialize the simulation with connectors and force=True
     sim = ss.Sim(
+        dt=1/12,
         n_agents=n_agents,
         networks=networks,
         start=inityear,
@@ -194,5 +199,6 @@ if __name__ == '__main__':
     # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'CervicalCancer', prevalence_data_df, init_year = inityear, end_year = endyear) 
     # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'ProstateCancer', prevalence_data_df, init_year = inityear, end_year = endyear) 
     
-    
-    
+    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
+
+    mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear) 
