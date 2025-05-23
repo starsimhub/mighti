@@ -8,9 +8,10 @@ import numpy as np
 import os
 
 ##### TO DO #####
+# Check dt and parameter units for each disease
 # Use HIV in stisim 
 # Incidence rate estimation 
-# Relative Risk implementation 
+# 
 
 
 # ---------------------------------------------------------------------

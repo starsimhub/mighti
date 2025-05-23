@@ -139,6 +139,7 @@ def get_pregnancy_module(sim):
 if __name__ == '__main__':
     # Initialize the simulation with connectors and force=True
     sim = ss.Sim(
+        dt = 1/12,
         n_agents=n_agents,
         networks=networks,
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
@@ -170,7 +171,7 @@ if __name__ == '__main__':
     
     mi.plot_mortality_rates_comparison(
         df_metrics=df_mortality_rates, 
-        observed_data=observed_death_data, 
+        observed_death_data=observed_death_data, 
         observed_year=year, 
         year=year, 
         log_scale=True, 
