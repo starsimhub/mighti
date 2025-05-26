@@ -7,8 +7,8 @@ import sciris as sc
 import pytest
 
 n_agents = 10_000
-inityear = 2000
-endyear = 2007
+inityear = 2007
+endyear = 2010
 country = "Eswatini"
 disease = "Type2Diabetes"
 diseases = ['HIV', disease]
@@ -33,13 +33,9 @@ def make_sim():
         return lambda module, sim, size: mi.age_sex_dependent_prevalence(
             disease, prevalence_data, age_bins, sim, size)
 
-    # # Initialize the PrevalenceAnalyzer
-    prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
-
     ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
     
     # Initialize networks
-    mf = ss.MFNet(duration=1/24, acts=80)
     maternal = ss.MaternalNet()
     structuredsexual = sti.StructuredSexual()
     networks = [maternal, structuredsexual]
@@ -63,25 +59,24 @@ def make_sim():
         start=inityear,
         stop=endyear,
         people=ppl,
-        analyzers=[prevalence_analyzer],
         diseases=disease_objects,
         copy_inputs=False,
         verbose=0,
     )
     return sim
 
-def build_sim(sim, calib_pars, **kwargs):
+def build_sim(sim, calib_pars=None, **kwargs):
     reps = kwargs.get('n_reps', 1)
-    # Rehydrate modules if needed
-    
-    dis = sim.pars.diseases
-    
+    # Pick correct disease; adjust index as needed
+    dis = sim.pars.diseases[1]  # or [0] if T2D is first
+
     # Set calibration parameters
-    for k, pars in calib_pars.items():
-        if k == 'incidence_prob':
-            dis.pars['incidence_prob'] = pars['value']
-        else:
-            raise NotImplementedError(f'Parameter {k} not recognized')
+    if calib_pars is not None:
+        for k, v in calib_pars.items():
+            if k == 'p_acquire':
+                dis.pars['p_acquire'] = v
+            else:
+                raise NotImplementedError(f'Parameter {k} not recognized')
 
     # DO NOT run the sim here!
     if reps == 1:
@@ -98,37 +93,47 @@ def test_onepar_normal(do_plot=True):
 
     # Define the calibration parameters
     calib_pars = dict(
-        beta = dict(low=0.01, high=0.30, guess=0.15, suggest_type='suggest_float', log=True),
+        p_acquire = dict(low=0.00001, high=0.1, guess=0.001, suggest_type='suggest_float', log=True),
     )
 
-    # Make the sim and data
-    sim = make_sim()
+    sim = make_sim() 
     
     prevalence_data_df = pd.read_csv(csv_prevalence)
     diseases = [disease]
     prevalence_dict, age_bins = mi.initialize_prevalence_data(diseases, prevalence_data_df, inityear)
-    calib_pars = dict(
-        inc_rate=dict(low=0.001, high=0.05, guess=0.01, suggest_type='suggest_float', log=True),
-    )
-
+    
     expected = []
     for age in age_bins[disease]:
         for sex in ['male', 'female']:
             prev = prevalence_dict[disease][sex][age]
-            expected.append({'Age': age, 'Sex': sex, 'prevalence': prev})
+            expected.append({'Age': age, 'Sex': sex, 'Year': inityear, 'prevalence': prev})
+    
     expected_df = pd.DataFrame(expected)
-    expected_df = expected_df.set_index(["Age", "Sex"]).sort_index()
-
-    sim = make_sim()
-
+    expected_df = expected_df.set_index(["Age", "Sex", "Year"]).sort_index()
+    expected_agg = expected_df.reset_index().groupby('Year')['prevalence'].mean().to_frame()
+    expected_agg.index.name = 't'
+    expected_agg.index = expected_agg.index.astype(float)
+    expected_agg['prevalence'] = expected_agg['prevalence'].astype(float)
+    
+    # This is the KEY step:
+    expected_agg = expected_agg.rename(columns={'prevalence': 'x'})  
+    
+    def my_extract_fn(sim):
+        vals = np.asarray(sim.results['type2diabetes']['new_cases'], dtype=float)
+        tvec = np.asarray(sim.results['timevec'], dtype=float)
+        df = pd.DataFrame({'x': vals}, index=pd.Index(tvec, name='t'))
+        # Force column to float explicitly
+        df['x'] = df['x'].astype(float)
+        df.index = df.index.astype(float)
+        print("extract_fn df.dtypes:", df.dtypes)
+        print("extract_fn df.index.dtype:", df.index.dtype)
+        return df
+    
     prevalence_component = ss.Normal(
         name='NCD prevalence',
         conform='prevalent',
-        expected=expected_df,
-        extract_fn = lambda sim: pd.DataFrame({
-            'x': sim.results.sir.n_infected, # Instead of prevalence, let's compute it from infected and n_alive
-            # 'n': sim.results.n_alive,
-        }, index=pd.Index(sim.results.timevec, name='t')),
+        expected=expected_agg,
+        extract_fn=my_extract_fn,
     )
 
     calib = ss.Calibration(
