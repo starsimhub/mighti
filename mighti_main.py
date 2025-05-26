@@ -19,7 +19,7 @@ import os
 # ---------------------------------------------------------------------
 n_agents = 10_000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
-endyear = 2030
+endyear = 2010
 
 # ---------------------------------------------------------------------
 # Specify data file paths
@@ -61,7 +61,7 @@ df.columns = df.columns.str.strip()
 # Extract all conditions except HIV
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
-healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
+healthconditions = ['Type2Diabetes']#, 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
 # 
 # Combine with HIV
 # healthconditions = []
@@ -181,3 +181,5 @@ if __name__ == '__main__':
  
     # Run the simulation
     sim.run()
+
+

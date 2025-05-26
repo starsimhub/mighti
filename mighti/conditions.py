@@ -31,26 +31,70 @@ class Type2Diabetes(ss.NCD):
             p_acquire=disease_params["incidence"]
         )
 
-        # Define the lambda function to calculate acquisition probability
-        def calculate_p_acquire(self, sim, uids):
-            # Start with base probability
-            p = np.full(len(uids), self.pars.p_acquire)
+        # # Define the lambda function to calculate acquisition probability
+        # def calculate_p_acquire(self, sim, uids):
+        #     # Start with base probability
+        #     p = np.full(len(uids), self.pars.p_acquire)
             
-            # Apply sex-specific filtering
+        #     # Apply sex-specific filtering
+        #     if self.pars.affected_sex == "female":
+        #         # Set probability to 0 for males
+        #         p[sim.people.male[uids]] = 0
+        #     elif self.pars.affected_sex == "male":
+        #         # Set probability to 0 for females
+        #         p[sim.people.female[uids]] = 0
+            
+        #     # Filter out invalid indices for HIV-specific relative susceptibility
+        #     valid_uids = [uid for uid in uids if uid in sim.people.hiv]
+            
+        #     # Apply HIV-specific relative susceptibility
+        #     p[valid_uids] *= self.pars.rel_sus_hiv
+
+        #     return p * self.rel_sus[uids]
+        
+        def calculate_p_acquire(self, sim, uids):
+            print("DEBUG: Entered calculate_p_acquire")
+            print("DEBUG: uids type:", type(uids))
+            # Print a sample of uids
+            try:
+                print("DEBUG: uids sample:", list(uids)[:5])
+            except Exception as e:
+                print("DEBUG: Could not print uids sample:", e)
+            p = np.full(len(uids), self.pars.p_acquire)
             if self.pars.affected_sex == "female":
-                # Set probability to 0 for males
                 p[sim.people.male[uids]] = 0
             elif self.pars.affected_sex == "male":
-                # Set probability to 0 for females
                 p[sim.people.female[uids]] = 0
-            
-            # Filter out invalid indices for HIV-specific relative susceptibility
-            valid_uids = [uid for uid in uids if uid in sim.people.hiv]
-            
-            # Apply HIV-specific relative susceptibility
-            p[valid_uids] *= self.pars.rel_sus_hiv
-
-            return p * self.rel_sus[uids]
+            if hasattr(sim.people, "hiv"):
+                hiv_arr = getattr(sim.people, "hiv")
+                if isinstance(hiv_arr, np.ndarray):
+                    hiv_positive = np.isin(uids, np.where(hiv_arr)[0])
+                    p[hiv_positive] *= self.pars.rel_sus_hiv
+            # Print the type and value for the first rel_sus[uid]
+            try:
+                first_uid = list(uids)[0]
+                first_val = self.rel_sus[first_uid]
+                print(f"DEBUG: first rel_sus[uid] type: {type(first_val)}, value: {first_val}")
+            except Exception as e:
+                print("DEBUG: Could not print rel_sus[uid] sample:", e)
+            # Build rel_sus_arr robustly
+            rel_sus_arr = []
+            for uid in uids:
+                val = self.rel_sus[uid]
+                if isinstance(val, dict):
+                    print(f"ERROR: rel_sus[{uid}] is a dict: {val}")
+                rel_sus_arr.append(val)
+            rel_sus_arr = np.array(rel_sus_arr)
+            print("DEBUG: rel_sus_arr type:", type(rel_sus_arr), "dtype:", rel_sus_arr.dtype, "first 5:", rel_sus_arr[:5])
+            # Try to force to float
+            try:
+                rel_sus_arr = rel_sus_arr.astype(float)
+            except Exception as e:
+                print("ERROR: Could not convert rel_sus_arr to float:", e)
+                raise
+            result = p * rel_sus_arr
+            print("DEBUG: result type:", type(result), "dtype:", result.dtype, "first 5:", result[:5])
+            return result
 
         self.p_acquire = ss.bernoulli(p=calculate_p_acquire)
         self.p_death = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_death.mean())  # Use mean to match Bernoulli
