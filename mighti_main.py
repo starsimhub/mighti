@@ -17,7 +17,6 @@ import os
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
-beta = 0.01
 n_agents = 10_000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2030
@@ -28,7 +27,7 @@ endyear = 2030
 
 
 # Parameters
-csv_path_params = 'mighti/data/eswatini_parameters_gbd.csv'
+csv_path_params = 'mighti/data/eswatini_parameters_dt.csv'
 
 # Relative Risks
 csv_path_interactions = "mighti/data/rel_sus.csv"
@@ -57,6 +56,7 @@ age_distribution_year = pd.read_csv(csv_path_age)
 # Load parameters
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
+
 
 # Extract all conditions except HIV
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
@@ -123,7 +123,7 @@ networks = [maternal, structuredsexual]
 # -------------------------
 
 # Initialize disease conditions
-hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),init_prev_data=None,  beta={'structuredsexual': [0.01, 0.01], 'maternal': [0.01, 0.01]})
+hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),init_prev_data=None,   p_hiv_death=0, include_aids_deaths=False, beta={'structuredsexual': [0.001, 0.001], 'maternal': [0.01, 0.01]})
 # hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
 disease_objects = []
 for disease in healthconditions:
@@ -181,25 +181,3 @@ if __name__ == '__main__':
  
     # Run the simulation
     sim.run()
-    
-    # # Plot the results for each simulation
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
-    
-    # Plot the results for each simulation
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear)  
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ChronicKidneyDisease', prevalence_data_df, init_year = inityear, end_year = endyear)
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'CervicalCancer', prevalence_data_df, init_year = inityear, end_year = endyear)
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ProstateCancer', prevalence_data_df, init_year = inityear, end_year = endyear)
-   
-    # # Example usage:
-    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear) 
-    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'ChronicKidneyDisease', prevalence_data_df, init_year = inityear, end_year = endyear) 
-    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'CervicalCancer', prevalence_data_df, init_year = inityear, end_year = endyear) 
-    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'ProstateCancer', prevalence_data_df, init_year = inityear, end_year = endyear) 
-    
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
-
-    mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear) 
