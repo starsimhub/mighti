@@ -128,6 +128,10 @@ def run_calib(calib_pars=None):
     # Perform the calibration
     sc.printcyan('\nPeforming calibration...')
     calib.calibrate()
+    
+    print(type(sim), hasattr(sim, "results"))
+    print(sim.results)
+
     calib.check_fit()
     calib.plot_optuna('plot_param_importances')
 
