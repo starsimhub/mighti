@@ -1,4 +1,5 @@
 import starsim as ss
+import stisim as sti
 import sciris as sc
 import mighti as mi
 import pandas as pd
@@ -9,8 +10,7 @@ import os
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
-beta = 0.001
-n_agents = 100000 # Number of agents in the simulation
+n_agents = 10_000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2024
 
@@ -82,32 +82,30 @@ pregnancy = ss.Pregnancy(pars=fertility_rate)
 ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
 
 # Initialize networks
-mf = ss.MFNet(duration=1/24, acts=80)
+# mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
-networks = [mf, maternal]
+structuredsexual = sti.StructuredSexual()
+networks = [maternal, structuredsexual]
 
 # -------------------------
 # Diseases
 # -------------------------
 
 # Initialize disease conditions
-hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
+hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
+                      init_prev_data=None,   
+                      # p_hiv_death=0, 
+                      # include_aids_deaths=False, 
+                      beta={'structuredsexual': [0.001, 0.001], 'maternal': [0.01, 0.01]})
 
-# Automatically create disease objects for all diseases
 disease_objects = []
 for disease in healthconditions:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
-    
-    # Dynamically get the disease class from `mi` module
     disease_class = getattr(mi, disease, None)
-    
     if disease_class:
         disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})
         disease_objects.append(disease_obj)
-    else:
-        print(f"[WARNING] {disease} is not found in `mighti` module. Skipping.")
-
-# Combine all disease objects including HIV
+        
 disease_objects.append(hiv_disease)
 
 # Initialize interaction objects for HIV-NCD interactions
@@ -139,15 +137,16 @@ def get_pregnancy_module(sim):
 if __name__ == '__main__':
     # Initialize the simulation with connectors and force=True
     sim = ss.Sim(
-        dt = 1/12,
+        dt=1/12,
         n_agents=n_agents,
         networks=networks,
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
-        diseases=disease_objects,
         start=inityear,
         stop=endyear,
         people=ppl,
         demographics=[pregnancy, death],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+        diseases=disease_objects,
+        interventions = [sti.ART()],
         connectors=interactions,
         copy_inputs=False,
         label='Connector'
@@ -168,10 +167,9 @@ if __name__ == '__main__':
     # Calculate mortality rates using `calculate_mortality_rates
     df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=year, max_age=100, radix=n_agents)
 
-    
     mi.plot_mortality_rates_comparison(
         df_metrics=df_mortality_rates, 
-        observed_death_data=observed_death_data, 
+        observed_data=observed_death_data, 
         observed_year=year, 
         year=year, 
         log_scale=True, 
@@ -186,5 +184,6 @@ if __name__ == '__main__':
     
     # Plot life expectancy comparison
     mi.plot_life_expectancy(life_table, observed_LE, year=year, max_age=100, figsize=(14, 10), title=None)
+
     
    

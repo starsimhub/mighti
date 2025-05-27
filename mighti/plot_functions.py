@@ -1012,26 +1012,136 @@ def plot_imr(observed_data_path, simulated_data, start_year, end_year):
     plt.grid(True)
     plt.show()
     
-def plot_mortality_rates_comparison(df_metrics, observed_data_path, observed_year=None, year=None, 
-                                    log_scale=True, figsize=(14, 10), title=None):
-    """
-    Plot comparison between simulated and observed mortality rates
+# def plot_mortality_rates_comparison(df_metrics, observed_data_path, observed_year=None, year=None, 
+#                                     log_scale=True, figsize=(14, 10), title=None):
+#     """
+#     Plot comparison between simulated and observed mortality rates
     
-    Args:
-        df_metrics: DataFrame with calculated mortality rates (mx)
-        observed_data_path: Path to the CSV file with observed mortality rates
-                            (columns: Time, Sex, AgeGrpStart, mx)
-        observed_year: Year to filter observed data (if None, will use simulated year)
-        year: Year to filter simulated data (if None, will use Time column from data)
-        log_scale: Whether to use log scale for mortality rates
-        figsize: Figure size (width, height) in inches
-        title: Custom title for the plot
+#     Args:
+#         df_metrics: DataFrame with calculated mortality rates (mx)
+#         observed_data_path: Path to the CSV file with observed mortality rates
+#                             (columns: Time, Sex, AgeGrpStart, mx)
+#         observed_year: Year to filter observed data (if None, will use simulated year)
+#         year: Year to filter simulated data (if None, will use Time column from data)
+#         log_scale: Whether to use log scale for mortality rates
+#         figsize: Figure size (width, height) in inches
+#         title: Custom title for the plot
         
+#     Returns:
+#         Figure and axes objects
+#     """
+#     # Load observed data
+#     observed_rates = pd.read_csv(observed_data_path)
+
+#     # Filter simulated data if year provided
+#     if year is not None:
+#         simulated_rates = df_metrics[df_metrics['year'] == year].copy()
+#     else:
+#         # Try to get year from the data
+#         years = df_metrics['year'].unique()
+#         if len(years) == 1:
+#             year = years[0]
+#         simulated_rates = df_metrics[df_metrics['year'] == year].copy()
+#         simulated_rates[simulated_rates['age']>90]
+    
+#     # Filter observed data by year
+#     if observed_year is None and year is not None:
+#         observed_year = year
+        
+#     if observed_year is not None:
+#         observed_rates = observed_rates[observed_rates['Time'] == observed_year].copy()
+
+#     # Extract unique age groups from observed data
+#     unique_ages = observed_rates['AgeGrpStart'].unique()
+#     # Create figure with two panels for male and female
+#     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
+#     plt.xticks(fontsize=20)
+#     plt.yticks(fontsize=20)
+#     # Plot male data
+#     male_sim = simulated_rates[simulated_rates['sex'] == 'Male'].sort_values('age')
+#     male_obs = observed_rates[observed_rates['Sex'] == 'Male'].sort_values('AgeGrpStart')
+    
+#     # Plot male mortality rates
+#     ax1.plot(male_sim['age'], male_sim['mx'], 'b-',   
+#              linewidth=6, alpha=0.5, label='Simulated Male')
+#     ax1.plot(male_obs['AgeGrpStart'], male_obs['mx'], 'b--', marker='s', markersize=8,
+#              linewidth=2, label='Observed Male')
+    
+#     # Plot female data
+#     female_sim = simulated_rates[simulated_rates['sex'] == 'Female'].sort_values('age')
+#     female_obs = observed_rates[observed_rates['Sex'] == 'Female'].sort_values('AgeGrpStart')
+    
+#     # Plot female mortality rates
+#     ax2.plot(female_sim['age'], female_sim['mx'], 'r-',
+#              linewidth=6, alpha=0.5, label='Simulated Female')
+#     ax2.plot(female_obs['AgeGrpStart'], female_obs['mx'], 'r--', marker='s', markersize=8, 
+#              linewidth=2,  label='Observed Female')
+    
+#     # Set axis scales
+#     if log_scale:
+#         ax1.set_yscale('log')
+#         ax2.set_yscale('log')
+#     else:
+#         ax1.set_ylim(0, 1)
+#         ax2.set_ylim(0, 1)        
+    
+#     # Set titles and labels for male panel
+#     ax1.set_title(f'Male', fontsize=28)
+#     ax1.set_ylabel('Mortality Rate (mx)', fontsize=24)
+#     ax1.tick_params(axis='both', which='major', labelsize=20)
+#     ax1.grid(True, which='both', alpha=0.3)
+    
+    
+#     # Set titles and labels for female panel
+#     ax2.set_title(f'Female', fontsize=28)
+#     ax2.set_xlabel('Age', fontsize=24)
+#     ax2.set_ylabel('Mortality Rate (mx)', fontsize=24)
+#     ax2.tick_params(axis='both', which='major', labelsize=20)
+#     ax2.grid(True, which='both', alpha=0.3)
+
+#     # Set overall title if provided
+#     if title:
+#         plt.suptitle(title, fontsize=28, y=0.98)
+#     else:
+#         plt.suptitle(f'Mortality Rates Comparison: Simulated vs Observed', fontsize=30, y=0.98)
+
+
+#     # Create unified legend
+#     handles, labels = [], []
+#     for ax in [ax1, ax2]:
+#         for handle, label in zip(*ax.get_legend_handles_labels()):
+#             if label not in labels:
+#                 handles.append(handle)
+#                 labels.append(label)
+
+#     fig.legend(handles, labels, loc='lower center', ncol=4, fontsize=20)
+    
+#     # Improve layout
+#     plt.tight_layout(rect=[0, 0, 1, 0.96])
+#     plt.subplots_adjust(bottom=0.15)
+#     plt.show()
+    
+#     return fig, (ax1, ax2)
+
+def plot_mortality_rates_comparison(df_metrics, observed_data, observed_year=None, year=None, 
+                                               log_scale=True, figsize=(14, 10), title=None):
+    """
+    Compare simulated and observed mortality rates using single-age data.
+
+    Args:
+        df_metrics (pd.DataFrame): Simulated data with columns ['year', 'sex', 'age', 'mx'].
+        observed_data (pd.DataFrame): Observed data with columns ['Time', 'Sex', 'Age', 'mx'].
+        observed_year (int, optional): Year of observed data to filter. Defaults to None.
+        year (int, optional): Year of simulated data to filter. Defaults to None.
+        log_scale (bool, optional): Whether to use a logarithmic scale for mortality rates. Defaults to True.
+        figsize (tuple, optional): Figure size for the plots. Defaults to (14, 10).
+        title (str, optional): Custom title for the plot. Defaults to None.
+
     Returns:
-        Figure and axes objects
+        fig, (ax1, ax2): Matplotlib figure and axes objects.
     """
     # Load observed data
-    observed_rates = pd.read_csv(observed_data_path)
+    observed_rates = observed_data
 
     # Filter simulated data if year provided
     if year is not None:
@@ -1042,7 +1152,6 @@ def plot_mortality_rates_comparison(df_metrics, observed_data_path, observed_yea
         if len(years) == 1:
             year = years[0]
         simulated_rates = df_metrics[df_metrics['year'] == year].copy()
-        simulated_rates[simulated_rates['age']>90]
     
     # Filter observed data by year
     if observed_year is None and year is not None:
@@ -1051,30 +1160,32 @@ def plot_mortality_rates_comparison(df_metrics, observed_data_path, observed_yea
     if observed_year is not None:
         observed_rates = observed_rates[observed_rates['Time'] == observed_year].copy()
 
-    # Extract unique age groups from observed data
-    unique_ages = observed_rates['AgeGrpStart'].unique()
+    # Extract unique ages from observed data
+    unique_ages = observed_rates['Age'].unique()
+    
     # Create figure with two panels for male and female
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
+    
     # Plot male data
     male_sim = simulated_rates[simulated_rates['sex'] == 'Male'].sort_values('age')
-    male_obs = observed_rates[observed_rates['Sex'] == 'Male'].sort_values('AgeGrpStart')
+    male_obs = observed_rates[observed_rates['Sex'] == 'Male'].sort_values('Age')
     
     # Plot male mortality rates
     ax1.plot(male_sim['age'], male_sim['mx'], 'b-',   
              linewidth=6, alpha=0.5, label='Simulated Male')
-    ax1.plot(male_obs['AgeGrpStart'], male_obs['mx'], 'b--', marker='s', markersize=8,
+    ax1.plot(male_obs['Age'], male_obs['mx'], 'b--', marker='s', markersize=8,
              linewidth=2, label='Observed Male')
     
     # Plot female data
     female_sim = simulated_rates[simulated_rates['sex'] == 'Female'].sort_values('age')
-    female_obs = observed_rates[observed_rates['Sex'] == 'Female'].sort_values('AgeGrpStart')
+    female_obs = observed_rates[observed_rates['Sex'] == 'Female'].sort_values('Age')
     
     # Plot female mortality rates
     ax2.plot(female_sim['age'], female_sim['mx'], 'r-',
              linewidth=6, alpha=0.5, label='Simulated Female')
-    ax2.plot(female_obs['AgeGrpStart'], female_obs['mx'], 'r--', marker='s', markersize=8, 
+    ax2.plot(female_obs['Age'], female_obs['mx'], 'r--', marker='s', markersize=8, 
              linewidth=2,  label='Observed Female')
     
     # Set axis scales
@@ -1091,7 +1202,6 @@ def plot_mortality_rates_comparison(df_metrics, observed_data_path, observed_yea
     ax1.tick_params(axis='both', which='major', labelsize=20)
     ax1.grid(True, which='both', alpha=0.3)
     
-    
     # Set titles and labels for female panel
     ax2.set_title(f'Female', fontsize=28)
     ax2.set_xlabel('Age', fontsize=24)
@@ -1104,7 +1214,6 @@ def plot_mortality_rates_comparison(df_metrics, observed_data_path, observed_yea
         plt.suptitle(title, fontsize=28, y=0.98)
     else:
         plt.suptitle(f'Mortality Rates Comparison: Simulated vs Observed', fontsize=30, y=0.98)
-
 
     # Create unified legend
     handles, labels = [], []
@@ -1121,7 +1230,7 @@ def plot_mortality_rates_comparison(df_metrics, observed_data_path, observed_yea
     plt.subplots_adjust(bottom=0.15)
     plt.show()
     
-    return fig, (ax1, ax2)
+    return fig, (ax1, ax2) 
 
 
 def plot_population_over_time(df, inityear, endyear, age_groups=None, nagent=50000, observed_data_path='demography/eswatini_age_distribution.csv'):
