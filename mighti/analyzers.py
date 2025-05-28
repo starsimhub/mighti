@@ -10,8 +10,14 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
         self.define_results(
             ss.Result('infant_deaths', label='Cumulative infant deaths', dtype=int),
             ss.Result('male_deaths_by_age', label='Number of male deaths by age', dtype=int, shape=101, ),
-            ss.Result('female_deaths_by_age', label='Number of female deaths by age', dtype=int, shape=101, )
+            ss.Result('female_deaths_by_age', label='Number of female deaths by age', dtype=int, shape=101,) 
         )
+        # n_timepoints = len(self.sim.t)
+        # self.define_results(
+        #     ss.Result('infant_deaths', label='Cumulative infant deaths', dtype=int, shape=n_timepoints),
+        #     ss.Result('male_deaths_by_age', label='Number of male deaths by age', dtype=int, shape=(101, n_timepoints)),
+        #     ss.Result('female_deaths_by_age', label='Number of female deaths by age', dtype=int, shape=(101, n_timepoints)),
+        # )
         return
 
 
