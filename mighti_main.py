@@ -8,8 +8,7 @@ import numpy as np
 import os
 
 ##### TO DO #####
-# Use HIV in stisim 
-# Incidence rate estimation 
+# Calibration 
 # Relative Risk implementation 
 
 
@@ -184,7 +183,7 @@ if __name__ == '__main__':
         demographics=[pregnancy, death],
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
-        # connectors=interactions,
+        connectors=interactions,
         # interventions = interventions,
         copy_inputs=False,
         label='Connector'
