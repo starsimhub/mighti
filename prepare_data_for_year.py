@@ -11,11 +11,13 @@ def prepare_data_for_year(year):
     if not os.path.exists(csv_path_death):
         # Load the mortality rates data
         csv_path_mortality_rates = os.path.join(script_dir, 'demography', 'eswatini_mortality_rates.csv')
-
         mortality_rates = pd.read_csv(csv_path_mortality_rates)
         
         # Extract rows for the specified year
         mortality_rates_year = mortality_rates[mortality_rates['Time'] == year]
+        
+        # Rename column 'Age' to 'AgeGrpStart'
+        mortality_rates_year = mortality_rates_year.rename(columns={'Age': 'AgeGrpStart'})
         
         # Save the extracted data to a new CSV file
         mortality_rates_year.to_csv(csv_path_death, index=False)
