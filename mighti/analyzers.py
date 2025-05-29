@@ -22,7 +22,7 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
         self.results.infant_deaths[ti] = len(people.dead[people.age < 1])
 
         for uid in people.dead.uids:
-            age = int(people.age[uid])
+            age = int(min(people.age[uid], 100))            
             if people.female[uid]:
                 self.results.female_deaths_by_age[age] += 1
             else:

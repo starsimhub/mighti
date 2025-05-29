@@ -18,10 +18,10 @@ class PrevalenceAnalyzer(ss.Analyzer):
         self.diseases = diseases
 
         # Define age bins
-        # self.age_bins = [(0, 15), (15, 20), (20, 25), (25, 30), (30, 35), (35, 40), (40, 45),
-        #                  (45, 50), (50, 55), (55, 60), (60, 65), (65, 70), (70, 75), (75, 80), (80, float('inf'))]
+        self.age_bins = [(0, 15), (15, 20), (20, 25), (25, 30), (30, 35), (35, 40), (40, 45),
+                          (45, 50), (50, 55), (55, 60), (60, 65), (65, 70), (70, 75), (75, 80), (80, float('inf'))]
         
-        self.age_bins = [(0, 15), (15, 30), (30, 45), (45, 60), (60, 75),  (75, float('inf'))]
+        # self.age_bins = [(0, 15), (15, 30), (30, 45), (45, 60), (60, 75),  (75, float('inf'))]
 
         self.results_defined = False
         # print(f"Initialized PrevalenceAnalyzer with diseases: {self.diseases}")

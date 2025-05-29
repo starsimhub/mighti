@@ -156,18 +156,10 @@ class RemittingDisease(ss.NCD):
         self.results.new_deaths[self.ti] = len(deaths)
 
     def step(self):
-        
-        if len(self.sim.people) == 0:
-            return
         ti = self.ti
-        # print(f"[DEBUG] {self.label} — people: {len(self.sim.people)}, affected: {np.count_nonzero(self.affected)}")
-        # print(f"[DEBUG] {self.label} — people: {len(self.sim.people)}, infected: {np.count_nonzero(self.infected)}")
 
         # New cases
         susceptible = (~self.affected).uids
-        if len(susceptible) == 0:
-            return
-
         new_cases = self.p_acquire.filter(susceptible)
         self.affected[new_cases] = True
         self.ti_affected[new_cases] = ti
