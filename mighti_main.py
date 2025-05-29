@@ -1,4 +1,5 @@
 import starsim as ss
+import stisim as sti
 import sciris as sc
 import mighti as mi
 import pandas as pd
@@ -15,10 +16,10 @@ import os
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
-beta = 0.001
-n_agents = 10_000 # Number of agents in the simulation
-inityear = 2007  # Simulation start year
-endyear = 2030
+n_agents = 100_000 # Number of agents in the simulation
+inityear = 2000  # Simulation start year
+endyear = 2002
+region = 'nyc'
 
 # ---------------------------------------------------------------------
 # Specify data file paths
@@ -26,25 +27,25 @@ endyear = 2030
 
 
 # Parameters
-csv_path_params = 'mighti/data/eswatini_parameters_gbd.csv'
+csv_path_params = f'mighti/data/{region}_parameters.csv'
 
 # Relative Risks
 csv_path_interactions = "mighti/data/rel_sus.csv"
 
 # Prevalence data
-csv_prevalence = 'mighti/data/prevalence_data_eswatini.csv'
+csv_prevalence = f'mighti/data/{region}_prevalence.csv'
 
 # Fertility data 
-csv_path_fertility = 'mighti/data/eswatini_asfr.csv'
+csv_path_fertility = f'mighti/data/{region}_asfr.csv'
 
 # Death data
-csv_path_death = f'mighti/data/eswatini_mortality_rates_{inityear}.csv'
+csv_path_death = f'mighti/data/{region}_mortality_rates_{inityear}.csv'
 
 # Age distribution data
-csv_path_age = f'mighti/data/eswatini_age_distribution_{inityear}.csv'
+csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
 
 import prepare_data_for_year
-prepare_data_for_year.prepare_data_for_year(inityear)
+prepare_data_for_year.prepare_data_for_year(inityear, region)
 
 # Load the mortality rates and ensure correct format
 mortality_rates_year = pd.read_csv(csv_path_death)
@@ -56,12 +57,8 @@ age_distribution_year = pd.read_csv(csv_path_age)
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
-# Extract all conditions except HIV
-# healthconditions = [condition for condition in df.condition if condition != "HIV"]
-healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
-# healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
-# 
 # Combine with HIV
+healthconditions = ['AlcoholUseDisorder']
 diseases = ["HIV"] + healthconditions
 
 # Filter the DataFrame for disease_class being 'ncd'
@@ -112,14 +109,22 @@ ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
 # Initialize networks
 mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
-networks = [mf, maternal]
+# structuredsexual = sti.StructuredSexual()
+networks = [maternal, mf]
+# networks = [maternal, structuredsexual]
 
 # -------------------------
 # Diseases
 # -------------------------
 
 # Initialize disease conditions
-hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta=beta)
+# hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
+#                       init_prev_data=None,   
+#                       p_hiv_death=0, 
+#                       include_aids_deaths=False, 
+#                       beta={'structuredsexual': [0.01, 0.01], 'maternal': [0.01, 0.01]})
+
+hiv_disease = ss.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')), beta = 0.0001)
 disease_objects = []
 for disease in healthconditions:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
@@ -143,7 +148,6 @@ connectors = mi.create_connectors(ncd_interactions)
 interactions.extend(connectors)
 
 
-
 def get_deaths_module(sim):
     for module in sim.modules:
         if isinstance(module, mi.DeathsByAgeSexAnalyzer):
@@ -160,6 +164,7 @@ def get_pregnancy_module(sim):
 if __name__ == '__main__':
     # Initialize the simulation with connectors and force=True
     sim = ss.Sim(
+        # dt=1/12,
         n_agents=n_agents,
         networks=networks,
         start=inityear,
@@ -168,31 +173,62 @@ if __name__ == '__main__':
         demographics=[pregnancy, death],
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
-        connectors=interactions,
+        # connectors=interactions,
         copy_inputs=False,
         label='Connector'
     )
  
-    # Run the simulation
-    sim.run()
+    # sim.init()
     
-    # # Plot the results for each simulation
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')  
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ChronicKidneyDisease')
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CervicalCancer')
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'ProstateCancer')
+    # for module in sim.modules:
+    #     if isinstance(module, sti.HIV):
+    #         hiv_module = module
+    #         break
+    # else:
+    #     raise RuntimeError("HIV module not found in sim.modules")
     
-    # Plot the results for each simulation
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear)  
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ChronicKidneyDisease', prevalence_data_df, init_year = inityear, end_year = endyear)
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'CervicalCancer', prevalence_data_df, init_year = inityear, end_year = endyear)
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'ProstateCancer', prevalence_data_df, init_year = inityear, end_year = endyear)
-   
-    # # Example usage:
-    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear) 
-    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'ChronicKidneyDisease', prevalence_data_df, init_year = inityear, end_year = endyear) 
-    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'CervicalCancer', prevalence_data_df, init_year = inityear, end_year = endyear) 
-    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'ProstateCancer', prevalence_data_df, init_year = inityear, end_year = endyear) 
+    # eligible = np.where((sim.people.age >= 15) & (sim.people.age < 50))[0]
+    # seed_count = min(50, len(eligible))
+    # seed_ids = np.random.choice(eligible, seed_count, replace=False)
+    # hiv_module.infected.raw[:] = False
+    # hiv_module.infected.raw[seed_ids] = True
+    # hiv_module.cd4.raw[seed_ids] = np.random.uniform(200, 600, size=seed_count)
     
+    # print(f"✅ Seeded {seed_count} HIV cases in age 15–49.")
     
+    # Step 5: Run simulation
+    sim.run() 
+
+    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
+
+    mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
     
+    # Get the modules
+    deaths_module = get_deaths_module(sim)
+    pregnancy_module = get_pregnancy_module(sim)
+    
+    year = 2009
+    
+    # Load observed mortality rate data
+    observed_death_data = pd.read_csv('demography/eswatini_mortality_rates.csv')
+    
+    # Calculate mortality rates using `calculate_mortality_rates
+    df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=year, max_age=100, radix=n_agents)
+
+    mi.plot_mortality_rates_comparison(
+        df_metrics=df_mortality_rates, 
+        observed_data=observed_death_data, 
+        observed_year=year, 
+        year=year, 
+        log_scale=True, 
+        title="Single-Age Mortality Rates Comparison"
+    )
+    # Create the life table
+    life_table = mi.create_life_table(df_mortality_rates, year=year, n_agents=n_agents, max_age=100)
+    print(life_table)
+    
+    # Load observed life expectancy data
+    observed_LE = pd.read_csv('demography/eswatini_life_expectancy_by_age.csv')
+    
+    # Plot life expectancy comparison
+    mi.plot_life_expectancy(life_table, observed_LE, year=year, max_age=100, figsize=(14, 10), title=None)

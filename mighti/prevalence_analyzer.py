@@ -18,8 +18,10 @@ class PrevalenceAnalyzer(ss.Analyzer):
         self.diseases = diseases
 
         # Define age bins
-        self.age_bins = [(0, 15), (15, 20), (20, 25), (25, 30), (30, 35), (35, 40), (40, 45),
-                         (45, 50), (50, 55), (55, 60), (60, 65), (65, 70), (70, 75), (75, 80), (80, float('inf'))]
+        # self.age_bins = [(0, 15), (15, 20), (20, 25), (25, 30), (30, 35), (35, 40), (40, 45),
+        #                  (45, 50), (50, 55), (55, 60), (60, 65), (65, 70), (70, 75), (75, 80), (80, float('inf'))]
+        
+        self.age_bins = [(0, 15), (15, 30), (30, 45), (45, 60), (60, 75),  (75, float('inf'))]
 
         self.results_defined = False
         # print(f"Initialized PrevalenceAnalyzer with diseases: {self.diseases}")
@@ -114,6 +116,8 @@ class PrevalenceAnalyzer(ss.Analyzer):
                 total_num_with_HIV += num_with_HIV_male + num_with_HIV_female
                 total_den_with_HIV += den_with_HIV_male + den_with_HIV_female
 
+                print(i)
+                print(disease)
                 print(f"Age group {age_start}-{age_end}: num_male={num_male}, den_male={den_male}, num_female={num_female}, den_female={den_female}")
 
                 self.results[f'{disease}_num_male_{i}'][ti] = num_male
