@@ -16,8 +16,8 @@ import os
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 n_agents = 100_000 # Number of agents in the simulation
-inityear = 2001  # Simulation start year
-endyear = 2003
+inityear = 2007  # Simulation start year
+endyear = 2010
 region = 'eswatini'
 
 # ---------------------------------------------------------------------
