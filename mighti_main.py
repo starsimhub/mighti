@@ -143,20 +143,6 @@ connectors = mi.create_connectors(ncd_interactions)
 # Add NCD-NCD connectors to interactions
 interactions.extend(connectors)
 
-# -------------------------
-# Interventions
-# -------------------------
-
-interventions = [
-    # Universal, high-probability annual HIV testing (ramping up in early 2010s)
-    sti.HIVTest(test_prob_data=[0.3, 0.7, 0.95], years=[2007, 2012, 2016]),
-    # Test and treat: ART for nearly all diagnosed from 2010 onward
-    sti.ART(pars={'future_coverage': {'year': 2010, 'prop': 0.95}}),
-    # VMMC scale-up: reach 30% by 2015
-    sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
-    # PrEP for high-risk (starts low, ramps up)
-    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]})
-]
 
 def get_deaths_module(sim):
     for module in sim.modules:
@@ -194,7 +180,8 @@ if __name__ == '__main__':
     
 
     mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'AlcoholUseDisorder', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Depression', prevalence_data_df, init_year = inityear, end_year = endyear)  
 
     # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
     
@@ -202,7 +189,7 @@ if __name__ == '__main__':
     deaths_module = get_deaths_module(sim)
     pregnancy_module = get_pregnancy_module(sim)
     
-    year = 2009
+    year = endyear
     
     # Load observed mortality rate data
     observed_death_data = pd.read_csv(f'demography/{region}_mortality_rates.csv')
