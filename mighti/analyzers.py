@@ -6,11 +6,13 @@ __all__ = ["DeathsByAgeSexAnalyzer"]
 class DeathsByAgeSexAnalyzer(ss.Analyzer):
 
     def init_results(self):
+        n_timepoints = len(self.sim.t)
+
         super().init_results()
         self.define_results(
             ss.Result('infant_deaths', label='Cumulative infant deaths', dtype=int),
-            ss.Result('male_deaths_by_age', label='Number of male deaths by age', dtype=int, shape=101, ),
-            ss.Result('female_deaths_by_age', label='Number of female deaths by age', dtype=int, shape=101, )
+            ss.Result('male_deaths_by_age', label='Number of male deaths by age', dtype=int, shape=(101, n_timepoints)),
+            ss.Result('female_deaths_by_age', label='Number of female deaths by age', dtype=int, shape=(101, n_timepoints))
         )
         return
 
@@ -24,6 +26,6 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
         for uid in people.dead.uids:
             age = int(people.age[uid])
             if people.female[uid]:
-                self.results.female_deaths_by_age[age] += 1
+                self.results.female_deaths_by_age[age, ti] += 1
             else:
-                self.results.male_deaths_by_age[age] += 1
+                self.results.male_deaths_by_age[age, ti] += 1

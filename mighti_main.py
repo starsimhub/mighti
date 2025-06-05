@@ -45,13 +45,13 @@ csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
 
 
 import prepare_data_for_year
-prepare_data_for_year.prepare_data_for_year(inityear)
+prepare_data_for_year.prepare_data_for_year(region,inityear)
 
-# Load the mortality rates and ensure correct format
-mortality_rates_year = pd.read_csv(csv_path_death)
+# # Load the mortality rates and ensure correct format
+# mortality_rates_year = pd.read_csv(csv_path_death)
 
-# Load the age distribution data for the specified year
-age_distribution_year = pd.read_csv(csv_path_age)
+# # Load the age distribution data for the specified year
+# age_distribution_year = pd.read_csv(csv_path_age)
 
 # Load parameters
 df = pd.read_csv(csv_path_params)
@@ -125,7 +125,7 @@ networks = [maternal, structuredsexual]
 # Initialize disease conditions
 hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
                       init_prev_data=None,   
-                      p_hiv_death=0.01, 
+                      p_hiv_death=None, 
                       include_aids_deaths=True, 
                       beta={'structuredsexual': [0.01, 0.01], 'maternal': [0.01, 0.01]})
 disease_objects = []
@@ -181,7 +181,7 @@ def get_pregnancy_module(sim):
 if __name__ == '__main__':
     # Initialize the simulation with connectors and force=True
     sim = ss.Sim(
-        dt=1/12,
+        # dt=1,
         n_agents=n_agents,
         networks=networks,
         start=inityear,
@@ -191,7 +191,7 @@ if __name__ == '__main__':
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
         # connectors=interactions,
-        # interventions = interventions,
+        interventions = interventions,
         copy_inputs=False,
         label='Connector'
     )
@@ -202,34 +202,29 @@ if __name__ == '__main__':
 
     mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
 
-    mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
     
-    # # Get the modules
-    # deaths_module = get_deaths_module(sim)
-    # pregnancy_module = get_pregnancy_module(sim)
+    # Get the modules
+    deaths_module = get_deaths_module(sim)
+    pregnancy_module = get_pregnancy_module(sim)
     
-    # year = 2003
+    target_year = 2009
     
-    # # Load observed mortality rate data
-    # observed_death_data = pd.read_csv('demography/eswatini_mortality_rates.csv')
+    # Load observed mortality rate data
+    mx_path = f'demography/{region}_mx.csv'
+    ex_path = f'demography/{region}_ex.csv'
     
-    # # Calculate mortality rates using `calculate_mortality_rates
-    # df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=year, max_age=100, radix=n_agents)
+    obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
+    obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
+    
+    # Calculate mortality rates using `calculate_mortality_rates
+    df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
 
-    # mi.plot_mortality_rates_comparison(
-    #     df_metrics=df_mortality_rates, 
-    #     observed_data=observed_death_data, 
-    #     observed_year=year, 
-    #     year=year, 
-    #     log_scale=True, 
-    #     title="Single-Age Mortality Rates Comparison"
-    # )
-    # # Create the life table
-    # life_table = mi.create_life_table(df_mortality_rates, year=year, n_agents=n_agents, max_age=100)
-    # print(life_table)
+    mi.plot_mx_comparison(df_mortality_rates, obs_mx, year=target_year, age_interval=5)
+
+    # Create the life table
+    life_table = mi.create_life_table(df_mortality_rates, year=target_year, n_agents=n_agents, max_age=100)
+    print(life_table)
     
-    # # Load observed life expectancy data
-    # observed_LE = pd.read_csv('demography/eswatini_life_expectancy_by_age.csv')
-    
-    # # Plot life expectancy comparison
-    # mi.plot_life_expectancy(life_table, observed_LE, year=year, max_age=100, figsize=(14, 10), title=None)
+    # Plot life expectancy comparison
+    mi.plot_life_expectancy(life_table, obs_ex, year=target_year, max_age=100, figsize=(14, 10), title=None)

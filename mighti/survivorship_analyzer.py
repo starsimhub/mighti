@@ -17,8 +17,22 @@ class SurvivorshipAnalyzer(ss.Analyzer):
     # def init_post(self):
     #     self.survivorship_data = np.zeros(shape=(self.max_age, 2))
 
+
+    def init_results(self):
+        n_timepoints = len(self.sim.t)
+        self.survivorship_data = {
+            'Male': np.zeros((self.max_age, n_timepoints)),
+            'Female': np.zeros((self.max_age, n_timepoints))
+        }
+        
+        
+        
     def step(self):
         ppl = self.sim.people
+        # for age in range(self.max_age):
+        #     for sex in ['Male', 'Female']:
+        #         self.survivorship_data[sex][age] += len(ppl.age[(ppl.age >= age) & (ppl.age < age+1) & (ppl.female == (sex=='Female'))])
         for age in range(self.max_age):
             for sex in ['Male', 'Female']:
-                self.survivorship_data[sex][age] += len(ppl.age[(ppl.age >= age) & (ppl.age < age+1) & (ppl.female == (sex=='Female'))])
+                count = len(ppl.age[(ppl.age >= age) & (ppl.age < age+1) & (ppl.female == (sex=='Female'))])
+                self.survivorship_data[sex][age, self.ti] = count

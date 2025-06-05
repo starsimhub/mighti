@@ -20,10 +20,12 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
     if len(timestep_indices) == 0:
         raise ValueError(f"No simulation time steps found for year {year}")
 
+    dt = float(sim.t.dt)  # timestep duration in years
+
     # Prepare arrays
-    deaths_male = np.array(deaths_module.results.male_deaths_by_age)  # [age, timestep]
+    deaths_male = np.array(deaths_module.results.male_deaths_by_age) 
     deaths_female = np.array(deaths_module.results.female_deaths_by_age)
-    surv_male = np.array(sim.analyzers.survivorship_analyzer.survivorship_data['Male'])  # [age, timestep]
+    surv_male = np.array(sim.analyzers.survivorship_analyzer.survivorship_data['Male'])  
     surv_female = np.array(sim.analyzers.survivorship_analyzer.survivorship_data['Female'])
 
     # Defensive shape checks
@@ -35,12 +37,15 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
         ('Female', deaths_female, surv_female)
     ]:
         for age in range(n_ages):
-            # Aggregate deaths for this age over all timesteps in the year
+            
+            # year_indices = np.where(sim.t.yearvec == year)[0]
             deaths_in_year = deaths[age, timestep_indices].sum()
-            # For person-years: average population at this age * length of year (should be 1.0 if yearvec is in years)
-            # If dt is months, sum population at each timestep * dt
-            dt = float(getattr(sim.t, 'dt', 1.0))
             person_years = surv[age, timestep_indices].sum() * dt
+
+            # deaths_in_year = deaths[age, timestep_indices].sum()
+            # dt = float(getattr(sim.t, 'dt', 1.0))
+            # person_years = surv[age, timestep_indices].sum() * dt
+            
             mx = deaths_in_year / person_years if person_years > 0 else 0
             mortality_rates.append({'year': year, 'age': age, 'sex': sex, 'mx': mx})
     return pd.DataFrame(mortality_rates)
@@ -86,7 +91,7 @@ def calculate_life_table(df_mortality_rates, n_agents=100000, sex='Female', max_
     # Calculate life table columns
     for age in range(max_age + 1):
         # Get mortality rate for this age
-        mort_rate = age_to_mx[age]
+        mort_rate = age_to_mx[age] /12
 
         # Store age and mortality rate
         ages.append(age)
@@ -109,7 +114,7 @@ def calculate_life_table(df_mortality_rates, n_agents=100000, sex='Female', max_
         # Calculate person-years lived in this interval
         if age == 0:
             # For age 0, use a factor like 0.3 instead of 0.5
-            L_x_value = 0.3 * current_l_x + 0.7 * next_l_x
+            L_x_value = 0.2 * current_l_x + 0.8 * next_l_x
         else:
             L_x_value = 0.5 * (current_l_x + next_l_x)
         L_x.append(L_x_value)

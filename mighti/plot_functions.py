@@ -284,130 +284,6 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
     plt.grid()
     
     plt.show()
-    
-# def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year):
-#     """
-#     Plot mean prevalence over time for a given disease and both sexes, including observed data points.
-#     Calculate and print the mean prevalence over the specified range of years.
-
-#     Parameters:
-#     - sim: The simulation object (provides `sim.timevec`)
-#     - prevalence_analyzer: The prevalence analyzer with stored results
-#     - disease: Name of the disease (e.g., 'HIV', 'Type2Diabetes')
-#     - prevalence_data_df: The DataFrame containing observed prevalence data
-#     - init_year: The initial year of the simulation
-#     - end_year: The end year of the simulation
-#     """
-
-#     # Extract male and female prevalence numerators and denominators
-#     def extract_results(key_pattern):
-#         return [prevalence_analyzer.results.get(f'{disease}_{key_pattern}_{i}', np.zeros(len(sim.timevec))) for i in range(len(prevalence_analyzer.age_bins))]
-
-#     male_num = np.sum(extract_results('num_male'), axis=0)
-#     female_num = np.sum(extract_results('num_female'), axis=0)
-#     male_den = np.sum(extract_results('den_male'), axis=0)
-#     female_den = np.sum(extract_results('den_female'), axis=0)
-
-#     # Ensure the arrays are the correct length (44)
-#     sim_length = len(sim.timevec)
-#     if len(male_num) != sim_length:
-#         male_num = np.zeros(sim_length)
-#     if len(female_num) != sim_length:
-#         female_num = np.zeros(sim_length)
-#     if len(male_den) != sim_length:
-#         male_den = np.zeros(sim_length)
-#     if len(female_den) != sim_length:
-#         female_den = np.zeros(sim_length)
-
-#     # Check for division by zero
-#     male_den[male_den == 0] = 1
-#     female_den[female_den == 0] = 1
-
-#     # Compute mean prevalence across all age groups
-#     mean_prevalence_male = np.nan_to_num(male_num / male_den) * 100
-#     mean_prevalence_female = np.nan_to_num(female_num / female_den) * 100
-
-
-#     # Add this right after the line that prints mean prevalence
-#     print("\nChecking raw prevalence values:")
-#     age_bins = list(range(15))  # Assuming 15 age bins
-#     timepoints = list(range(len(prevalence_analyzer.results['Type2Diabetes_num_male_0'])))
-#     for t in timepoints[:3]:  # Just look at first 3 timepoints
-#         year = 2007 + t
-#         total_male_num = 0
-#         total_male_den = 0
-#         for age_bin in age_bins:
-#             num_key = f'Type2Diabetes_num_male_{age_bin}'
-#             den_key = f'Type2Diabetes_den_male_{age_bin}'
-#             if num_key in prevalence_analyzer.results and den_key in prevalence_analyzer.results:
-#                 num = prevalence_analyzer.results[num_key][t]
-#                 den = prevalence_analyzer.results[den_key][t]
-#                 total_male_num += num
-#                 total_male_den += den
-        
-#         # Calculate prevalence two ways
-#         raw_prev = total_male_num / (total_male_num + total_male_den) if (total_male_num + total_male_den) > 0 else 0
-#         print(f"Year {year}: Male prevalence = {raw_prev:.6f} (raw) = {raw_prev*100:.4f}%")
-#     # Filter the data based on init_year and end_year
-#     years = np.arange(init_year, end_year + 1)
-#     mask = (sim.timevec >= init_year) & (sim.timevec <= end_year)
-
-#     # Calculate the mean prevalence over the specified range of years
-#     mean_prevalence_male_over_years = np.mean(mean_prevalence_male[mask])
-#     mean_prevalence_female_over_years = np.mean(mean_prevalence_female[mask])
-#     print(f"Mean Male Prevalence for {disease} from {init_year} to {end_year}: {mean_prevalence_male_over_years:.2f}%")
-#     print(f"Mean Female Prevalence for {disease} from {init_year} to {end_year}: {mean_prevalence_female_over_years:.2f}%")
-
-#     # Create figure
-#     plt.figure(figsize=(10, 5))
-
-#     # Plot mean prevalence for males and females
-#     plt.plot(sim.timevec[mask], mean_prevalence_male[mask], label=f'Male {disease.capitalize()} Prevalence (Total)', linewidth=5, color='blue', linestyle='solid')
-#     plt.plot(sim.timevec[mask], mean_prevalence_female[mask], label=f'Female {disease.capitalize()} Prevalence (Total)', linewidth=5, color='red', linestyle='solid')
-
-#     # Plot observed prevalence data if available
-#     if prevalence_data_df is not None:
-#         male_col = f'{disease}_male'
-#         female_col = f'{disease}_female'
-
-#         # Check if columns for observed male and female prevalence exist
-#         if male_col in prevalence_data_df.columns:
-#             # Drop NaN values from both Year and male prevalence data
-#             observed_male_data = prevalence_data_df[['Year', male_col]].dropna()
-#             observed_male_data = observed_male_data.groupby('Year', as_index=False).mean()
-#             observed_male_data[male_col] *= 100
-#             print(f"Observed Male Data for {disease}:\n", observed_male_data)
-
-#             # Filter observed data based on init_year and end_year
-#             observed_male_data = observed_male_data[(observed_male_data['Year'] >= init_year) & (observed_male_data['Year'] <= end_year)]
-
-#             # Plot observed male data
-#             plt.scatter(observed_male_data['Year'], observed_male_data[male_col], 
-#                         color='blue', marker='o', edgecolor='black', s=100, 
-#                         label='Observed Male Prevalence')
-
-#         if female_col in prevalence_data_df.columns:
-#             # Drop NaN values from both Year and female prevalence data
-#             observed_female_data = prevalence_data_df[['Year', female_col]].dropna()
-#             observed_female_data = observed_female_data.groupby('Year', as_index=False).mean()
-#             observed_female_data[female_col] *= 100
-
-#             # Filter observed data based on init_year and end_year
-#             observed_female_data = observed_female_data[(observed_female_data['Year'] >= init_year) & (observed_female_data['Year'] <= end_year)]
-
-#             # Plot observed female data
-#             plt.scatter(observed_female_data['Year'], observed_female_data[female_col], 
-#                         color='red', marker='o', edgecolor='black', s=100, 
-#                         label='Observed Female Prevalence')
-        
-#     # Labels and title
-#     plt.legend()
-#     plt.xlabel('Year')
-#     plt.ylabel(f'{disease.capitalize()} Prevalence (%)')
-#     plt.title(f'Mean {disease.capitalize()} Prevalence Over Time (All Ages)')
-#     plt.grid()
-    
-#     plt.show()
 
 
 def plot_age_group_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year, age_groups=None):
@@ -739,244 +615,164 @@ def plot_simulated_death_counts(death_tracker, year=None, age_interval=5, smooth
     return death_counts
 
 
-def plot_death_counts_comparison(death_tracker, observed_death_csv, year, age_interval=5, figsize=(14, 10)):
+
+
+
+def plot_dx_comparison(sim_mx_df, observed_mx_csv, year, age_interval=5, figsize=(14, 10)):
     """
-    Plot simulated death counts and overlay observed death counts from data
-    
+    Plot simulated and observed mx (mortality rate) by age for a given year as lines.
+    Simulated: thick solid line, Observed: dashed line with markers.
+
     Args:
-        death_tracker: The DeathTracker instance
-        observed_death_csv: Path to CSV file with observed death data
-                          (This file contains deaths in thousands)
-        year: Year to plot and compare (must be a year that exists in observed data)
-        age_interval: Group ages by this interval (e.g., 5 for 5-year age groups)
-        figsize: Figure size (width, height) in inches
+        sim_mx_df: DataFrame with ['year', 'age', 'sex', 'mx'] from simulation
+        observed_mx_csv: Path to CSV with ['Time', 'Sex', 'Age', 'mx'] per row
+        year: Year to plot (should be present in both data sources)
+        age_interval: Plot in this age grouping (default 5)
+        figsize: Figure size
     """
-    # Get simulated death counts
-    sim_death_counts = death_tracker.get_death_counts(year)
+    observed = pd.read_csv(observed_mx_csv)
+    sexes = ['Male', 'Female']
+    colors = {'Male': 'blue', 'Female': 'red'}
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
+    axes = [ax1, ax2]
     
-    # Load observed death data (values are in thousands)
-    try:
-        observed_death = pd.read_csv(observed_death_csv)
-    except Exception as e:
-        print(f"Error loading observed death data: {e}")
-        return
-    
-    # Check if the requested year exists in the data
-    year_str = str(year)
-    if year_str not in observed_death.columns:
-        print(f"Year {year} not found in observed death data")
-        available_years = [col for col in observed_death.columns if col not in ['age', 'sex']]
-        print(f"Available years: {available_years}")
-        return
-    
-    # Group simulated deaths if requested
-    if age_interval > 1:
-        grouped_sim_male = {}
-        grouped_sim_female = {}
-        for age_start in range(0, 101, age_interval):
-            age_end = min(age_start + age_interval, 101)
-            age_label = age_start
-            
-            # Sum deaths in this age group
-            male_sum = sum(sim_death_counts['Male'].get(age, 0) for age in range(age_start, age_end))
-            female_sum = sum(sim_death_counts['Female'].get(age, 0) for age in range(age_start, age_end))
-            
-            grouped_sim_male[age_label] = male_sum
-            grouped_sim_female[age_label] = female_sum
-        
-        # Replace with grouped data
-        sim_death_counts = {
-            'Male': grouped_sim_male,
-            'Female': grouped_sim_female
-        }
-    
-    # Extract simulated ages and death counts
-    sim_ages = sorted(sim_death_counts['Male'].keys())
-    sim_male_counts = [sim_death_counts['Male'][age] for age in sim_ages]
-    sim_female_counts = [sim_death_counts['Female'][age] for age in sim_ages]
-    
-    # Get current simulation population and its structure
-    total_sim_population = len(death_tracker.sim.people)
-    sim_alive = death_tracker.sim.people.alive
-    sim_female = death_tracker.sim.people.female
-    sim_male_pop = (~sim_female & sim_alive).sum()
-    sim_female_pop = (sim_female & sim_alive).sum()
-    
-    # Calculate the estimated Eswatini population based on the UN data
-    # Assuming the death data is representative of a ~1.2 million population
-    # These are rough estimates based on Eswatini demographics
-    eswatini_pop = 1_200_000
-    eswatini_male_pop = 600_000
-    eswatini_female_pop = 600_000
-    
-    # Calculate scaling factors for males and females separately
-    male_scaling = (eswatini_male_pop / sim_male_pop) / 1000  # Divide by 1000 because observed data is in thousands
-    female_scaling = (eswatini_female_pop / sim_female_pop) / 1000
-    
-    # Scale simulated counts to match observed data units (thousands) and population size
-    sim_male_counts_scaled = [count * male_scaling for count in sim_male_counts]
-    sim_female_counts_scaled = [count * female_scaling for count in sim_female_counts]
-    
-    # Group observed deaths in the same age intervals
-    observed_male = observed_death[observed_death['sex'] == 'Male']
-    observed_female = observed_death[observed_death['sex'] == 'Female']
-    
-    obs_male_counts = []
-    obs_female_counts = []
-    obs_ages = []
-    
-    for age_start in range(0, 101, age_interval):
-        age_end = min(age_start + age_interval, 101)
-        
-        # Filter observed data for this age group
-        male_age_group = observed_male[(observed_male['age'] >= age_start) & (observed_male['age'] < age_end)]
-        female_age_group = observed_female[(observed_female['age'] >= age_start) & (observed_female['age'] < age_end)]
-        
-        # Sum deaths in this age group
-        male_sum = male_age_group[year_str].sum() if not male_age_group.empty else 0
-        female_sum = female_age_group[year_str].sum() if not female_age_group.empty else 0
-        
-        obs_ages.append(age_start)
-        obs_male_counts.append(male_sum)
-        obs_female_counts.append(female_sum)
-    
-    # Create figure with two panels for male and female
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize)
-    
-    # Plot male data
-    ax1.bar(obs_ages, obs_male_counts, width=age_interval*0.8, alpha=0.6, 
-            color='blue', label=f'Observed Male ({year}) [thousands]')
-    ax1.plot(sim_ages, sim_male_counts_scaled, 'bo-', markersize=6, linewidth=2,
-             label=f'Simulated Male (scaled) [thousands]')
-    
-    ax1.set_title(f'Male Death Counts Comparison for {year}', fontsize=16)
-    ax1.set_ylabel('Deaths (thousands)', fontsize=14)
-    ax1.grid(True, alpha=0.3)
-    ax1.legend()
-    
-    # Plot female data
-    ax2.bar(obs_ages, obs_female_counts, width=age_interval*0.8, alpha=0.6,
-            color='red', label=f'Observed Female ({year}) [thousands]')
-    ax2.plot(sim_ages, sim_female_counts_scaled, 'ro-', markersize=6, linewidth=2, 
-             label=f'Simulated Female (scaled) [thousands]')
-    
-    ax2.set_title(f'Female Death Counts Comparison for {year}', fontsize=16)
-    ax2.set_xlabel('Age', fontsize=14)
-    ax2.set_ylabel('Deaths (thousands)', fontsize=14)
-    ax2.grid(True, alpha=0.3)
-    ax2.legend()
-    
-    # Improve layout
+    for i, sex in enumerate(sexes):
+        color = colors[sex]
+        # Simulated: filter for year and sex, group by age interval
+        sim_df = sim_mx_df[(sim_mx_df['sex'] == sex) & (sim_mx_df['year'] == year)][['age', 'mx']].copy()
+        sim_df['age_group'] = (sim_df['age'] // age_interval) * age_interval
+        sim_mx_grouped = sim_df.groupby('age_group')['mx'].mean().reset_index()
+
+        # Observed: filter for year and sex, group by age interval
+        obs_df = observed[(observed['Sex'] == sex) & (observed['Time'] == year)][['Age', 'mx']].copy()
+        obs_df['age_group'] = (obs_df['Age'] // age_interval) * age_interval
+        obs_mx_grouped = obs_df.groupby('age_group')['mx'].mean().reset_index()
+
+        ax = axes[i]
+        # Simulated: thick solid line
+        ax.plot(sim_mx_grouped['age_group'], sim_mx_grouped['mx'], linestyle='-', linewidth=8, alpha=0.4,
+                color=color, label='Simulated')
+        # Observed: dashed line with markers
+        ax.plot(obs_mx_grouped['age_group'], obs_mx_grouped['mx'], marker='s', linestyle='--', linewidth=2,
+                markersize=8, color=color, label='Observed')
+
+        ax.set_title(f"{sex} Mortality Rate (mx) Comparison, {year}", fontsize=16)
+        ax.set_ylabel('mx (deaths per person-year)', fontsize=14)
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+
+    axes[-1].set_xlabel('Age Group', fontsize=14)
     plt.tight_layout()
     plt.show()
     
-    # Calculate death rates for comparison
-    total_obs_male_deaths = sum(obs_male_counts) * 1000  # Convert back from thousands
-    total_obs_female_deaths = sum(obs_female_counts) * 1000
     
-    obs_male_rate = total_obs_male_deaths / eswatini_male_pop
-    obs_female_rate = total_obs_female_deaths / eswatini_female_pop
-    
-    total_sim_male_deaths = sum(sim_male_counts)
-    total_sim_female_deaths = sum(sim_female_counts)
-    
-    sim_male_rate = total_sim_male_deaths / sim_male_pop
-    sim_female_rate = total_sim_female_deaths / sim_female_pop
-    
-    # Print summary statistics
-    print(f"\nSummary of death counts comparison for year {year}:")
-    print(f"Observed deaths - Male: {sum(obs_male_counts):.3f}k, Female: {sum(obs_female_counts):.3f}k")
-    print(f"Simulated deaths - Male: {total_sim_male_deaths}, Female: {total_sim_female_deaths}")
-    
-    print(f"\nDeath rates comparison:")
-    print(f"Observed - Male: {obs_male_rate:.4f}, Female: {obs_female_rate:.4f}")
-    print(f"Simulated - Male: {sim_male_rate:.4f}, Female: {sim_female_rate:.4f}")
-    print(f"Rate ratio - Male: {sim_male_rate/obs_male_rate:.2f}x, Female: {sim_female_rate/obs_female_rate:.2f}x")
-    
-    print(f"\nScaling factors applied:")
-    print(f"Male: {male_scaling:.6f}, Female: {female_scaling:.6f}")
-    
-    # Return the comparison data
-    comparison_data = {
-        'simulated': {
-            'male': sim_male_counts,
-            'female': sim_female_counts,
-            'male_scaled': sim_male_counts_scaled,
-            'female_scaled': sim_female_counts_scaled,
-            'ages': sim_ages
-        },
-        'observed': {
-            'male': obs_male_counts,
-            'female': obs_female_counts,
-            'ages': obs_ages
-        },
-        'scaling_factors': {'male': male_scaling, 'female': female_scaling}
-    }
-    
-    return comparison_data
 
+def plot_mx_comparison(sim_mx_df, observed_mx_csv, year, age_interval=5, figsize=(14, 10)):
+    """
+    Plot simulated and observed mx (mortality rate) by age group for a given year,
+    using the output of calculate_mortality_rates.
+
+    Args:
+        sim_mx_df: DataFrame from calculate_mortality_rates with ['year', 'age', 'sex', 'mx']
+        observed_mx_csv: Path to observed mx CSV with columns ['Time', 'Sex', 'Age', 'mx']
+        year: Year to plot (should be present in both data sources)
+        age_interval: Plot in this age grouping (default 5)
+        figsize: Figure size
+    """
+    observed = observed_mx_csv
+    sexes = ['Male', 'Female']
+    colors = {'Male': 'blue', 'Female': 'red'}
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
+    axes = [ax1, ax2]
+    
+    for i, sex in enumerate(sexes):
+        color = colors[sex]
+        # Simulated: filter for year and sex, group by age interval
+        sim_df = sim_mx_df[(sim_mx_df['sex'] == sex) & (sim_mx_df['year'] == year)][['age', 'mx']].copy()
+        sim_df['age_group'] = (sim_df['age'] // age_interval) * age_interval
+        sim_mx_grouped = sim_df.groupby('age_group')['mx'].mean().reset_index()
+
+        # Observed: filter for year and sex, group by age interval
+        obs_df = observed[(observed['Sex'] == sex) & (observed['Time'] == year)][['Age', 'mx']].copy()
+        obs_df['age_group'] = (obs_df['Age'] // age_interval) * age_interval
+        obs_mx_grouped = obs_df.groupby('age_group')['mx'].mean().reset_index()
+
+        ax = axes[i]
+        ax.set_yscale('log')  # ← log scale here
+
+        # Simulated: thick solid line
+        ax.plot(sim_mx_grouped['age_group'], sim_mx_grouped['mx'],
+                linestyle='-', linewidth=8, alpha=0.4, color=color, label='Simulated')
+        # Observed: dashed line with markers
+        ax.plot(obs_mx_grouped['age_group'], obs_mx_grouped['mx'],
+                marker='s', linestyle='--', linewidth=2, markersize=8,
+                color=color, label='Observed')
+        ax.set_title(f"{sex} Mortality Rate (mx) Comparison, {year}", fontsize=16)
+        ax.set_ylabel('mx (deaths per person-year)', fontsize=14)
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+
+    axes[-1].set_xlabel('Age Group', fontsize=14)
+    plt.tight_layout()
+    plt.show()    
+    
 
 def plot_life_expectancy(life_table, observed_data, year, max_age=100, figsize=(14, 10), title=None):
     """
-    Plot life expectancy for each age for a given year in two panels: one for males and one for females.
-    Overlay observed life expectancy data with simulated data.
-    
+    Plot simulated and observed life expectancy by age and sex for a given year.
+
     Args:
-        life_table: DataFrame containing the complete life table
-        observed_data: DataFrame containing the observed life expectancy data
-        year: Year to filter the data
-        max_age: Maximum age to consider (default 100)
-        figsize: Figure size (width, height) in inches
-        title: Custom title for the plot
-        
-    Returns:
-        Figure and axes objects
+        life_table: DataFrame from simulation with ['Age', 'e(x)', 'sex', 'year']
+        observed_data: Long-format DataFrame with ['Age', 'Sex', 'Time', 'ex']
+        year: Year to filter
+        max_age: Maximum age to plot
+        figsize: Size of the figure
+        title: Optional plot title
     """
-    # Filter the life table for the given year
-    if 'Time' in life_table.columns:
-        life_table = life_table[life_table['Time'] == year]
-    
-    # Separate life table by sex
-    male_life_table = life_table[life_table['sex'] == 'Male']
-    female_life_table = life_table[life_table['sex'] == 'Female']
-    
-    # Filter observed data for the given year
-    observed_data_year = observed_data[['age', 'sex', str(year)]].copy()
-    observed_male = observed_data_year[observed_data_year['sex'] == 'Male']
-    observed_female = observed_data_year[observed_data_year['sex'] == 'Female']
-    
-    # Create figure with two panels for male and female
+    # Filter life table
+    life_table_year = life_table[life_table['year'] == year]
+
+    # Filter observed data
+    observed_year = observed_data[observed_data['Time'] == year]
+
+    # Split by sex
+    male_sim = life_table_year[life_table_year['sex'] == 'Male']
+    female_sim = life_table_year[life_table_year['sex'] == 'Female']
+    male_obs = observed_year[observed_year['Sex'] == 'Male']
+    female_obs = observed_year[observed_year['Sex'] == 'Female']
+
+    # Plot
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
-    
-    # Plot male life expectancy
-    ax1.plot(male_life_table['Age'], male_life_table['e(x)'], linestyle='-', linewidth=8, alpha=0.4, color='blue', label='Simulated')
-    ax1.plot(observed_male['age'], observed_male[str(year)], marker='s', linestyle='--', linewidth=2, markersize=8, color='blue', label='Observed')
+
+    # Male
+    ax1.plot(male_sim['Age'], male_sim['e(x)'], '-', linewidth=8, alpha=0.4, color='blue', label='Simulated')
+    ax1.plot(male_obs['Age'], male_obs['ex'], 's--', linewidth=2, markersize=8, color='blue', label='Observed')
     ax1.set_title('Male', fontsize=28)
     ax1.set_ylabel('Life Expectancy (years)', fontsize=24)
-    ax1.tick_params(axis='both', which='major', labelsize=20)
+    ax1.tick_params(labelsize=20)
     ax1.grid(True, alpha=0.3)
-    ax1.legend(fontsize=24)
-    
-    # Plot female life expectancy
-    ax2.plot(female_life_table['Age'], female_life_table['e(x)'], linestyle='-', linewidth=8, alpha=0.4, color='red', label='Simulated')
-    ax2.plot(observed_female['age'], observed_female[str(year)], marker='s', linestyle='--', linewidth=2, markersize=8, color='red', label='Observed')
+    ax1.legend(fontsize=20)
+
+    # Female
+    ax2.plot(female_sim['Age'], female_sim['e(x)'], '-', linewidth=8, alpha=0.4, color='red', label='Simulated')
+    ax2.plot(female_obs['Age'], female_obs['ex'], 's--', linewidth=2, markersize=8, color='red', label='Observed')
     ax2.set_title('Female', fontsize=28)
     ax2.set_xlabel('Age', fontsize=24)
     ax2.set_ylabel('Life Expectancy (years)', fontsize=24)
-    ax2.tick_params(axis='both', which='major', labelsize=20)
+    ax2.tick_params(labelsize=20)
     ax2.grid(True, alpha=0.3)
-    ax2.legend(fontsize=24)
-    
-    # Set overall title if provided
+    ax2.legend(fontsize=20)
+
+    # Title
     if title:
         plt.suptitle(title, fontsize=24, y=0.98)
     else:
-        plt.suptitle(f'Life Expectancy by Age for {year}', fontsize=24, y=0.98)
-    
+        plt.suptitle(f'Life Expectancy by Age in {year}', fontsize=24, y=0.98)
+
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.subplots_adjust(bottom=0.1)
     plt.show()
-    
+
     return fig, (ax1, ax2)
 
 
