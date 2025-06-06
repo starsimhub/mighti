@@ -1,22 +1,13 @@
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+"""
+Test calibration
+"""
+
+#%% Imports and settings
 import starsim as ss
-import stisim as sti
-import mighti as mi
-import pandas as pd
 import sciris as sc
-
-# Save the original method
-original_to_df = ss.Sim.to_df
-
-def patched_to_df(self, resample=None, *args, **kwargs):
-    # Patch invalid resample frequencies to 'A' (year-end)
-    if resample in ('year', 'YE', '1YE'):
-        resample = 'A'
-    return original_to_df(self, resample=resample, *args, **kwargs)
-
-ss.Sim.to_df = patched_to_df
+import stisim as sti
+import pandas as pd
+import mighti as mi
 
 do_plot = 1
 do_save = 0
@@ -26,16 +17,22 @@ n_agents = 2e3
 debug = True  # If True, this will do smaller runs that can be run locally for debugging
 do_save = True
 
+def ret(*values):
+    return values if __name__ == 'main' else None
+
 n_agents = 10_000
 inityear = 2007
 endyear = 2011
-csv_prevalence = "test_data/eswatini_hiv.csv"
-csv_path_age = f'../mighti/data/eswatini_age_distribution_{inityear}.csv'
-csv_path_fertility = '../mighti/data/eswatini_asfr.csv'
-csv_path_death = f'../mighti/data/eswatini_mortality_rates_{inityear}.csv'
+region = 'eswatini'
+
+csv_prevalence = f'test_data/{region}_hiv.csv'
+csv_path_age = f'../mighti/data/{region}_age_distribution_{inityear}.csv'
+csv_path_fertility = f'../mighti/data/{region}_asfr.csv'
+csv_path_death = f'../mighti/data/{region}_mortality_rates_{inityear}.csv'
+
 
 import prepare_data_for_year
-prepare_data_for_year.prepare_data_for_year(inityear)
+prepare_data_for_year.prepare_data_for_year(region,inityear)
 
 def make_sim():
 
@@ -71,7 +68,6 @@ def make_sim():
     networks = [maternal, structuredsexual]
 
     sim = ss.Sim(
-        dt=1/12,
         n_agents=n_agents,
         # total_pop=9980999,
         start=inityear,
@@ -109,7 +105,7 @@ def run_calib(calib_pars=None):
 
     # Make the sim and data
     sim = make_sim()
-    data = pd.read_csv('test_data/eswatini_calib.csv')
+    data = pd.read_csv(f'test_data/{region}_calib.csv')
 
     # Make the calibration
     calib = sti.Calibration(

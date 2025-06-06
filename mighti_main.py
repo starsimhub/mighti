@@ -26,7 +26,7 @@ region = 'eswatini'
 
 
 # Parameters
-csv_path_params = f'mighti/data/{region}_parameters.csv'
+csv_path_params = f'mighti/data/{region}_parameters_gbd.csv'
 
 # Relative Risks
 csv_path_interactions = "mighti/data/rel_sus.csv"
@@ -47,11 +47,6 @@ csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
 import prepare_data_for_year
 prepare_data_for_year.prepare_data_for_year(region,inityear)
 
-# # Load the mortality rates and ensure correct format
-# mortality_rates_year = pd.read_csv(csv_path_death)
-
-# # Load the age distribution data for the specified year
-# age_distribution_year = pd.read_csv(csv_path_age)
 
 # Load parameters
 df = pd.read_csv(csv_path_params)
@@ -59,12 +54,12 @@ df.columns = df.columns.str.strip()
 
 
 # Extract all conditions except HIV
-# healthconditions = [condition for condition in df.condition if condition != "HIV"]
+healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
 # healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
 # 
 # Combine with HIV
-healthconditions = []
+# healthconditions = []
 diseases = ["HIV"] + healthconditions
 
 # Filter the DataFrame for disease_class being 'ncd'
@@ -181,7 +176,6 @@ def get_pregnancy_module(sim):
 if __name__ == '__main__':
     # Initialize the simulation with connectors and force=True
     sim = ss.Sim(
-        # dt=1,
         n_agents=n_agents,
         networks=networks,
         start=inityear,
