@@ -29,6 +29,14 @@ Alternatively, you can clone the repository and install in editable mode:
     cd mighti
     pip install -e .
 
+
+Please also make sure to install its dependencies:
+
+.. code-block:: bash
+
+    pip install starsim stisim
+
+
 Usage and Documentation
 ------------------------
 
