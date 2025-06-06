@@ -5,13 +5,15 @@ Model of Inter-Generational Health, Transmission, and Interventions (MIGHTI)
 
 MIGHTI (Modeling Integrated Generational Health, Transmission, and Interventions) is an agent-based modeling framework designed to simulate the dynamics of infectious diseases, non-communicable diseases, and their interactions over time. MIGHTI builds on the Starsim architecture.
 
-## Requirements
+=======================================
+Requirements
 
 * Python 3.9–3.13
 
 We recommend, but do not require, installing MIGHTI in a virtual environment such as [Anaconda](https://www.anaconda.com/).
 
-## Installation
+=======================================
+Installation
 
 MIGHTI is **not yet available on PyPI**, but you can install it locally via GitHub:
 
@@ -27,7 +29,8 @@ cd mighti
 pip install -e .
 ```
 
-## Usage and Documentation
+=======================================
+Usage and Documentation
 
 Documentation and examples are currently under development. 
 
