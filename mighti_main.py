@@ -156,9 +156,9 @@ interactions.extend(connectors)
 
 interventions = [
     # Universal, high-probability annual HIV testing (ramping up in early 2010s)
-    sti.HIVTest(test_prob_data=[0.3, 0.7, 0.95], years=[2007, 2012, 2016]),
+    sti.HIVTest(test_prob_data=[0.6, 0.7, 0.95], years=[2000, 2007, 2016]),
     # Test and treat: ART for nearly all diagnosed from 2010 onward
-    sti.ART(pars={'future_coverage': {'year': 2010, 'prop': 0.95}}),
+    sti.ART(pars={'future_coverage': {'year': 2005, 'prop': 0.95}}),
     # VMMC scale-up: reach 30% by 2015
     sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
     # PrEP for high-risk (starts low, ramps up)
@@ -190,7 +190,7 @@ if __name__ == '__main__':
         demographics=[pregnancy, death],
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
-        # connectors=interactions,
+        connectors=interactions,
         interventions = interventions,
         copy_inputs=False,
         label='Connector'
@@ -208,7 +208,7 @@ if __name__ == '__main__':
     deaths_module = get_deaths_module(sim)
     pregnancy_module = get_pregnancy_module(sim)
     
-    target_year = 2009
+    target_year = endyear - 1
     
     # Load observed mortality rate data
     mx_path = f'demography/{region}_mx.csv'
@@ -218,13 +218,16 @@ if __name__ == '__main__':
     obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
     
     # Calculate mortality rates using `calculate_mortality_rates
-    df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
+    df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
 
-    mi.plot_mx_comparison(df_mortality_rates, obs_mx, year=target_year, age_interval=5)
+    df_mx_male = df_mx[df_mx['sex'] == 'Male']
+    df_mx_female = df_mx[df_mx['sex'] == 'Female']
+    
+    mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
 
     # Create the life table
-    life_table = mi.create_life_table(df_mortality_rates, year=target_year, n_agents=n_agents, max_age=100)
+    life_table = mi.create_life_table(df_mx_male, df_mx_female, max_age=100, radix=100000)
     print(life_table)
     
     # Plot life expectancy comparison
-    mi.plot_life_expectancy(life_table, obs_ex, year=target_year, max_age=100, figsize=(14, 10), title=None)
+    mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)

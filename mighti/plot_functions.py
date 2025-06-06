@@ -729,17 +729,13 @@ def plot_life_expectancy(life_table, observed_data, year, max_age=100, figsize=(
         figsize: Size of the figure
         title: Optional plot title
     """
-    # Filter life table
-    life_table_year = life_table[life_table['year'] == year]
 
-    # Filter observed data
-    observed_year = observed_data[observed_data['Time'] == year]
 
     # Split by sex
-    male_sim = life_table_year[life_table_year['sex'] == 'Male']
-    female_sim = life_table_year[life_table_year['sex'] == 'Female']
-    male_obs = observed_year[observed_year['Sex'] == 'Male']
-    female_obs = observed_year[observed_year['Sex'] == 'Female']
+    male_sim = life_table[life_table['sex'] == 'Male']
+    female_sim = life_table[life_table['sex'] == 'Female']
+    male_obs = observed_data[observed_data['Sex'] == 'Male']
+    female_obs = observed_data[observed_data['Sex'] == 'Female']
 
     # Plot
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
