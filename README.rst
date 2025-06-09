@@ -17,7 +17,7 @@ Installation
 
 MIGHTI is **not yet available on PyPI**, but you can install it directly from GitHub:
 
-```bash
+``bash
 pip install git+https://github.com/starsimhub/mighti.git
 
 Alternatively, you can clone the repository and install in editable mode:
@@ -37,7 +37,6 @@ Documentation and examples are currently under development.
 For help getting started, please see the following example scripts:
 	•	mighti_demography.py — runs demography-related modules (e.g., life expectancy, mortality)
 	•	mighti_main.py — runs full disease-related simulations
-
 
 
 References
