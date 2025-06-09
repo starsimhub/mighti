@@ -52,12 +52,16 @@ References
 ------------------------
 
 The MIGHTI framework incorporates data from the following public sources:
+
 	•	Demography data:
 		World Population Prospects 2024
 		https://population.un.org/wpp/downloads?folder=Standard%20Projections&group=Mortality
+
 	•	Disease data:
 		Global Burden of Disease Study (GBD)
 		https://vizhub.healthdata.org/gbd-results/
+
 	•	HIV data:
 		•	Demographic and Health Surveys (DHS) https://dhsprogram.com/pubs/pdf/FR202/FR202.pdf
+
 		•	Swaziland HIV Incidence Measurement Survey (SHIMS) https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5291824/
