@@ -64,6 +64,7 @@ class RemittingDisease(ss.NCD):
         self.define_states(
             ss.State('susceptible', default=True),
             ss.State('affected'),
+            ss.State('on_treatment'),
             ss.State('reversed'),  # New state for diabetes remission
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_reversed'),
@@ -239,6 +240,7 @@ class ChronicDisease(ss.NCD):
         self.define_states(
             ss.State('susceptible', default=True),
             ss.State('affected'),
+            ss.State('on_treatment'),
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus', default=1.0),  # Relative susceptibility
@@ -388,6 +390,7 @@ class AcuteDisease(ss.NCD):
         self.define_states(
             ss.State('susceptible', default=True),
             ss.State('affected'),
+            ss.State('on_treatment'),
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus', default=1.0),  # Relative susceptibility
@@ -534,6 +537,7 @@ class GenericSIS(ss.SIS):
         self.define_states(
             ss.State('susceptible', default=True),
             ss.State('infected'),
+            ss.State('on_treatment'),
             ss.FloatArr('ti_infected'),
             ss.FloatArr('ti_reversed'),
             ss.FloatArr('ti_dead'),

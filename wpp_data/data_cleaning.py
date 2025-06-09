@@ -102,7 +102,7 @@ def process_population_data(male_csv, female_csv, output_csv, country):
 #     df.to_csv(output_csv, index=False)
 #     print(f"Life expectancy data for {country} saved to {output_csv}")
 
-def extract_life_table_by_country(male_csv1, male_csv2, female_csv1, female_csv2, country):
+def extract_life_table_by_country(male_csv1, male_csv2, male_csv3, female_csv1, female_csv2, female_csv3, country):
     def load_and_clean(filepath, sex):
         df = pd.read_csv(filepath, low_memory=False)
         df = df[df['region'] == country].copy()
@@ -114,8 +114,8 @@ def extract_life_table_by_country(male_csv1, male_csv2, female_csv1, female_csv2
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         return df
 
-    male = pd.concat([load_and_clean(male_csv1, 'Male'), load_and_clean(male_csv2, 'Male')])
-    female = pd.concat([load_and_clean(female_csv1, 'Female'), load_and_clean(female_csv2, 'Female')])
+    male = pd.concat([load_and_clean(male_csv1, 'Male'),load_and_clean(male_csv2, 'Male'), load_and_clean(male_csv3, 'Male')])
+    female = pd.concat([load_and_clean(female_csv1, 'Female'), load_and_clean(female_csv2, 'Female'),load_and_clean(female_csv3, 'Male')])
     return pd.concat([male, female], ignore_index=True)
 
 def extract_indicator_from_life_table(life_table_df, indicator, output_csv=None):
@@ -143,8 +143,8 @@ if __name__ == "__main__":
     
     ### Life table ###
     life_table = extract_life_table_by_country(
-        'life_table_male_2006_2015.csv', 'life_table_male_2016_2023.csv',
-        'life_table_female_2006_2015.csv', 'life_table_female_2016_2023.csv',
+        'life_table_male_1986_1995.csv', 'life_table_male_2006_2015.csv', 'life_table_male_2016_2023.csv',
+        'life_table_female_1986_1995.csv', 'life_table_female_2006_2015.csv', 'life_table_female_2016_2023.csv',
         country='Eswatini'
     )
     

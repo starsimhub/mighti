@@ -16,8 +16,8 @@ import os
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
 n_agents = 100_000 # Number of agents in the simulation
-inityear = 2007  # Simulation start year
-endyear = 2010
+inityear = 1987  # Simulation start year
+endyear = 1990
 region = 'eswatini'
 
 # ---------------------------------------------------------------------
@@ -32,7 +32,7 @@ csv_path_params = f'mighti/data/{region}_parameters_gbd.csv'
 csv_path_interactions = "mighti/data/rel_sus.csv"
 
 # Prevalence data
-csv_prevalence = f'mighti/data/{region}_prevalence.csv'
+csv_prevalence = f'mighti/data/{region}_hiv_prevalence.csv'
 
 # Fertility data 
 csv_path_fertility = f'mighti/data/{region}_asfr.csv'
@@ -54,12 +54,12 @@ df.columns = df.columns.str.strip()
 
 
 # Extract all conditions except HIV
-healthconditions = [condition for condition in df.condition if condition != "HIV"]
+# healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
 # healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
 # 
 # Combine with HIV
-# healthconditions = []
+healthconditions = []
 diseases = ["HIV"] + healthconditions
 
 # Filter the DataFrame for disease_class being 'ncd'
