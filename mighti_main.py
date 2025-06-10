@@ -15,9 +15,9 @@ import os
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
-n_agents = 100_000 # Number of agents in the simulation
-inityear = 1987  
-endyear = 2020
+n_agents = 10_000 # Number of agents in the simulation
+inityear = 2007  
+endyear = 2009
 region = 'eswatini'
 
 # ---------------------------------------------------------------------
@@ -54,12 +54,12 @@ df.columns = df.columns.str.strip()
 
 
 # Extract all conditions except HIV
-# healthconditions = [condition for condition in df.condition if condition != "HIV"]
+healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
 # healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
 # 
 # Combine with HIV
-healthconditions = []
+# healthconditions = []
 diseases = ["HIV"] + healthconditions
 
 # Filter the DataFrame for disease_class being 'ncd'
@@ -75,8 +75,6 @@ remitting = ncd_df[ncd_df["disease_type"] == "remitting"]["condition"].tolist()
 # Extract communicable diseases with disease_class as 'sis'
 communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
 
-# Initialize disease models with preloaded data
-# mi.initialize_conditions(df, chronic, acute, remitting, communicable_diseases)
 
 # ---------------------------------------------------------------------
 # Initialize conditions, prevalence analyzer, and interactions

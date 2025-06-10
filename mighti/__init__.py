@@ -1,8 +1,8 @@
 from .version import __version__, __versiondate__, __license__
 from .utils import *
 from .life_expectancy import *
-from .conditions import *
 from .interactions import *
+from mighti.diseases import *  
 
 # Newly defined files
 from .analyzers import *
