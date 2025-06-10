@@ -8,49 +8,43 @@ def prepare_data_for_year(region, year):
     csv_path_death = os.path.join(script_dir, 'mighti', 'data', f'{region}_mortality_rates_{year}.csv')
     csv_path_age = os.path.join(script_dir, 'mighti', 'data', f'{region}_age_distribution_{year}.csv')
 
-    # Prepare mortality rates
-    if not os.path.exists(csv_path_death):
-        # Load wide-format mx file
-        csv_path_mortality_rates = os.path.join(script_dir, 'demography', f'{region}_mx.csv')
-        mortality_rates = pd.read_csv(csv_path_mortality_rates)
+    # Load wide-format mx file
+    csv_path_mortality_rates = os.path.join(script_dir, 'demography', f'{region}_mx.csv')
+    mortality_rates = pd.read_csv(csv_path_mortality_rates)
 
-        # Melt the data to long format
-        melted = mortality_rates.melt(id_vars=['Age', 'Sex'], var_name='Time', value_name='mx')
+    # Melt the data to long format
+    melted = mortality_rates.melt(id_vars=['Age', 'Sex'], var_name='Time', value_name='mx')
 
-        # Coerce year and mx to numeric
-        melted['Time'] = pd.to_numeric(melted['Time'], errors='coerce')
-        melted['mx'] = pd.to_numeric(melted['mx'], errors='coerce')
+    # Coerce year and mx to numeric
+    melted['Time'] = pd.to_numeric(melted['Time'], errors='coerce')
+    melted['mx'] = pd.to_numeric(melted['mx'], errors='coerce')
 
-        # Filter for the specified year
-        mortality_rates_year = melted[melted['Time'] == year].dropna(subset=['mx'])
+    # Filter for the specified year
+    mortality_rates_year = melted[melted['Time'] == year].dropna(subset=['mx'])
 
-        # Rename Age → AgeGrpStart
-        mortality_rates_year = mortality_rates_year.rename(columns={'Age': 'AgeGrpStart'})
+    # Rename Age → AgeGrpStart
+    mortality_rates_year = mortality_rates_year.rename(columns={'Age': 'AgeGrpStart'})
 
-        # Save
-        mortality_rates_year.to_csv(csv_path_death, index=False)
-        print(f"Mortality rates for {year} saved to '{csv_path_death}'")
-    else:
-        print(f"File '{csv_path_death}' already exists.")
+    # Save
+    mortality_rates_year.to_csv(csv_path_death, index=False)
+    print(f"Mortality rates for {year} saved to '{csv_path_death}'")
 
 
-    if not os.path.exists(csv_path_age):
-        # Load the age distribution data
-        csv_path_age_distribution = os.path.join(script_dir, 'demography', f'{region}_age_distribution.csv')
-        age_distribution = pd.read_csv(csv_path_age_distribution)
-        
-        # Extract rows for the specified year
-        age_distribution_year = age_distribution[['age', 'sex', str(year)]]
-        
-        # Calculate the total population for each age
-        age_distribution_year = age_distribution_year.groupby('age')[str(year)].sum().reset_index()
-        age_distribution_year.columns = ['age', 'value']
-        
-        # Save the extracted data to a new CSV file
-        age_distribution_year.to_csv(csv_path_age, index=False)
-        print(f"Age distribution for {year} saved to '{csv_path_age}'")
-    else:
-        print(f"File '{csv_path_age}' already exists.")
+    # Load the age distribution data
+    csv_path_age_distribution = os.path.join(script_dir, 'demography', f'{region}_age_distribution.csv')
+    age_distribution = pd.read_csv(csv_path_age_distribution)
+    
+    # Extract rows for the specified year
+    age_distribution_year = age_distribution[['age', 'sex', str(year)]]
+    
+    # Calculate the total population for each age
+    age_distribution_year = age_distribution_year.groupby('age')[str(year)].sum().reset_index()
+    age_distribution_year.columns = ['age', 'value']
+    
+    # Save the extracted data to a new CSV file
+    age_distribution_year.to_csv(csv_path_age, index=False)
+    print(f"Age distribution for {year} saved to '{csv_path_age}'")
+
         
         
 def extract_indicator_for_plot(csv_path, year, value_column_name='mx'):

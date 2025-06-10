@@ -9,11 +9,10 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
         super().init_results()
         self.define_results(
             ss.Result('infant_deaths', label='Cumulative infant deaths', dtype=int),
-            ss.Result('male_deaths_by_age', label='Number of male deaths by age', dtype=int, shape=101, ),
-            ss.Result('female_deaths_by_age', label='Number of female deaths by age', dtype=int, shape=101, )
+            ss.Result('male_deaths_by_age', label='Number of male deaths by age', dtype=int, shape=101),
+            ss.Result('female_deaths_by_age', label='Number of female deaths by age', dtype=int, shape=101)
         )
         return
-
 
     def step(self):
         people = self.sim.people
@@ -21,13 +20,14 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
 
         self.results.infant_deaths[ti] = len(people.dead[people.age < 1])
 
+        # Cap ages at 100 for array indexing (i.e., 100+ all in last bin)
         for uid in people.dead.uids:
             age = int(people.age[uid])
+            age_capped = min(age, 100)
             if people.female[uid]:
-                self.results.female_deaths_by_age[age] += 1
+                self.results.female_deaths_by_age[age_capped] += 1
             else:
-                self.results.male_deaths_by_age[age] += 1
-
+                self.results.male_deaths_by_age[age_capped] += 1
 
 # import numpy as np
 # import starsim as ss
