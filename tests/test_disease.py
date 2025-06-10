@@ -127,47 +127,6 @@ def plot_disease_trajectory(sim, disease_name):
     pl.tight_layout()
     pl.show()
     
-# if __name__ == '__main__':
-#     sims = test_all_diseases()
-#     do_plot = True
-#     if do_plot:
-#         for sim in sims:
-#             disease_name = sim.diseases[0].name
-#             plot_disease_trajectory(sim, disease_name)    
-
-# if __name__ == '__main__':
-#     sc.options(interactive=True)  # Enable interactive plotting
-#     do_plot = True
-#     sims = []
-
-#     for disease_name in disease_names:
-#         try:
-#             sim = test_disease_state(disease_name)
-#             sims.append(sim)
-#             print(f"[SUCCESS] {disease_name} passed.")
-
-#             if do_plot:
-#                 disease = sim.diseases[disease_name.lower()]
-#                 if hasattr(disease.results, 'n_not_at_risk') and hasattr(disease.results, 'n_at_risk') and hasattr(disease.results, 'n_affected'):
-#                     import pylab as pl
-#                     pl.figure()
-#                     pl.stackplot(
-#                         sim.timevec,
-#                         disease.results.n_not_at_risk,
-#                         disease.results.n_at_risk - disease.results.n_affected,
-#                         disease.results.n_affected,
-#                         sim.results.new_deaths.cumsum() if hasattr(sim.results, 'new_deaths') else np.zeros_like(sim.timevec),
-#                     )
-#                     pl.legend(['Not at risk', 'At risk', 'Affected', 'Dead'])
-#                     pl.title(disease_name)
-#                     pl.xlabel('Year')
-#                     pl.ylabel('Number of agents')
-#                     pl.tight_layout()
-#                     pl.show()
-#                 else:
-#                     print(f"[WARNING] {disease_name} does not have the required results for plotting.")
-#         except Exception as e:
-#             print(f"[ERROR] {disease_name} failed: {e}")
 
 if __name__ == '__main__':
     import pylab as pl
