@@ -41,22 +41,32 @@ class RemittingDisease(ss.NCD):
         def calculate_p_acquire(self, sim, uids):
             # Start with base probability
             p = np.full(len(uids), self.pars.p_acquire)
-            
-            # Apply sex-specific filtering
+        
+            # Sex filtering
             if self.pars.affected_sex == "female":
-                # Set probability to 0 for males
-                p[sim.people.male[uids]] = 0
+                try:
+                    p[sim.people.male[uids]] = 0
+                except Exception:
+                    pass
             elif self.pars.affected_sex == "male":
-                # Set probability to 0 for females
-                p[sim.people.female[uids]] = 0
-            
-            # Filter out invalid indices for HIV-specific relative susceptibility
-            valid_uids = [uid for uid in uids if uid in sim.people.hiv]
-            
-            # Apply HIV-specific relative susceptibility
-            p[valid_uids] *= self.pars.rel_sus_hiv
-
-            return p * self.rel_sus[uids]
+                try:
+                    p[sim.people.female[uids]] = 0
+                except Exception:
+                    pass
+        
+            # HIV susceptibility (skip safely if 'hiv' not present or not initialized)
+            try:
+                if hasattr(sim.people, 'hiv'):
+                    hiv_positive = sim.people.hiv[uids]
+                    p[hiv_positive] *= self.pars.rel_sus_hiv
+            except Exception:
+                pass
+        
+            # Final susceptibility scaling
+            try:
+                return p * self.rel_sus[uids]
+            except Exception:
+                return p
         
         self.p_acquire = ss.bernoulli(p=calculate_p_acquire)
         self.p_death = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_death.mean())  # Use mean to match Bernoulli
@@ -218,26 +228,32 @@ class AcuteDisease(ss.NCD):
         def calculate_p_acquire(self, sim, uids):
             # Start with base probability
             p = np.full(len(uids), self.pars.p_acquire)
-            
-            # Apply sex-specific filtering
-            if self.pars.affected_sex == "female":
-                # Set probability to 0 for males
-                p[sim.people.male[uids]] = 0
-            elif self.pars.affected_sex == "male":
-                # Set probability to 0 for females
-                p[sim.people.female[uids]] = 0
-                
-            # Print base probabilities
-            # print(f"Base probabilities (p): {p}")
-            
-            # Filter out invalid indices for HIV-specific relative susceptibility
-            valid_uids = [uid for uid in uids if uid in sim.people.hiv]
         
-            # Apply HIV-specific relative susceptibility
-            p[valid_uids] *= self.pars.rel_sus_hiv
-            # print(f"Probabilities after applying HIV-specific relative susceptibility (p): {p}")
-
-            return p * self.rel_sus[uids]
+            # Sex filtering
+            if self.pars.affected_sex == "female":
+                try:
+                    p[sim.people.male[uids]] = 0
+                except Exception:
+                    pass
+            elif self.pars.affected_sex == "male":
+                try:
+                    p[sim.people.female[uids]] = 0
+                except Exception:
+                    pass
+        
+            # HIV susceptibility (skip safely if 'hiv' not present or not initialized)
+            try:
+                if hasattr(sim.people, 'hiv'):
+                    hiv_positive = sim.people.hiv[uids]
+                    p[hiv_positive] *= self.pars.rel_sus_hiv
+            except Exception:
+                pass
+        
+            # Final susceptibility scaling
+            try:
+                return p * self.rel_sus[uids]
+            except Exception:
+                return p
 
         self.p_acquire = ss.bernoulli(p=calculate_p_acquire)
         self.p_death = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_death.mean())  # Use mean to match Bernoulli
@@ -362,31 +378,31 @@ class ChronicDisease(ss.NCD):
         self.define_pars(
             p_acquire=disease_params["incidence"],  # Probability of acquisition per timestep
         )
-    
-        # Define the lambda function to calculate acquisition probability
+
+        
         def calculate_p_acquire(self, sim, uids):
             # Start with base probability
             p = np.full(len(uids), self.pars.p_acquire)
-            
-            # Apply sex-specific filtering
-            if self.pars.affected_sex == "female":
-                # Set probability to 0 for males
-                p[sim.people.male[uids]] = 0
-            elif self.pars.affected_sex == "male":
-                # Set probability to 0 for females
-                p[sim.people.female[uids]] = 0
-                
-            # Print base probabilities
-            # print(f"Base probabilities (p): {p}")
-            
-            # Filter out invalid indices for HIV-specific relative susceptibility
-            valid_uids = [uid for uid in uids if uid in sim.people.hiv]
         
-            # Apply HIV-specific relative susceptibility
-            p[valid_uids] *= self.pars.rel_sus_hiv
-            # print(f"Probabilities after applying HIV-specific relative susceptibility (p): {p}")
-
-            return p * self.rel_sus[uids]
+            # Apply sex-specific filtering
+            if self.pars.affected_sex == "female" and hasattr(sim.people, 'male'):
+                p[sim.people.male[uids]] = 0
+            elif self.pars.affected_sex == "male" and hasattr(sim.people, 'female'):
+                p[sim.people.female[uids]] = 0
+        
+            # Apply HIV-specific relative susceptibility only if 'hiv' attribute exists
+            if hasattr(sim.people, 'hiv'):
+                hiv = sim.people.hiv
+                if isinstance(hiv, np.ndarray):  # extra safety
+                    hiv_positive = hiv[uids]
+                    p[hiv_positive] *= self.pars.rel_sus_hiv
+        
+            # Apply agent-specific relative susceptibility if available
+            rel_sus = getattr(self, 'rel_sus', None)
+            if rel_sus is not None:
+                p *= rel_sus[uids]
+        
+            return p
 
         self.p_acquire = ss.bernoulli(p=calculate_p_acquire)
         self.p_death = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_death.mean())  # Use mean to match Bernoulli
@@ -514,26 +530,35 @@ class GenericSIS(ss.SIS):
             p_acquire=disease_params["incidence"],  # Probability of acquisition per timestep
         )
 
-        # Define the lambda function to calculate acquisition probability
         def calculate_p_acquire(self, sim, uids):
             # Start with base probability
             p = np.full(len(uids), self.pars.p_acquire)
-            
-            # Apply sex-specific filtering
+        
+            # Sex filtering
             if self.pars.affected_sex == "female":
-                # Set probability to 0 for males
-                p[sim.people.male[uids]] = 0
+                try:
+                    p[sim.people.male[uids]] = 0
+                except Exception:
+                    pass
             elif self.pars.affected_sex == "male":
-                # Set probability to 0 for females
-                p[sim.people.female[uids]] = 0
-            
-            # Filter out invalid indices for HIV-specific relative susceptibility
-            valid_uids = [uid for uid in uids if uid in sim.people.hiv]
-            
-            # Apply HIV-specific relative susceptibility
-            p[valid_uids] *= self.pars.rel_sus_hiv
-
-            return p * self.rel_sus[uids]
+                try:
+                    p[sim.people.female[uids]] = 0
+                except Exception:
+                    pass
+        
+            # HIV susceptibility (skip safely if 'hiv' not present or not initialized)
+            try:
+                if hasattr(sim.people, 'hiv'):
+                    hiv_positive = sim.people.hiv[uids]
+                    p[hiv_positive] *= self.pars.rel_sus_hiv
+            except Exception:
+                pass
+        
+            # Final susceptibility scaling
+            try:
+                return p * self.rel_sus[uids]
+            except Exception:
+                return p
         
         self.p_acquire = ss.bernoulli(p=calculate_p_acquire)
         self.p_death = ss.bernoulli(p=lambda self, sim, uids: self.pars.p_death.mean())  # Use mean to match Bernoulli
