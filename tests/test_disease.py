@@ -77,24 +77,31 @@ def plot_disease_trajectory(sim, disease_name):
     pl.show()
 
 def test_all_diseases():
-    sims = []
+    n_passed = 0
+    n_failed = 0
+
     for name in ncd_names:
         try:
             sim = test_ncd_state(name)
             if do_plot: plot_disease_trajectory(sim, name)
             print(f"[SUCCESS] {name} passed.")
-            sims.append(sim)
+            n_passed += 1
         except Exception as E:
             print(f"[ERROR] {name} failed: {E}")
+            n_failed += 1
+
     for name in id_names:
         try:
             sim = test_id_state(name)
             if do_plot: plot_disease_trajectory(sim, name)
             print(f"[SUCCESS] {name} passed.")
-            sims.append(sim)
+            n_passed += 1
         except Exception as E:
             print(f"[ERROR] {name} failed: {E}")
-    return sims
+            n_failed += 1
+
+    # Final assertion: ensure at least one test passed
+    assert n_passed > 0, "All disease tests failed"
 
 def test_multidisease(n_agents=100):
     sc.heading('Testing multi-disease simulation')
@@ -109,7 +116,7 @@ def test_multidisease(n_agents=100):
     assert sim.diseases['sir1'].results.n_infected[-1] >= 0
     assert sim.diseases['sir2'].results.n_infected[-1] >= 0
     print("[SUCCESS] Multi-disease sim ran correctly.")
-    return sim
+    assert sim.results is not None
 
 if __name__ == '__main__':
     import pylab as pl
