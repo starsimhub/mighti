@@ -3,11 +3,11 @@ from scipy.stats import bernoulli, lognorm
 import starsim as ss
 import numpy as np
 import sciris as sc
-from mighti.diseases.base_disease import AcuteDisease
+from mighti.diseases.base_disease import GenericSIS
 
 
 
-class ViralHepatitis(AcuteDisease):
+class ViralHepatitis(GenericSIS):
     def __init__(self, csv_path, pars=None, **kwargs):
         self.disease_name = 'ViralHepatitis'
         super().__init__(csv_path, pars, **kwargs)

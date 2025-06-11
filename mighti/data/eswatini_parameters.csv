@@ -24,6 +24,6 @@ Asthma,0.000148,,7.01424332,5.937155593,1.72,,,chronic,ncd,both
 COPD,0.000257,,13.1202376,4.521120047,1,,,chronic,ncd,both
 AlzheimersDisease,0.0000386,0.0101,5.73107747,1.523332927,1,,,chronic,ncd,both
 ParkinsonsDisease,0.0000149,0.0005,6.69425511,0.208179273,1,,,chronic,ncd,both
-ViralHepatitis,,,,,,,,acute,sis,both
+ViralHepatitis,,,,,,,,sis,sis,both
 HPV,,,,,,0.01,,remitting,sis,both
-Flu,,0.15,,,5.7,,,acute,sis,both
+Flu,,0.15,,,5.7,,,sis,sis,both
