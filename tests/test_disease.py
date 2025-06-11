@@ -26,7 +26,7 @@ ncd_names = params_df.query("disease_class == 'ncd'")['condition'].unique().toli
 id_names = params_df.query("disease_class == 'sis'")['condition'].unique().tolist()
 
 
-def test_ncd_state(disease_name, n_agents=100):
+def run_test_ncd_state(disease_name, n_agents=100):
     sc.heading(f'Testing {disease_name}')
     ppl = ss.People(n_agents)
     ppl.hiv = np.zeros(n_agents, dtype=bool)
@@ -43,7 +43,7 @@ def test_ncd_state(disease_name, n_agents=100):
 
 
 
-def test_id_state(disease_name, n_agents=100):
+def run_test_id_state(disease_name, n_agents=100):
     sc.heading(f'Testing {disease_name}')
     ppl = ss.People(n_agents)
     ppl.hiv = np.zeros(n_agents, dtype=bool)
