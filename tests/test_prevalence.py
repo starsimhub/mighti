@@ -15,9 +15,13 @@ def test_disease_prevalence_from_data(n_agents=500, inityear=2007):
     prevalence_path = os.path.join(thisdir, '..', 'mighti', 'data', 'eswatini_prevalence.csv')
     prevalence_df = pd.read_csv(prevalence_path)
     prevalence_df.columns = prevalence_df.columns.str.strip()
+    
+    param_path = os.path.join(thisdir, '..', 'mighti', 'data', 'eswatini_parameters.csv')
+    params_df = pd.read_csv(param_path)
+    params_df.columns = params_df.columns.str.strip()
 
     # Extract diseases
-    diseases = prevalence_df['condition'].unique().tolist()
+    diseases = params_df.query("condition != 'HIV'")['condition'].unique()
 
     # Initialize prevalence matrix and bins
     prevalence_data, age_bins = mi.initialize_prevalence_data(
@@ -26,21 +30,24 @@ def test_disease_prevalence_from_data(n_agents=500, inityear=2007):
         inityear=inityear
     )
 
-    # Make fake sim to test prevalence sampling
+    # Simulate population
     sim = ss.Sim(n_agents=n_agents)
-    sim.initialize()
+    sim.init()  # Correct initialization
+    uids = sim.people.uid.raw
 
     for disease in diseases:
-        prev_fn = lambda module, sim, size: mi.age_sex_dependent_prevalence(
-            disease, prevalence_data, age_bins, sim, size
+        prev_fn = lambda module, sim, uids: mi.age_sex_dependent_prevalence(
+            disease, prevalence_data, age_bins, sim, uids
         )
-        sample = ss.bernoulli(prev_fn(None, sim, n_agents))
+        dist = ss.bernoulli(prev_fn(None, sim, uids), strict=False)   
+        dist.init(n_agents)
+        sample = dist()
         prevalence_value = sample.mean()
 
         print(f'{disease}: Simulated prevalence = {prevalence_value:.3f}')
         assert 0 <= prevalence_value <= 1, f'{disease} prevalence out of bounds'
 
-    print(' All prevalence functions returned valid outputs.')
+    print('[✓] All prevalence functions returned valid outputs.')
 
 # Run as a script (optional)
 if __name__ == '__main__':
