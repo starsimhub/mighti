@@ -122,5 +122,7 @@ if __name__ == '__main__':
     import pylab as pl
     sc.options(interactive=True)
     do_plot = True
-    sim_disease = test_all_diseases()
-    sim_multi = test_multidisease()
+    
+    test_all_diseases()
+    test_multidisease()
+    
