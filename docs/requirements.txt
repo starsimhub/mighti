@@ -1,9 +1,0 @@
-starsim
-sciris
-pandas
-numpy
-matplotlib
-pytest
-sphinx
-sphinx_rtd_theme
-numpydoc
