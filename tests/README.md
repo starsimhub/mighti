@@ -15,10 +15,9 @@ Test files use either pytest or standalone script style (if __name__ == '__main_
 |------------------------|---------------------------------------------------------------|----------------|
 | `test_sim.py`          | Verify basic simulation runs, including disease progression   | Integration    |
 | `test_disease.py`      | Validates disease state logic                                 | Unit / Scenario |
-| `test_interactions.py`  | Validates disease interactions                             | Unit / Scenario |
+| `test_connector.py`  | Validates disease interactions  (e.g., HIV-AlcoholUseDisorder connectors)      | Unit / Scenario |
 | `test_interventions.py` | Validate application, timing, and effect of interventions    | Unit / Scenario |
 | `test_prevalence.py`   | Test loading, interpolation, and application of prevalence    | Unit           |
-| `test_connector.py`    | Test disease-disease interactions (e.g., HIV-NCD connectors)  | Unit           |
 | `test_life_expectancy.py` | Validate LE and mortality calculations from death outputs   | Unit           |
 | `test_calibration.py`  | Ensure calibration machinery runs and produces valid outputs  | Integration    |
 
