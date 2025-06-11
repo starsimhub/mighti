@@ -62,7 +62,7 @@ def run_test_id_state(disease_name, n_agents=100):
 def test_all_diseases():
     for name in ncd_names:
         try:
-            test_ncd_state(name)
+            run_test_ncd_state(name)
             print(f"[SUCCESS] {name} passed.")
         except Exception as e:
             print(f"[ERROR] {name} failed: {e}")
@@ -70,7 +70,7 @@ def test_all_diseases():
 
     for name in id_names:
         try:
-            test_id_state(name)
+            run_test_id_state(name)
             print(f"[SUCCESS] {name} passed.")
         except Exception as e:
             print(f"[ERROR] {name} failed: {e}")
