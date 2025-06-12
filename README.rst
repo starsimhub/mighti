@@ -19,12 +19,6 @@ MIGHTI is **not yet available on PyPI**, but you can install it directly from Gi
 
 .. code-block:: bash
 
-    pip install git+https://github.com/starsimhub/mighti.git
-
-Alternatively, you can clone the repository and install in editable mode:
-
-.. code-block:: bash
-
     git clone https://github.com/starsimhub/mighti.git
     cd mighti
     pip install -e .
