@@ -5,7 +5,7 @@ on:
   push:
     branches: [ main, main_nao_June2025 ]
   pull_request:
-    branches: [ main, main_nao_June2025 ]
+    branches: [ main ]
 
 jobs:
   build:
