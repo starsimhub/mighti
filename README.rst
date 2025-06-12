@@ -5,6 +5,7 @@ Model of Inter-Generational Health, Transmission, and Interventions (MIGHTI)
 
 MIGHTI is an agent-based modeling framework designed to simulate the dynamics of infectious diseases, non-communicable diseases (NCDs), and their interactions over time. MIGHTI builds on the Starsim architecture.
 
+
 Requirements
 ------------
 
