@@ -1,3 +1,6 @@
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
 import starsim as ss
 import stisim as sti
 import sciris as sc
