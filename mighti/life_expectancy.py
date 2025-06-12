@@ -5,8 +5,6 @@ import pandas as pd
 import numpy as np
 import pandas as pd
 
-__all__ = ['create_life_table','calculate_mortality_rates','calculate_life_table_from_mx']
-
 
 def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=100000):
 
