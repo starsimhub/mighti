@@ -615,9 +615,6 @@ def plot_simulated_death_counts(death_tracker, year=None, age_interval=5, smooth
     return death_counts
 
 
-
-
-
 def plot_dx_comparison(sim_mx_df, observed_mx_csv, year, age_interval=5, figsize=(14, 10)):
     """
     Plot simulated and observed mx (mortality rate) by age for a given year as lines.
