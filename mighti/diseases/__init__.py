@@ -25,6 +25,7 @@ from .parkinsonsdisease import *
 from .prostatecancer import *
 from .ptsd import *
 from .roadinjuries import *
+from .substanceusedisorder import *
 from .tb import *
 from .tobaccouse import *
 from .type1diabetes import *

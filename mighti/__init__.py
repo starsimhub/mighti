@@ -3,6 +3,7 @@ from .utils import *
 from .life_expectancy import *
 from .interactions import *
 from mighti.diseases import *  
+from .sdoh import *
 
 # Newly defined files
 from .analyzers import *

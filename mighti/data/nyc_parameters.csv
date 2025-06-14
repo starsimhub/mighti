@@ -1,0 +1,5 @@
+﻿condition,p_death,incidence,dur_condition,init_prev,rel_sus,remmision_rate,max_disease_duration,disease_type,disease_class,affected_sex
+HIV,,,,,,,,chronic,,
+AlcoholUseDisorder,9.25E-07,8.34E-05,2.05407094,2.891861943,2.47,,,remitting,ncd,both
+SubstanceUseDisorder,,,,,,,,remitting,ncd,both
+Depression,0.0000111,0.0001,0.83248621,6.213375913,1,,,remitting,ncd,both

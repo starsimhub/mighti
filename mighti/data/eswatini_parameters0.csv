@@ -1,3 +1,0 @@
-﻿condition,p_death,incidence,dur_condition,init_prev,rel_sus,remmision_rate,max_disease_duration,disease_type,disease_class,affected_sex
-HIV,,,,,,,,chronic,,
-Type1Diabetes,0.0005653,,27.3970433,0.318872567,1,,,chronic,ncd,both
