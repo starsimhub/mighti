@@ -12,8 +12,7 @@ def make_sim():
     hiv = sti.HIV(beta_m2f=0.05, beta_m2c=0.025, init_prev=0.15)
     pregnancy = ss.Pregnancy(fertility_rate=fertility_rates)
     death = ss.Deaths(death_rate=death_rates, rate_units=1)  # Assuming death_rate is a yearly rate
-
-    sexual = sti.StructuredSexual(prop_f2=0.2)
+    sexual = sti.StructuredSexual()
     maternal = ss.MaternalNet()
 
     prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=pd.read_csv('mighti/data/prevalence_data_eswatini.csv'), diseases=['HIV'])
@@ -130,7 +129,7 @@ if __name__ == '__main__':
     # where hiv is for STIsim HIV parameters and nw is for StructuredSexual network parameters.
     calib_pars = dict(
         hiv_beta_m2f = dict(low=0.01, high=0.10, guess=0.05), # HIV transmission parameter
-        nw_f1_conc = dict(low=0.005, high=0.1, guess=0.01), # Network females in risk group 1 concurrent partners
+        hiv_beta_m2c = dict(low=0.001, high=0.1, guess=0.025), # Network females in risk group 1 concurrent partners
     )
 
     calib = run_calib(calib_pars=calib_pars, total_trials=10, keep_db=False)
