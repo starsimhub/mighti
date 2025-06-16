@@ -34,16 +34,22 @@ class PrevalenceAnalyzer(ss.Analyzer):
                 results += [
                     ss.Result(f'{disease}_num_male_{i}', dtype=int),
                     ss.Result(f'{disease}_den_male_{i}', dtype=int),
+                    ss.Result(f'{disease}_prev_male_{i}', dtype=float, scale=False),
                     ss.Result(f'{disease}_num_female_{i}', dtype=int),
                     ss.Result(f'{disease}_den_female_{i}', dtype=int),
+                    ss.Result(f'{disease}_prev_female_{i}', dtype=float, scale=False),
                     ss.Result(f'{disease}_num_with_HIV_male_{i}', dtype=int),
                     ss.Result(f'{disease}_den_with_HIV_male_{i}', dtype=int),
+                    ss.Result(f'{disease}_prev_with_HIV_male_{i}', dtype=float, scale=False),
                     ss.Result(f'{disease}_num_with_HIV_female_{i}', dtype=int),
                     ss.Result(f'{disease}_den_with_HIV_female_{i}', dtype=int),
+                    ss.Result(f'{disease}_prev_with_HIV_female_{i}', dtype=float, scale=False),
                     ss.Result(f'{disease}_num_without_HIV_male_{i}', dtype=int),
                     ss.Result(f'{disease}_den_without_HIV_male_{i}', dtype=int),
+                    ss.Result(f'{disease}_prev_without_HIV_male_{i}', dtype=float, scale=False),
                     ss.Result(f'{disease}_num_without_HIV_female_{i}', dtype=int),
                     ss.Result(f'{disease}_den_without_HIV_female_{i}', dtype=int),
+                    ss.Result(f'{disease}_prev_without_HIV_female_{i}', dtype=float, scale=False),
                 ]
             results += [
                 ss.Result(f'{disease}_prev_no_hiv', dtype=float, scale=False),
@@ -114,20 +120,29 @@ class PrevalenceAnalyzer(ss.Analyzer):
                 total_num_with_HIV += num_with_HIV_male + num_with_HIV_female
                 total_den_with_HIV += den_with_HIV_male + den_with_HIV_female
 
-                print(f"Age group {age_start}-{age_end}: num_male={num_male}, den_male={den_male}, num_female={num_female}, den_female={den_female}")
+                # print(f"Age group {age_start}-{age_end}: num_male={num_male}, den_male={den_male}, num_female={num_female}, den_female={den_female}")
 
                 self.results[f'{disease}_num_male_{i}'][ti] = num_male
                 self.results[f'{disease}_den_male_{i}'][ti] = den_male
+                self.results[f'{disease}_prev_male_{i}'][ti] = sc.safedivide(num_male, den_male)
                 self.results[f'{disease}_num_female_{i}'][ti] = num_female
                 self.results[f'{disease}_den_female_{i}'][ti] = den_female
+                self.results[f'{disease}_prev_female_{i}'][ti] = sc.safedivide(num_female, den_female)
                 self.results[f'{disease}_num_with_HIV_male_{i}'][ti] = num_with_HIV_male
                 self.results[f'{disease}_den_with_HIV_male_{i}'][ti] = den_with_HIV_male
+                self.results[f'{disease}_prev_with_HIV_male_{i}'][ti] = sc.safedivide(num_with_HIV_male, den_with_HIV_male)
                 self.results[f'{disease}_num_with_HIV_female_{i}'][ti] = num_with_HIV_female
                 self.results[f'{disease}_den_with_HIV_female_{i}'][ti] = den_with_HIV_female
+                self.results[f'{disease}_prev_with_HIV_female_{i}'][ti] = sc.safedivide(num_with_HIV_female,
+                                                                                      den_with_HIV_female)
                 self.results[f'{disease}_num_without_HIV_male_{i}'][ti] = num_without_HIV_male
                 self.results[f'{disease}_den_without_HIV_male_{i}'][ti] = den_without_HIV_male
+                self.results[f'{disease}_prev_without_HIV_male_{i}'][ti] = sc.safedivide(num_without_HIV_male,
+                                                                                      den_without_HIV_male)
                 self.results[f'{disease}_num_without_HIV_female_{i}'][ti] = num_without_HIV_female
                 self.results[f'{disease}_den_without_HIV_female_{i}'][ti] = den_without_HIV_female
+                self.results[f'{disease}_prev_without_HIV_female_{i}'][ti] = sc.safedivide(num_without_HIV_female,
+                                                                                         den_without_HIV_female)
 
             self.results[f'{disease}_prev_no_hiv'][ti] = self.cond_prob(has_disease, no_hiv)
             self.results[f'{disease}_prev_has_hiv'][ti] = self.cond_prob(has_disease, has_hiv)
