@@ -3,7 +3,7 @@ name: Run tests and build docs
 
 on:
   push:
-    branches: [ main, main_nao_June2025 ]
+    branches: [ main, main_nao_june2025 ]
   pull_request:
 
 jobs:
