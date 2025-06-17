@@ -1,0 +1,225 @@
+import starsim as ss
+import stisim as sti
+import sciris as sc
+import mighti as mi
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
+##### TO DO #####
+# Calibration 
+# Relative Risk implementation 
+
+
+# ---------------------------------------------------------------------
+# Define population size and simulation timeline
+# ---------------------------------------------------------------------
+n_agents = 10_000 # Number of agents in the simulation
+inityear = 2007  
+endyear = 2009
+region = 'eswatini'
+
+# ---------------------------------------------------------------------
+# Specify data file paths
+# ---------------------------------------------------------------------
+
+
+# Parameters
+csv_path_params = f'mighti/data/{region}_parameters_gbd.csv'
+
+# Relative Risks
+csv_path_interactions = "mighti/data/rel_sus.csv"
+
+# Prevalence data
+csv_prevalence = f'mighti/data/{region}_hiv_prevalence.csv'
+
+# Fertility data 
+csv_path_fertility = f'mighti/data/{region}_asfr.csv'
+
+# Death data
+csv_path_death = f'mighti/data/{region}_mortality_rates_{inityear}.csv'
+
+# Age distribution data
+csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
+
+
+import prepare_data_for_year
+prepare_data_for_year.prepare_data_for_year(region,inityear)
+
+
+# Load parameters
+df = pd.read_csv(csv_path_params)
+df.columns = df.columns.str.strip()
+
+
+# Extract all conditions except HIV
+healthconditions = [condition for condition in df.condition if condition != "HIV"]
+# healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
+# healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
+# 
+# Combine with HIV
+# healthconditions = []
+diseases = ["HIV"] + healthconditions
+
+# Filter the DataFrame for disease_class being 'ncd'
+ncd_df = df[df["disease_class"] == "ncd"]
+
+# Extract disease categories from the filtered DataFrame
+chronic = ncd_df[ncd_df["disease_type"] == "chronic"]["condition"].tolist()
+acute = ncd_df[ncd_df["disease_type"] == "acute"]["condition"].tolist()
+remitting = ncd_df[ncd_df["disease_type"] == "remitting"]["condition"].tolist()
+
+# ncd = chronic + acute + remitting
+
+# Extract communicable diseases with disease_class as 'sis'
+communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
+
+
+# ---------------------------------------------------------------------
+# Initialize conditions, prevalence analyzer, and interactions
+# ---------------------------------------------------------------------
+prevalence_data_df = pd.read_csv(csv_prevalence)
+
+prevalence_data, age_bins = mi.initialize_prevalence_data(
+    diseases, prevalence_data=prevalence_data_df, inityear=inityear
+)
+
+# Define a function for disease-specific prevalence
+def get_prevalence_function(disease):
+    return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
+
+# Initialize the PrevalenceAnalyzer
+prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
+survivorship_analyzer = mi.SurvivorshipAnalyzer()
+deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
+
+# -------------------------
+# Demographics
+# -------------------------
+
+death_rates = {'death_rate': pd.read_csv(csv_path_death), 'rate_units': 1}
+death = ss.Deaths(death_rates)  # Use Demographics class implemented in mighti
+fertility_rate = {'fertility_rate': pd.read_csv(csv_path_fertility)}
+pregnancy = ss.Pregnancy(pars=fertility_rate)
+
+ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
+
+# Initialize networks
+# mf = ss.MFNet(duration=1/24, acts=80)
+maternal = ss.MaternalNet()
+structuredsexual = sti.StructuredSexual()
+networks = [maternal, structuredsexual]
+
+# -------------------------
+# Diseases
+# -------------------------
+
+# Initialize disease conditions
+hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
+                      init_prev_data=None,   
+                      p_hiv_death=None, 
+                      include_aids_deaths=True, 
+                      beta={'structuredsexual': [0.01, 0.01], 'maternal': [0.01, 0.01]})
+disease_objects = []
+for disease in healthconditions:
+    init_prev = ss.bernoulli(get_prevalence_function(disease))
+    disease_class = getattr(mi, disease, None)
+    if disease_class:
+        disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})
+        disease_objects.append(disease_obj)
+        
+disease_objects.append(hiv_disease)
+
+# Initialize interaction objects for HIV-NCD interactions
+ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
+ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
+interactions = [ncd_hiv_connector]
+
+# Load NCD-NCD interactions
+ncd_interactions = mi.read_interactions(csv_path_interactions) 
+connectors = mi.create_connectors(ncd_interactions)
+
+# Add NCD-NCD connectors to interactions
+interactions.extend(connectors)
+
+# -------------------------
+# Interventions
+# -------------------------
+
+interventions = [
+    # Universal, high-probability annual HIV testing (ramping up in early 2010s)
+    sti.HIVTest(test_prob_data=[0.6, 0.7, 0.95], years=[2000, 2007, 2016]),
+    # Test and treat: ART for nearly all diagnosed from 2010 onward
+    sti.ART(pars={'future_coverage': {'year': 2005, 'prop': 0.95}}),
+    # VMMC scale-up: reach 30% by 2015
+    sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
+    # PrEP for high-risk (starts low, ramps up)
+    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]})
+]
+
+def get_deaths_module(sim):
+    for module in sim.modules:
+        if isinstance(module, mi.DeathsByAgeSexAnalyzer):
+            return module
+    raise ValueError("Deaths module not found in the simulation. Make sure you've added the DeathsByAgeSexAnalyzer to your simulation configuration")
+
+def get_pregnancy_module(sim):
+    for module in sim.modules:
+        if isinstance(module, ss.Pregnancy):
+            return module
+    raise ValueError("Pregnancy module not found in the simulation.")
+
+
+if __name__ == '__main__':
+    # Initialize the simulation with connectors and force=True
+    sim = ss.Sim(
+        n_agents=n_agents,
+        networks=networks,
+        start=inityear,
+        stop=endyear,
+        people=ppl,
+        demographics=[pregnancy, death],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+        diseases=disease_objects,
+        connectors=interactions,
+        interventions = interventions,
+        copy_inputs=False,
+        label='Connector'
+    )
+ 
+    # Run the simulation
+    sim.run()
+    
+
+    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
+
+    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    
+    # Get the modules
+    deaths_module = get_deaths_module(sim)
+    pregnancy_module = get_pregnancy_module(sim)
+    
+    target_year = endyear - 1
+    
+    # Load observed mortality rate data
+    mx_path = f'demography/{region}_mx.csv'
+    ex_path = f'demography/{region}_ex.csv'
+    
+    obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
+    obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
+    
+    # Calculate mortality rates using `calculate_mortality_rates
+    df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
+
+    df_mx_male = df_mx[df_mx['sex'] == 'Male']
+    df_mx_female = df_mx[df_mx['sex'] == 'Female']
+    
+    mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
+
+    # Create the life table
+    life_table = mi.create_life_table(df_mx_male, df_mx_female, max_age=100, radix=100000)
+    print(life_table)
+    
+    # Plot life expectancy comparison
+    mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
