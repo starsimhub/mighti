@@ -32,11 +32,6 @@ class RemittingDisease(ss.NCD):
             p_acquire=disease_params["incidence"]
         )
 
-        # Define disease parameters
-        self.define_pars(
-            p_acquire=disease_params["incidence"],  # Probability of acquisition per timestep
-        )
-
         # Define the lambda function to calculate acquisition probability
         def calculate_p_acquire(self, sim, uids):
             # Start with base probability
@@ -193,8 +188,6 @@ class RemittingDisease(ss.NCD):
 
     
 
-
-
 class AcuteDisease(ss.NCD):
     """ Base class for all acute diseases. """
 
@@ -217,11 +210,6 @@ class AcuteDisease(ss.NCD):
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  # Store HIV relative risk
             affected_sex=disease_params["affected_sex"]
-        )
-
-        # Define disease parameters
-        self.define_pars(
-            p_acquire=disease_params["incidence"],  # Probability of acquisition per timestep
         )
 
         # Define the lambda function to calculate acquisition probability
@@ -373,12 +361,6 @@ class ChronicDisease(ss.NCD):
             rel_sus_hiv=disease_params["rel_sus_hiv"],  # Store HIV relative risk
             affected_sex=disease_params["affected_sex"]
         )
-    
-        # Define disease parameters
-        self.define_pars(
-            p_acquire=disease_params["incidence"],  # Probability of acquisition per timestep
-        )
-
         
         def calculate_p_acquire(self, sim, uids):
             # Start with base probability
@@ -523,11 +505,6 @@ class GenericSIS(ss.SIS):
             rel_sus_hiv=disease_params["rel_sus_hiv"],  # Store HIV relative risk
             affected_sex=disease_params["affected_sex"],
             p_acquire=disease_params["incidence"]
-        )
-
-        # Define disease parameters
-        self.define_pars(
-            p_acquire=disease_params["incidence"],  # Probability of acquisition per timestep
         )
 
         def calculate_p_acquire(self, sim, uids):
