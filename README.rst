@@ -31,15 +31,43 @@ Please also make sure to install its dependencies:
     pip install starsim stisim
 
 
+Running an Example
+------------
+
+python mighti_main.py
+
+This will run a sample simulation that includes demography, HIV, and NCD modules. Outputs will be saved in the outputs/ folder.
+
+You can also run:
+	•	mighti_demography.py — mortality and life expectancy module
+	•	mighti_calibration.py — Optuna-based parameter calibration
+
+
 Usage and Documentation
-------------------------
+------------
 
-Documentation and examples are currently under development.
+MIGHTI is based on Starsim, please refer to [Starsim documentation](https://docs.idmod.org/projects/starsim/en/latest/) for additional information.
 
-For help getting started, please see the following example scripts:
 
-- ``mighti_demography.py`` — runs demography-related modules (e.g., life expectancy, mortality)
-- ``mighti_main.py`` — runs full disease-related simulations
+References
+------------
+
+MIGHTI uses data from:
+	•	Demography: UN WPP 2024
+	•	NCDs: Global Burden of Disease (GBD)
+	•	HIV: DHS, SHIMS
+
+
+Contributing
+------------
+
+Contributions to the MIGHTI project are welcome! Please read CONTRIBUTING.md for details on our code of conduct, and the process for submitting pull requests.
+
+
+Disclaimer
+------------
+
+This code was developed by researchers at NYU, IDM, and collaborators. It is shared under the MIT License to foster reproducibility and future development. No guarantees are made regarding functionality or support. You are free to fork and modify the code under the terms of the license.
 
 
 References
