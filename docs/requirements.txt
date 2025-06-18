@@ -1,7 +1,6 @@
 starsim
 sciris
 pandas
-numpy
 matplotlib
 pytest
 sphinx
