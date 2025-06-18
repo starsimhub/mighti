@@ -46,7 +46,7 @@ You can also run:
 Usage and Documentation
 ------------
 
-MIGHTI is based on Starsim, please refer to [Starsim documentation](https://docs.idmod.org/projects/starsim/en/latest/) for additional information.
+MIGHTI is based on Starsim, please refer to `Starsim documentation <https://docs.idmod.org/projects/starsim/en/latest/>`_ for additional information.
 
 
 References
@@ -61,7 +61,7 @@ MIGHTI uses data from:
 Contributing
 ------------
 
-Contributions to the MIGHTI project are welcome! Please read CONTRIBUTING.md for details on our code of conduct, and the process for submitting pull requests.
+Contributions to the MIGHTI project are welcome! Please read `CONTRIBUTING.mst <https://github.com/starsimhub/mighti/blob/main/contributing.rst>`_ for details on our code of conduct, and the process for submitting pull requests.
 
 
 Disclaimer
