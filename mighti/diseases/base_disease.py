@@ -169,7 +169,28 @@ class RemittingDisease(ss.NCD):
 
         # New cases
         susceptible = (~self.affected).uids
-        new_cases = self.p_acquire.filter(susceptible)
+        
+        p_acq = np.full(len(susceptible), self.pars.p_acquire)
+        
+        # Apply sex filtering
+        if self.pars.affected_sex == "female":
+            p_acq[self.sim.people.male[susceptible]] = 0
+        elif self.pars.affected_sex == "male":
+            p_acq[self.sim.people.female[susceptible]] = 0
+        
+        # Apply rel_sus and rel_sus_hiv
+        try:
+            p_acq *= self.rel_sus[susceptible]
+            if hasattr(self.sim.people, 'hiv'):
+                hiv_pos = self.sim.people.hiv[susceptible]
+                p_acq[hiv_pos] *= self.pars.rel_sus_hiv
+        except Exception:
+            pass
+        
+        # Sample new cases using numpy
+        draws = np.random.rand(len(susceptible))
+        new_cases = susceptible[draws < p_acq]
+        
         self.affected[new_cases] = True
         self.ti_affected[new_cases] = ti
 
@@ -209,7 +230,8 @@ class AcuteDisease(ss.NCD):
             init_prev=ss.bernoulli(disease_params["init_prev"]),
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  # Store HIV relative risk
-            affected_sex=disease_params["affected_sex"]
+            affected_sex=disease_params["affected_sex"],
+            p_acquire=disease_params["incidence"]
         )
 
         # Define the lambda function to calculate acquisition probability
@@ -322,7 +344,25 @@ class AcuteDisease(ss.NCD):
 
         # New cases
         susceptible = (~self.affected).uids
-        new_cases = self.p_acquire.filter(susceptible)
+        
+        p_acq = np.full(len(susceptible), self.pars.p_acquire)
+        
+        if self.pars.affected_sex == "female":
+            p_acq[self.sim.people.male[susceptible]] = 0
+        elif self.pars.affected_sex == "male":
+            p_acq[self.sim.people.female[susceptible]] = 0
+        
+        try:
+            p_acq *= self.rel_sus[susceptible]
+            if hasattr(self.sim.people, 'hiv'):
+                hiv_pos = self.sim.people.hiv[susceptible]
+                p_acq[hiv_pos] *= self.pars.rel_sus_hiv
+        except Exception:
+            pass
+        
+        # Sample new cases using numpy
+        draws = np.random.rand(len(susceptible))
+        new_cases = susceptible[draws < p_acq]
         self.affected[new_cases] = True
         self.ti_affected[new_cases] = ti
 
@@ -359,7 +399,8 @@ class ChronicDisease(ss.NCD):
             init_prev=ss.bernoulli(disease_params["init_prev"]),
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  # Store HIV relative risk
-            affected_sex=disease_params["affected_sex"]
+            affected_sex=disease_params["affected_sex"],
+            p_acquire=disease_params["incidence"]
         )
         
         def calculate_p_acquire(self, sim, uids):
@@ -465,7 +506,25 @@ class ChronicDisease(ss.NCD):
 
         # New cases
         susceptible = (~self.affected).uids
-        new_cases = self.p_acquire.filter(susceptible)
+        
+        p_acq = np.full(len(susceptible), self.pars.p_acquire)
+        
+        if self.pars.affected_sex == "female":
+            p_acq[self.sim.people.male[susceptible]] = 0
+        elif self.pars.affected_sex == "male":
+            p_acq[self.sim.people.female[susceptible]] = 0
+        
+        try:
+            p_acq *= self.rel_sus[susceptible]
+            if hasattr(self.sim.people, 'hiv'):
+                hiv_pos = self.sim.people.hiv[susceptible]
+                p_acq[hiv_pos] *= self.pars.rel_sus_hiv
+        except Exception:
+            pass
+        
+        # Sample new cases using numpy
+        draws = np.random.rand(len(susceptible))
+        new_cases = susceptible[draws < p_acq]
         self.affected[new_cases] = True
         self.ti_affected[new_cases] = ti
 
@@ -501,6 +560,7 @@ class GenericSIS(ss.SIS):
             incidence_prob=disease_params["incidence"],
             p_death=bernoulli(disease_params["p_death"]),  # Define p_death as a Bernoulli distribution
             init_prev=ss.bernoulli(disease_params["init_prev"]),
+            remission_rate=bernoulli(disease_params["remission_rate"]),  # Define remission_rate as a Bernoulli distribution
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  # Store HIV relative risk
             affected_sex=disease_params["affected_sex"],
@@ -617,8 +677,27 @@ class GenericSIS(ss.SIS):
         ti = self.ti
 
         # New cases
-        susceptible = (~self.infected).uids
-        new_cases = self.p_acquire.filter(susceptible)
+        susceptible = (~self.affected).uids
+        
+        p_acq = np.full(len(susceptible), self.pars.p_acquire)
+        
+        if self.pars.affected_sex == "female":
+            p_acq[self.sim.people.male[susceptible]] = 0
+        elif self.pars.affected_sex == "male":
+            p_acq[self.sim.people.female[susceptible]] = 0
+        
+        try:
+            p_acq *= self.rel_sus[susceptible]
+            if hasattr(self.sim.people, 'hiv'):
+                hiv_pos = self.sim.people.hiv[susceptible]
+                p_acq[hiv_pos] *= self.pars.rel_sus_hiv
+        except Exception:
+            pass
+        
+        # Sample new cases using numpy
+        draws = np.random.rand(len(susceptible))
+        new_cases = susceptible[draws < p_acq]
+
         self.infected[new_cases] = True
         self.ti_infected[new_cases] = ti
 
@@ -634,6 +713,3 @@ class GenericSIS(ss.SIS):
 
         return new_cases              
         
-
-
-

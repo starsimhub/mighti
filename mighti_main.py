@@ -17,7 +17,7 @@ import os
 # ---------------------------------------------------------------------
 n_agents = 10_000 # Number of agents in the simulation
 inityear = 2007  
-endyear = 2009
+endyear = 2023
 region = 'eswatini'
 
 # ---------------------------------------------------------------------
@@ -32,7 +32,7 @@ csv_path_params = f'mighti/data/{region}_parameters_gbd.csv'
 csv_path_interactions = "mighti/data/rel_sus.csv"
 
 # Prevalence data
-csv_prevalence = f'mighti/data/{region}_hiv_prevalence.csv'
+csv_prevalence = f'mighti/data/{region}_prevalence.csv'
 
 # Fertility data 
 csv_path_fertility = f'mighti/data/{region}_asfr.csv'
@@ -193,8 +193,10 @@ if __name__ == '__main__':
     
 
     mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear)  
 
-    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear)  
     
     # Get the modules
     deaths_module = get_deaths_module(sim)
