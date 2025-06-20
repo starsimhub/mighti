@@ -17,7 +17,7 @@ import os
 # ---------------------------------------------------------------------
 n_agents = 10_000 # Number of agents in the simulation
 inityear = 2007  
-endyear = 2023
+endyear = 2009
 region = 'eswatini'
 
 # ---------------------------------------------------------------------
@@ -205,8 +205,8 @@ if __name__ == '__main__':
     target_year = endyear - 1
     
     # Load observed mortality rate data
-    mx_path = f'demography/{region}_mx.csv'
-    ex_path = f'demography/{region}_ex.csv'
+    mx_path = f'mighti/data/{region}_mx.csv'
+    ex_path = f'mighti/data/{region}_ex.csv'
     
     obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
     obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')

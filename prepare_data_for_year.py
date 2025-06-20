@@ -9,7 +9,7 @@ def prepare_data_for_year(region, year):
     csv_path_age = os.path.join(script_dir, 'mighti', 'data', f'{region}_age_distribution_{year}.csv')
 
     # Load wide-format mx file
-    csv_path_mortality_rates = os.path.join(script_dir, 'demography', f'{region}_mx.csv')
+    csv_path_mortality_rates = os.path.join(script_dir, 'mighti', 'data', f'{region}_mx.csv')
     mortality_rates = pd.read_csv(csv_path_mortality_rates)
 
     # Melt the data to long format
@@ -31,7 +31,7 @@ def prepare_data_for_year(region, year):
 
 
     # Load the age distribution data
-    csv_path_age_distribution = os.path.join(script_dir, 'demography', f'{region}_age_distribution.csv')
+    csv_path_age_distribution = os.path.join(script_dir, 'mighti', 'data', f'{region}_age_distribution.csv')
     age_distribution = pd.read_csv(csv_path_age_distribution)
     
     # Extract rows for the specified year

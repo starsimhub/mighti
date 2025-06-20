@@ -13,31 +13,34 @@ import os
 n_agents = 10_000 # Number of agents in the simulation
 inityear = 2007  # Simulation start year
 endyear = 2024
+region = 'eswatini'
 
 # ---------------------------------------------------------------------
 # Specify data file paths
 # ---------------------------------------------------------------------
 
+
 # Parameters
-csv_path_params = 'mighti/data/eswatini_parameters_gbd.csv'
+csv_path_params = f'mighti/data/{region}_parameters_gbd.csv'
 
 # Relative Risks
 csv_path_interactions = "mighti/data/rel_sus.csv"
 
 # Prevalence data
-csv_prevalence = 'mighti/data/prevalence_data_eswatini.csv'
+csv_prevalence = f'mighti/data/{region}_prevalence.csv'
 
 # Fertility data 
-csv_path_fertility = 'mighti/data/eswatini_asfr.csv'
+csv_path_fertility = f'mighti/data/{region}_asfr.csv'
 
 # Death data
-csv_path_death = f'mighti/data/eswatini_mortality_rates_{inityear}.csv'
+csv_path_death = f'mighti/data/{region}_mortality_rates_{inityear}.csv'
 
 # Age distribution data
-csv_path_age = f'mighti/data/eswatini_age_distribution_{inityear}.csv'
+csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
+
 
 import prepare_data_for_year
-prepare_data_for_year.prepare_data_for_year(inityear)
+prepare_data_for_year.prepare_data_for_year(region,inityear)
 
 # Load the mortality rates and ensure correct format
 mortality_rates_year = pd.read_csv(csv_path_death)
@@ -162,7 +165,7 @@ if __name__ == '__main__':
     year = 2023
     
     # Load observed mortality rate data
-    observed_death_data = pd.read_csv('demography/eswatini_mortality_rates.csv')
+    observed_death_data = pd.read_csv('mighit/data/eswatini_mortality_rates.csv')
     
     # Calculate mortality rates using `calculate_mortality_rates
     df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=year, max_age=100, radix=n_agents)
@@ -180,7 +183,7 @@ if __name__ == '__main__':
     print(life_table)
     
     # Load observed life expectancy data
-    observed_LE = pd.read_csv('demography/eswatini_life_expectancy_by_age.csv')
+    observed_LE = pd.read_csv('mighit/data/eswatini_life_expectancy_by_age.csv')
     
     # Plot life expectancy comparison
     mi.plot_life_expectancy(life_table, observed_LE, year=year, max_age=100, figsize=(14, 10), title=None)
