@@ -27,3 +27,4 @@ ParkinsonsDisease,0.0000149,0.0005,6.69425511,0.208179273,1,,,chronic,ncd,both
 HPV,,,,,,0.01,,remitting,sis,both
 Flu,,0.15,,,5.7,,,sis,sis,both
 SubstanceUseDisorder,0.0000111,,2.05407094,2.891861943,2.47,,,remitting,ncd,both
+ViralHepatitis,,,,,,,,sis,sis,both
