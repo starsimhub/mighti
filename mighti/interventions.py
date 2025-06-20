@@ -1,5 +1,11 @@
+"""
+Implements interventions applied to the simulated population
+"""
+
+
 import starsim as ss
 import numpy as np
+
 
 class BaseHealthIntervention(ss.Intervention):
     def __init__(self, name=None, start=None, stop=None, uptake_prob=1.0, eligibility=None, **kwargs):
@@ -45,8 +51,6 @@ class BaseHealthIntervention(ss.Intervention):
     def update_results(self):
         self.results['n_intervened'][self.ti] = np.count_nonzero(self.ti_intervened == self.ti)
         
-        
-
 
 class DepressionDrugIntervention(BaseHealthIntervention):
     def __init__(self, name='depression_tx', start=None, stop=None, uptake_prob=1.0, **kwargs):
@@ -55,3 +59,4 @@ class DepressionDrugIntervention(BaseHealthIntervention):
     def apply_effects(self, uids):
         """Flag agents as receiving depression medication"""
         self.sim.conditions['Depression'].on_treatment[uids] = True
+        

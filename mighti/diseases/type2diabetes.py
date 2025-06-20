@@ -1,10 +1,9 @@
-import pandas as pd
-from scipy.stats import bernoulli, lognorm
-import starsim as ss
-import numpy as np
-import sciris as sc
-from mighti.diseases.base_disease import RemittingDisease
+"""
+Module defining the Type 2 Diabetes remitting disease model.
+"""
 
+
+from mighti.diseases.base_disease import RemittingDisease
 
 
 class Type2Diabetes(RemittingDisease):

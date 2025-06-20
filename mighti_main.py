@@ -1,37 +1,58 @@
+"""
+MIGHTI Simulation Script for a selected region: HIV and Health Conditions Interaction Modeling
+
+This script initializes and runs an agent-based simulation using the MIGHTI framework
+(built on StarSim and STI-Sim) to analyze the interplay between HIV and
+other health conditions (HCs) in selected country. 
+It loads demographic data, initializes diseases and networks, 
+applies interventions, and analyzes prevalence and mortality outcomes for the selected period.
+
+Key components:
+- Loads parameters and prevalence data from CSV files.
+- Initializes networks: maternal and structured sexual.
+- Initializes HIV and HC modules.
+- Sets up demographic modules (deaths, pregnancy).
+- Applies HIV interventions (e.g., ART, VMMC).
+- Computes and plots prevalence, mortality rates, and life expectancy.
+
+To run: `python mighti_main.py`
+"""
+
+
+import logging
+import mighti as mi
+import numpy as np
+import pandas as pd
+import prepare_data_for_year
 import starsim as ss
 import stisim as sti
-import sciris as sc
-import mighti as mi
-import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
-import os
 
-##### TO DO #####
-# Calibration 
-# Relative Risk implementation 
+# Set up logging and random seeds for reproducibility
+logger = logging.getLogger('MIGHTI')
+logger.setLevel(logging.INFO) 
+np.random.seed(12345)   
+ss.set_seed(12345)      
 
 
 # ---------------------------------------------------------------------
-# Define population size and simulation timeline
+# Simulation Settings
 # ---------------------------------------------------------------------
-n_agents = 10_000 # Number of agents in the simulation
+n_agents = 10_000 
 inityear = 2007  
 endyear = 2009
 region = 'eswatini'
 
-# ---------------------------------------------------------------------
-# Specify data file paths
-# ---------------------------------------------------------------------
 
-
+# ---------------------------------------------------------------------
+# File paths
+# ---------------------------------------------------------------------
 # Parameters
 csv_path_params = f'mighti/data/{region}_parameters_gbd.csv'
 
 # Relative Risks
 csv_path_interactions = "mighti/data/rel_sus.csv"
 
-# Prevalence data
+# Disease prevalence data
 csv_prevalence = f'mighti/data/{region}_prevalence.csv'
 
 # Fertility data 
@@ -43,121 +64,104 @@ csv_path_death = f'mighti/data/{region}_mortality_rates_{inityear}.csv'
 # Age distribution data
 csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
 
-
-import prepare_data_for_year
+# Ensure required demographic files are prepared
 prepare_data_for_year.prepare_data_for_year(region,inityear)
 
 
-# Load parameters
+# ---------------------------------------------------------------------
+# Load Parameters and Disease Configuration
+# ---------------------------------------------------------------------
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
-
-# Extract all conditions except HIV
 healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
 # healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
-# 
-# Combine with HIV
 # healthconditions = []
+
 diseases = ["HIV"] + healthconditions
 
-# Filter the DataFrame for disease_class being 'ncd'
 ncd_df = df[df["disease_class"] == "ncd"]
-
-# Extract disease categories from the filtered DataFrame
 chronic = ncd_df[ncd_df["disease_type"] == "chronic"]["condition"].tolist()
 acute = ncd_df[ncd_df["disease_type"] == "acute"]["condition"].tolist()
 remitting = ncd_df[ncd_df["disease_type"] == "remitting"]["condition"].tolist()
-
-# ncd = chronic + acute + remitting
-
-# Extract communicable diseases with disease_class as 'sis'
 communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
 
 
 # ---------------------------------------------------------------------
-# Initialize conditions, prevalence analyzer, and interactions
+# Prevalence Data and Analyzers
 # ---------------------------------------------------------------------
 prevalence_data_df = pd.read_csv(csv_prevalence)
-
 prevalence_data, age_bins = mi.initialize_prevalence_data(
     diseases, prevalence_data=prevalence_data_df, inityear=inityear
 )
-
-# Define a function for disease-specific prevalence
-def get_prevalence_function(disease):
-    return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
+get_prev_fn = lambda d: lambda mod, sim, size: mi.age_sex_dependent_prevalence(d, prevalence_data, age_bins, sim, size)
 
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
-# -------------------------
-# Demographics
-# -------------------------
 
+# ---------------------------------------------------------------------
+# Demographics and Networks
+# ---------------------------------------------------------------------
 death_rates = {'death_rate': pd.read_csv(csv_path_death), 'rate_units': 1}
-death = ss.Deaths(death_rates)  # Use Demographics class implemented in mighti
+death = ss.Deaths(death_rates) 
 fertility_rate = {'fertility_rate': pd.read_csv(csv_path_fertility)}
 pregnancy = ss.Pregnancy(pars=fertility_rate)
 
 ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
 
-# Initialize networks
-# mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
 structuredsexual = sti.StructuredSexual()
 networks = [maternal, structuredsexual]
 
-# -------------------------
-# Diseases
-# -------------------------
 
-# Initialize disease conditions
-hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
+# ---------------------------------------------------------------------
+# Diseases
+# ---------------------------------------------------------------------
+hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prev_fn('HIV')),
                       init_prev_data=None,   
                       p_hiv_death=None, 
                       include_aids_deaths=True, 
                       beta={'structuredsexual': [0.01, 0.01], 'maternal': [0.01, 0.01]})
+
 disease_objects = []
-for disease in healthconditions:
-    init_prev = ss.bernoulli(get_prevalence_function(disease))
-    disease_class = getattr(mi, disease, None)
-    if disease_class:
-        disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})
-        disease_objects.append(disease_obj)
-        
+for dis in healthconditions:
+    cls = getattr(mi, dis, None)
+    if cls is not None:
+        disease_objects.append(cls(csv_path=csv_path_params, pars={"init_prev": ss.bernoulli(get_prev_fn(dis))}))
 disease_objects.append(hiv_disease)
 
-# Initialize interaction objects for HIV-NCD interactions
+
+# ---------------------------------------------------------------------
+# Interactions
+# ---------------------------------------------------------------------
 ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
 ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
 interactions = [ncd_hiv_connector]
 
-# Load NCD-NCD interactions
 ncd_interactions = mi.read_interactions(csv_path_interactions) 
 connectors = mi.create_connectors(ncd_interactions)
 
-# Add NCD-NCD connectors to interactions
 interactions.extend(connectors)
 
-# -------------------------
-# Interventions
-# -------------------------
 
+# ---------------------------------------------------------------------
+# Interventions
+# ---------------------------------------------------------------------
 interventions = [
-    # Universal, high-probability annual HIV testing (ramping up in early 2010s)
     sti.HIVTest(test_prob_data=[0.6, 0.7, 0.95], years=[2000, 2007, 2016]),
-    # Test and treat: ART for nearly all diagnosed from 2010 onward
     sti.ART(pars={'future_coverage': {'year': 2005, 'prop': 0.95}}),
-    # VMMC scale-up: reach 30% by 2015
     sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
-    # PrEP for high-risk (starts low, ramps up)
     sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]})
 ]
 
+
+# ---------------------------------------------------------------------
+# Utility: Get Modules
+# ---------------------------------------------------------------------
 def get_deaths_module(sim):
     for module in sim.modules:
         if isinstance(module, mi.DeathsByAgeSexAnalyzer):
@@ -171,8 +175,10 @@ def get_pregnancy_module(sim):
     raise ValueError("Pregnancy module not found in the simulation.")
 
 
+# ---------------------------------------------------------------------
+# Main Simulation
+# ---------------------------------------------------------------------
 if __name__ == '__main__':
-    # Initialize the simulation with connectors and force=True
     sim = ss.Sim(
         n_agents=n_agents,
         networks=networks,
@@ -192,16 +198,13 @@ if __name__ == '__main__':
     sim.run()
     
 
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    # Plot prevalence
+    for disease in ['HIV', 'Type2Diabetes']:
+        mi.plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year=inityear, end_year=endyear)
+        mi.plot_age_group_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year=inityear, end_year=endyear)
 
-    mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
-    mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, init_year = inityear, end_year = endyear)  
-    
-    # Get the modules
-    deaths_module = get_deaths_module(sim)
-    pregnancy_module = get_pregnancy_module(sim)
-    
+
+    # Mortality rates and life table
     target_year = endyear - 1
     
     # Load observed mortality rate data
@@ -210,6 +213,10 @@ if __name__ == '__main__':
     
     obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
     obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
+    
+    # Get the modules
+    deaths_module = get_deaths_module(sim)
+    pregnancy_module = get_pregnancy_module(sim)
     
     # Calculate mortality rates using `calculate_mortality_rates
     df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
@@ -221,7 +228,6 @@ if __name__ == '__main__':
 
     # Create the life table
     life_table = mi.create_life_table(df_mx_male, df_mx_female, max_age=100, radix=100000)
-    print(life_table)
     
     # Plot life expectancy comparison
     mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)

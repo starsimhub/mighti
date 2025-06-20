@@ -1,10 +1,9 @@
-import pandas as pd
-from scipy.stats import bernoulli, lognorm
-import starsim as ss
-import numpy as np
-import sciris as sc
-from mighti.diseases.base_disease import RemittingDisease
+"""
+Module defining tobacco use as a remitting disease model.
+"""
 
+
+from mighti.diseases.base_disease import RemittingDisease
 
 
 class TobaccoUse(RemittingDisease):

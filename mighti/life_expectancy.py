@@ -1,24 +1,33 @@
-import numpy as np
-import starsim as ss
-import sciris as sc
-import pandas as pd
+"""
+Calculates and analyzes mortality rates and life expectancy from simulation data
+"""
+
+
 import numpy as np
 import pandas as pd
 
 
 def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=100000):
+    """
+    Compute age-specific mortality rates (m(x)) using simulated death tracking and survivorship.
 
-    # Initialize survivorship function l(x)
+    Args:
+        sim (ss.Sim): The simulation object.
+        deaths_module: Module tracking male/female deaths by age (e.g., mi.DeathsByAgeSexAnalyzer).
+        year (int, optional): Simulation year for labeling output. If None, uses current sim year.
+        max_age (int): Maximum age to include in calculations.
+        radix (int): Reference population size used for initial survivorship (typically 100000).
+
+    Returns:
+        pd.DataFrame: A table with columns ['year', 'age', 'sex', 'mx'].
+    """
     survivorship = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
     survivorship['Male'][0] = radix/2
     survivorship['Female'][0] = radix/2
 
-    # Initialize deaths and person-years lived by age and sex
     deaths_by_age = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
     person_years = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
 
-
-    # Populate deaths by age and sex using deaths_module.death_tracking
     for age in range(max_age + 1):
             deaths_by_age['Male'][age] = (
                 deaths_module.results.male_deaths_by_age[age]
@@ -30,7 +39,6 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
                     if age < len(deaths_module.results.female_deaths_by_age) else 0
             )
     
-    # Calculate survivorship, person-years, and mortality rates
     mortality_rates = []
     for age in range(max_age):
         for sex in ['Male', 'Female']:
@@ -39,19 +47,17 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
             
             # Compute l(x+1) using l(x) and deaths
             survivorship[sex][age + 1] = sim.analyzers.survivorship_analyzer.survivorship_data[sex][age]
+            
             # Compute L(x)
             Lx = survivorship[sex][age + 1] + 0.5 * deaths
             person_years[sex][age] = Lx
 
             # Compute m(x)
             mx = deaths / Lx if Lx > 0 else 0
-            print(f"age: {age}, sex: {sex}, deaths: {deaths}, Lx: {Lx} ")
-            # Record mortality rate
+
             current_year = year if year is not None else int(sim.t.yearvec[sim.t.ti])
             mortality_rates.append({'year': current_year, 'age': age, 'sex': sex, 'mx': mx})
             
-
-
     # Handle the last age group (open interval)
     for sex in ['Male', 'Female']:
         age = max_age
@@ -111,7 +117,6 @@ def calculate_life_table_from_mx(m_x, max_age=100, radix=100000):
         'T(x)': T_x,
         'e(x)': e_x
     })
-
     return df
 
 

@@ -1,10 +1,9 @@
-import pandas as pd
-from scipy.stats import bernoulli, lognorm
-import starsim as ss
-import numpy as np
-import sciris as sc
-from mighti.diseases.base_disease import GenericSIS
+"""
+Module defining TB infectiou as a infectious disease model.
+"""
 
+
+from mighti.diseases.base_disease import GenericSIS
 
 
 class TB(GenericSIS):

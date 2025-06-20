@@ -1,13 +1,42 @@
-import starsim as ss
-import sciris as sc
+"""
+Defines interdependencies and risk modifiers between diseases and conditions.
+"""
+
+
 import pandas as pd
 import matplotlib.pyplot as plt
+import starsim as ss
+import sciris as sc
 from collections import defaultdict
 
+
 class NCDHIVConnector(ss.Connector):
+    """
+    Connector to model interaction between HIV and NCDs by adjusting susceptibility.
+
+    This connector increases the susceptibility to specified NCDs among HIV-infected agents
+    by a user-specified relative susceptibility factor. It also tracks and optionally plots
+    the dynamics of NCD prevalence, HIV prevalence, and susceptibility over time.
+
+    Attributes:
+        rel_sus_dict (dict): Dictionary mapping NCD names (str) to relative susceptibility values (float).
+        time (sc.autolist): List of simulation times for plotting.
+        rel_sus (defaultdict): Time-series of mean relative susceptibility for each NCD.
+        ncd_prev (defaultdict): Time-series of NCD prevalence values.
+        hiv_prev (sc.autolist): Time-series of HIV prevalence values.
+    """
+
     def __init__(self, rel_sus_dict, pars=None, **kwargs):
+        """
+        Initialize the NCD-HIV connector.
+
+        Args:
+            rel_sus_dict (dict): Mapping from NCD names to relative susceptibility values.
+            pars (dict, optional): Additional parameters (unused, for compatibility).
+            **kwargs: Additional keyword arguments passed to `update_pars`.
+        """
         super().__init__(label='NCD-HIV')
-        self.rel_sus_dict = rel_sus_dict  # Dictionary containing relative susceptibility values for each NCD
+        self.rel_sus_dict = rel_sus_dict
         self.update_pars(pars, **kwargs)
         
         self.time = sc.autolist()
@@ -16,6 +45,9 @@ class NCDHIVConnector(ss.Connector):
         self.hiv_prev = sc.autolist()
         
     def step(self):
+        """
+        Apply increased susceptibility to NCDs for HIV-infected agents and record values for plotting.
+        """
         hiv = self.sim.diseases.hiv
         
         for ncd, rel_sus_val in self.rel_sus_dict.items():
@@ -23,18 +55,20 @@ class NCDHIVConnector(ss.Connector):
             if ncd_obj is not None:
                 ncd_obj.rel_sus[hiv.infected.uids] = rel_sus_val
 
-                # Collecting data for analysis
                 self.rel_sus[ncd].append(ncd_obj.rel_sus.mean())
                 self.ncd_prev[ncd].append(ncd_obj.results.prevalence[self.sim.ti])
-                
-                # print(f"Relative susceptibility for {ncd} due to HIV: {ncd_obj.rel_sus[hiv.infected.uids]}")
-
                 
         self.time.append(self.sim.t)
         self.hiv_prev.append(hiv.results.prevalence[self.sim.ti])
         return
     
     def plot(self):
+        """
+        Plot time-series of NCD susceptibility, NCD prevalence, and HIV prevalence.
+
+        Returns:
+            matplotlib.figure.Figure: The figure object containing the plot.
+        """
         sc.options(dpi=200)
         fig, ax = plt.subplots(len(self.rel_sus_dict), 1, figsize=(10, 8))
         
@@ -44,7 +78,7 @@ class NCDHIVConnector(ss.Connector):
         for i, ncd in enumerate(self.rel_sus_dict.keys()):
             ax[i].plot(self.time, self.rel_sus[ncd], label=f'{ncd} rel_sus')
             ax[i].plot(self.time, self.ncd_prev[ncd], label=f'{ncd} prevalence')
-            ax[i].plot(self.time, self.hiv_prev, label=f'HIV prevalence')
+            ax[i].plot(self.time, self.hiv_prev, label='HIV prevalence')
             ax[i].legend()
             ax[i].set_title(f'{self.sim.label} - {ncd}')
         
@@ -53,7 +87,6 @@ class NCDHIVConnector(ss.Connector):
         return fig
 
 
-# Function to read interaction data
 def read_interactions(datafile=None):
     """
     Reads interaction data from a CSV file.
@@ -74,7 +107,7 @@ def read_interactions(datafile=None):
 
     return rel_sus
 
-# Function to create connectors for each pair of conditions
+
 def create_connectors(rel_sus):
     connectors = []
     for condition1, interactions in rel_sus.items():
@@ -83,7 +116,7 @@ def create_connectors(rel_sus):
             connectors.append(connector)
     return connectors
 
-# Function to create a dynamic connector with unique class name
+
 def create_dynamic_connector(condition1, condition2, rel_sus_val):
     class_name = f"{condition1}_{condition2}_Connector"
     DynamicConnector = type(class_name, (ss.Connector,), {
@@ -99,12 +132,12 @@ def create_dynamic_connector(condition1, condition2, rel_sus_val):
     })
     return DynamicConnector()
 
+
 def step_function(self, condition1, condition2, rel_sus_val):
     condition1_obj = self.sim.diseases.get(condition1.lower(), None)
     condition2_obj = self.sim.diseases.get(condition2.lower(), None)
     
     if condition1_obj is None or condition2_obj is None:
-        # print(f"Error: {condition1} or {condition2} not found in simulation diseases.")
         return
         
     # Determine if the first condition uses 'infected' or 'affected'
@@ -119,14 +152,11 @@ def step_function(self, condition1, condition2, rel_sus_val):
         condition2_obj.rel_sus[condition1_uids] = self.relative_risk
         return
 
-    # print(f"Relative susceptibility for {condition2} due to {condition1}: {condition2_obj.rel_sus[condition1_obj.affected.uids]}")
-
     # Collecting data for analysis
     self.time.append(self.sim.t)
     self.rel_sus.append(condition2_obj.rel_sus.mean())
     self.condition1_prev.append(condition1_obj.results.prevalence[self.sim.ti])
     self.condition2_prev.append(condition2_obj.results.prevalence[self.sim.ti])
-
 
 
 def plot_function(self):

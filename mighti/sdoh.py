@@ -1,9 +1,18 @@
+"""
+Defines social determinants of health modules for housing, transportation, education, and income
+"""
+
+
 import starsim as ss
 import numpy as np
 
+
 __all__ = ["HousingSituation", "TransportationSituation", "EducationSituation", "IncomeSituation"]
 
+
 class HousingSituation(ss.Module):
+    """Models unstable housing as a binary state influenced by employment."""
+    
     def __init__(self, prob=0.3):
         super().__init__()
         self.name = 'housing_situation'
@@ -29,7 +38,10 @@ class HousingSituation(ss.Module):
             self.housing_unstable[to_stabilize] = False
         return
 
+
 class TransportationSituation(ss.Module):
+    """Placeholder module for modeling access to transportation."""
+    
     def __init__(self):
         super().__init__()
         self.name = 'transportation_situation'
@@ -41,7 +53,10 @@ class TransportationSituation(ss.Module):
     def step(self, sim):
         pass
 
+
 class EducationSituation(ss.Module):
+    """Placeholder module for modeling educational attainment."""
+    
     def __init__(self):
         super().__init__()
         self.name = 'education_situation'
@@ -53,7 +68,10 @@ class EducationSituation(ss.Module):
     def step(self, sim):
         pass
 
+
 class IncomeSituation(ss.Module):
+    """Placeholder module for modeling income level or poverty status."""
+    
     def __init__(self):
         super().__init__()
         self.name = 'income_situation'
@@ -64,3 +82,4 @@ class IncomeSituation(ss.Module):
 
     def step(self, sim):
         pass
+    

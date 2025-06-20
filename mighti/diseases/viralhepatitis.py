@@ -1,10 +1,9 @@
-import pandas as pd
-from scipy.stats import bernoulli, lognorm
-import starsim as ss
-import numpy as np
-import sciris as sc
-from mighti.diseases.base_disease import GenericSIS
+"""
+Module defining viral hepatitis infectious disease model.
+"""
 
+
+from mighti.diseases.base_disease import GenericSIS
 
 
 class ViralHepatitis(GenericSIS):

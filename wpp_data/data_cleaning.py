@@ -1,4 +1,6 @@
 import pandas as pd
+import logging
+logging.basicConfig(level=logging.INFO)
 
 def process_population_data(male_csv, female_csv, output_csv, country):
     # Read population data
@@ -28,8 +30,7 @@ def process_population_data(male_csv, female_csv, output_csv, country):
     # Create DataFrame and save to CSV
     df = pd.DataFrame(data)
     df.to_csv(output_csv, index=False)
-    print(f"Population data saved to {output_csv}")
-
+    logging.info(f"Population data saved to {output_csv}")
 
 def extract_life_table_by_country(male_csv1, male_csv2, male_csv3, male_csv4, female_csv1, female_csv2, female_csv3, female_csv4, country):
     def load_and_clean(filepath, sex):
@@ -54,7 +55,7 @@ def extract_indicator_from_life_table(life_table_df, indicator, output_csv=None)
     
     if output_csv:
         result.to_csv(output_csv, index=False)
-        print(f"{indicator} saved to {output_csv}")
+        logging.info(f"{indicator} saved to {output_csv}")
     
     return result
 

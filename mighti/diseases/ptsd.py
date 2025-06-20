@@ -1,8 +1,8 @@
-import pandas as pd
-from scipy.stats import bernoulli, lognorm
-import starsim as ss
-import numpy as np
-import sciris as sc
+"""
+Module defining prostate cancer as a remitting disease model.
+"""
+
+
 from mighti.diseases.base_disease import RemittingDisease
 
 

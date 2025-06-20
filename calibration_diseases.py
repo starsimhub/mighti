@@ -4,12 +4,13 @@ using MIGHTI and prevalence data. Outputs best-fit parameter and comparison
 of observed vs. simulated prevalence by age and sex.
 """
 
+
 import sciris as sc
 import starsim as ss
 import stisim as sti
 import mighti as mi
 import pandas as pd
-import matplotlib.pyplot as plt
+
 
 disease_name = 'Type2Diabetes'  # Set the name of the disease to calibrate
 init_year = 2007                # Set the starting year for calibration
@@ -64,19 +65,14 @@ def make_sim():
 
 
 def build_sim(sim, calib_pars):
-    
-    # Prefix "hc_" stands for health condition parameter; e.g., 'hc_p_acquire'
     hc = sim.diseases[disease_name.lower()]
 
-    rand_seed = dict(guess=12345)
-    
-    for k, pars in calib_pars.items():
+    for k, v in calib_pars.items():
         if k == 'rand_seed':
             sim.pars.rand_seed = v
             continue
 
-        v = pars['value']
-        if 'hc_' in k:  # health condition parameters
+        if 'hc_' in k: 
             param_name = k.replace('hc_', '')
             hc.pars[param_name] = v
         else:
@@ -129,7 +125,7 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
     calib.check_fit()
 
     # Best-fit summary
-    best_val = calib.best_pars['hc_p_acquire']
+    best_val = calib.best_pars['hc_p_acquire_multiplier']
     print(f'\nBest-fit p_acquire for {disease_name} = {best_val:.3f}\n')
     
     # Set the estimated p_acquire
@@ -170,7 +166,7 @@ if __name__ == '__main__':
 
     # Define the calibration parameters for health condition
     calib_pars = dict(
-        hc_p_acquire = dict(low=0.01, high=0.10, guess=0.05),
+        hc_p_acquire_multiplier = dict(low=0.01, high=0.10, guess=0.05),
     )
 
     calib = run_calib(calib_pars=calib_pars, total_trials=total_trials, keep_db=False)

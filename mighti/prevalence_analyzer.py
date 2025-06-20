@@ -1,14 +1,38 @@
+"""
+Analyzer for tracking and recording disease prevalence over time.
+
+This analyzer computes stratified disease prevalence by:
+- Age group (in 5-year bins up to 80+)
+- Sex (male/female)
+- HIV status (with/without HIV)
+
+It stores both counts and prevalence estimates for:
+- Total population
+- Population stratified by sex and HIV status
+- Each age-sex-HIV-status group
+"""
+
+
 import starsim as ss
 import numpy as np
 import sciris as sc
 
+
 class PrevalenceAnalyzer(ss.Analyzer):
+    """
+    Analyzer for computing and storing prevalence of multiple diseases by age, sex, and HIV status.
+    
+    Attributes:
+        prevalence_data (dict): Optional data reference (e.g., for plotting).
+        diseases (list): List of disease names to track (must match keys in `sim.diseases`).
+        age_bins (list of tuple): Age group intervals used for stratification.
+        results_defined (bool): Tracks whether results have been initialized.
+    """
     @staticmethod
     def cond_prob(numerator, denominator):
         numer = len((denominator & numerator).uids)
         denom = len(denominator.uids)
         out = sc.safedivide(numer, denom)
-        # print(f"Conditional Probability: Numerator={numer}, Denominator={denom}, Result={out}")
         return out
 
     def __init__(self, prevalence_data, diseases=None, *args, **kwargs):
@@ -22,7 +46,6 @@ class PrevalenceAnalyzer(ss.Analyzer):
                          (45, 50), (50, 55), (55, 60), (60, 65), (65, 70), (70, 75), (75, 80), (80, float('inf'))]
 
         self.results_defined = False
-        # print(f"Initialized PrevalenceAnalyzer with diseases: {self.diseases}")
         return
 
     def init_results(self):
@@ -63,8 +86,6 @@ class PrevalenceAnalyzer(ss.Analyzer):
             ]
         self.define_results(*results)
         self.results_defined = True
-        print(f"Results initialized for diseases: {self.diseases}")
-        return
 
     def init_pre(self, sim):
         super().init_pre(sim)
@@ -72,7 +93,6 @@ class PrevalenceAnalyzer(ss.Analyzer):
 
         # Initialize array to store population age distribution for each year (single-age resolution)
         self.results['population_age_distribution'] = np.zeros((npts, 101))  # 0 to 100 years (single-year resolution)
-        print(f"Initialized population age distribution array with shape: {self.results['population_age_distribution'].shape}")
         return
 
     def step(self):
@@ -84,8 +104,6 @@ class PrevalenceAnalyzer(ss.Analyzer):
         denom = (ppl.age >= 0)  # All individuals
         has_hiv = denom & hiv.infected  # Individuals with HIV
         no_hiv = denom & hiv.susceptible  # Individuals without HIV
-
-        # print(f"Step {ti}: Processing diseases for time step {ti}")
 
         for disease in self.diseases:
             dis = getattr(sim.diseases, disease.lower())
@@ -120,8 +138,6 @@ class PrevalenceAnalyzer(ss.Analyzer):
                 total_num_with_HIV += num_with_HIV_male + num_with_HIV_female
                 total_den_with_HIV += den_with_HIV_male + den_with_HIV_female
 
-                # print(f"Age group {age_start}-{age_end}: num_male={num_male}, den_male={den_male}, num_female={num_female}, den_female={den_female}")
-
                 self.results[f'{disease}_num_male_{i}'][ti] = num_male
                 self.results[f'{disease}_den_male_{i}'][ti] = den_male
                 self.results[f'{disease}_prev_male_{i}'][ti] = sc.safedivide(num_male, den_male)
@@ -152,7 +168,4 @@ class PrevalenceAnalyzer(ss.Analyzer):
             self.results[f'{disease}_prev_has_hiv_m'][ti] = self.cond_prob(has_disease_m, has_hiv_m)
             self.results[f'{disease}_num_total'][ti] = total_num_with_HIV
             self.results[f'{disease}_den_total'][ti] = total_den_with_HIV
-
-            # print(f"Total with HIV: num={total_num_with_HIV}, den={total_den_with_HIV}")
-
-        return
+    
