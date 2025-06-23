@@ -67,6 +67,10 @@ csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
 # Ensure required demographic files are prepared
 prepare_data_for_year.prepare_data_for_year(region,inityear)
 
+# Data paths for post process
+mx_path = f'mighti/data/{region}_mx.csv'
+ex_path = f'mighti/data/{region}_ex.csv'
+
 
 # ---------------------------------------------------------------------
 # Load Parameters and Disease Configuration
@@ -199,17 +203,14 @@ if __name__ == '__main__':
     
 
     # Plot prevalence
-    for disease in ['HIV', 'Type2Diabetes']:
+    plot_diseases = ['Type2Diabetes', 'HIV']
+    for disease in plot_diseases:
         mi.plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year=inityear, end_year=endyear)
         mi.plot_age_group_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year=inityear, end_year=endyear)
 
 
     # Mortality rates and life table
-    target_year = endyear - 1
-    
-    # Load observed mortality rate data
-    mx_path = f'mighti/data/{region}_mx.csv'
-    ex_path = f'mighti/data/{region}_ex.csv'
+    target_year = endyear 
     
     obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
     obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
@@ -218,7 +219,6 @@ if __name__ == '__main__':
     deaths_module = get_deaths_module(sim)
     pregnancy_module = get_pregnancy_module(sim)
     
-    # Calculate mortality rates using `calculate_mortality_rates
     df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
 
     df_mx_male = df_mx[df_mx['sex'] == 'Male']
@@ -227,7 +227,7 @@ if __name__ == '__main__':
     mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
 
     # Create the life table
-    life_table = mi.create_life_table(df_mx_male, df_mx_female, max_age=100, radix=100000)
+    life_table = mi.create_life_table(df_mx_male, df_mx_female, max_age=100, radix=n_agents)
     
     # Plot life expectancy comparison
     mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)

@@ -57,3 +57,23 @@ def prepare_data_for_year(region, year):
     df_age_year.columns = ['age', 'value']
     df_age_year.to_csv(output_age_path, index=False)
     logger.info(f"Age distribution for {year} saved to '{output_age_path}'")
+    
+    
+def extract_indicator_for_plot(csv_path, year, value_column_name='mx'):
+    """
+    Convert a wide-format indicator file (e.g., mx or ex) into long-format for a single year.
+
+    Args:
+        csv_path: Path to the wide-format CSV file (e.g., region_mx.csv or region_ex.csv)
+        year: Target year to extract
+        value_column_name: Name to assign to the melted value column (e.g., 'mx', 'ex')
+
+    Returns:
+        DataFrame with columns: ['Age', 'Sex', 'Time', value_column_name]
+    """
+    df = pd.read_csv(csv_path)
+    df = df.melt(id_vars=['Age', 'Sex'], var_name='Time', value_name=value_column_name)
+    df['Time'] = pd.to_numeric(df['Time'], errors='coerce')
+    df[value_column_name] = pd.to_numeric(df[value_column_name], errors='coerce')
+    df = df[df['Time'] == year].dropna(subset=[value_column_name])
+    return df    
