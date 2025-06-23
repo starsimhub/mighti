@@ -66,7 +66,7 @@ if __name__ == "__main__":
     ### Age distribution data ###
     male_csv = 'population_single_age_male.csv'
     female_csv = 'population_single_age_female.csv'
-    output_csv = '../demography/eswatini_age_distribution.csv'
+    output_csv = '../data/eswatini_age_distribution.csv'
     
     process_population_data(male_csv, female_csv, output_csv, country ='Eswatini')
     
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     )
     
     # Extract and save mx and ex
-    mx_df = extract_indicator_from_life_table(life_table, 'mx', '../demography/eswatini_mx.csv')
-    ex_df = extract_indicator_from_life_table(life_table, 'ex', '../demography/eswatini_ex.csv')
+    mx_df = extract_indicator_from_life_table(life_table, 'mx', '../data/eswatini_mx.csv')
+    ex_df = extract_indicator_from_life_table(life_table, 'ex', '../data/eswatini_ex.csv')
     
    
