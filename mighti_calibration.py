@@ -1,8 +1,14 @@
+"""
+Calibrate betas for HIV
+"""
+
+
+import optuna
+import mighti as mi
+import pandas as pd
 import sciris as sc
 import starsim as ss
 import stisim as sti
-import mighti as mi
-import pandas as pd
 
 
 def make_sim():
@@ -73,6 +79,7 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
         keep_db (bool): Whether to keep the database after calibration. If kept it can be used to continue a calibration with more trials
     """
     sim = make_sim()
+
     #
     # if calib_pars is not None:
     #     sim = build_sim(sim, calib_pars)
@@ -89,6 +96,8 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
         n_workers=1,
         keep_db=keep_db,
         die=True,
+        reseed=False,
+        sampler=optuna.samplers.TPESampler(seed=12345) 
     )
 
     calib.calibrate()
@@ -137,7 +146,8 @@ if __name__ == '__main__':
         hiv_beta_m2c = dict(low=0.001, high=0.1, guess=0.025), # Network females in risk group 1 concurrent partners
     )
 
-    calib = run_calib(calib_pars=calib_pars, total_trials=10, keep_db=False)
+    calib = run_calib(calib_pars=calib_pars, total_trials=100, keep_db=False)
 
     sc.toc(T)
     print('Done.')
+    

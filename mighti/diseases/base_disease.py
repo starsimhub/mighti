@@ -81,7 +81,7 @@ class RemittingDisease(ss.NCD):
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
-            p_acquire_multiplier=1.0,
+            p_acquire_multiplier=1,
         )
         
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -163,7 +163,7 @@ class RemittingDisease(ss.NCD):
         # New cases
         susceptible = (~self.affected).uids
         
-        p_acq = np.full(len(susceptible), self.pars.p_acquire)
+        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
         
         # Apply sex filtering
         if self.pars.affected_sex == "female":
@@ -198,6 +198,7 @@ class RemittingDisease(ss.NCD):
         self.results.prevalence[self.ti] = np.count_nonzero(self.affected) / len(self.sim.people)
         self.results.remission_prevalence[self.ti] = np.count_nonzero(self.reversed) / len(self.sim.people)
         return new_cases
+   
     
 
 class AcuteDisease(ss.NCD):

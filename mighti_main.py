@@ -30,8 +30,6 @@ import stisim as sti
 # Set up logging and random seeds for reproducibility
 logger = logging.getLogger('MIGHTI')
 logger.setLevel(logging.INFO) 
-np.random.seed(12345)   
-ss.set_seed(12345)      
 
 
 # ---------------------------------------------------------------------
@@ -39,7 +37,7 @@ ss.set_seed(12345)
 # ---------------------------------------------------------------------
 n_agents = 10_000 
 inityear = 2007  
-endyear = 2009
+endyear = 2023
 region = 'eswatini'
 
 
@@ -78,11 +76,11 @@ ex_path = f'mighti/data/{region}_ex.csv'
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
-healthconditions = [condition for condition in df.condition if condition != "HIV"]
+#healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
 # healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
 # healthconditions = []
-
+healthconditions = ['Type2Diabetes']
 diseases = ["HIV"] + healthconditions
 
 ncd_df = df[df["disease_class"] == "ncd"]
@@ -129,7 +127,9 @@ hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prev_fn('HIV')),
                       init_prev_data=None,   
                       p_hiv_death=None, 
                       include_aids_deaths=True, 
-                      beta={'structuredsexual': [0.01, 0.01], 'maternal': [0.01, 0.01]})
+                      beta={'structuredsexual': [0.011023883426646121, 0.011023883426646121], 
+                            'maternal': [0.044227226248848076, 0.044227226248848076]})
+    # Best pars: {'hiv_beta_m2f': 0.011023883426646121, 'hiv_beta_m2c': 0.044227226248848076} seed: 12345
 
 disease_objects = []
 for dis in healthconditions:
@@ -203,31 +203,31 @@ if __name__ == '__main__':
     
 
     # Plot prevalence
-    plot_diseases = ['Type2Diabetes', 'HIV']
+    plot_diseases = ['Type2Diabetes']
     for disease in plot_diseases:
         mi.plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year=inityear, end_year=endyear)
         mi.plot_age_group_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year=inityear, end_year=endyear)
 
 
-    # Mortality rates and life table
-    target_year = endyear 
+    # # Mortality rates and life table
+    # target_year = endyear 
     
-    obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
-    obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
+    # obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
+    # obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
     
-    # Get the modules
-    deaths_module = get_deaths_module(sim)
-    pregnancy_module = get_pregnancy_module(sim)
+    # # Get the modules
+    # deaths_module = get_deaths_module(sim)
+    # pregnancy_module = get_pregnancy_module(sim)
     
-    df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
+    # df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
 
-    df_mx_male = df_mx[df_mx['sex'] == 'Male']
-    df_mx_female = df_mx[df_mx['sex'] == 'Female']
+    # df_mx_male = df_mx[df_mx['sex'] == 'Male']
+    # df_mx_female = df_mx[df_mx['sex'] == 'Female']
     
-    mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
+    # mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
 
-    # Create the life table
-    life_table = mi.create_life_table(df_mx_male, df_mx_female, max_age=100, radix=n_agents)
+    # # Create the life table
+    # life_table = mi.create_life_table(df_mx_male, df_mx_female, max_age=100, radix=n_agents)
     
-    # Plot life expectancy comparison
-    mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
+    # # Plot life expectancy comparison
+    # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)

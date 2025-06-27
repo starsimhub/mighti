@@ -5,11 +5,13 @@ of observed vs. simulated prevalence by age and sex.
 """
 
 
+import optuna
+import mighti as mi
+import pandas as pd
 import sciris as sc
 import starsim as ss
 import stisim as sti
-import mighti as mi
-import pandas as pd
+
 
 
 disease_name = 'Type2Diabetes'  # Set the name of the disease to calibrate
@@ -17,11 +19,12 @@ init_year = 2007                # Set the starting year for calibration
 total_trials = 100              # Use a small number for testing; increase to 100+ for full calibration
 
 path_prevalence = 'mighti/data/eswatini_prevalence.csv'
-path_parameters = 'mighti/data/eswatini_parameters_gbd.csv'
+path_parameters = 'mighti/data/eswatini_parameters_original.csv'
 
 
 def make_sim():
-    hiv = sti.HIV(beta_m2f=0.05, beta_m2c=0.025, init_prev=0.15)
+    # Best pars: {'hiv_beta_m2f': 0.011023883426646121, 'hiv_beta_m2c': 0.044227226248848076} seed: 12345
+    hiv = sti.HIV(beta_m2f=0.011023883426646121, beta_m2c=0.044227226248848076, init_prev=0.15)
     
     # Dynamically select disease constructor
     health_condition_cls = getattr(mi, disease_name)
@@ -67,14 +70,15 @@ def make_sim():
 def build_sim(sim, calib_pars):
     hc = sim.diseases[disease_name.lower()]
 
-    for k, v in calib_pars.items():
+    for k, pars in calib_pars.items():
         if k == 'rand_seed':
-            sim.pars.rand_seed = v
+            sim.pars.rand_seed = pars
             continue
-
+        
+        v = pars['value']
         if 'hc_' in k: 
-            param_name = k.replace('hc_', '')
-            hc.pars[param_name] = v
+            k = k.replace('hc_', '')
+            hc.pars[k] = v
         else:
             raise NotImplementedError(f'Parameter {k} not recognized in build_sim()')
 
@@ -120,6 +124,8 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
         n_workers=1,
         keep_db=keep_db,
         die=True,
+        reseed=False,
+        sampler=optuna.samplers.TPESampler(seed=12345) 
     )
     calib.calibrate()
     calib.check_fit()
@@ -166,7 +172,7 @@ if __name__ == '__main__':
 
     # Define the calibration parameters for health condition
     calib_pars = dict(
-        hc_p_acquire_multiplier = dict(low=0.01, high=0.10, guess=0.05),
+        hc_p_acquire_multiplier = dict(low=0.0001, high=0.10, guess=0.011),
     )
 
     calib = run_calib(calib_pars=calib_pars, total_trials=total_trials, keep_db=False)
