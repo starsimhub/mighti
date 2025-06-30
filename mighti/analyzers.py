@@ -3,10 +3,11 @@ Analyzers for demographic outcomes such as age-specific deaths and survivorship.
 """
 
 import numpy as np
+import pandas as pd
 import starsim as ss
 
 
-__all__ = ["DeathsByAgeSexAnalyzer", "SurvivorshipAnalyzer"]
+__all__ = ["DeathsByAgeSexAnalyzer", "SurvivorshipAnalyzer", "ConditionAtDeathAnalyzer"]
 
 
 class DeathsByAgeSexAnalyzer(ss.Analyzer):
@@ -50,3 +51,55 @@ class SurvivorshipAnalyzer(ss.Analyzer):
             for sex in ['Male', 'Female']:
                 self.survivorship_data[sex][age] += len(ppl.age[(ppl.age >= age) & (ppl.age < age+1) & (ppl.female == (sex=='Female'))])
  
+
+class ConditionAtDeathAnalyzer(ss.Analyzer):
+    def __init__(self, conditions=None, condition_attr_map=None, **kwargs):
+        super().__init__(**kwargs)
+        self.conditions = [c.lower() for c in (conditions or [])]
+        self.condition_attr_map = condition_attr_map or {}  # maps condition name to attribute like 'positive'
+        self.records = []
+
+    def init_results(self):
+        super().init_results()
+        self.records = []
+
+    def step(self):
+        ppl = self.sim.people
+        ti = self.sim.ti
+        year = self.sim.t.yearvec[ti]
+
+        if not hasattr(self, 'previous_alive'):
+            self.previous_alive = set(np.where(ppl.alive)[0])
+            return
+
+        current_alive = set(np.where(ppl.alive)[0])
+        died = np.array(list(self.previous_alive - current_alive))
+        self.previous_alive = current_alive
+
+        for uid in died:
+            record = {
+                'uid': uid,
+                'year': year,
+                'age': ppl.age[uid],
+                'sex': 'Female' if ppl.female[uid] else 'Male',
+            }
+
+            for cond in self.conditions:
+                disease = self.sim.diseases.get(cond)
+                if disease:
+                    attr = self.condition_attr_map.get(cond, 'has')  # default to 'has' if not specified
+                    if hasattr(disease, attr):
+                        record[f'had_{cond}'] = getattr(disease, attr)[uid]
+                    else:
+                        print(f"[Warning] Disease '{cond}' does not have attribute '{attr}'")
+                        record[f'had_{cond}'] = None
+                else:
+                    print(f"[Warning] Disease '{cond}' not found in sim.diseases")
+                    record[f'had_{cond}'] = None
+
+            self.records.append(record)
+
+    def to_df(self):
+        return pd.DataFrame(self.records)
+    
+    

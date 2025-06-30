@@ -283,7 +283,7 @@ class AcuteDisease(ss.NCD):
         # New cases
         susceptible = (~self.affected).uids
         
-        p_acq = np.full(len(susceptible), self.pars.p_acquire)
+        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
         
         if self.pars.affected_sex == "female":
             p_acq[self.sim.people.male[susceptible]] = 0
@@ -398,7 +398,7 @@ class ChronicDisease(ss.NCD):
         # New cases
         susceptible = (~self.affected).uids
         
-        p_acq = np.full(len(susceptible), self.pars.p_acquire)
+        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
         
         if self.pars.affected_sex == "female":
             p_acq[self.sim.people.male[susceptible]] = 0
@@ -517,7 +517,7 @@ class GenericSIS(ss.SIS):
         # New cases
         susceptible = (~self.infected).uids
         
-        p_acq = np.full(len(susceptible), self.pars.p_acquire)
+        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
         
         if self.pars.affected_sex == "female":
             p_acq[self.sim.people.male[susceptible]] = 0

@@ -42,6 +42,11 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     mean_prevalence_female_with_HIV = np.nan_to_num(female_num_with_HIV / female_den_with_HIV) * 100
     mean_prevalence_male_without_HIV = np.nan_to_num(male_num_without_HIV / male_den_without_HIV) * 100
     mean_prevalence_female_without_HIV = np.nan_to_num(female_num_without_HIV / female_den_without_HIV) * 100
+    
+    # mean_prevalence_male_with_HIV = np.sum(extract_results('prev_with_HIV_male'), axis=0)
+    # mean_prevalence_female_with_HIV = np.sum(extract_results('prev_with_HIV_female'), axis=0)
+    # mean_prevalence_male_without_HIV = np.sum(extract_results('prev_without_HIV_male'), axis=0)
+    # mean_prevalence_female_without_HIV = np.sum(extract_results('prev_without_HIV_female'), axis=0)
 
     fig, ax = plt.subplots(figsize=(10, 5))
 
@@ -50,12 +55,14 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     ax.plot(sim.timevec, mean_prevalence_male_without_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV-)', linewidth=2, color='blue', linestyle='dashed')
     ax.plot(sim.timevec, mean_prevalence_female_without_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV-)', linewidth=2, color='red', linestyle='dashed')
 
-    ax.set_xlabel('Year')
-    ax.set_ylabel(f'{disease.capitalize()} Prevalence (%)')
-    ax.set_title(f'Mean {disease.capitalize()} Prevalence Over Time (All Ages)')
-    ax.legend()
+    ax.set_xlabel('Year', fontsize=16)
+    ax.set_ylabel(f'{disease.capitalize()} Prevalence (%)', fontsize=16)
+    ax.set_title(f'Mean {disease.capitalize()} Prevalence Over Time (All Ages)', fontsize=18)
+    ax.tick_params(axis='both', which='major', labelsize=14)
+    ax.legend(loc='lower right', fontsize=14, frameon=False)   
     ax.grid()
-    return fig
+
+    plt.show()
 
 
 def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year):

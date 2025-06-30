@@ -13,9 +13,8 @@ class Type2Diabetes(RemittingDisease):
         self.disease_name = 'Type2Diabetes'
         super().__init__(csv_path, pars, **kwargs)
         
-        self.define_pars(label='Type2Diabetes')  # okay
-        self.pars.p_acquire_multiplier = 0.01   # override again after
-        # self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
-        
+        self.define_pars(label='Type2Diabetes')  
+        if not hasattr(self.pars, 'p_acquire_multiplier'):
+            self.pars.p_acquire_multiplier = 0.092
         return
 
