@@ -31,7 +31,7 @@ def test_life_expectancy():
     
     # File paths
     thisdir = os.path.dirname(__file__)
-    csv_path_death = os.path.join(thisdir, 'test_data', 'eswatini_mortality_rates_2007.csv')
+    csv_path_death = os.path.join(thisdir, 'test_data', 'eswatini_mortality_rates.csv')
     csv_path_fertility = os.path.join(thisdir, 'test_data', 'eswatini_asfr.csv')
 
     # Prepare input
@@ -67,7 +67,7 @@ def test_life_expectancy():
     df_mx_male = df_mx[df_mx['sex'] == 'Male']
     df_mx_female = df_mx[df_mx['sex'] == 'Female']
 
-    life_table = mi.create_life_table(df_mx_male, df_mx_female, max_age=100)
+    life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
 
     assert set(['Age', 'l(x)', 'd(x)', 'q(x)', 'm(x)', 'L(x)', 'T(x)', 'e(x)', 'sex']).issubset(life_table.columns)    
     assert len(life_table) == 2 * (100 + 1)  # 0–100 for Male and Female
