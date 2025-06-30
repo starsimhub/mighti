@@ -287,14 +287,14 @@ def plot_mx_comparison(sim_mx_df, observed_mx_csv, year, age_interval=5, figsize
         ax.plot(sim_mx_grouped['age_group'], sim_mx_grouped['mx'],
                 linestyle='-', linewidth=8, alpha=0.4, color=color, label='Simulated')
         ax.plot(obs_mx_grouped['age_group'], obs_mx_grouped['mx'],
-                marker='s', linestyle='--', linewidth=2, markersize=8,
-                color=color, label='Observed')
-        ax.set_title(f"{sex} Mortality Rate (mx) Comparison, {year}", fontsize=16)
-        ax.set_ylabel('mx (deaths per person-year)', fontsize=14)
+                marker='s', linestyle='--', linewidth=2, markersize=5,
+                color='black', label='Observed')
+        ax.set_title(f"{sex} Mortality Rate (mx) Comparison, {year}", fontsize=24)
+        ax.set_ylabel('m(x)', fontsize=24)
         ax.grid(True, alpha=0.3)
         ax.legend()
 
-    axes[-1].set_xlabel('Age Group', fontsize=14)
+    axes[-1].set_xlabel('Age Group', fontsize=24)
     plt.tight_layout()
     plt.show()    
     
@@ -318,22 +318,86 @@ def plot_life_expectancy(life_table, observed_data, year, max_age=100, figsize=(
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
 
-    ax1.plot(male_sim['Age'], male_sim['e(x)'], '-', linewidth=8, alpha=0.4, color='blue', label='Simulated')
-    ax1.plot(male_obs['Age'], male_obs['ex'], 's--', linewidth=2, markersize=8, color='blue', label='Observed')
+    ax1.plot(male_sim['Age'], male_sim['e(x)'], '-', linewidth=12, alpha=0.4, color='blue', label='Simulated')
+    ax1.plot(male_obs['Age'], male_obs['ex'], 's--', linewidth=2, markersize=5, color='black', label='Observed')
     ax1.set_title('Male', fontsize=28)
     ax1.set_ylabel('Life Expectancy (years)', fontsize=24)
     ax1.tick_params(labelsize=20)
     ax1.grid(True, alpha=0.3)
     ax1.legend(fontsize=20)
 
-    ax2.plot(female_sim['Age'], female_sim['e(x)'], '-', linewidth=8, alpha=0.4, color='red', label='Simulated')
-    ax2.plot(female_obs['Age'], female_obs['ex'], 's--', linewidth=2, markersize=8, color='red', label='Observed')
+    ax2.plot(female_sim['Age'], female_sim['e(x)'], '-', linewidth=12, alpha=0.4, color='red', label='Simulated')
+    ax2.plot(female_obs['Age'], female_obs['ex'], 's--', linewidth=2, markersize=5, color='black', label='Observed')
     ax2.set_title('Female', fontsize=28)
     ax2.set_xlabel('Age', fontsize=24)
     ax2.set_ylabel('Life Expectancy (years)', fontsize=24)
     ax2.tick_params(labelsize=20)
     ax2.grid(True, alpha=0.3)
     ax2.legend(fontsize=20)
+
+    if title:
+        plt.suptitle(title, fontsize=24, y=0.98)
+    else:
+        plt.suptitle(f'Life Expectancy by Age in {year}', fontsize=24, y=0.98)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.subplots_adjust(bottom=0.1)
+    plt.show()
+    return fig, (ax1, ax2)
+
+
+def plot_life_expectancy_three(sim_with, sim_without, observed_data, year, max_age=100, figsize=(14, 10), title=None):
+    """
+    Plot life expectancy by age and sex for:
+        - Simulated with intervention
+        - Simulated without intervention
+        - Observed data
+
+    Args:
+        sim_with: DataFrame with ['Age', 'e(x)', 'sex'] from sim WITH intervention
+        sim_without: DataFrame with ['Age', 'e(x)', 'sex'] from sim WITHOUT intervention
+        observed_data: DataFrame with ['Age', 'Sex', 'Time', 'ex']
+        year: Year to filter observed data
+        max_age: Max age to display
+        figsize: Figure size
+        title: Optional suptitle
+    """
+    # Filter inputs
+    male_obs = observed_data[(observed_data['Sex'] == 'Male') & (observed_data['Time'] == year)]
+    female_obs = observed_data[(observed_data['Sex'] == 'Female') & (observed_data['Time'] == year)]
+
+    male_sim_with = sim_with[sim_with['sex'] == 'Male']
+    male_sim_without = sim_without[sim_without['sex'] == 'Male']
+
+    female_sim_with = sim_with[sim_with['sex'] == 'Female']
+    female_sim_without = sim_without[sim_without['sex'] == 'Female']
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
+
+    # Male plot
+    ax1.plot(male_sim_with['Age'], male_sim_with['e(x)'], '-', lw=5, alpha=0.7, color='blue', label='Simulated (With ART)')
+    ax1.plot(male_sim_without['Age'], male_sim_without['e(x)'], '--', lw=5, color='blue', label='Simulated (No ART)')
+    ax1.plot(male_obs['Age'], male_obs['ex'], 's-', lw=2, markersize=3, color='black', label='Observed')
+    ax1.set_title('Male', fontsize=24)
+    ax1.set_ylabel('Life Expectancy (years)', fontsize=20)
+    ax1.tick_params(labelsize=20)
+    ax1.set_ylim(0, 70)
+    ax1.set_yticks(np.arange(0, 66, 10))
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(fontsize=20, frameon=False)
+
+    # Female plot
+    ax2.plot(female_sim_with['Age'], female_sim_with['e(x)'], '-', lw=5, alpha=0.7, color='red', label='Simulated (With ART)')
+    ax2.plot(female_sim_without['Age'], female_sim_without['e(x)'], '--', lw=5, color='red', label='Simulated (No ART)')
+    ax2.plot(female_obs['Age'], female_obs['ex'], 's-', lw=2, markersize=3, color='black', label='Observed')
+    ax2.set_title('Female', fontsize=24)
+    ax2.set_xlabel('Age', fontsize=20)
+    ax2.set_ylabel('Life Expectancy (years)', fontsize=20)
+    ax2.tick_params(labelsize=20)
+    ax2.set_ylim(0, 70)
+    ax2.set_yticks(np.arange(0, 66, 10))
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(fontsize=20, frameon=False)
 
     if title:
         plt.suptitle(title, fontsize=24, y=0.98)

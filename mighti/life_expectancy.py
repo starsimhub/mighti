@@ -69,155 +69,64 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
     return pd.DataFrame(mortality_rates)
 
 
-def calculate_life_table_from_mx(m_x, max_age=100, radix=100000):
+def calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100):
     """
-    Calculate a life table from a vector of mortality rates m(x).
+    Compute life tables for males and females using m(x) and simulated l(0) from survivorship analyzer.
 
     Args:
-        m_x: 1D numpy array of age-specific mortality rates for ages 0 to max_age.
-        max_age: maximum age.
-        radix: starting cohort size, typically 100000.
+        sim: Simulation object with a survivorship analyzer.
+        df_mx_male, df_mx_female: DataFrames with columns ['age', 'mx'].
+        max_age: Maximum age to compute.
 
     Returns:
-        pd.DataFrame with columns ['Age', 'l(x)', 'd(x)', 'q(x)', 'm(x)', 'L(x)', 'T(x)', 'e(x)']
+        pd.DataFrame with columns ['sex', 'Age', 'l(x)', 'd(x)', 'q(x)', 'm(x)', 'L(x)', 'T(x)', 'e(x)']
     """
-    ages = np.arange(max_age + 1)
-    l_x = [radix]
+    def compute_life_table(sex, l0, m_x):
+        l_x = [l0]
+        for age in range(max_age):
+            l_next = l_x[-1] * np.exp(-m_x[age])
+            l_x.append(l_next)
+        l_x = np.array(l_x)
 
-    # Step 1: compute l(x)
-    for age in range(max_age):
-        l_next = l_x[-1] * np.exp(-m_x[age])
-        l_x.append(l_next)
-    l_x = np.array(l_x)
+        d_x = l_x[:-1] - l_x[1:]
+        d_x = np.append(d_x, l_x[-1])  # all die at terminal age
 
-    # Step 2: compute d(x), q(x)
-    d_x = l_x[:-1] - l_x[1:]
-    d_x = np.append(d_x, l_x[-1])  # All remaining die at last age
-    q_x = 1 - np.exp(-m_x)
+        q_x = 1 - np.exp(-m_x)
 
-    # Step 3: compute L(x)
-    L_x = 0.5 * (l_x[:-1] + l_x[1:])
-    L_x = np.append(L_x, l_x[-1] / m_x[-1] if m_x[-1] > 0 else 0)  # Terminal age open interval
+        L_x = 0.5 * (l_x[:-1] + l_x[1:])
+        L_x = np.append(L_x, l_x[-1] / m_x[-1] if m_x[-1] > 0 else 0)
 
-    # Step 4: compute T(x), e(x)
-    T_x = np.zeros_like(L_x)
-    T_accum = 0
-    for i in reversed(range(max_age + 1)):
-        T_accum += L_x[i]
-        T_x[i] = T_accum
-    e_x = T_x / l_x
+        T_x = np.zeros_like(L_x)
+        T_accum = 0
+        for i in reversed(range(max_age + 1)):
+            T_accum += L_x[i]
+            T_x[i] = T_accum
 
-    df = pd.DataFrame({
-        'Age': ages,
-        'l(x)': l_x,
-        'd(x)': d_x,
-        'q(x)': q_x,
-        'm(x)': m_x,
-        'L(x)': L_x,
-        'T(x)': T_x,
-        'e(x)': e_x
-    })
-    return df
+        e_x = T_x / l_x
 
+        return pd.DataFrame({
+            'sex': sex,
+            'Age': np.arange(max_age + 1),
+            'l(x)': l_x,
+            'd(x)': d_x,
+            'q(x)': q_x,
+            'm(x)': m_x,
+            'L(x)': L_x,
+            'T(x)': T_x,
+            'e(x)': e_x
+        })
 
-def calculate_life_table_from_lx_mx(l_x, m_x, max_age=100, radix=100000):
-    """
-    Calculate a life table from a vector of mortality rates m(x).
+    # Extract initial survivorship
+    l0_male = sim.analyzers.survivorship_analyzer.survivorship_data['Male'][0]
+    l0_female = sim.analyzers.survivorship_analyzer.survivorship_data['Female'][0]
 
-    Args:
-        m_x: 1D numpy array of age-specific mortality rates for ages 0 to max_age.
-        max_age: maximum age.
-        radix: starting cohort size, typically 100000.
-
-    Returns:
-        pd.DataFrame with columns ['Age', 'l(x)', 'd(x)', 'q(x)', 'm(x)', 'L(x)', 'T(x)', 'e(x)']
-    """
-    ages = np.arange(max_age + 1)
-
-    d_x = l_x[:-1] - l_x[1:]
-    d_x = np.append(d_x, l_x[-1]) 
-    
-    q_x = 1 - np.exp(-m_x)
-
-    L_x = np.zeros(max_age + 1)
-    L_x[:max_age] = l_x[1:] + 0.5 * d_x[:max_age]
-    L_x[max_age] = l_x[max_age] / m_x[max_age] if m_x[max_age] > 0 else 0
-
-    T_x = np.zeros_like(L_x)
-    T_accum = 0
-    for i in reversed(range(max_age + 1)):
-        T_accum += L_x[i]
-        T_x[i] = T_accum
-        
-    with np.errstate(divide='ignore', invalid='ignore'):
-        e_x = np.divide(T_x, l_x, out=np.zeros_like(T_x), where=l_x > 0)
-
-    df = pd.DataFrame({
-        'Age': ages,
-        'l(x)': l_x,
-        'd(x)': d_x,
-        'q(x)': q_x,
-        'm(x)': m_x,
-        'L(x)': L_x,
-        'T(x)': T_x,
-        'e(x)': e_x
-    })
-    
-    # Print a few key values
-    for i in [0, 10, 30, 50, 70, 90, 99]:
-        print(f"Age {i:>2}: l(x)={l_x[i]:,.0f}, m(x)={m_x[i]:.5f}, L(x)={L_x[i]:,.0f}, T(x)={T_x[i]:,.0f}")
-    print(f"Sum of L(x): {np.sum(L_x):,.0f}")
-    print(f"DEBUG: l(0) = {l_x[0]:,.0f}")
-    print(f"DEBUG: L(0) = {L_x[0]:,.0f}")
-    print(f"DEBUG: T(0) = {T_x[0]:,.0f}")
-    print(f"DEBUG: e(0) = {T_x[0]/l_x[0]:.2f}")
-    return df
-
-
-def create_life_table(sim, df_mx_male, df_mx_female, max_age=100, radix = 100000):
-    """
-    Create life tables for both sexes using mortality (m_x) and survivorship (l_x) from simulation.
-
-    Args:
-        sim: Simulation object with `sim.analyzers.survivorship_analyzer.survivorship_data`.
-        df_mx_male: DataFrame with 'age' and 'mx' for males.
-        df_mx_female: DataFrame with 'age' and 'mx' for females.
-        max_age: Maximum age to include in the life table.
-
-    Returns:
-        Concatenated DataFrame with life tables for males and females.
-    """
-    # Get survivorship arrays from sim (already aligned by age)
-    # l_x_male = sim.analyzers.survivorship_analyzer.survivorship_data['Male'][:max_age + 1]
-    # l_x_female = sim.analyzers.survivorship_analyzer.survivorship_data['Female'][:max_age + 1]
-    
-    l_x_male = sim.analyzers.survivorship_analyzer.survivorship_data['Male']
-    if len(l_x_male) < max_age + 1:
-        max_age = len(l_x_male) - 1
-        print(f"Adjusted max_age to {max_age} based on l_x length")
-    
-    l_x_female = sim.analyzers.survivorship_analyzer.survivorship_data['Female']
-    if len(l_x_female) < max_age + 1:
-        max_age = len(l_x_female) - 1
-        print(f"Adjusted max_age to {max_age} based on l_x length")
-    
-    l_x_male = l_x_male[:max_age + 1]
-    l_x_female = l_x_female[:max_age + 1]
-    
-    # Normalize to radix
-    radix = radix
-    l_x_male = (l_x_male / l_x_male[0]) * radix
-    l_x_female = (l_x_female / l_x_female[0]) * radix
-
-    # Get mortality rates m(x) as array aligned by age
+    # Align and extract m(x)
     m_x_male = df_mx_male.set_index('age').reindex(range(max_age + 1)).fillna(0)['mx'].values
     m_x_female = df_mx_female.set_index('age').reindex(range(max_age + 1)).fillna(0)['mx'].values
 
-    # Use updated function that consumes l(x) and m(x)
-    lt_male = calculate_life_table_from_lx_mx(l_x_male, m_x_male, max_age=max_age)
-    lt_female = calculate_life_table_from_lx_mx(l_x_female, m_x_female, max_age=max_age)
-
-    lt_male['sex'] = 'Male'
-    lt_female['sex'] = 'Female'
+    # Compute life tables
+    lt_male = compute_life_table('Male', l0_male, m_x_male)
+    lt_female = compute_life_table('Female', l0_female, m_x_female)
 
     return pd.concat([lt_male, lt_female], ignore_index=True)
+

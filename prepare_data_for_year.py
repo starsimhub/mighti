@@ -57,6 +57,35 @@ def prepare_data_for_year(region, year):
     df_age_year.columns = ['age', 'value']
     df_age_year.to_csv(output_age_path, index=False)
     logger.info(f"Age distribution for {year} saved to '{output_age_path}'")
+
+
+def prepare_data(region):
+    """
+    Prepare year-specific mortality rates and age distribution files from wide-format input.
+
+    Args:
+        region (str): Region or country identifier (used in file naming).
+        year (int): Year to extract data for.
+
+    Outputs:
+        - {region}_mortality_rates_{year}.csv
+        - {region}_age_distribution_{year}.csv
+        (Both saved in mighti/data/)
+    """
+    # ------------------------------------------------------------------
+    # Extract mortality rates
+    # ------------------------------------------------------------------
+    input_mx_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_mx.csv')
+    output_mx_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_mortality_rates.csv')
+
+    df_mx = pd.read_csv(input_mx_path)
+    df_mx = df_mx.melt(id_vars=['Age', 'Sex'], var_name='Time', value_name='mx')
+    df_mx['Time'] = pd.to_numeric(df_mx['Time'], errors='coerce')
+    df_mx['mx'] = pd.to_numeric(df_mx['mx'], errors='coerce')
+
+    df_mx_year = df_mx.rename(columns={'Age': 'AgeGrpStart'})
+    df_mx_year.to_csv(output_mx_path, index=False)
+    logger.info(f"Mortality rates saved to '{output_mx_path}'")
     
     
 def extract_indicator_for_plot(csv_path, year, value_column_name='mx'):

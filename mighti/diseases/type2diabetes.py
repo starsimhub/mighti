@@ -3,8 +3,6 @@ Module defining the Type 2 Diabetes remitting disease model.
 """
 
 
-import numpy as np
-import starsim as ss
 from mighti.diseases.base_disease import RemittingDisease
 
 
