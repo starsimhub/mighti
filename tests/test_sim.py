@@ -59,9 +59,9 @@ def test_full_mighti_simulation():
     interactions = [mi.NCDHIVConnector(df.set_index('condition')['rel_sus'].to_dict())]
     
     # Load demographics
-    death_path = os.path.join(thisdir, 'test_data', 'eswatini_mortality_rates_2007.csv')
+    death_path = os.path.join(thisdir, 'test_data', 'eswatini_mortality_rates.csv')
     fertility_path = os.path.join(thisdir, 'test_data', 'eswatini_asfr.csv')
-    age_path = os.path.join(thisdir, 'test_data', 'eswatini_age_distribution_2007.csv')
+    age_path = os.path.join(thisdir, 'test_data', 'eswatini_age_distribution.csv')
     
     deaths = ss.Deaths({'death_rate': pd.read_csv(death_path), 'rate_units': 1})
     pregnancy = ss.Pregnancy({'fertility_rate': pd.read_csv(fertility_path)})
