@@ -37,7 +37,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 n_agents = 100_000 
 inityear = 2007  
-endyear = 2024
+endyear = 2050
 region = 'eswatini'
 
 
@@ -162,7 +162,7 @@ interactions.extend(connectors)
 
 
 # ---------------------------------------------------------------------
-# Interventions (with updated empirical data)
+# Interventions 
 # ---------------------------------------------------------------------
 # ART coverage among PLHIV (from 95-95-95 cascade estimates and Lancet data)
 art_coverage_data = pd.DataFrame({
@@ -175,12 +175,31 @@ test_prob_data = [0.10, 0.25, 0.60, 0.70, 0.80, 0.95]
 # test_prob_data = [1,1,1,1,1,1]
 test_years = [2003, 2005, 2007, 2010, 2014, 2016]
 
+tx_df = pd.read_csv("mighti/data/t2d_tx.csv")
+t2d_tx = ss.Tx(df=tx_df)
+
+t2d_treatment = mi.ReduceMortalityTx(
+    label='T2D Mortality Reduction',
+    product=t2d_tx,
+    prob=1.0,
+    rel_death_reduction=0.5,
+    eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids
+)
+
 # Define interventions using these data
 interventions = [
     sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
     sti.ART(coverage_data=art_coverage_data),
     sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
-    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]})
+    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
+]
+
+interventions2 = [
+    sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
+    sti.ART(coverage_data=art_coverage_data),
+    sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
+    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
+    t2d_treatment
 ]
 
 # ---------------------------------------------------------------------
@@ -203,50 +222,7 @@ def get_pregnancy_module(sim):
 # Main Simulation
 # ---------------------------------------------------------------------
 if __name__ == '__main__':
-    # sim = ss.Sim(
-    #     n_agents=n_agents,
-    #     networks=networks,
-    #     start=inityear,
-    #     stop=endyear,
-    #     people=ppl,
-    #     demographics=[pregnancy, death],
-    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-    #     diseases=disease_objects,
-    #     connectors=interactions,
-    #     interventions = interventions,
-    #     copy_inputs=False,
-    #     label='Without Intervention'
-    # )
-    # # Run the simulation
-    # sim.run()
-    
-    # # Mortality rates and life table
-    # target_year = endyear - 1
-    
-    # obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
-    # obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
-    
-    # # Get the modules
-    # deaths_module = get_deaths_module(sim)
-    # pregnancy_module = get_pregnancy_module(sim)
-    
-    # df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
-
-    # df_mx_male = df_mx[df_mx['sex'] == 'Male']
-    # df_mx_female = df_mx[df_mx['sex'] == 'Female']
-    
-    
-    # life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
-    
-    # mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
-
-    # # Create the life table
-    # # life_table = mi.create_life_table(sim, df_mx_male, df_mx_female, max_age=100, radix=n_agents)
-    
-    # # Plot life expectancy comparison
-    # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
-    
-    sim_with = ss.Sim(
+    sim = ss.Sim(
         n_agents=n_agents,
         networks=networks,
         start=inityear,
@@ -258,56 +234,101 @@ if __name__ == '__main__':
         connectors=interactions,
         interventions = interventions,
         copy_inputs=False,
-        label='With Intervention'
+        label='With Interventions'
     )
+    # Run the simulation
+    sim.run()
     
-    sim_without = ss.Sim(
-        n_agents=n_agents,
-        networks=networks,
-        start=inityear,
-        stop=endyear,
-        people=ppl,
-        demographics=[pregnancy, death],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-        diseases=disease_objects,
-        connectors=interactions,
-        # interventions = interventions,
-        copy_inputs=False,
-        label='Without Intervention'
-    )
- 
-
-    # 3. Initialize MultiSim
-    msim = ss.MultiSim(sims=[sim_with, sim_without])
-    msim.run()
-    
-    # Target year for evaluation
+    # Mortality rates and life table
     target_year = endyear - 1
     
-    # Load observed mortality and life expectancy
     obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
     obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
     
-    # Helper to extract mortality rates and life table from one sim
-    def process_life_table(sim):
-        deaths_module = get_deaths_module(sim)
-        df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
-        df_mx_male = df_mx[df_mx['sex'] == 'Male']
-        df_mx_female = df_mx[df_mx['sex'] == 'Female']
-        life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
-        return df_mx, life_table
+    # Get the modules
+    deaths_module = get_deaths_module(sim)
+    pregnancy_module = get_pregnancy_module(sim)
     
-    # Process both sims in MultiSim
-    df_mx_with, lt_with = process_life_table(msim.sims[0])
-    df_mx_without, lt_without = process_life_table(msim.sims[1])
+    df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
+
+    df_mx_male = df_mx[df_mx['sex'] == 'Male']
+    df_mx_female = df_mx[df_mx['sex'] == 'Female']
     
-    # Plot mx comparison (can pick one to compare to observed)
-    mi.plot_mx_comparison(df_mx_with, obs_mx, year=target_year, age_interval=5)
     
-    # Plot life expectancy: Sim with vs. without vs. Observed
-    mi.plot_life_expectancy_three(
-        sim_with=lt_with,
-        sim_without=lt_without,
-        observed_data=obs_ex,
-        year=target_year
-    )    
+    life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
+    
+    mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
+
+    # Create the life table
+    # life_table = mi.create_life_table(sim, df_mx_male, df_mx_female, max_age=100, radix=n_agents)
+    
+    # Plot life expectancy comparison
+    mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
+    
+    
+    ##### To run 2 simulation simultaneously #####
+    
+    # sim_with = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=endyear,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=interactions,
+    #     interventions = interventions,
+    #     copy_inputs=False,
+    #     label='With Intervention'
+    # )
+    
+    # sim_without = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=endyear,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=interactions,
+    #     interventions = interventions2,
+    #     copy_inputs=False,
+    #     label='With Intervention for T2D'
+    # )
+ 
+    # msim = ss.MultiSim(sims=[sim_with, sim_without])
+    # msim.run()
+    
+    # # Target year for evaluation
+    # target_year = endyear - 1
+    
+    # # Load observed mortality and life expectancy
+    # obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
+    # obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
+    
+    # # Helper to extract mortality rates and life table from one sim
+    # def process_life_table(sim):
+    #     deaths_module = get_deaths_module(sim)
+    #     df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
+    #     df_mx_male = df_mx[df_mx['sex'] == 'Male']
+    #     df_mx_female = df_mx[df_mx['sex'] == 'Female']
+    #     life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
+    #     return df_mx, life_table
+    
+    # # Process both sims in MultiSim
+    # df_mx_with, lt_with = process_life_table(msim.sims[0])
+    # df_mx_without, lt_without = process_life_table(msim.sims[1])
+    
+    # # Plot mx comparison (can pick one to compare to observed)
+    # mi.plot_mx_comparison(df_mx_with, obs_mx, year=target_year, age_interval=5)
+    
+    # # Plot life expectancy: Sim with vs. without vs. Observed
+    # mi.plot_life_expectancy_three(
+    #     sim_with=lt_with,
+    #     sim_without=lt_without,
+    #     observed_data=obs_ex,
+    #     year=target_year
+    # )    
+ 
