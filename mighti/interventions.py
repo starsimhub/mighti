@@ -4,10 +4,13 @@ Implements interventions applied to the simulated population
 
 
 import starsim as ss
-import numpy as np
 
 
 from starsim.interventions import treat_num
+
+
+__all__ = ["ReduceMortalityTx"]
+
 
 class ReduceMortalityTx(treat_num):
     def __init__(self, *args, product=None, prob=1.0, rel_death_reduction=0.5, eligibility=None, **kwargs):
