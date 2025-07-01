@@ -201,6 +201,10 @@ interventions2 = [
     t2d_treatment
 ]
 
+interventions3 = [
+    t2d_treatment
+]
+
 # ---------------------------------------------------------------------
 # Utility: Get Modules
 # ---------------------------------------------------------------------
@@ -231,7 +235,7 @@ if __name__ == '__main__':
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
         diseases=disease_objects,
         connectors=interactions,
-        interventions = interventions2,
+        # interventions = interventions,
         copy_inputs=False,
         label='With Interventions'
     )
@@ -272,6 +276,8 @@ if __name__ == '__main__':
     counts = df[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
     print(counts)
     df.groupby('sex')[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
+    
+    
     
     ##### To run 2 simulation simultaneously #####
     

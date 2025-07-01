@@ -23,6 +23,7 @@ class ReduceMortalityTx(treat_num):
             if len(successful):
                 # self.sim.diseases['type2diabetes'].rel_death[successful] *= self.rel_death_reduction
                 self.sim.diseases['type2diabetes'].rel_death[ss.uids(successful)] *= self.rel_death_reduction
+                print(f"[{self.label}] Successfully treated {len(successful)} agents at step {self.ti}")
         return treat_inds
     
 # class BaseHealthIntervention(ss.Intervention):

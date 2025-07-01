@@ -188,7 +188,17 @@ class RemittingDisease(ss.NCD):
         self.ti_affected[new_cases] = ti
 
         # Death
-        deaths = self.pars.p_death.filter(new_cases)  
+        affected_uids = self.affected.uids
+        rel_death = self.rel_death[affected_uids]
+    
+        try:
+            base_p = self.pars.p_death.pars['p']
+        except Exception:
+            raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
+    
+        adjusted_p_death = base_p * rel_death
+        draws = np.random.rand(len(affected_uids))
+        deaths = affected_uids[draws < adjusted_p_death]
         self.sim.people.request_death(deaths)
         self.ti_dead[deaths] = ti
 
