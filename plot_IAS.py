@@ -1,13 +1,13 @@
 ##### Place these in mighti_main to run this chunk #####
 
-   # df = death_cause_analyzer.to_df()   
-   # df['HIV only'] = df['had_hiv'] & ~df['had_type2diabetes']
-   # df['T2D only'] = df['had_type2diabetes'] & ~df['had_hiv']
-   # df['Both'] = df['had_hiv'] & df['had_type2diabetes']
-   # df['Neither'] = ~df['had_hiv'] & ~df['had_type2diabetes']
-   # counts = df[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
-   # print(counts)
-   # df.groupby('sex')[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
+    # df = death_cause_analyzer.to_df()   
+    # df['HIV only'] = df['had_hiv'] & ~df['had_type2diabetes']
+    # df['T2D only'] = df['had_type2diabetes'] & ~df['had_hiv']
+    # df['Both'] = df['had_hiv'] & df['had_type2diabetes']
+    # df['Neither'] = ~df['had_hiv'] & ~df['had_type2diabetes']
+    # counts = df[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
+    # print(counts)
+    # df.groupby('sex')[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
    
    # import plot_IAS
    # target_years = [2007, 2024, 2030, 2050]

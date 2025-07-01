@@ -61,7 +61,7 @@ def test_full_mighti_simulation():
     # Load demographics
     death_path = os.path.join(thisdir, 'test_data', 'eswatini_mortality_rates.csv')
     fertility_path = os.path.join(thisdir, 'test_data', 'eswatini_asfr.csv')
-    age_path = os.path.join(thisdir, 'test_data', 'eswatini_age_distribution_{year}.csv')
+    age_path = os.path.join(thisdir, 'test_data', 'eswatini_age_distribution_2007.csv')
     
     deaths = ss.Deaths({'death_rate': pd.read_csv(death_path), 'rate_units': 1})
     pregnancy = ss.Pregnancy({'fertility_rate': pd.read_csv(fertility_path)})

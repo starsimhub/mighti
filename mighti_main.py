@@ -104,7 +104,6 @@ get_prev_fn = lambda d: lambda mod, sim, size: mi.age_sex_dependent_prevalence(d
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
-# death_cause_analyzer = mi.ConditionAtDeathAnalyzer(conditions=["HIV", "Type2Diabetes"])
 
 death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
     conditions=['hiv', 'type2diabetes'],
@@ -232,7 +231,7 @@ if __name__ == '__main__':
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
         diseases=disease_objects,
         connectors=interactions,
-        interventions = interventions,
+        interventions = interventions2,
         copy_inputs=False,
         label='With Interventions'
     )
@@ -265,6 +264,14 @@ if __name__ == '__main__':
     # Plot life expectancy comparison
     mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
     
+    df = death_cause_analyzer.to_df()   
+    df['HIV only'] = df['had_hiv'] & ~df['had_type2diabetes']
+    df['T2D only'] = df['had_type2diabetes'] & ~df['had_hiv']
+    df['Both'] = df['had_hiv'] & df['had_type2diabetes']
+    df['Neither'] = ~df['had_hiv'] & ~df['had_type2diabetes']
+    counts = df[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
+    print(counts)
+    df.groupby('sex')[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
     
     ##### To run 2 simulation simultaneously #####
     
