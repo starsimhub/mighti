@@ -42,10 +42,8 @@ def test_reduce_mortality_tx_runs():
     })
     tx = ss.Tx(df=tx_df)
 
-    from mighti.interventions import ReduceMortalityTx
-
     # Intervention to reduce death
-    t2d_tx = ReduceMortalityTx(
+    t2d_tx = mi.ReduceMortalityTx(
         product=tx,
         rel_death_reduction=0.5,
         eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,

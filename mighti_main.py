@@ -35,7 +35,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 # Simulation Settings
 # ---------------------------------------------------------------------
-n_agents = 1000 
+n_agents = 100_000 
 inityear = 2007  
 endyear = 2024
 region = 'eswatini'
@@ -181,7 +181,7 @@ t2d_treatment = mi.ReduceMortalityTx(
     label='T2D Mortality Reduction',
     product=t2d_tx,
     prob=1.0,
-    rel_death_reduction=1,
+    rel_death_reduction=0.5,
     eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids
 )
 
@@ -274,6 +274,8 @@ if __name__ == '__main__':
     print(counts)
     df.groupby('sex')[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
     
+    df[['had_hiv', 'died_of_hiv', 'had_type2diabetes', 'died_of_type2diabetes']].sum()
+    
     
     
     # #### To run 2 simulation simultaneously #####
@@ -358,20 +360,3 @@ if __name__ == '__main__':
     #     year=target_year
     # )    
 
-uids = sim.people.uid.raw
-alive = sim.people.alive.raw
-
-# Get disease modules
-hiv = sim.diseases.get('hiv')
-t2d = sim.diseases.get('type2diabetes')
-
-# Build the dataframe
-df = pd.DataFrame({
-    'uid': uids,
-    'alive': alive,
-    'has_hiv': hiv.infected[uids],
-    'has_t2d': t2d.affected[uids],
-})
-
-# Optional: filter to alive agents
-df_alive = df[df['alive']]

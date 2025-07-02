@@ -70,6 +70,7 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
         ti = self.sim.ti
         year = self.sim.t.yearvec[ti]
 
+        # Track deaths since last step
         if not hasattr(self, 'previous_alive'):
             self.previous_alive = set(np.where(ppl.alive)[0])
         else:
@@ -85,14 +86,22 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
                 }
 
                 for cond in self.conditions:
+                    # 1. Snapshot status
                     key = (uid, cond)
                     record[f'had_{cond}'] = self.condition_snapshots.get(key, None)
+
+                    # 2. Death caused by disease?
+                    disease = self.sim.diseases.get(cond)
+                    if disease and hasattr(disease, 'ti_dead'):
+                        record[f'died_of_{cond}'] = disease.ti_dead[uid] == ti
+                    else:
+                        record[f'died_of_{cond}'] = None
 
                 self.records.append(record)
 
             self.previous_alive = current_alive
 
-        # Always snapshot condition status *before* next death
+        # Always snapshot condition status before next step
         for cond in self.conditions:
             disease = self.sim.diseases.get(cond)
             if not disease:
@@ -106,5 +115,4 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
 
     def to_df(self):
         return pd.DataFrame(self.records)
-    
     
