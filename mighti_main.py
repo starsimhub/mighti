@@ -35,9 +35,9 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 # Simulation Settings
 # ---------------------------------------------------------------------
-n_agents = 100_000 
+n_agents = 1000 
 inityear = 2007  
-endyear = 2050
+endyear = 2024
 region = 'eswatini'
 
 
@@ -181,7 +181,7 @@ t2d_treatment = mi.ReduceMortalityTx(
     label='T2D Mortality Reduction',
     product=t2d_tx,
     prob=1.0,
-    rel_death_reduction=0.5,
+    rel_death_reduction=1,
     eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids
 )
 
@@ -231,11 +231,11 @@ if __name__ == '__main__':
         start=inityear,
         stop=endyear,
         people=ppl,
-        demographics=[pregnancy, death],
+        demographics=[pregnancy],
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
         diseases=disease_objects,
         connectors=interactions,
-        # interventions = interventions,
+        interventions = interventions,
         copy_inputs=False,
         label='With Interventions'
     )
@@ -261,9 +261,6 @@ if __name__ == '__main__':
     life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
     
     mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
-
-    # Create the life table
-    # life_table = mi.create_life_table(sim, df_mx_male, df_mx_female, max_age=100, radix=n_agents)
     
     # Plot life expectancy comparison
     mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
@@ -279,7 +276,21 @@ if __name__ == '__main__':
     
     
     
-    ##### To run 2 simulation simultaneously #####
+    # #### To run 2 simulation simultaneously #####
+    # sim_without = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=endyear,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=interactions,
+    #     # interventions = interventions,
+    #     copy_inputs=False,
+    #     label='No Intervention'
+    # )
     
     # sim_with = ss.Sim(
     #     n_agents=n_agents,
@@ -293,10 +304,10 @@ if __name__ == '__main__':
     #     connectors=interactions,
     #     interventions = interventions,
     #     copy_inputs=False,
-    #     label='With Intervention'
+    #     label='With HIV Intervention'
     # )
     
-    # sim_without = ss.Sim(
+    # sim_with_both = ss.Sim(
     #     n_agents=n_agents,
     #     networks=networks,
     #     start=inityear,
@@ -308,10 +319,10 @@ if __name__ == '__main__':
     #     connectors=interactions,
     #     interventions = interventions2,
     #     copy_inputs=False,
-    #     label='With Intervention for T2D'
+    #     label='With HIV and T2D ntervention'
     # )
  
-    # msim = ss.MultiSim(sims=[sim_with, sim_without])
+    # msim = ss.MultiSim(sims=[sim_without, sim_with, sim_with_both])
     # msim.run()
     
     # # Target year for evaluation
@@ -331,17 +342,36 @@ if __name__ == '__main__':
     #     return df_mx, life_table
     
     # # Process both sims in MultiSim
-    # df_mx_with, lt_with = process_life_table(msim.sims[0])
-    # df_mx_without, lt_without = process_life_table(msim.sims[1])
+    # df_mx_without, lt_without = process_life_table(msim.sims[0])
+    # df_mx_with, lt_with = process_life_table(msim.sims[1])
+    # df_mx_with_both, lt_with_both = process_life_table(msim.sims[2])
     
     # # Plot mx comparison (can pick one to compare to observed)
     # mi.plot_mx_comparison(df_mx_with, obs_mx, year=target_year, age_interval=5)
     
     # # Plot life expectancy: Sim with vs. without vs. Observed
-    # mi.plot_life_expectancy_three(
-    #     sim_with=lt_with,
-    #     sim_without=lt_without,
+    # mi.plot_life_expectancy_four(
+    #     sim_no_intervention=lt_without,
+    #     sim_hiv_only=lt_with,
+    #     sim_both_interventions=lt_with_both,
     #     observed_data=obs_ex,
     #     year=target_year
     # )    
- 
+
+uids = sim.people.uid.raw
+alive = sim.people.alive.raw
+
+# Get disease modules
+hiv = sim.diseases.get('hiv')
+t2d = sim.diseases.get('type2diabetes')
+
+# Build the dataframe
+df = pd.DataFrame({
+    'uid': uids,
+    'alive': alive,
+    'has_hiv': hiv.infected[uids],
+    'has_t2d': t2d.affected[uids],
+})
+
+# Optional: filter to alive agents
+df_alive = df[df['alive']]

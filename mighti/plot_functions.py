@@ -409,6 +409,74 @@ def plot_life_expectancy_three(sim_with, sim_without, observed_data, year, max_a
     plt.show()
     return fig, (ax1, ax2)
 
+def plot_life_expectancy_four(sim_no_intervention, sim_hiv_only, sim_both_interventions, observed_data, year, max_age=100, figsize=(14, 10), title=None):
+    """
+    Plot life expectancy by age and sex for:
+        - Simulated with no intervention
+        - Simulated with HIV-only intervention
+        - Simulated with both interventions
+        - Observed data
+
+    Args:
+        sim_no_intervention: DataFrame with ['Age', 'e(x)', 'sex'] from sim with no intervention
+        sim_hiv_only: DataFrame with ['Age', 'e(x)', 'sex'] from sim with HIV-only intervention
+        sim_both_interventions: DataFrame with ['Age', 'e(x)', 'sex'] from sim with both interventions
+        observed_data: DataFrame with ['Age', 'Sex', 'Time', 'ex']
+        year: Year to filter observed data
+        max_age: Max age to display
+        figsize: Figure size
+        title: Optional suptitle
+    """
+    # Filter inputs
+    male_obs = observed_data[(observed_data['Sex'] == 'Male') & (observed_data['Time'] == year)]
+    female_obs = observed_data[(observed_data['Sex'] == 'Female') & (observed_data['Time'] == year)]
+
+    male_sim_no = sim_no_intervention[sim_no_intervention['sex'] == 'Male']
+    male_sim_hiv = sim_hiv_only[sim_hiv_only['sex'] == 'Male']
+    male_sim_both = sim_both_interventions[sim_both_interventions['sex'] == 'Male']
+
+    female_sim_no = sim_no_intervention[sim_no_intervention['sex'] == 'Female']
+    female_sim_hiv = sim_hiv_only[sim_hiv_only['sex'] == 'Female']
+    female_sim_both = sim_both_interventions[sim_both_interventions['sex'] == 'Female']
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
+
+    # Male plot
+    ax1.plot(male_sim_no['Age'], male_sim_no['e(x)'], '-', lw=4,color='blue', label='No Intervention')
+    ax1.plot(male_sim_hiv['Age'], male_sim_hiv['e(x)'], '--', lw=4, color='blue', label='HIV Only')
+    ax1.plot(male_sim_both['Age'], male_sim_both['e(x)'], '-', lw=6, color='blue', alpha=0.3, label='Both Interventions')
+    ax1.plot(male_obs['Age'], male_obs['ex'], 's-', lw=2, markersize=4, color='black', label='Observed')
+    ax1.set_title('Male', fontsize=24)
+    ax1.set_ylabel('Life Expectancy (years)', fontsize=20)
+    ax1.tick_params(labelsize=18)
+    ax1.set_ylim(0, 70)
+    ax1.set_yticks(np.arange(0, 66, 10))
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(fontsize=16, frameon=False)
+
+    # Female plot
+    ax2.plot(female_sim_no['Age'], female_sim_no['e(x)'], '-', lw=4, color='red', label='No Intervention')
+    ax2.plot(female_sim_hiv['Age'], female_sim_hiv['e(x)'], '--', lw=4, color='red', label='HIV Only')
+    ax2.plot(female_sim_both['Age'], female_sim_both['e(x)'], '-', lw=6, color='red', alpha=0.3,  label='Both Interventions')
+    ax2.plot(female_obs['Age'], female_obs['ex'], 's-', lw=2, markersize=4, color='black', label='Observed')
+    ax2.set_title('Female', fontsize=24)
+    ax2.set_xlabel('Age', fontsize=20)
+    ax2.set_ylabel('Life Expectancy (years)', fontsize=20)
+    ax2.tick_params(labelsize=18)
+    ax2.set_ylim(0, 70)
+    ax2.set_yticks(np.arange(0, 66, 10))
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(fontsize=16, frameon=False)
+
+    if title:
+        plt.suptitle(title, fontsize=24, y=0.98)
+    else:
+        plt.suptitle(f'Life Expectancy by Age in {year}', fontsize=24, y=0.98)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.subplots_adjust(bottom=0.1)
+    plt.show()
+    return fig, (ax1, ax2)
 
 def plot_population_over_time(df, inityear, endyear, age_groups=None, nagent=50000, observed_data_path='demography/eswatini_age_distribution.csv'):
     """

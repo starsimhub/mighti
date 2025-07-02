@@ -56,12 +56,14 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
     def __init__(self, conditions=None, condition_attr_map=None, **kwargs):
         super().__init__(**kwargs)
         self.conditions = [c.lower() for c in (conditions or [])]
-        self.condition_attr_map = condition_attr_map or {}  # maps condition name to attribute like 'positive'
+        self.condition_attr_map = condition_attr_map or {}
         self.records = []
+        self.condition_snapshots = {}  # (uid, condition) → True/False
 
     def init_results(self):
         super().init_results()
         self.records = []
+        self.condition_snapshots = {}
 
     def step(self):
         ppl = self.sim.people
@@ -70,34 +72,37 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
 
         if not hasattr(self, 'previous_alive'):
             self.previous_alive = set(np.where(ppl.alive)[0])
-            return
+        else:
+            current_alive = set(np.where(ppl.alive)[0])
+            died = self.previous_alive - current_alive
 
-        current_alive = set(np.where(ppl.alive)[0])
-        died = np.array(list(self.previous_alive - current_alive))
-        self.previous_alive = current_alive
+            for uid in died:
+                record = {
+                    'uid': uid,
+                    'year': year,
+                    'age': ppl.age[uid],
+                    'sex': 'Female' if ppl.female[uid] else 'Male',
+                }
 
-        for uid in died:
-            record = {
-                'uid': uid,
-                'year': year,
-                'age': ppl.age[uid],
-                'sex': 'Female' if ppl.female[uid] else 'Male',
-            }
+                for cond in self.conditions:
+                    key = (uid, cond)
+                    record[f'had_{cond}'] = self.condition_snapshots.get(key, None)
 
-            for cond in self.conditions:
-                disease = self.sim.diseases.get(cond)
-                if disease:
-                    attr = self.condition_attr_map.get(cond, 'has')  # default to 'has' if not specified
-                    if hasattr(disease, attr):
-                        record[f'had_{cond}'] = getattr(disease, attr)[uid]
-                    else:
-                        print(f"[Warning] Disease '{cond}' does not have attribute '{attr}'")
-                        record[f'had_{cond}'] = None
-                else:
-                    print(f"[Warning] Disease '{cond}' not found in sim.diseases")
-                    record[f'had_{cond}'] = None
+                self.records.append(record)
 
-            self.records.append(record)
+            self.previous_alive = current_alive
+
+        # Always snapshot condition status *before* next death
+        for cond in self.conditions:
+            disease = self.sim.diseases.get(cond)
+            if not disease:
+                continue
+            attr = self.condition_attr_map.get(cond, 'has')
+            if not hasattr(disease, attr):
+                continue
+            condition_state = getattr(disease, attr)
+            for uid in np.where(ppl.alive)[0]:
+                self.condition_snapshots[(uid, cond)] = condition_state[uid]
 
     def to_df(self):
         return pd.DataFrame(self.records)
