@@ -3,8 +3,10 @@ Module defining the Type 2 Diabetes remitting disease model.
 """
 
 
+import starsim as ss
 from mighti.diseases.base_disease import RemittingDisease
 from starsim.interventions import treat_num
+
 
 
 class Type2Diabetes(RemittingDisease):
