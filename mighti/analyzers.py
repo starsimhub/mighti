@@ -70,49 +70,26 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
         ti = self.sim.ti
         year = self.sim.t.yearvec[ti]
 
-        # Track deaths since last step
-        if not hasattr(self, 'previous_alive'):
-            self.previous_alive = set(np.where(ppl.alive)[0])
-        else:
-            current_alive = set(np.where(ppl.alive)[0])
-            died = self.previous_alive - current_alive
+        for uid in ppl.dead.uids:
+            record = {
+                'uid': uid,
+                'year': year,
+                'age': ppl.age[uid],
+                'sex': 'Female' if ppl.female[uid] else 'Male',
+            }
 
-            for uid in died:
-                record = {
-                    'uid': uid,
-                    'year': year,
-                    'age': ppl.age[uid],
-                    'sex': 'Female' if ppl.female[uid] else 'Male',
-                }
+            for cond in self.conditions:
 
-                for cond in self.conditions:
-                    # 1. Snapshot status
-                    key = (uid, cond)
-                    record[f'had_{cond}'] = self.condition_snapshots.get(key, None)
+                # if the condition has a different time step unit, adjust accordingly
+                if not np.isnan(ppl[cond].ti_dead[uid]):
+                    condition_ti = self.sim.diseases[cond].t.abstvec[int(ppl[cond].ti_dead[uid])]
+                    record[f'died_{cond}'] = (condition_ti > ti-1) & (condition_ti <= ti)
+                else:
+                    record[f'died_{cond}'] = False
 
-                    # 2. Death caused by disease?
-                    disease = self.sim.diseases.get(cond)
-                    if disease and hasattr(disease, 'ti_dead'):
-                        record[f'died_of_{cond}'] = disease.ti_dead[uid] == ti
-                    else:
-                        record[f'died_of_{cond}'] = None
-
-                self.records.append(record)
-
-            self.previous_alive = current_alive
-
-        # Always snapshot condition status before next step
-        for cond in self.conditions:
-            disease = self.sim.diseases.get(cond)
-            if not disease:
-                continue
-            attr = self.condition_attr_map.get(cond, 'has')
-            if not hasattr(disease, attr):
-                continue
-            condition_state = getattr(disease, attr)
-            for uid in np.where(ppl.alive)[0]:
-                self.condition_snapshots[(uid, cond)] = condition_state[uid]
+            self.records.append(record)
 
     def to_df(self):
         return pd.DataFrame(self.records)
+    
     
