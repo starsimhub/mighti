@@ -266,10 +266,10 @@ if __name__ == '__main__':
     mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
     
     df = death_cause_analyzer.to_df()   
-    df['HIV only'] = df['had_hiv'] & ~df['had_type2diabetes']
-    df['T2D only'] = df['had_type2diabetes'] & ~df['had_hiv']
-    df['Both'] = df['had_hiv'] & df['had_type2diabetes']
-    df['Neither'] = ~df['had_hiv'] & ~df['had_type2diabetes']
+    df['HIV only'] = df['died_hiv'] & ~df['died_type2diabetes']
+    df['T2D only'] = df['died_type2diabetes'] & ~df['died_hiv']
+    df['Both'] = df['died_hiv'] & df['died_type2diabetes']
+    df['Neither'] = ~df['died_hiv'] & ~df['died_type2diabetes']
     counts = df[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
     print(counts)
     df.groupby('sex')[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
