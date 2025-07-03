@@ -14,6 +14,7 @@ import starsim as ss
 import mighti as mi
 import pandas as pd
 import os
+from mighti.diseases.type2diabetes import ReduceMortalityTx
 
 
 # Settings
@@ -33,6 +34,7 @@ def test_reduce_mortality_tx_runs():
     # Make disease
     t2d = mi.Type2Diabetes(csv_path=param_path, init_prev=0.1)
 
+
     # Create a minimal treatment product for T2D
     tx_df = pd.DataFrame({
         'disease': ['type2diabetes'],
@@ -41,8 +43,6 @@ def test_reduce_mortality_tx_runs():
         'efficacy': [1.0]  # Ensure treatment always succeeds
     })
     tx = ss.Tx(df=tx_df)
-
-    from mighti.interventions import ReduceMortalityTx
 
     # Intervention to reduce death
     t2d_tx = ReduceMortalityTx(
