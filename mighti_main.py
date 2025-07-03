@@ -26,6 +26,8 @@ import pandas as pd
 import prepare_data_for_year
 import starsim as ss
 import stisim as sti
+from mighti.diseases.type2diabetes import ReduceMortalityTx
+
 
 # Set up logging and random seeds for reproducibility
 logger = logging.getLogger('MIGHTI')
@@ -37,7 +39,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 n_agents = 100_000 
 inityear = 2007  
-endyear = 2024
+endyear = 2050
 region = 'eswatini'
 
 
@@ -177,7 +179,7 @@ test_years = [2003, 2005, 2007, 2010, 2014, 2016]
 tx_df = pd.read_csv("mighti/data/t2d_tx.csv")
 t2d_tx = ss.Tx(df=tx_df)
 
-t2d_treatment = mi.ReduceMortalityTx(
+t2d_treatment = ReduceMortalityTx(
     label='T2D Mortality Reduction',
     product=t2d_tx,
     prob=1.0,
@@ -276,6 +278,22 @@ if __name__ == '__main__':
     
     df[['had_hiv', 'died_of_hiv', 'had_type2diabetes', 'died_of_type2diabetes']].sum()
     
+    import plot_IAS
+    target_years = [2007, 2024, 2030, 2050]
+    age_groups = [
+        (0, 5, 'Under 5'),
+        (5, 15, '5 to 14'),
+        (15, 50, '15 to 49'),
+        (50, 70, '50 to 70'),
+        (70, 100, 'Over 70'),
+    ]
+    df_male, df_female = plot_IAS.extract_t2d_prevalence_by_age_plhiv(sim, prevalence_analyzer, 'Type2Diabetes', target_years, age_groups)
+
+
+    colors = ['#08306b', '#2171b3', '#6baed6', '#9ecae1', '#c6dbef']  # One color per age group (5 total)
+
+    plot_IAS.plot_grouped_prevalence_bar_combined(df_female, colors)
+    plot_IAS.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')
     
     
     # #### To run 2 simulation simultaneously #####
