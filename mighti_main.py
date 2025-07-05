@@ -237,7 +237,7 @@ if __name__ == '__main__':
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
         diseases=disease_objects,
         connectors=interactions,
-        interventions = interventions,
+        interventions = interventions3,
         copy_inputs=False,
         label='With Interventions'
     )
@@ -274,26 +274,9 @@ if __name__ == '__main__':
     df['Neither'] = ~df['died_hiv'] & ~df['died_type2diabetes']
     counts = df[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
     print(counts)
-    df.groupby('sex')[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
+    # df.groupby('sex')[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
     
-    df[['had_hiv', 'died_of_hiv', 'had_type2diabetes', 'died_of_type2diabetes']].sum()
-    
-    import plot_IAS
-    target_years = [2007, 2024, 2030, 2050]
-    age_groups = [
-        (0, 5, 'Under 5'),
-        (5, 15, '5 to 14'),
-        (15, 50, '15 to 49'),
-        (50, 70, '50 to 70'),
-        (70, 100, 'Over 70'),
-    ]
-    df_male, df_female = plot_IAS.extract_t2d_prevalence_by_age_plhiv(sim, prevalence_analyzer, 'Type2Diabetes', target_years, age_groups)
-
-
-    colors = ['#08306b', '#2171b3', '#6baed6', '#9ecae1', '#c6dbef']  # One color per age group (5 total)
-
-    plot_IAS.plot_grouped_prevalence_bar_combined(df_female, colors)
-    plot_IAS.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')
+    # df[['had_hiv', 'died_of_hiv', 'had_type2diabetes', 'died_of_type2diabetes']].sum()
     
     
     # #### To run 2 simulation simultaneously #####
@@ -377,4 +360,3 @@ if __name__ == '__main__':
     #     observed_data=obs_ex,
     #     year=target_year
     # )    
-

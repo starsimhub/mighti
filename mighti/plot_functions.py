@@ -476,7 +476,8 @@ def plot_life_expectancy_four(sim_no_intervention, sim_hiv_only, sim_both_interv
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.subplots_adjust(bottom=0.1)
     plt.show()
-    return fig, (ax1, ax2)
+    plt.close(fig)  
+
 
 def plot_population_over_time(df, inityear, endyear, age_groups=None, nagent=50000, observed_data_path='demography/eswatini_age_distribution.csv'):
     """
