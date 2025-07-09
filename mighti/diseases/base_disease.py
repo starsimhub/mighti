@@ -81,7 +81,7 @@ class RemittingDisease(ss.NCD):
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
-            p_acquire_multiplier=1,
+            p_acquire_multiplier=0.092,
         )
         
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -156,7 +156,10 @@ class RemittingDisease(ss.NCD):
         deaths = (self.ti_dead == self.ti).uids
         self.sim.people.request_death(deaths)
         self.results.new_deaths[self.ti] = len(deaths)
-
+        
+    def on_death(self, uids):
+        self.ti_dead[uids] = self.ti
+            
     def step(self):
         ti = self.ti
 
@@ -200,7 +203,8 @@ class RemittingDisease(ss.NCD):
         draws = np.random.rand(len(affected_uids))
         deaths = affected_uids[draws < adjusted_p_death]
         self.sim.people.request_death(deaths)
-        self.ti_dead[deaths] = ti
+        # self.ti_dead[deaths] = ti
+
 
         # Results
         self.results.new_cases[ti] = len(new_cases)

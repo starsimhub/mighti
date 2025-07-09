@@ -70,6 +70,9 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
         ti = self.sim.ti
         year = self.sim.t.yearvec[ti]
 
+        print(f"\n[ConditionAtDeathAnalyzer] Step {ti}, Year {year}")
+        print(f"Number of deaths this step: {len(ppl.dead.uids)}")
+        
         for uid in ppl.dead.uids:
             record = {
                 'uid': uid,
@@ -77,18 +80,21 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
                 'age': ppl.age[uid],
                 'sex': 'Female' if ppl.female[uid] else 'Male',
             }
-
+        
             for cond in self.conditions:
-
-                # if the condition has a different time step unit, adjust accordingly
                 if not np.isnan(ppl[cond].ti_dead[uid]):
                     condition_ti = self.sim.diseases[cond].t.abstvec[int(ppl[cond].ti_dead[uid])]
-                    record[f'died_{cond}'] = (condition_ti > ti-1) & (condition_ti <= ti)
+                    died_of_cond = (condition_ti > ti - 1) and (condition_ti <= ti)
                 else:
-                    record[f'died_{cond}'] = False
-
+                    died_of_cond = False
+        
+                record[f'died_{cond}'] = died_of_cond
+        
+                # 🔍 Print condition status at death
+                print(f"UID {uid}: condition={cond}, ti_dead={ppl[cond].ti_dead[uid]}, condition_ti={condition_ti if not np.isnan(ppl[cond].ti_dead[uid]) else 'nan'}, died_{cond}={died_of_cond}")
+        
             self.records.append(record)
-
+            
     def to_df(self):
         return pd.DataFrame(self.records)
     

@@ -1,37 +1,13 @@
-##### Place these in mighti_main to run this chunk #####
-
-    # df = death_cause_analyzer.to_df()   
-    # df['HIV only'] = df['had_hiv'] & ~df['had_type2diabetes']
-    # df['T2D only'] = df['had_type2diabetes'] & ~df['had_hiv']
-    # df['Both'] = df['had_hiv'] & df['had_type2diabetes']
-    # df['Neither'] = ~df['had_hiv'] & ~df['had_type2diabetes']
-    # counts = df[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
-    # print(counts)
-    # df.groupby('sex')[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
-   
-   # import plot_IAS
-   # target_years = [2007, 2024, 2030, 2050]
-   # age_groups = [
-   #     (0, 5, 'Under 5'),
-   #     (5, 15, '5 to 14'),
-   #     (15, 50, '15 to 49'),
-   #     (50, 70, '50 to 70'),
-   #     (70, 100, 'Over 70'),
-   # ]
-   # df_male, df_female = plot_IAS.extract_t2d_prevalence_by_age_plhiv(sim, prevalence_analyzer, 'Type2Diabetes', target_years, age_groups)
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
-   # colors = ['#08306b', '#2171b3', '#6baed6', '#9ecae1', '#c6dbef']  # One color per age group (5 total)
-
-   # plot_IAS.plot_grouped_prevalence_bar_combined(df_female, colors)
-   # plot_IAS.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')
 
 
 ##############################################################
 
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
+
 
 def extract_t2d_prevalence_by_age_plhiv(sim, prevalence_analyzer, disease, target_years, age_groups):
     """
@@ -76,24 +52,32 @@ def extract_t2d_prevalence_by_age_plhiv(sim, prevalence_analyzer, disease, targe
     return df_male, df_female
 
 
-def extract_combined_t2d_prevalence_by_age_plhiv(sim, prevalence_analyzer, disease, target_years, age_groups):
+def extract_combined_t2d_prevalence_by_age_plhiv(sim, prevalence_analyzer, disease, target_years, custom_age_groups):
     """
-    Extract combined (male + female) T2D prevalence among PLHIV by age group and year.
+    Extract combined (male + female) T2D prevalence among PLHIV by custom age group and year.
+    Uses fixed 15 bins from PrevalenceAnalyzer and aggregates to match custom bins.
     """
+    import numpy as np
+    import pandas as pd
+    import sciris as sc
+
+    # Define the fixed bins used in the PrevalenceAnalyzer
+    analyzer_bins = [(0, 15), (15, 20), (20, 25), (25, 30), (30, 35), (35, 40), (40, 45),
+                     (45, 50), (50, 55), (55, 60), (60, 65), (65, 70), (70, 75), (75, 80), (80, float('inf'))]
+
+    # Create mapping from custom group to list of indices in analyzer_bins
+    bin_map = {}
+    for i, (a_start, a_end, label) in enumerate(custom_age_groups):
+        print(i)
+        print(f'label is {label}, astart is {a_start}, aend is {a_end}')
+        indices = [
+            j for j, (b_start, b_end) in enumerate(analyzer_bins)
+            if not (b_end <= a_start or b_start >= a_end)
+        ]
+        bin_map[label] = indices
+
     year_to_index = {int(round(year)): idx for idx, year in enumerate(sim.timevec)}
     selected_indices = {int(year): year_to_index[int(year)] for year in target_years if int(year) in year_to_index}
-
-    def extract_results(key_pattern):
-        return [
-            prevalence_analyzer.results.get(f'{disease}_{key_pattern}_{i}', np.zeros(len(sim.timevec)))
-            for i in range(len(age_groups))
-        ]
-
-    # Extract male and female numerators and denominators
-    male_num = extract_results('num_with_HIV_male')
-    female_num = extract_results('num_with_HIV_female')
-    male_den = extract_results('den_with_HIV_male')
-    female_den = extract_results('den_with_HIV_female')
 
     combined_data = []
 
@@ -103,21 +87,21 @@ def extract_combined_t2d_prevalence_by_age_plhiv(sim, prevalence_analyzer, disea
             continue
 
         row = []
-        for i in range(len(age_groups)):
-            m_num = male_num[i][ti]
-            m_den = male_den[i][ti]
-            f_num = female_num[i][ti]
-            f_den = female_den[i][ti]
+        for label, indices in bin_map.items():
+            m_num = sum(prevalence_analyzer.results[f'{disease}_num_with_HIV_male_{i}'][ti] for i in indices)
+            m_den = sum(prevalence_analyzer.results[f'{disease}_den_with_HIV_male_{i}'][ti] for i in indices)
+            f_num = sum(prevalence_analyzer.results[f'{disease}_num_with_HIV_female_{i}'][ti] for i in indices)
+            f_den = sum(prevalence_analyzer.results[f'{disease}_den_with_HIV_female_{i}'][ti] for i in indices)
 
             total_num = m_num + f_num
             total_den = m_den + f_den
             prevalence = (total_num / total_den * 100) if total_den > 0 else 0
             row.append(prevalence)
+            print(f'yearis {year}: prevalence is {prevalence}')
 
         combined_data.append(row)
 
-    age_labels = [label for _, _, label in age_groups]
-    df_combined = pd.DataFrame(combined_data, index=target_years, columns=age_labels).T
+    df_combined = pd.DataFrame(combined_data, index=target_years, columns=bin_map.keys()).T
     return df_combined
 
 
@@ -198,6 +182,50 @@ def plot_grouped_prevalence_bar_combined(df, colors=None):
     plt.show() 
 
 
+def plot_t2d_prevalence_by_age_and_year(data, colors=None):
+    """
+    Plot grouped bar chart for T2D prevalence among PLHIV by age group over selected years.
+
+    Args:
+        data (dict or pd.DataFrame): Keys (or index) are age groups; columns are years; values are prevalence (%).
+        colors (list): Optional list of colors for the bars.
+    """
+    # Convert dict to DataFrame if needed
+    if isinstance(data, dict):
+        df = pd.DataFrame(data).T  # transpose so rows = age groups, columns = years
+    elif isinstance(data, pd.DataFrame):
+        df = data
+    else:
+        raise ValueError("Input must be a DataFrame or a dict")
+
+    labels = df.columns.astype(str).tolist()  # years on x-axis
+    age_groups = df.index.tolist()            # age bins (bar series)
+    x = np.arange(len(labels))                # x-axis positions for years
+    n_groups = len(age_groups)
+    width = 0.8 / n_groups                    # bar width
+
+    if colors is None:
+        colors = plt.cm.viridis(np.linspace(0.2, 0.9, n_groups))  # default palette
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    for i, age_group in enumerate(age_groups):
+        ax.bar(x + i * width, df.loc[age_group], width, label=age_group, color=colors[i])
+
+    ax.set_xlabel('Year', fontsize=22, fontweight='bold')
+    ax.set_ylabel('T2D Prevalence among PLHIV (%)', fontsize=20, fontweight='bold')
+    ax.set_xticks(x + width * (n_groups - 1) / 2)
+    ax.set_xticklabels(labels, fontsize=16)
+    ax.tick_params(axis='y', labelsize=16)
+    ax.tick_params(axis='x', labelsize=16)
+
+    ax.legend(title='Age Group', title_fontsize=16, fontsize=14, frameon=False, loc='upper left')
+    ax.grid(axis='y', linestyle='--', alpha=0.5)
+
+    plt.tight_layout()
+    plt.show()
+    
+
 def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     """
     Plot mean prevalence over time for a given disease and both sexes.
@@ -252,4 +280,55 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
 
     plt.show()
 
+# # ##### Run the following 4 times after changing the end_year #####
+# # # Get the T2D disease module
+# t2d = sim.diseases['type2diabetes']
 
+# # Define custom age groups
+# age_groups = [
+#     (0, 18, '0–17'),
+#     (18, 35, '18–34'),
+#     (35, 50, '35–49'),
+#     (50, 65, '50–64'),
+#     (65, 150, '65+'),
+# ]
+
+# print("Age Group | Total People | T2D Cases | % with T2D")
+# print("---------------------------------------------------")
+
+# for a0, a1, label in age_groups:
+#     age_mask = (sim.people.age >= a0) & (sim.people.age < a1)
+#     total = age_mask.sum()
+#     affected = (age_mask & t2d.affected).sum()
+#     prevalence = 100 * affected / total if total > 0 else 0
+#     print(f"{label:>8} |     {total:5}     |    {affected:5}   |   {prevalence:6.2f}%")
+    
+    
+# # # Get the T2D disease module
+# # t2d = sim.diseases['type2diabetes']
+
+# # print("Age | Total People | T2D Cases |  % with T2D")
+# # print("---------------------------------------------")
+
+# # for age in range(6):  # Ages 0 through 5
+# #     is_age = (sim.people.age >= age) & (sim.people.age < age + 1)
+# #     total = is_age.sum()
+# #     affected = (is_age & t2d.affected).sum()
+# #     prevalence = 100 * affected / total if total > 0 else 0
+# #     print(f" {age}  |     {total:5}     |    {affected:5}   |   {prevalence:6.2f}%")  
+
+
+# data = {
+#     "0-17":  [0.06, 0.10, 0.09, 0.08],
+#     "18-34": [1.5, 1.99, 2.16, 2.01],
+#     "35-49": [3.77, 5.37, 5.97, 6.12],
+#     "50-64": [12.06, 14.21, 14.2, 15.13],
+#     "65+":   [24.22, 29.35, 32.66, 35.58],
+# }
+# columns = [2008, 2021, 2035, 2050]
+# df = pd.DataFrame(data, index=columns).T  # transpose to have age groups as index
+
+# colors = ['#08306b', '#2171b3', '#6baed6', '#9ecae1', '#c6dbef']  # One color per age group (5 total)
+
+# plot_t2d_prevalence_by_age_and_year(df,colors)  
+# plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')
