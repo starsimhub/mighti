@@ -81,7 +81,7 @@ class RemittingDisease(ss.NCD):
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
-            p_acquire_multiplier=0.092,
+            p_acquire_multiplier=1,
         )
         
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -156,10 +156,7 @@ class RemittingDisease(ss.NCD):
         deaths = (self.ti_dead == self.ti).uids
         self.sim.people.request_death(deaths)
         self.results.new_deaths[self.ti] = len(deaths)
-        
-    def on_death(self, uids):
-        self.ti_dead[uids] = self.ti
-            
+
     def step(self):
         ti = self.ti
 
@@ -191,20 +188,9 @@ class RemittingDisease(ss.NCD):
         self.ti_affected[new_cases] = ti
 
         # Death
-        affected_uids = self.affected.uids
-        rel_death = self.rel_death[affected_uids]
-    
-        try:
-            base_p = self.pars.p_death.pars['p']
-        except Exception:
-            raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
-    
-        adjusted_p_death = base_p * rel_death
-        draws = np.random.rand(len(affected_uids))
-        deaths = affected_uids[draws < adjusted_p_death]
+        deaths = self.pars.p_death.filter(new_cases)  
         self.sim.people.request_death(deaths)
-        # self.ti_dead[deaths] = ti
-
+        self.ti_dead[deaths] = ti
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
@@ -319,17 +305,7 @@ class AcuteDisease(ss.NCD):
         self.ti_affected[new_cases] = ti
 
         # Death
-        affected_uids = self.affected.uids
-        rel_death = self.rel_death[affected_uids]
-    
-        try:
-            base_p = self.pars.p_death.pars['p']
-        except Exception:
-            raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
-    
-        adjusted_p_death = base_p * rel_death
-        draws = np.random.rand(len(affected_uids))
-        deaths = affected_uids[draws < adjusted_p_death]
+        deaths = self.pars.p_death.filter(new_cases)
         self.sim.people.request_death(deaths)
         self.ti_dead[deaths] = ti
 
@@ -444,17 +420,7 @@ class ChronicDisease(ss.NCD):
         self.ti_affected[new_cases] = ti
 
         # Death
-        affected_uids = self.affected.uids
-        rel_death = self.rel_death[affected_uids]
-    
-        try:
-            base_p = self.pars.p_death.pars['p']
-        except Exception:
-            raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
-    
-        adjusted_p_death = base_p * rel_death
-        draws = np.random.rand(len(affected_uids))
-        deaths = affected_uids[draws < adjusted_p_death]
+        deaths = self.pars.p_death.filter(new_cases) 
         self.sim.people.request_death(deaths)
         self.ti_dead[deaths] = ti
 
@@ -574,17 +540,7 @@ class GenericSIS(ss.SIS):
         self.ti_infected[new_cases] = ti
 
         # Death
-        affected_uids = self.infected.uids
-        rel_death = self.rel_death[affected_uids]
-    
-        try:
-            base_p = self.pars.p_death.pars['p']
-        except Exception:
-            raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
-    
-        adjusted_p_death = base_p * rel_death
-        draws = np.random.rand(len(affected_uids))
-        deaths = affected_uids[draws < adjusted_p_death]
+        deaths = self.pars.p_death.filter(new_cases) 
         self.sim.people.request_death(deaths)
         self.ti_dead[deaths] = ti
 

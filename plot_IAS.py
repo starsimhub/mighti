@@ -263,22 +263,104 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     # mean_prevalence_male_without_HIV = np.sum(extract_results('prev_without_HIV_male'), axis=0)
     # mean_prevalence_female_without_HIV = np.sum(extract_results('prev_without_HIV_female'), axis=0)
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(10, 6))
 
     ax.plot(sim.timevec, mean_prevalence_male_with_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV+)', linewidth=3, color='blue', linestyle='solid')
     ax.plot(sim.timevec, mean_prevalence_female_with_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV+)', linewidth=3, color='red', linestyle='solid')
     ax.plot(sim.timevec, mean_prevalence_male_without_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV-)', linewidth=3, color='blue', linestyle='dashed')
     ax.plot(sim.timevec, mean_prevalence_female_without_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV-)', linewidth=3, color='red', linestyle='dashed')
 
-    ax.set_xlabel('Year', fontsize=22, fontweight='bold')
-    ax.set_ylabel('T2D Prevalence (%)', fontsize=20, fontweight='bold')
+    ax.set_xlabel('Year', fontsize=24, fontweight='bold')
+    ax.set_ylabel('T2D Prevalence (%)', fontsize=24, fontweight='bold')
     # ax.set_title(f'Mean {disease.capitalize()} Prevalence Over Time (All Ages)', fontsize=18)
-    ax.tick_params(axis='y', labelsize=16)
-    ax.tick_params(axis='x', labelsize=16)
-    ax.legend(loc='lower right', fontsize=14, frameon=False)   
+    ax.tick_params(axis='y', labelsize=22)
+    ax.tick_params(axis='x', labelsize=22)
+    #ax.legend(loc='upper left', fontsize=10, frameon=False)   
     ax.grid()
 
     plt.show()
+
+
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Load CSV
+df = pd.read_csv("result_LE.csv")
+df.columns = [col.lower().replace(" ", "_") for col in df.columns]
+
+# Add small increasing offset to 'both' to visually separate it
+np.random.seed(0)
+offset = np.linspace(0.1, 0.5, len(df))
+df["both_female"] += offset
+df["both_male"] += offset
+offset2 = np.linspace(0.2, 0.7,  len(df))  # gradually increasing
+df["only_t2d_female"] += offset2
+df["only_t2d_male"] += offset2
+
+def plot_life_expectancy(df, sex):
+    fig, ax = plt.subplots(figsize=(9, 6))
+
+    # Split time
+    df_pre = df[df["year"] <= 2023]
+    df_post = df[df["year"] > 2023]
+
+    # Observed data
+    ax.scatter(
+        df_pre["year"],
+        df_pre[f"obs_{sex}"],
+        label="Observed",
+        s=60,
+        color="black",
+        zorder=5,
+    )
+
+    # Interventions
+    interventions = {
+        "no_interv": {"label": "No intervention", "color": "#fb5607"},
+        "only_hiv": {"label": "HIV intervention", "color": "#fb5607"},
+        "only_t2d": {"label": "T2D intervention", "color": "#5fad56"},
+        "both": {"label": "Both intervention", "color": "#8338ec"},
+    }
+
+    for key, props in interventions.items():
+        col = f"{key}_{sex}"
+        if col in df.columns:
+            # Pre-2024: solid line
+            ax.plot(df_pre["year"], df_pre[col],
+                    label=props["label"],
+                    linestyle='-',
+                    linewidth=5,
+                    color=props["color"])
+            # Post-2024: dashed line
+            ax.plot(df_post["year"], df_post[col],
+                    linestyle='--',
+                    linewidth=5,
+                    color=props["color"],
+                    alpha=1)
+
+    # Axis and styling
+    ax.set_xlabel("Year", fontsize=24, fontweight="bold")
+    ax.set_ylabel("Life Expectancy at Birth", fontsize=24, fontweight="bold")
+    ax.set_title(f"{sex.capitalize()}", fontsize=28, fontweight="bold")
+    ax.set_xticks(list(range(1990, 2051, 10)))
+    ax.set_xlim(2007, 2050)
+    ax.set_yticks(list(range(30, 70, 10)))
+    ax.grid(True, linestyle='--', alpha=0.6)
+    ax.tick_params(labelsize=22)
+    #ax.legend(fontsize=18, frameon=False)
+
+    plt.tight_layout()
+    return fig
+
+# Generate and show both figures
+fig_female = plot_life_expectancy(df, "female")
+fig_male = plot_life_expectancy(df, "male")
+plt.show()
+
+
 
 # # ##### Run the following 4 times after changing the end_year #####
 # # # Get the T2D disease module
@@ -332,3 +414,345 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
 
 # plot_t2d_prevalence_by_age_and_year(df,colors)  
 # plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')
+
+
+
+
+
+import logging
+import mighti as mi
+import numpy as np
+import pandas as pd
+import prepare_data_for_year
+import starsim as ss
+import stisim as sti
+from mighti.diseases.type2diabetes import ReduceMortalityTx
+
+
+# Set up logging and random seeds for reproducibility
+logger = logging.getLogger('MIGHTI')
+logger.setLevel(logging.INFO) 
+
+
+# ---------------------------------------------------------------------
+# Simulation Settings
+# ---------------------------------------------------------------------
+n_agents = 100_000 
+inityear = 2007
+endyear = 2050
+region = 'eswatini'
+
+
+# ---------------------------------------------------------------------
+# File paths
+# ---------------------------------------------------------------------
+# Parameters
+csv_path_params = f'mighti/data/{region}_parameters_gbd.csv'
+
+# Relative Risks
+csv_path_interactions = "mighti/data/rel_sus.csv"
+
+# Disease prevalence data
+csv_prevalence = f'mighti/data/{region}_prevalence.csv'
+
+# Fertility data 
+csv_path_fertility = f'mighti/data/{region}_asfr.csv'
+
+# Death data
+csv_path_death = f'mighti/data/{region}_mortality_rates.csv'
+
+# Age distribution data
+csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
+
+# Ensure required demographic files are prepared
+prepare_data_for_year.prepare_data_for_year(region,inityear)
+prepare_data_for_year.prepare_data(region)
+
+# Data paths for post process
+mx_path = f'mighti/data/{region}_mx.csv'
+ex_path = f'mighti/data/{region}_ex.csv'
+
+
+# ---------------------------------------------------------------------
+# Load Parameters and Disease Configuration
+# ---------------------------------------------------------------------
+df = pd.read_csv(csv_path_params)
+df.columns = df.columns.str.strip()
+
+healthconditions = ['Type2Diabetes']
+diseases = ["HIV"] + healthconditions
+
+ncd_df = df[df["disease_class"] == "ncd"]
+chronic = ncd_df[ncd_df["disease_type"] == "chronic"]["condition"].tolist()
+acute = ncd_df[ncd_df["disease_type"] == "acute"]["condition"].tolist()
+remitting = ncd_df[ncd_df["disease_type"] == "remitting"]["condition"].tolist()
+communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
+
+
+# ---------------------------------------------------------------------
+# Prevalence Data and Analyzers
+# ---------------------------------------------------------------------
+prevalence_data_df = pd.read_csv(csv_prevalence)
+prevalence_data, age_bins = mi.initialize_prevalence_data(
+    diseases, prevalence_data=prevalence_data_df, inityear=inityear
+)
+get_prev_fn = lambda d: lambda mod, sim, size: mi.age_sex_dependent_prevalence(d, prevalence_data, age_bins, sim, size)
+
+# Initialize the PrevalenceAnalyzer
+prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
+survivorship_analyzer = mi.SurvivorshipAnalyzer()
+deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
+
+death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
+    conditions=['hiv', 'type2diabetes'],
+    condition_attr_map={
+        'hiv': 'infected',
+        'type2diabetes': 'affected'  
+    }
+)
+
+# ---------------------------------------------------------------------
+# Demographics and Networks
+# ---------------------------------------------------------------------
+death_rates = {'death_rate': pd.read_csv(csv_path_death), 'rate_units': 1}
+death = ss.Deaths(death_rates) 
+death.death_rate_data *= 0.4
+fertility_rate = {'fertility_rate': pd.read_csv(csv_path_fertility)}
+pregnancy = ss.Pregnancy(pars=fertility_rate)
+
+ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
+
+maternal = ss.MaternalNet()
+structuredsexual = sti.StructuredSexual()
+networks = [maternal, structuredsexual]
+
+
+# ---------------------------------------------------------------------
+# Diseases
+# ---------------------------------------------------------------------
+hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prev_fn('HIV')),
+                      init_prev_data=None,   
+                      p_hiv_death=None, 
+                      include_aids_deaths=False, 
+                      beta={'structuredsexual': [0.011023883426646121, 0.011023883426646121], 
+                            'maternal': [0.044227226248848076, 0.044227226248848076]})
+    # Best pars: {'hiv_beta_m2f': 0.011023883426646121, 'hiv_beta_m2c': 0.044227226248848076} seed: 12345
+
+disease_objects = []
+for dis in healthconditions:
+    cls = getattr(mi, dis, None)
+    if cls is not None:
+        disease_objects.append(cls(csv_path=csv_path_params, pars={"init_prev": ss.bernoulli(get_prev_fn(dis))}))
+disease_objects.append(hiv_disease)
+
+
+# ---------------------------------------------------------------------
+# Interactions
+# ---------------------------------------------------------------------
+ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
+ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
+interactions = [ncd_hiv_connector]
+
+ncd_interactions = mi.read_interactions(csv_path_interactions) 
+connectors = mi.create_connectors(ncd_interactions)
+
+interactions.extend(connectors)
+
+
+# ---------------------------------------------------------------------
+# Interventions 
+# ---------------------------------------------------------------------
+# ART coverage among PLHIV (from 95-95-95 cascade estimates and Lancet data)
+art_coverage_data = pd.DataFrame({
+    'p_art': [0.10, 0.34, 0.50, 0.65, 0.741, 0.85]
+    # 'p_art': [1,1,1,1,1,1]
+}, index=[2003, 2010, 2013, 2014, 2016, 2022])
+
+# HIV testing probabilities over time (estimated testing uptake)
+test_prob_data = [0.10, 0.25, 0.60, 0.70, 0.80, 0.95]
+# test_prob_data = [1,1,1,1,1,1]
+test_years = [2003, 2005, 2007, 2010, 2014, 2016]
+
+tx_df = pd.read_csv("mighti/data/t2d_tx.csv")
+t2d_tx = ss.Tx(df=tx_df)
+
+t2d_treatment = ReduceMortalityTx(
+    label='T2D Mortality Reduction',
+    product=t2d_tx,
+    prob=1.0,
+    rel_death_reduction=0.5,
+    eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids
+)
+
+# Define interventions using these data
+interventions = [
+    sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
+    sti.ART(coverage_data=art_coverage_data),
+    sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
+    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
+]
+
+interventions2 = [
+    sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
+    sti.ART(coverage_data=art_coverage_data),
+    sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
+    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
+    t2d_treatment
+]
+
+interventions3 = [
+    t2d_treatment
+]
+
+# ---------------------------------------------------------------------
+# Utility: Get Modules
+# ---------------------------------------------------------------------
+def get_deaths_module(sim):
+    for module in sim.modules:
+        if isinstance(module, mi.DeathsByAgeSexAnalyzer):
+            return module
+    raise ValueError("Deaths module not found in the simulation. Make sure you've added the DeathsByAgeSexAnalyzer to your simulation configuration")
+
+def get_pregnancy_module(sim):
+    for module in sim.modules:
+        if isinstance(module, ss.Pregnancy):
+            return module
+    raise ValueError("Pregnancy module not found in the simulation.")
+
+
+# ---------------------------------------------------------------------
+# Main Simulation
+# ---------------------------------------------------------------------
+if __name__ == '__main__':
+    # sim = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=endyear,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=interactions,
+    #     # interventions = interventions3,
+    #     copy_inputs=False,
+    #     label='Without Interventions'
+    # )
+    # # Run the simulation
+    # sim.run()
+    
+    
+    
+    ### To run 2 simulation simultaneously #####
+    sim = ss.Sim(
+        n_agents=n_agents,
+        networks=networks,
+        start=inityear,
+        stop=endyear,
+        people=ppl,
+        demographics=[pregnancy, death],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+        diseases=disease_objects,
+        connectors=interactions,
+        interventions = interventions,
+        copy_inputs=False,
+        label='No_intervention'
+    )
+    
+    # sim_with = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=endyear,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=interactions,
+    #     interventions = interventions,
+    #     copy_inputs=False,
+    #     label='HIV_intervention'
+    # )
+    
+    # sim_with_t2d = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=endyear,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=interactions,
+    #     interventions = interventions3,
+    #     copy_inputs=False,
+    #     label='T2D_intervention'
+    # )
+    
+    # sim_with_both = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=endyear,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=interactions,
+    #     interventions = interventions2,
+    #     copy_inputs=False,
+    #     label='Both_intervention'
+    # )
+ 
+    # msim = ss.MultiSim(sims=[sim, sim_with, sim_with_t2d, sim_with_both])
+    # # msim = ss.MultiSim(sims=[sim_with_t2d,sim_with_both])
+    # msim.run()
+    sim.run()
+    
+    # # Mortality rates and life table
+    # target_year = endyear - 1
+    
+    # obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
+    # obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
+    
+    # # Get the modules
+    # deaths_module = get_deaths_module(sim)
+    # pregnancy_module = get_pregnancy_module(sim)
+    
+    # df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
+
+    # df_mx_male = df_mx[df_mx['sex'] == 'Male']
+    # df_mx_female = df_mx[df_mx['sex'] == 'Female']
+    
+    
+    # life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
+    
+    # mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
+    
+    # # Plot life expectancy comparison
+    # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
+    
+    
+    import plot_IAS
+    plot_IAS.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'Type2Diabetes')
+
+    
+
+
+#56.52
+#41.59 0.5
+#42.62 0.4
+
+# # Filter life expectancy at birth
+# lt0 = life_table[life_table['Age'] == 0].copy()
+
+# # Compute weighted average life expectancy at birth
+# total_l0 = lt0['l(x)'].sum()
+# lt0['weight'] = lt0['l(x)'] / total_l0
+# weighted_le = (lt0['e(x)'] * lt0['weight']).sum()
+
+# print(f"Life expectancy at birth (both sexes): {weighted_le:.2f} years")
+
+
+
+
