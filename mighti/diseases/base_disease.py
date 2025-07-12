@@ -186,11 +186,22 @@ class RemittingDisease(ss.NCD):
         
         self.affected[new_cases] = True
         self.ti_affected[new_cases] = ti
+        
+        # New implementation of detah
+        affected_uids = self.affected.uids
+        rel_death = self.rel_death[affected_uids]
 
-        # Death
-        deaths = self.pars.p_death.filter(new_cases)  
+        try:
+            base_p = self.pars.p_death.pars['p']
+        except Exception:
+            raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
+
+        adjusted_p_death = base_p * rel_death
+        draws = np.random.rand(len(affected_uids))
+        deaths = affected_uids[draws < adjusted_p_death]
+
         self.sim.people.request_death(deaths)
-        self.ti_dead[deaths] = ti
+        # self.ti_dead[deaths] = ti
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
@@ -304,10 +315,26 @@ class AcuteDisease(ss.NCD):
         self.affected[new_cases] = True
         self.ti_affected[new_cases] = ti
 
-        # Death
-        deaths = self.pars.p_death.filter(new_cases)
+        # # Death
+        # deaths = self.pars.p_death.filter(new_cases)
+        # self.sim.people.request_death(deaths)
+        # self.ti_dead[deaths] = ti
+        
+                
+        # New implementation of detah
+        affected_uids = self.affected.uids
+        rel_death = self.rel_death[affected_uids]
+
+        try:
+            base_p = self.pars.p_death.pars['p']
+        except Exception:
+            raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
+
+        adjusted_p_death = base_p * rel_death
+        draws = np.random.rand(len(affected_uids))
+        deaths = affected_uids[draws < adjusted_p_death]
+
         self.sim.people.request_death(deaths)
-        self.ti_dead[deaths] = ti
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
@@ -419,10 +446,26 @@ class ChronicDisease(ss.NCD):
         self.affected[new_cases] = True
         self.ti_affected[new_cases] = ti
 
-        # Death
-        deaths = self.pars.p_death.filter(new_cases) 
+        # # Death
+        # deaths = self.pars.p_death.filter(new_cases) 
+        # self.sim.people.request_death(deaths)
+        # self.ti_dead[deaths] = ti
+        
+                
+        # New implementation of detah
+        affected_uids = self.affected.uids
+        rel_death = self.rel_death[affected_uids]
+
+        try:
+            base_p = self.pars.p_death.pars['p']
+        except Exception:
+            raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
+
+        adjusted_p_death = base_p * rel_death
+        draws = np.random.rand(len(affected_uids))
+        deaths = affected_uids[draws < adjusted_p_death]
+
         self.sim.people.request_death(deaths)
-        self.ti_dead[deaths] = ti
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
@@ -539,10 +582,26 @@ class GenericSIS(ss.SIS):
         self.infected[new_cases] = True
         self.ti_infected[new_cases] = ti
 
-        # Death
-        deaths = self.pars.p_death.filter(new_cases) 
+        # # Death
+        # deaths = self.pars.p_death.filter(new_cases) 
+        # self.sim.people.request_death(deaths)
+        # self.ti_dead[deaths] = ti
+        
+                
+        # New implementation of detah
+        affected_uids = self.affected.uids
+        rel_death = self.rel_death[affected_uids]
+
+        try:
+            base_p = self.pars.p_death.pars['p']
+        except Exception:
+            raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
+
+        adjusted_p_death = base_p * rel_death
+        draws = np.random.rand(len(affected_uids))
+        deaths = affected_uids[draws < adjusted_p_death]
+
         self.sim.people.request_death(deaths)
-        self.ti_dead[deaths] = ti
 
         # Results
         self.results.new_cases[ti] = len(new_cases)

@@ -82,16 +82,23 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
             }
         
         for cond in self.conditions:
-            ti_dead_val = ppl[cond].ti_dead[uid]
+            # ti_dead_val = ppl[cond].ti_dead[uid]
         
-            if not np.isnan(ti_dead_val):
-                ti_dead_idx = int(ti_dead_val)
-                if ti_dead_idx < len(self.sim.diseases[cond].t.abstvec):
-                    condition_ti = self.sim.diseases[cond].t.abstvec[ti_dead_idx]
-                    died_of_cond = (condition_ti > ti - 1) and (condition_ti <= ti)
-                else:
-                    died_of_cond = False  # dead, but beyond current abstvec — skip tagging
+            # if not np.isnan(ti_dead_val):
+            #     ti_dead_idx = int(ti_dead_val)
+            #     if ti_dead_idx < len(self.sim.diseases[cond].t.abstvec):
+            #         condition_ti = self.sim.diseases[cond].t.abstvec[ti_dead_idx]
+            #         died_of_cond = (condition_ti > ti - 1) and (condition_ti <= ti)
+            #     else:
+            #         died_of_cond = False  # dead, but beyond current abstvec — skip tagging
+            # else:
+            #     died_of_cond = False
+            ti_dead = ppl[cond].ti_dead[uid]
+            if not np.isnan(ti_dead):
+                condition_ti = self.sim.diseases[cond].t.abstvec[int(ti_dead)]
+                died_of_cond = (condition_ti > ti - 1) and (condition_ti <= ti)
             else:
+                condition_ti = np.nan
                 died_of_cond = False
         
             record[f'died_{cond}'] = died_of_cond

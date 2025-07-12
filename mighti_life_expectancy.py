@@ -254,8 +254,7 @@ def make_sim(year):
         label='Both_intervention'
     )
  
-    # msim = ss.MultiSim(sims=[sim_without, sim_with, sim_with_t2d, sim_with_both])
-    msim = ss.MultiSim(sims=[sim_with])
+    msim = ss.MultiSim(sims=[sim_without, sim_with, sim_with_t2d, sim_with_both])
 
     return msim
 
@@ -278,7 +277,7 @@ def get_pregnancy_module(sim):
 
 
     
-years = list(range(2008, 2051))  # or any range you like
+years = list(range(2008, 2050))  # or any range you like
 
 
 life_expectancy_by_year = []
@@ -327,5 +326,5 @@ pivot_df = le_df.pivot_table(index='year', columns=['scenario', 'sex'], values='
 
 # Display result
 print(pivot_df)
-# pivot_df.to_csv("result_hiv.csv", index=False)
-
+pivot_df.to_csv("result_hivtest.csv", index=False)
+ 

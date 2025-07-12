@@ -266,7 +266,7 @@ if __name__ == '__main__':
     
     # Plot life expectancy comparison
     mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
-    
+    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
     
     # df = death_cause_analyzer.to_df()   
     # df['HIV only'] = df['died_hiv'] & ~df['died_type2diabetes']
