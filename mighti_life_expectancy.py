@@ -194,20 +194,20 @@ def make_sim(year):
     
     
     # ### To run 2 simulation simultaneously #####
-    # sim_without = ss.Sim(
-    #     n_agents=n_agents,
-    #     networks=networks,
-    #     start=inityear,
-    #     stop=year,
-    #     people=ppl,
-    #     demographics=[pregnancy, death],
-    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-    #     diseases=disease_objects,
-    #     connectors=interactions,
-    #     # interventions = interventions,
-    #     copy_inputs=False,
-    #     label='No_intervention'
-    # )
+    sim_without = ss.Sim(
+        n_agents=n_agents,
+        networks=networks,
+        start=inityear,
+        stop=year,
+        people=ppl,
+        demographics=[pregnancy, death],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+        diseases=disease_objects,
+        connectors=interactions,
+        # interventions = interventions,
+        copy_inputs=False,
+        label='No_intervention'
+    )
     
     sim_with = ss.Sim(
         n_agents=n_agents,
@@ -224,35 +224,35 @@ def make_sim(year):
         label='HIV_intervention'
     )
     
-    # sim_with_t2d = ss.Sim(
-    #     n_agents=n_agents,
-    #     networks=networks,
-    #     start=inityear,
-    #     stop=year,
-    #     people=ppl,
-    #     demographics=[pregnancy, death],
-    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-    #     diseases=disease_objects,
-    #     connectors=interactions,
-    #     interventions = interventions3,
-    #     copy_inputs=False,
-    #     label='T2D_intervention'
-    # )
+    sim_with_t2d = ss.Sim(
+        n_agents=n_agents,
+        networks=networks,
+        start=inityear,
+        stop=year,
+        people=ppl,
+        demographics=[pregnancy, death],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+        diseases=disease_objects,
+        connectors=interactions,
+        interventions = interventions3,
+        copy_inputs=False,
+        label='T2D_intervention'
+    )
     
-    # sim_with_both = ss.Sim(
-    #     n_agents=n_agents,
-    #     networks=networks,
-    #     start=inityear,
-    #     stop=year,
-    #     people=ppl,
-    #     demographics=[pregnancy, death],
-    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-    #     diseases=disease_objects,
-    #     connectors=interactions,
-    #     interventions = interventions2,
-    #     copy_inputs=False,
-    #     label='Both_intervention'
-    # )
+    sim_with_both = ss.Sim(
+        n_agents=n_agents,
+        networks=networks,
+        start=inityear,
+        stop=year,
+        people=ppl,
+        demographics=[pregnancy, death],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+        diseases=disease_objects,
+        connectors=interactions,
+        interventions = interventions2,
+        copy_inputs=False,
+        label='Both_intervention'
+    )
  
     # msim = ss.MultiSim(sims=[sim_without, sim_with, sim_with_t2d, sim_with_both])
     msim = ss.MultiSim(sims=[sim_with])
@@ -279,12 +279,7 @@ def get_pregnancy_module(sim):
 
     
 years = list(range(2008, 2051))  # or any range you like
-# years = list(range(2020, 2025))  # or any range you like
-# years = list(range(2025, 2030))  # or any range you like
-# years = list(range(2030, 2040))  # or any range you like
-# years = list(range(2035, 2040))  # or any range you like
-# years = list(range(2040, 2045))  # or any range you like
-# years = list(range(2051, 2052))  # or any range you like
+
 
 life_expectancy_by_year = []
 
@@ -332,6 +327,5 @@ pivot_df = le_df.pivot_table(index='year', columns=['scenario', 'sex'], values='
 
 # Display result
 print(pivot_df)
-# pivot_df.to_csv("output_2020_2050.csv", index=False)
-pivot_df.to_csv("result_hiv.csv", index=False)
+# pivot_df.to_csv("result_hiv.csv", index=False)
 
