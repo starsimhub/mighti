@@ -32,7 +32,15 @@ params_df.columns = params_df.columns.str.strip()
 def test_reduce_mortality_tx_runs():
 
     # Make disease
-    t2d = mi.Type2Diabetes(csv_path=param_path, init_prev=0.1)
+    t2d = mi.Type2Diabetes(
+        csv_path=param_path,
+        pars={
+            'init_prev': 0.5,
+            'p_death': ss.bernoulli(0.05),
+            'dur_condition': 5,
+            'max_disease_duration': 10,
+        }
+    )
 
 
     # Create a minimal treatment product for T2D
