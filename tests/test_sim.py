@@ -50,6 +50,10 @@ def test_full_mighti_simulation():
     for d in healthconditions:
         cls = getattr(mi, d, None)
         if cls:
+            bins = age_bins.get(d, [])
+            if len(bins) < 2:
+                print(f"[⚠] Skipping {d}: no prevalence age bins")
+                continue
             disease_objects.append(cls(csv_path=param_path,
                                        pars={"init_prev": ss.bernoulli(get_prev_fn(d))}))
     
