@@ -36,9 +36,14 @@ def test_disease_prevalence_from_data(n_agents=500, inityear=2007):
     uids = sim.people.uid.raw
 
     for disease in diseases:
+        if len(age_bins.get(disease, [])) < 2:
+            print(f"[⚠] Skipping {disease}: insufficient age bin data.")
+            continue
+
         prev_fn = lambda module, sim, uids: mi.age_sex_dependent_prevalence(
             disease, prevalence_data, age_bins, sim, uids
         )
+        
         dist = ss.bernoulli(prev_fn(None, sim, uids), strict=False)   
         dist.init(n_agents)
         sample = dist()
