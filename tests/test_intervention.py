@@ -35,13 +35,12 @@ def test_reduce_mortality_tx_runs():
     t2d = mi.Type2Diabetes(
         csv_path=param_path,
         pars={
-            'init_prev': 0.5,
-            'p_death': ss.bernoulli(0.05),
-            'dur_condition': 5,
+            'init_prev': ss.bernoulli(0.9),
+            'p_death': ss.bernoulli(0.1),
+            'dur_condition': ss.normal(5, 0.01),
             'max_disease_duration': 10,
         }
     )
-
 
     # Create a minimal treatment product for T2D
     tx_df = pd.DataFrame({
@@ -62,9 +61,9 @@ def test_reduce_mortality_tx_runs():
 
     pars = dict(
         start=2000,
-        stop=2020,
+        stop=2050,
         dt=1,
-        n_agents=1000,
+        n_agents=10000,
         networks=[],
         diseases=[t2d],
     )

@@ -83,9 +83,10 @@ class RemittingDisease(ss.NCD):
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1,
         )
-        
+
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
         self.p_remission = ss.bernoulli(p=lambda self, sim, uids: self.pars.remission_rate) 
+        print(type(self.pars.p_death))  # Should be <class 'starsim.distributions.bernoulli'>
 
         self.update_pars(pars, **kwargs)
 
@@ -96,7 +97,6 @@ class RemittingDisease(ss.NCD):
             ss.State('reversed'), 
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_reversed'),
-            ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus', default=1.0),  
             ss.FloatArr('rel_death', default=1.0),  
         )
@@ -107,26 +107,13 @@ class RemittingDisease(ss.NCD):
         return initial_cases
 
     def set_prognoses(self, uids):
-        sim = self.sim
-        p = self.pars
-    
         self.susceptible[uids] = False
         self.affected[uids] = True
-    
-        dur_condition = p.dur_condition.rvs(size=len(uids))
-    
-        dead_uids = p.p_death.filter(uids)    
-        rec_uids = np.setdiff1d(uids, dead_uids)
-        dead_indices = np.isin(uids, dead_uids)
-        rec_indices = ~dead_indices
-    
-        self.ti_dead[dead_uids] = self.ti + dur_condition[dead_indices] / self.t.dt
-        self.ti_reversed[rec_uids] = self.ti + dur_condition[rec_indices] / self.t.dt
-    
+
     def init_results(self):
         super().init_results()
         existing_results = set(self.results.keys())
-        
+
         if 'new_cases' not in existing_results:
             self.define_results(ss.Result('new_cases', dtype=int, label='New Cases'))
         if 'new_deaths' not in existing_results:
@@ -147,30 +134,25 @@ class RemittingDisease(ss.NCD):
             self.affected[going_into_remission] = False
             self.reversed[going_into_remission] = True
             self.ti_reversed[going_into_remission] = self.ti
-    
-            # Handle recovery, death, and beta-cell function exhaustion
+
+            # Handle recovery, beta-cell function exhaustion
             recovered = (self.reversed & (self.ti_reversed <= self.ti)).uids
             self.reversed[recovered] = False
             self.susceptible[recovered] = True  
-            
-        deaths = (self.ti_dead == self.ti).uids
-        self.sim.people.request_death(deaths)
-        self.results.new_deaths[self.ti] = len(deaths)
 
     def step(self):
         ti = self.ti
 
         # New cases
         susceptible = (~self.affected).uids
-        
         p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
-        
+
         # Apply sex filtering
         if self.pars.affected_sex == "female":
             p_acq[self.sim.people.male[susceptible]] = 0
         elif self.pars.affected_sex == "male":
             p_acq[self.sim.people.female[susceptible]] = 0
-        
+
         # Apply rel_sus and rel_sus_hiv
         try:
             p_acq *= self.rel_sus[susceptible]
@@ -179,38 +161,36 @@ class RemittingDisease(ss.NCD):
                 p_acq[hiv_pos] *= self.pars.rel_sus_hiv
         except Exception:
             pass
-        
-        # Sample new cases using numpy
+
         draws = np.random.rand(len(susceptible))
         new_cases = susceptible[draws < p_acq]
-        
+
         self.affected[new_cases] = True
         self.ti_affected[new_cases] = ti
-        
-        # New implementation of detah
+
+        # Dynamic death logic — allows rel_death to be changed over time
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
 
         try:
-            base_p = self.pars.p_death.pars['p']
+            base_p = self.pars.p_death.pars['p']  # extract base death prob
         except Exception:
             raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
 
         adjusted_p_death = base_p * rel_death
         draws = np.random.rand(len(affected_uids))
         deaths = affected_uids[draws < adjusted_p_death]
+        self.ti_dead[deaths] = ti  # <== ✅ UNCOMMENT THIS LINE
 
         self.sim.people.request_death(deaths)
-        # self.ti_dead[deaths] = ti
+        self.results.new_deaths[ti] = len(deaths)
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
-        self.results.new_deaths[ti] = len(deaths)
         self.results.prevalence[self.ti] = np.count_nonzero(self.affected) / len(self.sim.people)
         self.results.remission_prevalence[self.ti] = np.count_nonzero(self.reversed) / len(self.sim.people)
         return new_cases
-   
-    
+
 
 class AcuteDisease(ss.NCD):
     """ Base class for all acute diseases. """

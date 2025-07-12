@@ -37,7 +37,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 # Simulation Settings
 # ---------------------------------------------------------------------
-n_agents = 100_000 
+n_agents = 10_000 
 inityear = 2007  
 endyear = 2050
 region = 'eswatini'
