@@ -589,7 +589,7 @@ class GenericSIS(ss.SIS):
         
                 
         # New implementation of detah
-        affected_uids = self.affected.uids
+        affected_uids = self.infected.uids
         rel_death = self.rel_death[affected_uids]
 
         try:
