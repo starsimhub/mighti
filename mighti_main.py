@@ -100,7 +100,10 @@ prevalence_data_df = pd.read_csv(csv_prevalence)
 prevalence_data, age_bins = mi.initialize_prevalence_data(
     diseases, prevalence_data=prevalence_data_df, inityear=inityear
 )
-get_prev_fn = lambda d: lambda mod, sim, size: mi.age_sex_dependent_prevalence(d, prevalence_data, age_bins, sim, size)
+# get_prev_fn = lambda d: lambda mod, sim, size: mi.age_sex_dependent_prevalence(d, prevalence_data, age_bins, sim, size)
+def get_prevalence_function(disease):
+    return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
+
 
 # Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
@@ -133,7 +136,7 @@ networks = [maternal, structuredsexual]
 # ---------------------------------------------------------------------
 # Diseases
 # ---------------------------------------------------------------------
-hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prev_fn('HIV')),
+hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
                       init_prev_data=None,   
                       p_hiv_death=None, 
                       include_aids_deaths=False, 
@@ -142,10 +145,16 @@ hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prev_fn('HIV')),
     # Best pars: {'hiv_beta_m2f': 0.011023883426646121, 'hiv_beta_m2c': 0.044227226248848076} seed: 12345
 
 disease_objects = []
-for dis in healthconditions:
-    cls = getattr(mi, dis, None)
-    if cls is not None:
-        disease_objects.append(cls(csv_path=csv_path_params, pars={"init_prev": ss.bernoulli(get_prev_fn(dis))}))
+# for dis in healthconditions:
+#     cls = getattr(mi, dis, None)
+#     if cls is not None:
+#         disease_objects.append(cls(csv_path=csv_path_params, pars={"init_prev": ss.bernoulli(get_prev_fn(dis))}))
+for disease in healthconditions:
+    init_prev = ss.bernoulli(get_prevalence_function(disease))
+    disease_class = getattr(mi, disease, None)
+    if disease_class:
+        disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})
+        disease_objects.append(disease_obj)
 disease_objects.append(hiv_disease)
 
 
@@ -268,14 +277,14 @@ if __name__ == '__main__':
     mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
     mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
     
-    # df = death_cause_analyzer.to_df()   
-    # df['HIV only'] = df['died_hiv'] & ~df['died_type2diabetes']
-    # df['T2D only'] = df['died_type2diabetes'] & ~df['died_hiv']
-    # df['Both'] = df['died_hiv'] & df['died_type2diabetes']
-    # df['Neither'] = ~df['died_hiv'] & ~df['died_type2diabetes']
-    # counts = df[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
-    # print(counts)
-    # # df.groupby('sex')[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
+    df = death_cause_analyzer.to_df()   
+    df['HIV only'] = df['died_hiv'] & ~df['died_type2diabetes']
+    df['T2D only'] = df['died_type2diabetes'] & ~df['died_hiv']
+    df['Both'] = df['died_hiv'] & df['died_type2diabetes']
+    df['Neither'] = ~df['died_hiv'] & ~df['died_type2diabetes']
+    counts = df[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
+    print(counts)
+    # df.groupby('sex')[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
     
     # # df[['had_hiv', 'died_of_hiv', 'had_type2diabetes', 'died_of_type2diabetes']].sum()
     

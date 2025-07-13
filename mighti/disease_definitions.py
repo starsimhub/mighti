@@ -47,20 +47,37 @@ def initialize_prevalence_data(diseases, prevalence_data, inityear):
     return prevalence_dict, age_bins
 
 
+# Function to compute age and sex-dependent prevalence
 def age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size):
+    """
+    Return the age- and sex-dependent prevalence for a given disease.
+    
+    Args:
+        disease (str): Disease name.
+        prevalence_data (dict): Prevalence data for diseases.
+        age_bins (dict): Age bins for diseases.
+        sim (object): Simulation object with population data.
+        size (int): Size of the population subset.
+        
+    Returns:
+        np.array: Prevalence values for the subset of the population.
+    """
     ages = sim.people.age[size]
     females = sim.people.female[size]
-    sex = np.where(females, 'female', 'male')
+    prevalence = np.zeros(len(ages))
+    disease_age_bins = age_bins[disease]  # Get age bins for the specific disease
 
-    bins = age_bins[disease]
-    if len(bins) < 2:
-        return np.zeros(len(size))  # or fallback
-    
-    out = np.zeros(len(size))
-    for i, b in enumerate(bins[:-1]):
-        mask = (ages >= b) & (ages < bins[i + 1])
-        for s in ['female', 'male']:
-            submask = mask & (sex == s)
-            val = prevalence_data[disease][s].get(b, 0.0)
-            out[submask] = val
-    return out
+    for i in range(len(ages)):
+        sex = 'female' if females[i] else 'male'
+        # Ensure bins are processed correctly
+        for j in range(len(disease_age_bins) - 1):
+            left = disease_age_bins[j]
+            right = disease_age_bins[j + 1]
+            if ages[i] >= left and ages[i] < right:
+                prevalence[i] = prevalence_data[disease][sex][left]
+                break
+        if ages[i] >= 80:  # For ages 80+
+            if 80 in prevalence_data[disease][sex]:  # Check if 80+ data is available
+                prevalence[i] = prevalence_data[disease][sex][80]
+
+    return prevalence
