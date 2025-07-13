@@ -8,7 +8,6 @@ from .interactions import *
 from .analyzers import *
 from .disease_definitions import *  
 from .prevalence_analyzer import *
-from .survivorship_analyzer import *
 from .plot_functions import *
 
 

@@ -1,15 +1,36 @@
+"""
+MIGHTI Simulation Script for a selected region: HIV and Health Conditions Interaction Modeling
+
+This script initializes and runs an agent-based simulation using the MIGHTI framework
+(built on StarSim and STI-Sim) to analyze the interplay between HIV and
+other health conditions (HCs) in selected country. 
+It loads demographic data, initializes diseases and networks, 
+applies interventions, and analyzes prevalence and mortality outcomes for the selected period.
+
+Key components:
+- Loads parameters and prevalence data from CSV files.
+- Initializes networks: maternal and structured sexual.
+- Initializes HIV and HC modules.
+- Sets up demographic modules (deaths, pregnancy).
+- Applies HIV interventions (e.g., ART, VMMC).
+- Computes and plots prevalence, mortality rates, and life expectancy.
+
+To run: `python mighti_main.py`
+"""
+
+
+import logging
+import mighti as mi
+import numpy as np
+import pandas as pd
+import prepare_data_for_year
 import starsim as ss
 import stisim as sti
-import sciris as sc
-import mighti as mi
-import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
-import os
 
-##### TO DO #####
-# Calibration 
-# Relative Risk implementation 
+
+# Set up logging and random seeds for reproducibility
+logger = logging.getLogger('MIGHTI')
+logger.setLevel(logging.INFO) 
 
 
 # ---------------------------------------------------------------------
@@ -38,13 +59,11 @@ csv_prevalence = f'mighti/data/{region}_prevalence.csv'
 csv_path_fertility = f'mighti/data/{region}_asfr.csv'
 
 # Death data
-csv_path_death = f'mighti/data/{region}_mortality_rates_{inityear}.csv'
+csv_path_death = f'mighti/data/{region}_deaths.csv'
 
 # Age distribution data
-csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
+csv_path_age = f'mighti/data/{region}_age_2023.csv'
 
-import prepare_data_for_year
-prepare_data_for_year.prepare_data_for_year(inityear, region)
 
 # Load the mortality rates and ensure correct format
 mortality_rates_year = pd.read_csv(csv_path_death)
@@ -57,24 +76,12 @@ df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
 # Combine with HIV
-healthconditions = ['AlcoholUseDisorder', 'Depression']
+healthconditions = ['AlcoholUseDisorder', 'SubstanceUseDisorder', 'Depression']
 diseases = ["HIV"] + healthconditions
 
-# Filter the DataFrame for disease_class being 'ncd'
-ncd_df = df[df["disease_class"] == "ncd"]
-
-# Extract disease categories from the filtered DataFrame
-chronic = ncd_df[ncd_df["disease_type"] == "chronic"]["condition"].tolist()
-acute = ncd_df[ncd_df["disease_type"] == "acute"]["condition"].tolist()
-remitting = ncd_df[ncd_df["disease_type"] == "remitting"]["condition"].tolist()
-
-# ncd = chronic + acute + remitting
-
-# Extract communicable diseases with disease_class as 'sis'
-communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
-
-# Initialize disease models with preloaded data
-# mi.initialize_conditions(df, chronic, acute, remitting, communicable_diseases)
+# Data paths for post process
+mx_path = f'mighti/data/{region}_mx.csv'
+ex_path = f'mighti/data/{region}_ex.csv'
 
 # ---------------------------------------------------------------------
 # Initialize conditions, prevalence analyzer, and interactions
@@ -105,8 +112,6 @@ pregnancy = ss.Pregnancy(pars=fertility_rate)
 
 ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
 
-# Initialize networks
-# mf = ss.MFNet(duration=1/24, acts=80)
 maternal = ss.MaternalNet()
 structuredsexual = sti.StructuredSexual()
 networks = [maternal, structuredsexual]
@@ -118,9 +123,10 @@ networks = [maternal, structuredsexual]
 # Initialize disease conditions
 hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
                       init_prev_data=None,   
-                      p_hiv_death=0.01, 
-                      include_aids_deaths=True, 
+                      p_hiv_death=None, 
+                      # include_aids_deaths=True, 
                       beta={'structuredsexual': [0.01, 0.01], 'maternal': [0.01, 0.01]})
+
 disease_objects = []
 for disease in healthconditions:
     init_prev = ss.bernoulli(get_prevalence_function(disease))
@@ -142,7 +148,6 @@ connectors = mi.create_connectors(ncd_interactions)
 
 # Add NCD-NCD connectors to interactions
 interactions.extend(connectors)
-
 
 def get_deaths_module(sim):
     for module in sim.modules:
@@ -183,34 +188,21 @@ if __name__ == '__main__':
     mi.plot_mean_prevalence(sim, prevalence_analyzer, 'AlcoholUseDisorder', prevalence_data_df, init_year = inityear, end_year = endyear)  
     mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Depression', prevalence_data_df, init_year = inityear, end_year = endyear)  
 
-    # mi.plot_age_group_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    # Mortality rates and life table
+    target_year = endyear - 1
     
     # Get the modules
     deaths_module = get_deaths_module(sim)
     pregnancy_module = get_pregnancy_module(sim)
     
-    year = endyear
-    
-    # Load observed mortality rate data
-    observed_death_data = pd.read_csv(f'demography/{region}_mortality_rates.csv')
-    
-    # Calculate mortality rates using `calculate_mortality_rates
-    df_mortality_rates = mi.calculate_mortality_rates(sim, deaths_module, year=year, max_age=100, radix=n_agents)
+    df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
 
-    mi.plot_mortality_rates_comparison(
-        df_metrics=df_mortality_rates, 
-        observed_data=observed_death_data, 
-        observed_year=year, 
-        year=year, 
-        log_scale=True, 
-        title="Single-Age Mortality Rates Comparison"
-    )
-    # Create the life table
-    life_table = mi.create_life_table(df_mortality_rates, year=year, n_agents=n_agents, max_age=100)
-    print(life_table)
+    df_mx_male = df_mx[df_mx['sex'] == 'Male']
+    df_mx_female = df_mx[df_mx['sex'] == 'Female']
     
-    # Load observed life expectancy data
-    observed_LE = pd.read_csv(f'demography/{region}_life_expectancy_by_age.csv')
     
+    life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
+        
     # Plot life expectancy comparison
-    mi.plot_life_expectancy(life_table, observed_LE, year=year, max_age=100, figsize=(14, 10),  title=None)
+    mi.plot_life_expectancy(life_table, pd.read_csv(ex_path), year = target_year, max_age=100, figsize=(14, 10), title=None)
+
