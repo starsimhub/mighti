@@ -103,7 +103,7 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
     calib.calibrate()
     calib.check_fit()
 
-    # Return the results for further analysis
+    # Return the results for further analysisz
     return calib
 
 

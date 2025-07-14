@@ -50,6 +50,7 @@ def get_disease_parameters(csv_path, disease_name):
     return {
         "p_death": get_value_safe("p_death", 0.0001),
         "dur_condition": get_value_safe("dur_condition", 10),
+        "init_prev": get_value_safe("init_prev", 0.1),
         "rel_sus_hiv": get_value_safe("rel_sus", 1.0),
         "remission_rate": get_value_safe("remission_rate", 0.0),
         "max_disease_duration": get_value_safe("max_disease_duration", 30),
@@ -73,12 +74,12 @@ class RemittingDisease(ss.NCD):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             p_death=ss.bernoulli(disease_params["p_death"]),  
+            init_prev=ss.bernoulli(disease_params["init_prev"]),
             remission_rate=disease_params["remission_rate"],  
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
-            p_acquire_multiplier=1.0,
-            init_prev=None
+            p_acquire=1
         )
         
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -98,11 +99,9 @@ class RemittingDisease(ss.NCD):
         )
 
     def init_post(self):
-        if 'init_prev' in self.pars:
-            initial_cases = self.pars.init_prev.filter()
-            self.set_prognoses(initial_cases)
-            return initial_cases
-        return []
+        initial_cases = self.pars.init_prev.filter()
+        self.set_prognoses(initial_cases)
+        return initial_cases
 
     def set_prognoses(self, uids):
         self.susceptible[uids] = False
@@ -185,7 +184,7 @@ class RemittingDisease(ss.NCD):
         adjusted_p_death = base_p * rel_death
         draws = np.random.rand(len(affected_uids))
         deaths = affected_uids[draws < adjusted_p_death]
-        self.ti_dead[deaths] = ti  
+        self.ti_dead[deaths] = ti  # <== ✅ UNCOMMENT THIS LINE
 
         self.sim.people.request_death(deaths)
         self.results.new_deaths[ti] = len(deaths)
@@ -212,13 +211,11 @@ class AcuteDisease(ss.NCD):
         # Define parameters using extracted values
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
-            p_acquire=disease_params["incidence"],
             p_death=ss.bernoulli(disease_params["p_death"]),  
+            init_prev=ss.bernoulli(disease_params["init_prev"]),
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
-            p_acquire_multiplier=1.0,
-            init_prev=None
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -235,11 +232,9 @@ class AcuteDisease(ss.NCD):
         )
 
     def init_post(self):
-        if 'init_prev' in self.pars:
-            initial_cases = self.pars.init_prev.filter()
-            self.set_prognoses(initial_cases)
-            return initial_cases
-        return []
+        initial_cases = self.pars.init_prev.filter()
+        self.set_prognoses(initial_cases)
+        return initial_cases
 
     def set_prognoses(self, uids):
         sim = self.sim
@@ -346,11 +341,10 @@ class ChronicDisease(ss.NCD):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             p_death=ss.bernoulli(disease_params["p_death"]),  
+            init_prev=ss.bernoulli(disease_params["init_prev"]),
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
-            p_acquire_multiplier=1.0,
-            init_prev=None
         )
         
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))    
@@ -367,11 +361,9 @@ class ChronicDisease(ss.NCD):
         )
     
     def init_post(self):
-        if 'init_prev' in self.pars:
-            initial_cases = self.pars.init_prev.filter()
-            self.set_prognoses(initial_cases)
-            return initial_cases
-        return []
+        initial_cases = self.pars.init_prev.filter()
+        self.set_prognoses(initial_cases)
+        return initial_cases
 
     def set_prognoses(self, uids):
         sim = self.sim
@@ -478,12 +470,11 @@ class GenericSIS(ss.SIS):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             p_death=ss.bernoulli(disease_params["p_death"]),  
+            init_prev=ss.bernoulli(disease_params["init_prev"]),
             remission_rate=disease_params["remission_rate"],
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
-            p_acquire_multiplier=1.0,
-            init_prev=None
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -503,11 +494,9 @@ class GenericSIS(ss.SIS):
         )
 
     def init_post(self):
-        if 'init_prev' in self.pars:
-            initial_cases = self.pars.init_prev.filter()
-            self.set_prognoses(initial_cases)
-            return initial_cases
-        return []
+        initial_cases = self.pars.init_prev.filter()
+        self.set_prognoses(initial_cases)
+        return initial_cases
 
     def set_prognoses(self, uids):
         sim = self.sim
@@ -601,28 +590,328 @@ class GenericSIS(ss.SIS):
     
 
 def calculate_p_acquire_generic(disease, sim, uids):
-    """Calculate acquisition probability for a disease with optional sex filtering and HIV interaction."""
-    p_base = np.full(len(uids), disease.pars.p_acquire_multiplier)
-    
+    """Simplified for calibration: assume constant baseline, scaled by multiplier."""
+
+    # Optional: limit to adults
+    age = sim.people.age[uids]
+    p_base = np.zeros(len(uids))
+    adult = age >= 15
+    p_base[adult] = disease.pars.p_acquire_multiplier
+
+    # Optional: restrict by sex
     if disease.pars.affected_sex == "female":
-        try:
-            p_base[sim.people.male[uids]] = 0
-        except Exception:
-            pass
+        p_base[sim.people.male[uids]] = 0
     elif disease.pars.affected_sex == "male":
-        try:
-            p_base[sim.people.female[uids]] = 0
-        except Exception:
-            pass
+        p_base[sim.people.female[uids]] = 0
 
-    try:
-        if hasattr(sim.people, 'hiv'):
-            hiv_positive = sim.people.hiv[uids]
-            p_base[hiv_positive] *= disease.pars.rel_sus_hiv
-    except Exception:
-        pass
+    return p_base
 
-    try:
-        return p_base * disease.rel_sus[uids]
-    except Exception:
-        return p_base           
+
+
+class Type1Diabetes(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'Type1Diabetes'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label='Type1Diabetes')  
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class Type2Diabetes(RemittingDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        print("[CALIB] Initializing Type2Diabetes for calibration")
+        self.disease_name = 'Type2Diabetes'
+        super().__init__(csv_path, pars, **kwargs)
+
+        self.define_pars(label='Type2Diabetes')  
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+    
+
+class Hypertension(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'Hypertension'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'Hypertension')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class Obesity(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'Obesity'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'Obesity')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class CardiovascularDiseases(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'CardiovascularDiseases'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'CardiovascularDiseases')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class ChronicKidneyDisease(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'ChronicKidneyDisease'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'ChronicKidneyDisease')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class Hyperlipidemia(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'Hyperlipidemia'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'Hyperlipidemia')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+    
+
+class CervicalCancer(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'CervicalCancer'
+        super().__init__(csv_path, pars, **kwargs)
+       
+        self.define_pars(label = 'CervicalCancer')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class ColorectalCancer(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'ColorectalCancer'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'ColorectalCancer')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class BreastCancer(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'BreastCancer'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'BreastCancer')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+    
+
+class LungCancer(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'LungCancer'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'LungCancer')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+    
+
+class ProstateCancer(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'ProstateCancer'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'ProstateCancer')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class AlcoholUseDisorder(RemittingDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'AlcoholUseDisorder'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'AlcoholUseDisorder')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class TobaccoUse(RemittingDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'TobaccoUse'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'TobaccoUse')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+class HIVAssociatedDementia(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'HIVAssociatedDementia'
+        super().__init__(csv_path, pars, **kwargs)
+       
+        self.define_pars(label = 'HIVAssociatedDementia')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class PTSD(RemittingDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'PTSD'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'PTSD')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class Depression(RemittingDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'Depression'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'Depression')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class DomesticViolence(AcuteDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'DomesticViolence'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'DomesticViolence')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class RoadInjuries(AcuteDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'RoadInjuries'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'RoadInjuries')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class ChronicLiverDisease(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'ChronicLiverDisease'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'ChronicLiverDisease')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class Asthma(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'Asthma'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'Asthma')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class COPD(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'COPD'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'COPD')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class AlzheimersDisease(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'AlzheimersDisease'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'AlzheimersDisease')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class ParkinsonsDisease(ChronicDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'ParkinsonsDisease'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'ParkinsonsDisease')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class ViralHepatitis(AcuteDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'ViralHepatitis'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'ViralHepatitis')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class HPV(GenericSIS):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'HPV'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'HPV')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class Flu(GenericSIS):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'Flu'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'Flu')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class TB(GenericSIS):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'TB'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'TB')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+    

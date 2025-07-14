@@ -13,13 +13,16 @@ import starsim as ss
 import stisim as sti
 
 
+# Set the name of the disease to calibrate
+from mighti.calibration.diseases_for_calibration import Type2Diabetes as DiseaseClass  
+disease_name = 'Type2Diabetes'  
 
-disease_name = 'Type2Diabetes'  # Set the name of the disease to calibrate
-init_year = 2007                # Set the starting year for calibration
-total_trials = 100              # Use a small number for testing; increase to 100+ for full calibration
+# Set the starting year for calibration
+init_year = 2007                
+total_trials = 10   # Use a small number for testing; increase to 100+ for full calibration
 
-path_prevalence = 'mighti/data/eswatini_prevalence.csv'
-path_parameters = 'mighti/data/eswatini_parameters_original.csv'
+path_prevalence = '../data/eswatini_prevalence.csv'
+path_parameters = '../data/eswatini_parameters_original.csv'
 
 
 def make_sim():
@@ -27,7 +30,7 @@ def make_sim():
     hiv = sti.HIV(beta_m2f=0.011023883426646121, beta_m2c=0.044227226248848076, init_prev=0.15)
     
     # Dynamically select disease constructor
-    health_condition_cls = getattr(mi, disease_name)
+    health_condition_cls = DiseaseClass
 
     prev_data = pd.read_csv(path_prevalence)
     prev_data, age_bins = mi.initialize_prevalence_data([disease_name], prev_data, init_year)  # 2007 = init_year
@@ -40,9 +43,9 @@ def make_sim():
         csv_path=path_parameters
     )
     
-    fertility_rate = {'fertility_rate': pd.read_csv('mighti/data/eswatini_asfr.csv')}
+    fertility_rate = {'fertility_rate': pd.read_csv('../data/eswatini_asfr.csv')}
     pregnancy = ss.Pregnancy(pars=fertility_rate)
-    death_rates = {'death_rate': pd.read_csv('mighti/data/eswatini_mortality_rates_2007.csv'), 'rate_units': 1}
+    death_rates = {'death_rate': pd.read_csv('../data/eswatini_mortality_rates_2007.csv'), 'rate_units': 1}
     death = ss.Deaths(death_rates)  
 
     sexual = sti.StructuredSexual()
@@ -134,34 +137,6 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
     best_val = calib.best_pars['hc_p_acquire_multiplier']
     print(f'\nBest-fit p_acquire for {disease_name} = {best_val:.3f}\n')
     
-    # Set the estimated p_acquire
-    sim.diseases[disease_name.lower()].pars['p_acquire'] = best_val
-    
-    # Reinitialize and run for 1 time step to get baseline stats
-    sim.run()
-    
-    # Get analyzer results
-    analyzer = sim.analyzers.prevalence_analyzer
-    res = sim.results.prevalence_analyzer
-    
-    print(f"\nInitial Prevalence Comparison by Age Bin — {disease_name}")
-    print(f"{'Age':>5} | {'Obs F':>7} | {'Sim F':>7} | {'Obs M':>7} | {'Sim M':>7}")
-    print("-" * 42)
-    
-    for i, (age_low, age_high) in enumerate(sim.analyzers.prevalence_analyzer.age_bins):
-        # Simulated
-        sim_f = res[f'{disease_name}_prev_female_{i}'][0]
-        sim_m = res[f'{disease_name}_prev_male_{i}'][0]
-    
-        # Observed
-        obs_row = data[(data['Year'] == init_year) & (data['Age'] == age_low)]
-        if obs_row.empty:
-            continue  # skip if no observed data
-    
-        obs_f = obs_row[f'{disease_name}_female'].values[0]
-        obs_m = obs_row[f'{disease_name}_male'].values[0]
-    
-        print(f"{age_low:>5} | {obs_f:7.2%} | {sim_f:7.2%} | {obs_m:7.2%} | {sim_m:7.2%}")
     return calib
 
 

@@ -26,7 +26,7 @@ import pandas as pd
 import prepare_data_for_year
 import starsim as ss
 import stisim as sti
-from mighti.diseases.type2diabetes import ReduceMortalityTx
+# from mighti.diseases.type2diabetes import ReduceMortalityTx
 
 
 # Set up logging and random seeds for reproducibility
@@ -39,7 +39,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 n_agents = 10_000 
 inityear = 2007  
-endyear = 2050
+endyear = 2010
 region = 'eswatini'
 
 
@@ -47,7 +47,7 @@ region = 'eswatini'
 # File paths
 # ---------------------------------------------------------------------
 # Parameters
-csv_path_params = f'mighti/data/{region}_parameters_gbd.csv'
+csv_path_params = f'mighti/data/{region}_parameters.csv'
 
 # Relative Risks
 csv_path_interactions = "mighti/data/rel_sus.csv"
@@ -63,6 +63,10 @@ csv_path_death = f'mighti/data/{region}_mortality_rates.csv'
 
 # Age distribution data
 csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
+
+# Intervention 
+csv_path_intervention = f'mighti/data/{region}_intervention.csv'
+
 
 # Ensure required demographic files are prepared
 prepare_data_for_year.prepare_data_for_year(region,inityear)
@@ -100,7 +104,7 @@ prevalence_data_df = pd.read_csv(csv_prevalence)
 prevalence_data, age_bins = mi.initialize_prevalence_data(
     diseases, prevalence_data=prevalence_data_df, inityear=inityear
 )
-# get_prev_fn = lambda d: lambda mod, sim, size: mi.age_sex_dependent_prevalence(d, prevalence_data, age_bins, sim, size)
+
 def get_prevalence_function(disease):
     return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
 
@@ -145,16 +149,14 @@ hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
     # Best pars: {'hiv_beta_m2f': 0.011023883426646121, 'hiv_beta_m2c': 0.044227226248848076} seed: 12345
 
 disease_objects = []
-# for dis in healthconditions:
-#     cls = getattr(mi, dis, None)
-#     if cls is not None:
-#         disease_objects.append(cls(csv_path=csv_path_params, pars={"init_prev": ss.bernoulli(get_prev_fn(dis))}))
+
 for disease in healthconditions:
-    init_prev = ss.bernoulli(get_prevalence_function(disease))
     disease_class = getattr(mi, disease, None)
     if disease_class:
+        init_prev = ss.bernoulli(get_prevalence_function(disease))
         disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})
         disease_objects.append(disease_obj)
+        
 disease_objects.append(hiv_disease)
 
 
@@ -177,24 +179,14 @@ interactions.extend(connectors)
 # ART coverage among PLHIV (from 95-95-95 cascade estimates and Lancet data)
 art_coverage_data = pd.DataFrame({
     'p_art': [0.10, 0.34, 0.50, 0.65, 0.741, 0.85]
-    # 'p_art': [1,1,1,1,1,1]
 }, index=[2003, 2010, 2013, 2014, 2016, 2022])
 
 # HIV testing probabilities over time (estimated testing uptake)
 test_prob_data = [0.10, 0.25, 0.60, 0.70, 0.80, 0.95]
-# test_prob_data = [1,1,1,1,1,1]
 test_years = [2003, 2005, 2007, 2010, 2014, 2016]
 
-tx_df = pd.read_csv("mighti/data/t2d_tx.csv")
-t2d_tx = ss.Tx(df=tx_df)
-
-t2d_treatment = ReduceMortalityTx(
-    label='T2D Mortality Reduction',
-    product=t2d_tx,
-    prob=1.0,
-    rel_death_reduction=0.5,
-    eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids
-)
+intervention_df = pd.read_csv(csv_path_intervention)
+intervention = ss.Tx(df=intervention_df)
 
 # Define interventions using these data
 interventions = [
@@ -209,11 +201,13 @@ interventions2 = [
     sti.ART(coverage_data=art_coverage_data),
     sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
     sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
-    t2d_treatment
+    mi.T2D_ReduceMortalityTx(product=intervention,prob=1.0,rel_death_reduction=0.54,
+                             eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids)
 ]
 
 interventions3 = [
-    t2d_treatment
+    mi.T2D_ReduceMortalityTx(product=intervention,prob=1.0,rel_death_reduction=0.54,
+                             eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids)
 ]
 
 # ---------------------------------------------------------------------
@@ -253,37 +247,39 @@ if __name__ == '__main__':
     # Run the simulation
     sim.run()
     
-    # Mortality rates and life table
-    target_year = endyear - 1
     
-    obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
-    obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
     
-    # Get the modules
-    deaths_module = get_deaths_module(sim)
-    pregnancy_module = get_pregnancy_module(sim)
+    # # Mortality rates and life table
+    # target_year = endyear - 1
     
-    df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
+    # obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
+    # obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
+    
+    # # Get the modules
+    # deaths_module = get_deaths_module(sim)
+    # pregnancy_module = get_pregnancy_module(sim)
+    
+    # df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
 
-    df_mx_male = df_mx[df_mx['sex'] == 'Male']
-    df_mx_female = df_mx[df_mx['sex'] == 'Female']
+    # df_mx_male = df_mx[df_mx['sex'] == 'Male']
+    # df_mx_female = df_mx[df_mx['sex'] == 'Female']
     
     
-    life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
+    # life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
     
-    mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
+    # mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
     
-    # Plot life expectancy comparison
-    mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
+    # # Plot life expectancy comparison
+    # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
     mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
     
-    df = death_cause_analyzer.to_df()   
-    df['HIV only'] = df['died_hiv'] & ~df['died_type2diabetes']
-    df['T2D only'] = df['died_type2diabetes'] & ~df['died_hiv']
-    df['Both'] = df['died_hiv'] & df['died_type2diabetes']
-    df['Neither'] = ~df['died_hiv'] & ~df['died_type2diabetes']
-    counts = df[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
-    print(counts)
+    # df = death_cause_analyzer.to_df()   
+    # df['HIV only'] = df['died_hiv'] & ~df['died_type2diabetes']
+    # df['T2D only'] = df['died_type2diabetes'] & ~df['died_hiv']
+    # df['Both'] = df['died_hiv'] & df['died_type2diabetes']
+    # df['Neither'] = ~df['died_hiv'] & ~df['died_type2diabetes']
+    # counts = df[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
+    # print(counts)
     # df.groupby('sex')[['HIV only', 'T2D only', 'Both', 'Neither']].sum()
     
     # # df[['had_hiv', 'died_of_hiv', 'had_type2diabetes', 'died_of_type2diabetes']].sum()

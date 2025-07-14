@@ -1,0 +1,2 @@
+disease,intervention_name,state,post_state,value,efficacy,start_year,end_year
+type2diabetes,T2D_ReduceMortalityTx,affected,on_treatment,0.54,1,2025,2050
