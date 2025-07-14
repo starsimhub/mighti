@@ -39,7 +39,7 @@ def prepare_data_for_year(region, year):
     df_mx_year = df_mx[df_mx['Time'] == year].dropna(subset=['mx'])
 
     df_mx_year = df_mx_year.rename(columns={'Age': 'AgeGrpStart'})
-    df_mx_year.to_csv(output_mx_path, index=False)
+    # df_mx_year.to_csv(output_mx_path, index=False)
     logger.info(f"Mortality rates for {year} saved to '{output_mx_path}'")
 
     # ------------------------------------------------------------------
