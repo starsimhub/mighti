@@ -24,12 +24,15 @@ total_trials = 10   # Use a small number for testing; increase to 100+ for full 
 region = 'nyc'
 
 path_prevalence = f'../data/{region}_prevalence.csv'
-path_parameters = f'../data/{region}_parameters_original.csv'
+path_parameters = f'../data/{region}_parameters.csv'
 
 
 def make_sim():
-    # Best pars: {'hiv_beta_m2f': 0.011023883426646121, 'hiv_beta_m2c': 0.044227226248848076} seed: 12345
-    hiv = sti.HIV(beta_m2f=0.011023883426646121, beta_m2c=0.044227226248848076, init_prev=0.15)
+    def get_prev_fn(disease):
+        return lambda mod, sim, size: mi.age_sex_dependent_prevalence(disease, prev_data, age_bins, sim, size)
+    
+    hiv_disease = sti.HIV(beta_m2f=0.010754946814739815,beta_m2c=0.011537993293074214)
+        # Best pars: {'hiv_beta_m2f': 0.010754946814739815, 'hiv_beta_m2c': 0.011537993293074214} seed: 12345
     
     # Dynamically select disease constructor
     health_condition_cls = DiseaseClass
@@ -37,17 +40,13 @@ def make_sim():
     prev_data = pd.read_csv(path_prevalence)
     prev_data, age_bins = mi.initialize_prevalence_data([disease_name], prev_data, init_year)  # 2007 = init_year
     
-    def get_prev_fn(disease):
-        return lambda mod, sim, size: mi.age_sex_dependent_prevalence(disease, prev_data, age_bins, sim, size)
-    
-    health_condition = health_condition_cls(
-        pars={'init_prev': ss.bernoulli(get_prev_fn(disease_name))},
-        csv_path=path_parameters
-    )
-    
+    init_prev = ss.bernoulli(get_prev_fn(disease_name))
+    health_condition = health_condition_cls(pars={"init_prev": init_prev},csv_path=path_parameters)
+        
+
     fertility_rate = {'fertility_rate': pd.read_csv(f'../data/{region}_asfr.csv')}
     pregnancy = ss.Pregnancy(pars=fertility_rate)
-    death_rates = {'death_rate': pd.read_csv(f'../data/{region}_mortality_rates_2007.csv'), 'rate_units': 1}
+    death_rates = {'death_rate': pd.read_csv(f'../data/{region}_deaths.csv'), 'rate_units': 1}
     death = ss.Deaths(death_rates)  
 
     sexual = sti.StructuredSexual()
@@ -62,7 +61,7 @@ def make_sim():
         total_pop=9980999,
         start=init_year,
         stop=2023,
-        diseases=[hiv, health_condition],
+        diseases=[hiv_disease, health_condition],
         networks=[sexual, maternal],
         demographics=[pregnancy, death],
         analyzers=[prevalence_analyzer],

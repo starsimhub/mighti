@@ -39,7 +39,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 n_agents = 10_000 # Number of agents in the simulation
 inityear = 2000  # Simulation start year
-endyear = 2001
+endyear = 2010
 region = 'nyc'
 
 # ---------------------------------------------------------------------
@@ -78,6 +78,7 @@ df.columns = df.columns.str.strip()
 
 # Combine with HIV
 healthconditions = ['AlcoholUseDisorder', 'SubstanceUseDisorder', 'Depression']
+# healthconditions = ['Depression']
 diseases = ["HIV"] + healthconditions
 
 # Data paths for post process
@@ -127,13 +128,13 @@ housing_module = HousingSituation(prob=0.4)  # You can adjust this probability a
 # -------------------------
 # Diseases
 # -------------------------
-
-# Initialize disease conditions
 hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
                       init_prev_data=None,   
                       p_hiv_death=None, 
-                      # include_aids_deaths=True, 
-                      beta={'structuredsexual': [0.01, 0.01], 'maternal': [0.01, 0.01]})
+                      include_aids_deaths=False, 
+                      beta={'structuredsexual': [0.010754946814739815, 0.010754946814739815], 
+                            'maternal': [0.011537993293074214, 0.011537993293074214]})
+    # Best pars: {'hiv_beta_m2f': 0.010754946814739815, 'hiv_beta_m2c': 0.011537993293074214} seed: 12345
 
 disease_objects = []
 for disease in healthconditions:
@@ -157,6 +158,24 @@ connectors = mi.create_connectors(ncd_interactions)
 # Add NCD-NCD connectors to interactions
 interactions.extend(connectors)
 
+
+
+# -------------------------
+# Intervention
+# -------------------------
+intervention_hospital = [
+    mi.ImproveHospitalDischarge(
+        disease_name='depression',
+        multiplier=10.0,
+        start_day=0,
+        end_day=10,
+        label='FastDischarge'
+    )
+]
+
+intervention_housing = [mi.GiveHousingToDepressed(coverage=1, start_day=0)]
+
+
 def get_deaths_module(sim):
     for module in sim.modules:
         if isinstance(module, mi.DeathsByAgeSexAnalyzer):
@@ -171,9 +190,49 @@ def get_pregnancy_module(sim):
 
 
 if __name__ == '__main__':
-    # Initialize the simulation with connectors and force=True
+    # # Initialize the simulation with connectors and force=True
+    # sim_without = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=endyear,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=interactions,
+    #     # interventions = interventions,
+    #     copy_inputs=False,
+    #     label='No Intervention'
+    # )
+    
+    # sim_with = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=endyear,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=interactions,
+    #     interventions = intervention_hospital,
+    #     copy_inputs=False,
+    #     label='With Intervention'
+    # )
+     
+    # # Run 
+    # msim = ss.MultiSim(sims=[sim_with,sim_without])
+    # msim.run(parallel=False)
+    # housing_module.initialize(msim)     
+    # msim.housing_module = housing_module
+    # sim_without = msim.sims[0]
+    # sim_with = msim.sims[1] 
+    # print(np.count_nonzero(sim_without.diseases['depression'].hospitalized))
+    # print(np.count_nonzero(sim_with.diseases['depression'].hospitalized))    
+
+
     sim = ss.Sim(
-        dt=1,
         n_agents=n_agents,
         networks=networks,
         start=inityear,
@@ -183,20 +242,30 @@ if __name__ == '__main__':
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
         connectors=interactions,
-        # interventions = interventions,
+        interventions = intervention_housing,
         copy_inputs=False,
-        label='Connector'
+        label='Without Interventions'
     )
-     
-    # Run as usual
+
+    sim.init()
+    housing_module.initialize(sim)
+    sim.housing_module = housing_module
+    
+    # sim.step_fns.append(housing_module.step)
+    
+    # Run the simulation
     sim.run()
-    # housing_module.initialize(sim)         
-    np.count_nonzero(sim.diseases['depression'].hospitalized)    
-    np.count_nonzero(sim.diseases['alcoholusedisorder'].hospitalized)    
+    sim.housing_module = housing_module
+
+
+    print(np.count_nonzero(housing_module.housing_unstable)) # 2951 without intervention 
+
+
 
     # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'AlcoholUseDisorder', prevalence_data_df, init_year = inityear, end_year = endyear)  
     # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Depression', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'AlcoholUseDisorder', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'SubstanceUseDisorder', prevalence_data_df, init_year = inityear, end_year = endyear)  
 
     # # Mortality rates and life table
     # target_year = endyear - 1

@@ -47,7 +47,6 @@ def get_disease_parameters(csv_path, disease_name):
     return {
         "p_death": get_value_safe("p_death", 0.0001),
         "dur_condition": get_value_safe("dur_condition", 10),
-        "init_prev": get_value_safe("init_prev", 0.1),
         "rel_sus_hiv": get_value_safe("rel_sus", 1.0),
         "remission_rate": get_value_safe("remission_rate", 0.0),
         "max_disease_duration": get_value_safe("max_disease_duration", 30),
@@ -71,11 +70,11 @@ class RemittingDisease(ss.NCD):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             p_death=ss.bernoulli(disease_params["p_death"]),  
-            init_prev=ss.bernoulli(disease_params["init_prev"]),
             remission_rate=disease_params["remission_rate"],  
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
+            init_prev=None,
             p_acquire=1
         )
         

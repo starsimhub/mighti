@@ -409,7 +409,6 @@ def plot_life_expectancy_three(sim_with, sim_without, observed_data, year, max_a
     plt.show()
     return fig, (ax1, ax2)
 
-
 def plot_life_expectancy_four(sim_no_intervention, sim_hiv_only, sim_both_interventions, observed_data, year, max_age=100, figsize=(14, 10), title=None):
     """
     Plot life expectancy by age and sex for:
@@ -478,3 +477,136 @@ def plot_life_expectancy_four(sim_no_intervention, sim_hiv_only, sim_both_interv
     plt.subplots_adjust(bottom=0.1)
     plt.show()
     plt.close(fig)  
+
+
+def plot_population_over_time(df, inityear, endyear, age_groups=None, nagent=50000, observed_data_path='demography/eswatini_age_distribution.csv'):
+    """
+    Plot population changes over time by age group and sex
+    
+    Args:
+        df: DataFrame containing results with columns for population, birth rates, and death rates by age and sex
+        inityear: Start year of the simulation
+        endyear: End year of the simulation
+        age_groups: List of tuples defining age groups (start_age, end_age, label)
+        observed_data_path: Path to CSV file with observed age distribution
+    """
+    import pandas as pd
+    
+    if age_groups is None:
+        # Default age groups
+        age_groups = [
+            (0, 5, "0-4"),
+            (5, 15, "5-14"),
+            (15, 25, "15-24"),
+            (25, 35, "25-34"),
+            (35, 45, "35-44"),
+            (45, 55, "45-54"),
+            (55, 65, "55-64"),
+            (65, 75, "65-74"),
+            (75, 85, "75-84"),
+            (85, 101, "85+")
+        ]
+
+    observed_data = None
+    if observed_data_path:
+        try:
+            observed_data = pd.read_csv(observed_data_path)
+            print(f"Loaded observed age distribution data from {observed_data_path}")
+        except Exception as e:
+            print(f"Could not load observed data: {str(e)}")
+    
+    population_data = {
+        'years': list(range(inityear, endyear + 1)),
+        'male': {group[2]: [] for group in age_groups},
+        'female': {group[2]: [] for group in age_groups}
+    }
+    
+    for year in population_data['years']:
+        if year not in df['year'].values:
+            continue
+            
+        for start_age, end_age, label in age_groups:
+            male_count = sum(df[df['year'] == year][f'male_population_age_{age}'] / nagent * 1000
+                             for age in range(start_age, end_age + 1) if f'male_population_age_{age}' in df.columns)
+            population_data['male'][label].append(male_count)
+            female_count = sum(df[df['year'] == year][f'female_population_age_{age}'] / nagent * 1000
+                               for age in range(start_age, end_age + 1) if f'female_population_age_{age}' in df.columns)
+            population_data['female'][label].append(female_count)
+    
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+    
+    for label, counts in population_data['male'].items():
+        if len(counts) == len(population_data['years']):
+            ax1.plot(population_data['years'], counts, '-o', linewidth=2, label=f'Sim: {label}')
+    
+    for label, counts in population_data['female'].items():
+        if len(counts) == len(population_data['years']):
+            ax2.plot(population_data['years'], counts, '-o', linewidth=2, label=f'Sim: {label}')
+    
+    if observed_data is not None:
+        observed_years = [str(y) for y in range(inityear, endyear + 1) 
+                          if str(y) in observed_data.columns]
+        
+        if observed_years:
+            obs_male = {}
+            obs_female = {}
+            
+            for start_age, end_age, label in age_groups:
+                male_rows = observed_data[(observed_data['sex'] == 'Male') & 
+                                          (observed_data['age'] >= start_age) & 
+                                          (observed_data['age'] <= end_age)]
+                
+                female_rows = observed_data[(observed_data['sex'] == 'Female') & 
+                                            (observed_data['age'] >= start_age) & 
+                                            (observed_data['age'] <= end_age)]
+                
+                obs_male[label] = []
+                obs_female[label] = []
+                
+                for year_str in observed_years:
+                    male_pop = male_rows[year_str].sum()
+                    female_pop = female_rows[year_str].sum() 
+                    
+                    obs_male[label].append(male_pop)
+                    obs_female[label].append(female_pop)
+            
+            obs_year_ints = [int(y) for y in observed_years]
+            
+            for label, counts in obs_male.items():
+                if len(counts) > 0:
+                    ax1.plot(obs_year_ints, counts, '--s', linewidth=1.5, alpha=0.7, 
+                            label=f'Obs: {label}')
+            
+            for label, counts in obs_female.items():
+                if len(counts) > 0:
+                    ax2.plot(obs_year_ints, counts, '--s', linewidth=1.5, alpha=0.7, 
+                            label=f'Obs: {label}')
+            
+            print(f"Added observed data for years: {', '.join(observed_years)}")
+        else:
+            print("No matching years found in observed data")
+    
+    ax1.set_title('Male Population by Age Group', fontsize=14)
+    ax1.set_ylabel('Population Count (Thousands)', fontsize=12)
+    ax1.grid(True, alpha=0.3)
+    
+    ax2.set_title('Female Population by Age Group', fontsize=14)
+    ax2.set_xlabel('Year', fontsize=12)
+    ax2.set_ylabel('Population Count (Thousands)', fontsize=12)
+    ax2.grid(True, alpha=0.3)
+    
+    handles, labels = [], []
+    for ax in [ax1, ax2]:
+        for handle, label in zip(*ax.get_legend_handles_labels()):
+            if label not in labels:
+                handles.append(handle)
+                labels.append(label)
+
+    fig.legend(handles, labels, loc='lower center', ncol=6, fontsize=12)
+
+    # Improve layout
+    plt.tight_layout(rect=[0, 0, 1, 0.93])
+    plt.subplots_adjust(bottom=0.15)
+    plt.suptitle('Population Changes Over Time by Age Group and Sex', fontsize=16)
+    plt.show()
+    return fig, (ax1, ax2)
