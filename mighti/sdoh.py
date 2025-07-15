@@ -10,7 +10,7 @@ import numpy as np
 __all__ = ["HousingSituation", "TransportationSituation", "EducationSituation", "IncomeSituation"]
 
 
-class HousingSituation(ss.Module):
+class HousingSituation(ss.Connector):
     """Models unstable housing as a binary state influenced by employment."""
     
     def __init__(self, prob=0.3):
@@ -39,7 +39,7 @@ class HousingSituation(ss.Module):
         return
 
 
-class TransportationSituation(ss.Module):
+class TransportationSituation(ss.Connector):
     """Placeholder module for modeling access to transportation."""
     
     def __init__(self):
@@ -54,7 +54,7 @@ class TransportationSituation(ss.Module):
         pass
 
 
-class EducationSituation(ss.Module):
+class EducationSituation(ss.Connector):
     """Placeholder module for modeling educational attainment."""
     
     def __init__(self):
@@ -69,7 +69,7 @@ class EducationSituation(ss.Module):
         pass
 
 
-class IncomeSituation(ss.Module):
+class IncomeSituation(ss.Connector):
     """Placeholder module for modeling income level or poverty status."""
     
     def __init__(self):

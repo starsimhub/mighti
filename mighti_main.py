@@ -32,6 +32,7 @@ from mighti.sdoh import HousingSituation
 # Set up logging and random seeds for reproducibility
 logger = logging.getLogger('MIGHTI')
 logger.setLevel(logging.INFO) 
+logger.setLevel(logging.ERROR) 
 
 
 # ---------------------------------------------------------------------
@@ -241,21 +242,21 @@ if __name__ == '__main__':
         demographics=[pregnancy, death],
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
-        connectors=interactions,
+        # connectors=interactions,
         interventions = intervention_housing,
         copy_inputs=False,
         label='Without Interventions'
     )
 
-    sim.init()
-    housing_module.initialize(sim)
-    sim.housing_module = housing_module
+    # sim.init()
+    # housing_module.initialize(sim)
+    # sim.housing_module = housing_module
         
     # Run the simulation
     sim.run()
-    sim.housing_module = housing_module
+    # sim.housing_module = housing_module
 
-    print(np.count_nonzero(housing_module.housing_unstable)) #s without intervention 
+    # print(np.count_nonzero(housing_module.housing_unstable)) #s without intervention 
 
 
 
