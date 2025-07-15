@@ -50,7 +50,6 @@ def get_disease_parameters(csv_path, disease_name):
     return {
         "p_death": get_value_safe("p_death", 0.0001),
         "dur_condition": get_value_safe("dur_condition", 10),
-        "init_prev": get_value_safe("init_prev", 0.1),
         "rel_sus_hiv": get_value_safe("rel_sus", 1.0),
         "remission_rate": get_value_safe("remission_rate", 0.0),
         "max_disease_duration": get_value_safe("max_disease_duration", 30),
@@ -74,12 +73,12 @@ class RemittingDisease(ss.NCD):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             p_death=ss.bernoulli(disease_params["p_death"]),  
-            init_prev=ss.bernoulli(disease_params["init_prev"]),
             remission_rate=disease_params["remission_rate"],  
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
-            p_acquire=1
+            p_acquire=1,
+            init_prev=None
         )
         
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -212,10 +211,11 @@ class AcuteDisease(ss.NCD):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             p_death=ss.bernoulli(disease_params["p_death"]),  
-            init_prev=ss.bernoulli(disease_params["init_prev"]),
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
+            p_acquire=1,
+            init_prev=None
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -296,12 +296,6 @@ class AcuteDisease(ss.NCD):
         new_cases = susceptible[draws < p_acq]
         self.affected[new_cases] = True
         self.ti_affected[new_cases] = ti
-
-        # # Death
-        # deaths = self.pars.p_death.filter(new_cases)
-        # self.sim.people.request_death(deaths)
-        # self.ti_dead[deaths] = ti
-        
                 
         # New implementation of detah
         affected_uids = self.affected.uids
@@ -341,10 +335,11 @@ class ChronicDisease(ss.NCD):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             p_death=ss.bernoulli(disease_params["p_death"]),  
-            init_prev=ss.bernoulli(disease_params["init_prev"]),
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
+            # p_acquire=1,
+            init_prev=None
         )
         
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))    
@@ -425,12 +420,6 @@ class ChronicDisease(ss.NCD):
         new_cases = susceptible[draws < p_acq]
         self.affected[new_cases] = True
         self.ti_affected[new_cases] = ti
-
-        # # Death
-        # deaths = self.pars.p_death.filter(new_cases) 
-        # self.sim.people.request_death(deaths)
-        # self.ti_dead[deaths] = ti
-        
                 
         # New implementation of detah
         affected_uids = self.affected.uids
@@ -470,11 +459,12 @@ class GenericSIS(ss.SIS):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             p_death=ss.bernoulli(disease_params["p_death"]),  
-            init_prev=ss.bernoulli(disease_params["init_prev"]),
-            remission_rate=disease_params["remission_rate"],
+            remission_rate=disease_params["remission_rate"],  
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
+            p_acquire=1,
+            init_prev=None
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -559,12 +549,6 @@ class GenericSIS(ss.SIS):
 
         self.infected[new_cases] = True
         self.ti_infected[new_cases] = ti
-
-        # # Death
-        # deaths = self.pars.p_death.filter(new_cases) 
-        # self.sim.people.request_death(deaths)
-        # self.ti_dead[deaths] = ti
-        
                 
         # New implementation of detah
         affected_uids = self.infected.uids
@@ -626,8 +610,8 @@ class Type2Diabetes(RemittingDisease):
         super().__init__(csv_path, pars, **kwargs)
 
         self.define_pars(label='Type2Diabetes')  
-        if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire_multiplier = 1  
+        # if not hasattr(self.pars, 'p_acquire'):
+            # self.pars.p_acquire_multiplier = 1  
         return
     
 

@@ -26,7 +26,7 @@ import pandas as pd
 import prepare_data_for_year
 import starsim as ss
 import stisim as sti
-# from mighti.diseases.type2diabetes import ReduceMortalityTx
+from mighti.sdoh import HousingSituation 
 
 
 # Set up logging and random seeds for reproducibility
@@ -137,6 +137,12 @@ structuredsexual = sti.StructuredSexual()
 networks = [maternal, structuredsexual]
 
 
+# -------------------------
+# SDoH
+# -------------------------
+
+housing_module = HousingSituation(prob=0.4)  # You can adjust this probability as needed
+
 # ---------------------------------------------------------------------
 # Diseases
 # ---------------------------------------------------------------------
@@ -209,6 +215,18 @@ interventions3 = [
     mi.T2D_ReduceMortalityTx(product=intervention,prob=1.0,rel_death_reduction=0.54,
                              eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids)
 ]
+
+intervention_hospital = [
+    mi.ImproveHospitalDischarge(
+        disease_name='depression',
+        multiplier=10.0,
+        start_day=0,
+        end_day=10,
+        label='FastDischarge'
+    )
+]
+
+intervention_housing = [mi.GiveHousingToDepressed(coverage=1, start_day=0)]
 
 # ---------------------------------------------------------------------
 # Utility: Get Modules

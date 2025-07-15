@@ -22,7 +22,7 @@ init_year = 2007
 total_trials = 10   # Use a small number for testing; increase to 100+ for full calibration
 
 path_prevalence = '../data/eswatini_prevalence.csv'
-path_parameters = '../data/eswatini_parameters_original.csv'
+path_parameters = '../data/eswatini_parameters.csv'
 
 
 def make_sim():
@@ -45,7 +45,7 @@ def make_sim():
     
     fertility_rate = {'fertility_rate': pd.read_csv('../data/eswatini_asfr.csv')}
     pregnancy = ss.Pregnancy(pars=fertility_rate)
-    death_rates = {'death_rate': pd.read_csv('../data/eswatini_mortality_rates_2007.csv'), 'rate_units': 1}
+    death_rates = {'death_rate': pd.read_csv('../data/eswatini_mortality_rates.csv'), 'rate_units': 1}
     death = ss.Deaths(death_rates)  
 
     sexual = sti.StructuredSexual()
