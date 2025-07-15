@@ -14,7 +14,7 @@ import starsim as ss
 import mighti as mi
 import pandas as pd
 import os
-from mighti.diseases.type2diabetes import ReduceMortalityTx
+from mighti.diseases.type2diabetes import T2D_ReduceMortalityTx
 
 
 # Settings
@@ -52,7 +52,7 @@ def test_reduce_mortality_tx_runs():
     tx = ss.Tx(df=tx_df)
 
     # Intervention to reduce death
-    t2d_tx = ReduceMortalityTx(
+    t2d_tx = T2D_ReduceMortalityTx(
         product=tx,
         rel_death_reduction=0.5,
         eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
