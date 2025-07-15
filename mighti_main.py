@@ -262,9 +262,16 @@ if __name__ == '__main__':
         copy_inputs=False,
         label='With Interventions'
     )
+
+    sim.init()
+    housing_module.initialize(sim)
+    sim.housing_module = housing_module
+        
     # Run the simulation
     sim.run()
-    
+    sim.housing_module = housing_module
+
+    print(np.count_nonzero(housing_module.housing_unstable)) #s without intervention 
     
     
     # # Mortality rates and life table

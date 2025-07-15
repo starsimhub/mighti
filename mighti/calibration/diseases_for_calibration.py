@@ -142,13 +142,6 @@ class RemittingDisease(ss.NCD):
         # New cases
         susceptible = (~self.affected).uids
         p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
-        
-        # ##### DEBUG #####
-
-        # print(f"[{self.disease_name}] Year {self.ti}: "
-        #       f"multiplier={self.pars.p_acquire_multiplier}"
-        #       f"self.pars.p_acquire={self.pars.p_acquire}"
-        #       f"p_acq={p_acq}") 
 
         # Apply sex filtering
         if self.pars.affected_sex == "female":
@@ -183,7 +176,7 @@ class RemittingDisease(ss.NCD):
         adjusted_p_death = base_p * rel_death
         draws = np.random.rand(len(affected_uids))
         deaths = affected_uids[draws < adjusted_p_death]
-        self.ti_dead[deaths] = ti  # <== ✅ UNCOMMENT THIS LINE
+        self.ti_dead[deaths] = ti  
 
         self.sim.people.request_death(deaths)
         self.results.new_deaths[ti] = len(deaths)
@@ -309,8 +302,10 @@ class AcuteDisease(ss.NCD):
         adjusted_p_death = base_p * rel_death
         draws = np.random.rand(len(affected_uids))
         deaths = affected_uids[draws < adjusted_p_death]
+        self.ti_dead[deaths] = ti  
 
         self.sim.people.request_death(deaths)
+        self.results.new_deaths[ti] = len(deaths)
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
@@ -338,7 +333,7 @@ class ChronicDisease(ss.NCD):
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
-            # p_acquire=1,
+            p_acquire=1,
             init_prev=None
         )
         
@@ -399,7 +394,6 @@ class ChronicDisease(ss.NCD):
 
         # New cases
         susceptible = (~self.affected).uids
-        
         p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
         
         if self.pars.affected_sex == "female":
@@ -433,8 +427,10 @@ class ChronicDisease(ss.NCD):
         adjusted_p_death = base_p * rel_death
         draws = np.random.rand(len(affected_uids))
         deaths = affected_uids[draws < adjusted_p_death]
+        self.ti_dead[deaths] = ti  
 
         self.sim.people.request_death(deaths)
+        self.results.new_deaths[ti] = len(deaths)
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
@@ -598,8 +594,7 @@ class Type1Diabetes(ChronicDisease):
         super().__init__(csv_path, pars, **kwargs)
         
         self.define_pars(label='Type1Diabetes')  
-        if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire_multiplier = 1  
+
         return
 
 
@@ -610,8 +605,7 @@ class Type2Diabetes(RemittingDisease):
         super().__init__(csv_path, pars, **kwargs)
 
         self.define_pars(label='Type2Diabetes')  
-        # if not hasattr(self.pars, 'p_acquire'):
-            # self.pars.p_acquire_multiplier = 1  
+
         return
     
 
