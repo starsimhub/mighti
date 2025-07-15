@@ -250,15 +250,12 @@ if __name__ == '__main__':
     sim.init()
     housing_module.initialize(sim)
     sim.housing_module = housing_module
-    
-    # sim.step_fns.append(housing_module.step)
-    
+        
     # Run the simulation
     sim.run()
     sim.housing_module = housing_module
 
-
-    print(np.count_nonzero(housing_module.housing_unstable)) # 2951 without intervention 
+    print(np.count_nonzero(housing_module.housing_unstable)) #s without intervention 
 
 
 
