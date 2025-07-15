@@ -26,6 +26,7 @@ import pandas as pd
 import prepare_data_for_year
 import starsim as ss
 import stisim as sti
+from mighti.sdoh import HousingSituation 
 
 
 # Set up logging and random seeds for reproducibility
@@ -36,7 +37,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 # Define population size and simulation timeline
 # ---------------------------------------------------------------------
-n_agents = 100_000 # Number of agents in the simulation
+n_agents = 10_000 # Number of agents in the simulation
 inityear = 2000  # Simulation start year
 endyear = 2001
 region = 'nyc'
@@ -117,6 +118,13 @@ structuredsexual = sti.StructuredSexual()
 networks = [maternal, structuredsexual]
 
 # -------------------------
+# SDoH
+# -------------------------
+
+housing_module = HousingSituation(prob=0.4)  # You can adjust this probability as needed
+
+
+# -------------------------
 # Diseases
 # -------------------------
 
@@ -179,30 +187,32 @@ if __name__ == '__main__':
         copy_inputs=False,
         label='Connector'
     )
- 
-    # Run the simulation
+     
+    # Run as usual
     sim.run()
-    
+    # housing_module.initialize(sim)         
+    np.count_nonzero(sim.diseases['depression'].hospitalized)    
+    np.count_nonzero(sim.diseases['alcoholusedisorder'].hospitalized)    
 
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'AlcoholUseDisorder', prevalence_data_df, init_year = inityear, end_year = endyear)  
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Depression', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'AlcoholUseDisorder', prevalence_data_df, init_year = inityear, end_year = endyear)  
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Depression', prevalence_data_df, init_year = inityear, end_year = endyear)  
 
-    # Mortality rates and life table
-    target_year = endyear - 1
+    # # Mortality rates and life table
+    # target_year = endyear - 1
     
-    # Get the modules
-    deaths_module = get_deaths_module(sim)
-    pregnancy_module = get_pregnancy_module(sim)
+    # # Get the modules
+    # deaths_module = get_deaths_module(sim)
+    # pregnancy_module = get_pregnancy_module(sim)
     
-    df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
+    # df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
 
-    df_mx_male = df_mx[df_mx['sex'] == 'Male']
-    df_mx_female = df_mx[df_mx['sex'] == 'Female']
+    # df_mx_male = df_mx[df_mx['sex'] == 'Male']
+    # df_mx_female = df_mx[df_mx['sex'] == 'Female']
     
     
-    life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
+    # life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
         
-    # Plot life expectancy comparison
-    mi.plot_life_expectancy(life_table, pd.read_csv(ex_path), year = target_year, max_age=100, figsize=(14, 10), title=None)
+    # # Plot life expectancy comparison
+    # mi.plot_life_expectancy(life_table, pd.read_csv(ex_path), year = target_year, max_age=100, figsize=(14, 10), title=None)
 

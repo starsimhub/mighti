@@ -1,5 +1,5 @@
-﻿condition,p_death,incidence,dur_condition,init_prev,rel_sus,remmision_rate,max_disease_duration,disease_type,disease_class,affected_sex
-HIV,,,,,,,,chronic,,
-AlcoholUseDisorder,0.0000111,,2.05407094,,1.77,0.0001,,remitting,ncd,both
-SubstanceUseDisorder,0.0000111,,2.05407094,,3.35,0.0001,,remitting,ncd,both
-Depression,0.0000111,,2.05407094,,4,0.0001,,remitting,ncd,both
+﻿condition,p_death,dur_condition,rel_sus,remmision_rate,max_disease_duration,disease_type,disease_class,affected_sex
+HIV,,,,,,chronic,,
+AlcoholUseDisorder,0.0000111,2.05407094,1.77,0.0001,,remitting,ncd,both
+SubstanceUseDisorder,0.0000111,2.05407094,3.35,0.0001,,remitting,ncd,both
+Depression,0.0000111,2.05407094,4,0.0001,,remitting,ncd,both

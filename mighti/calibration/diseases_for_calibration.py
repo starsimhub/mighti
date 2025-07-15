@@ -9,11 +9,7 @@ import starsim as ss
 from scipy.stats import lognorm
 
 
-__all__ = ['RemittingDisease', 'AlcoholUseDisorder', 'SubstanceUseDisorder', 'Depression']
-
-
 logger = logging.getLogger(__name__)
-
 
 
 def get_disease_parameters(csv_path, disease_name):
@@ -50,7 +46,6 @@ def get_disease_parameters(csv_path, disease_name):
 
     return {
         "p_death": get_value_safe("p_death", 0.0001),
-        "incidence": get_value_safe("incidence", 0.1),
         "dur_condition": get_value_safe("dur_condition", 10),
         "init_prev": get_value_safe("init_prev", 0.1),
         "rel_sus_hiv": get_value_safe("rel_sus", 1.0),
@@ -60,12 +55,11 @@ def get_disease_parameters(csv_path, disease_name):
     }
 
 
-class AlcoholUseDisorder(ss.NCD):
+class RemittingDisease(ss.NCD):
     """ Base class for all remitting diseases."""
 
     def __init__(self, csv_path, pars=None, **kwargs):
         super().__init__()
-        self.disease_name = 'AlcoholUseDisorder'
         self.csv_path = csv_path        
         disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)        
 
@@ -77,22 +71,13 @@ class AlcoholUseDisorder(ss.NCD):
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
             p_death=ss.bernoulli(disease_params["p_death"]),  
+            init_prev=ss.bernoulli(disease_params["init_prev"]),
             remission_rate=disease_params["remission_rate"],  
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
-            p_acquire_multiplier=1.0,
-            init_prev=None,
-            p_hospitalization_affected=0.01,  # daily prob from affected → hospitalized
-            p_hospitalization_treated=0.005,  # daily prob from on_treatment → hospitalized
-            p_discharge_to_treatment=0.6,     # prob that discharge goes to on_treatment
-            p_discharge_to_reversed=0.4,      # prob that discharge goes to reversed
-            p_daily_discharge=0.1,            # prob of discharging per day
-            label='AlcoholUseDisorder'
+            p_acquire=1
         )
-        
-        if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire = 0.018  # Default fallback
         
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
         self.p_remission = ss.bernoulli(p=lambda self, sim, uids: self.pars.remission_rate) 
@@ -104,7 +89,6 @@ class AlcoholUseDisorder(ss.NCD):
             ss.State('affected'),
             ss.State('on_treatment'),
             ss.State('reversed'), 
-            ss.State('hospitalized'),
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_reversed'),
             ss.FloatArr('rel_sus', default=1.0),  
@@ -112,11 +96,9 @@ class AlcoholUseDisorder(ss.NCD):
         )
 
     def init_post(self):
-        if 'init_prev' in self.pars:
-            initial_cases = self.pars.init_prev.filter()
-            self.set_prognoses(initial_cases)
-            return initial_cases
-        return []
+        initial_cases = self.pars.init_prev.filter()
+        self.set_prognoses(initial_cases)
+        return initial_cases
 
     def set_prognoses(self, uids):
         self.susceptible[uids] = False
@@ -134,16 +116,11 @@ class AlcoholUseDisorder(ss.NCD):
             self.define_results(ss.Result('prevalence', dtype=float, label='Prevalence'))
         if 'remission_prevalence' not in existing_results:
             self.define_results(ss.Result('remission_prevalence', dtype=float, label='Remission Prevalence'))
-        if 'hospitalized_prevalence' not in existing_results:
-            self.define_results(ss.Result('hospitalized_prevalence', dtype=float, label='Hospitalization Prevalence'))
-        if 'discharged' not in existing_results:
-            self.define_results(ss.Result('discharged', dtype=int, label='Hospital Discharges'))       
 
     def update_results(self):
         super().update_results()
         self.results.prevalence[self.ti] = np.count_nonzero(self.affected) / len(self.sim.people)
         self.results.remission_prevalence[self.ti] = np.count_nonzero(self.reversed) / len(self.sim.people)
-        self.results.hospitalized_prevalence[self.ti] = np.count_nonzero(self.hospitalized) / len(self.sim.people)
 
     def step_state(self):
         if hasattr(self, "p_remission"):
@@ -156,57 +133,20 @@ class AlcoholUseDisorder(ss.NCD):
             recovered = (self.reversed & (self.ti_reversed <= self.ti)).uids
             self.reversed[recovered] = False
             self.susceptible[recovered] = True  
-            
-        # Hospitalization
-        # From affected
-        affected_uids = self.affected.uids
-        hosp_draws1 = np.random.rand(len(affected_uids))
-        hosp_affected = affected_uids[hosp_draws1 < self.pars.p_hospitalization_affected]
-        self.affected[hosp_affected] = False
-        self.hospitalized[hosp_affected] = True
-    
-        # From on_treatment
-        treated_uids = self.on_treatment.uids
-        hosp_draws2 = np.random.rand(len(treated_uids))
-        hosp_treated = treated_uids[hosp_draws2 < self.pars.p_hospitalization_treated]
-        self.on_treatment[hosp_treated] = False
-        self.hospitalized[hosp_treated] = True
 
-    def step_discharge(self):
-        hospitalized_uids = self.hospitalized.uids
-        if len(hospitalized_uids) == 0:
-            return
-    
-        # Daily discharge
-        draws = np.random.rand(len(hospitalized_uids))
-        to_discharge = hospitalized_uids[draws < self.pars.p_daily_discharge]
-    
-        # Split between treatment and reversal
-        route_draws = np.random.rand(len(to_discharge))
-        to_treatment = to_discharge[route_draws < self.pars.p_discharge_to_treatment]
-        to_reversed = np.setdiff1d(to_discharge, to_treatment)
-    
-        # Transition
-        self.hospitalized[to_treatment] = False
-        self.on_treatment[to_treatment] = True
-    
-        self.hospitalized[to_reversed] = False
-        self.reversed[to_reversed] = True
-        self.ti_reversed[to_reversed] = self.ti
-        self.results.discharged[self.ti] = len(to_discharge)
-        
     def step(self):
         ti = self.ti
-        
-        # Step internal transitions first
-        self.step_state()
-        self.step_discharge()
-
 
         # New cases
         susceptible = (~self.affected).uids
         p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
         
+        # ##### DEBUG #####
+
+        # print(f"[{self.disease_name}] Year {self.ti}: "
+        #       f"multiplier={self.pars.p_acquire_multiplier}"
+        #       f"self.pars.p_acquire={self.pars.p_acquire}"
+        #       f"p_acq={p_acq}") 
 
         # Apply sex filtering
         if self.pars.affected_sex == "female":
@@ -241,7 +181,7 @@ class AlcoholUseDisorder(ss.NCD):
         adjusted_p_death = base_p * rel_death
         draws = np.random.rand(len(affected_uids))
         deaths = affected_uids[draws < adjusted_p_death]
-        self.ti_dead[deaths] = ti  
+        self.ti_dead[deaths] = ti  # <== ✅ UNCOMMENT THIS LINE
 
         self.sim.people.request_death(deaths)
         self.results.new_deaths[ti] = len(deaths)
@@ -252,6 +192,24 @@ class AlcoholUseDisorder(ss.NCD):
         self.results.remission_prevalence[self.ti] = np.count_nonzero(self.reversed) / len(self.sim.people)
         return new_cases
 
+    
+
+def calculate_p_acquire_generic(disease, sim, uids):
+    """Simplified for calibration: assume constant baseline, scaled by multiplier."""
+
+    # Optional: limit to adults
+    age = sim.people.age[uids]
+    p_base = np.zeros(len(uids))
+    adult = age >= 15
+    p_base[adult] = disease.pars.p_acquire_multiplier
+
+    # Optional: restrict by sex
+    if disease.pars.affected_sex == "female":
+        p_base[sim.people.male[uids]] = 0
+    elif disease.pars.affected_sex == "male":
+        p_base[sim.people.female[uids]] = 0
+
+    return p_base
 
 
 
@@ -259,56 +217,33 @@ class AlcoholUseDisorder(RemittingDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
         self.disease_name = 'AlcoholUseDisorder'
         super().__init__(csv_path, pars, **kwargs)
+        
         self.define_pars(label = 'AlcoholUseDisorder')
         if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire = 0.018 
+            self.pars.p_acquire_multiplier = 1  
         return
-    
+
+
 
 class SubstanceUseDisorder(RemittingDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
         self.disease_name = 'SubstanceUseDisorder'
         super().__init__(csv_path, pars, **kwargs)
+        
         self.define_pars(label = 'SubstanceUseDisorder')
         if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire = 0.018 
+            self.pars.p_acquire_multiplier = 1  
         return
+    
 
-
-class Depression(RemittingDisease2):
+class Depression(RemittingDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
         self.disease_name = 'Depression'
         super().__init__(csv_path, pars, **kwargs)
+        
         self.define_pars(label = 'Depression')
         if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire = 0.018 
+            self.pars.p_acquire_multiplier = 1  
         return
 
-
-def calculate_p_acquire_generic(disease, sim, uids):
-    """Calculate acquisition probability for a disease with optional sex filtering and HIV interaction."""
-    p_base = np.full(len(uids), disease.pars.p_acquire_multiplier)
-    
-    if disease.pars.affected_sex == "female":
-        try:
-            p_base[sim.people.male[uids]] = 0
-        except Exception:
-            pass
-    elif disease.pars.affected_sex == "male":
-        try:
-            p_base[sim.people.female[uids]] = 0
-        except Exception:
-            pass
-
-    try:
-        if hasattr(sim.people, 'hiv'):
-            hiv_positive = sim.people.hiv[uids]
-            p_base[hiv_positive] *= disease.pars.rel_sus_hiv
-    except Exception:
-        pass
-
-    try:
-        return p_base * disease.rel_sus[uids]
-    except Exception:
-        return p_base                     
     
