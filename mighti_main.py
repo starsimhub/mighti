@@ -158,8 +158,7 @@ connectors = mi.create_connectors(ncd_interactions)
 
 # Add NCD-NCD connectors to interactions
 interactions.extend(connectors)
-
-
+# interactions = connectors + [ncd_interactions] + [housing_module]
 
 # -------------------------
 # Intervention
@@ -242,21 +241,22 @@ if __name__ == '__main__':
         demographics=[pregnancy, death],
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
-        # connectors=interactions,
+        # connectors=housing_module,
+        connectors=interactions,
         interventions = intervention_housing,
         copy_inputs=False,
         label='Without Interventions'
     )
 
-    # sim.init()
-    # housing_module.initialize(sim)
-    # sim.housing_module = housing_module
+    sim.init()
+    housing_module.initialize(sim)
+    sim.housing_module = housing_module
         
     # Run the simulation
     sim.run()
-    # sim.housing_module = housing_module
+    sim.housing_module = housing_module
 
-    # print(np.count_nonzero(housing_module.housing_unstable)) #s without intervention 
+    print(np.count_nonzero(housing_module.housing_unstable)) #s without intervention 
 
 
 

@@ -9,7 +9,6 @@ import numpy as np
 
 class ImproveHospitalDischarge(ss.Intervention):
     def __init__(self, disease_name, multiplier=2.0, start_day=0, end_day=None, label=None):
-        print('CALLED')
         super().__init__(label=label)
         self.disease_name = disease_name
         self.multiplier = multiplier
@@ -32,9 +31,6 @@ class ImproveHospitalDischarge(ss.Intervention):
                 raise ValueError(f"Disease '{self.disease_name}' not found. Available: {self.sim.diseases.keys()}")
     
         active = self.start_day <= ti < (self.end_day if self.end_day is not None else float('inf'))
-    
-        if ti % 1 == 0:
-            print(f"[{ti}] ACTIVE={active} | start={self.start_day} end={self.end_day} | Sim={self.sim.label}")
     
         if active:
             self.disease.pars.p_daily_discharge_multiplier = self.multiplier

@@ -10,9 +10,9 @@ import numpy as np
 __all__ = ["HousingSituation", "TransportationSituation", "EducationSituation", "IncomeSituation"]
 
 
-class HousingSituation(ss.Connector):
+class HousingSituation(ss.Module):
     """Models unstable housing as a binary state influenced by employment."""
-    
+
     def __init__(self, prob=0.3):
         super().__init__()
         self.name = 'housing_situation'
@@ -30,14 +30,13 @@ class HousingSituation(ss.Connector):
         self.housing_unstable.init_vals()
         self.housing_unstable.set(self.people.uid, new_vals=np.random.rand(n) < self.prob)
 
-    def step(self, sim):
+    def step(self, sim):  # ← IMPORTANT: must accept `sim` as an argument
         if hasattr(self.people, 'employed'):
             employed = self.people.employed
             at_risk = self.housing_unstable & employed
             to_stabilize = at_risk[np.random.rand(len(at_risk)) < 0.3]
             self.housing_unstable[to_stabilize] = False
-        return
-
+            
 
 class TransportationSituation(ss.Connector):
     """Placeholder module for modeling access to transportation."""
