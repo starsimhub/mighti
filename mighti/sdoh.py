@@ -10,10 +10,10 @@ import numpy as np
 __all__ = ["HousingSituation", "TransportationSituation", "EducationSituation", "IncomeSituation"]
 
 
-class HousingSituation(ss.Module):
-    """Models unstable housing as a binary state influenced by employment."""
-
+class HousingSituation(ss.Connector):
     def __init__(self, prob=0.3):
+        print('I AM RUNNING mighti/sdoh.py file.')
+
         super().__init__()
         self.name = 'housing_situation'
         self.prob = prob
@@ -30,13 +30,14 @@ class HousingSituation(ss.Module):
         self.housing_unstable.init_vals()
         self.housing_unstable.set(self.people.uid, new_vals=np.random.rand(n) < self.prob)
 
-    def step(self, sim):  # ← IMPORTANT: must accept `sim` as an argument
+    def step(self, sim):
+        print(f"[{sim.ti}] HousingSituation.step() called")
         if hasattr(self.people, 'employed'):
             employed = self.people.employed
             at_risk = self.housing_unstable & employed
             to_stabilize = at_risk[np.random.rand(len(at_risk)) < 0.3]
-            self.housing_unstable[to_stabilize] = False
-            
+            self.housing_unstable[to_stabilize] = False            
+
 
 class TransportationSituation(ss.Connector):
     """Placeholder module for modeling access to transportation."""

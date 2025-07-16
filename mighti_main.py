@@ -26,7 +26,6 @@ import pandas as pd
 import prepare_data_for_year
 import starsim as ss
 import stisim as sti
-from mighti.sdoh import HousingSituation 
 
 
 # Set up logging and random seeds for reproducibility
@@ -123,7 +122,7 @@ networks = [maternal, structuredsexual]
 # SDoH
 # -------------------------
 
-housing_module = HousingSituation(prob=0.4)  # You can adjust this probability as needed
+housing_module = mi.HousingSituation(prob=0.1)  # You can adjust this probability as needed
 
 
 # -------------------------
@@ -166,7 +165,7 @@ interactions.extend(connectors)
 intervention_hospital = [
     mi.ImproveHospitalDischarge(
         disease_name='depression',
-        multiplier=10.0,
+        multiplier=2.0,
         start_day=0,
         end_day=10,
         label='FastDischarge'
@@ -224,8 +223,7 @@ if __name__ == '__main__':
     # # Run 
     # msim = ss.MultiSim(sims=[sim_with,sim_without])
     # msim.run(parallel=False)
-    # housing_module.initialize(msim)     
-    # msim.housing_module = housing_module
+
     # sim_without = msim.sims[0]
     # sim_with = msim.sims[1] 
     # print(np.count_nonzero(sim_without.diseases['depression'].hospitalized))
@@ -241,23 +239,22 @@ if __name__ == '__main__':
         demographics=[pregnancy, death],
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
-        # connectors=housing_module,
         connectors=interactions,
-        interventions = intervention_housing,
+        # interventions = intervention_housing,
         copy_inputs=False,
         label='Without Interventions'
     )
-
+    
     sim.init()
+
     housing_module.initialize(sim)
-    sim.housing_module = housing_module
-        
-    # Run the simulation
+    sim.housing_module = housing_module 
+
     sim.run()
-    sim.housing_module = housing_module
 
-    print(np.count_nonzero(housing_module.housing_unstable)) #s without intervention 
-
+    print(np.count_nonzero(housing_module.housing_unstable)) # without intervention 
+    depression = sim.diseases.get('depression', None)
+    print('Depression affected count:', np.count_nonzero(depression.affected))
 
 
     # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'HIV', prevalence_data_df, init_year = inityear, end_year = endyear)  

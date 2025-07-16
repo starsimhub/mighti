@@ -43,33 +43,45 @@ class ImproveHospitalDischarge(ss.Intervention):
 
 class GiveHousingToDepressed(ss.Intervention):
     def __init__(self, coverage=0.5, start_day=0, label=None):
+        print(f"Intervention activated — changing housing for agents")
+
         super().__init__(label=label or "GiveHousingToDepressed")
         self.coverage = coverage
         self.start_day = start_day
 
     def initialize(self, sim):
-        self.sim = sim  # Store reference to the simulation
+        self.sim = sim  # Save reference to sim for use in step
 
     def apply(self):
-        sim = self.sim  # Use stored sim object
+        sim = self.sim
         if sim.ti < self.start_day:
             return
 
-        depression = sim.diseases.get('Depression', None)
-        if depression is None or not hasattr(depression, 'depressed'):
+        # Safe search for depression
+        depression = None
+        for d in sim.diseases:
+            if getattr(d, 'disease_name', '').lower() == 'depression':
+                depression = d
+                break
+
+        if depression is None or not hasattr(depression, 'affected'):
+            print(f"[{sim.ti}] Depression module not found or invalid")
             return
 
         housing_module = getattr(sim, 'housing_module', None)
         if housing_module is None or not hasattr(housing_module, 'housing_unstable'):
+            print(f"[{sim.ti}] Housing module missing or housing_unstable not found")
             return
 
-        depressed = depression.depressed
+        depressed = depression.affected
         housing_unstable = housing_module.housing_unstable
         target = depressed & housing_unstable
         to_house = target[np.random.rand(len(target)) < self.coverage]
-
         housing_unstable[to_house] = False
-
+        print(f"[{sim.ti}] Intervention activated — changed housing for {np.count_nonzero(to_house)} agents")
+        
     def step(self):
+        print(f"[{self.sim.ti}] step() called")
+
         self.apply()
         
