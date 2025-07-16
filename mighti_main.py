@@ -141,6 +141,7 @@ networks = [maternal, structuredsexual]
 # -------------------------
 
 housing_module = mi.HousingSituation(prob=0.4)  # You can adjust this probability as needed
+connectors = [housing_module]
 
 # ---------------------------------------------------------------------
 # Diseases
@@ -173,7 +174,7 @@ ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
 interactions = [ncd_hiv_connector]
 
 ncd_interactions = mi.read_interactions(csv_path_interactions) 
-connectors = mi.create_connectors(ncd_interactions)
+connectors.extend(mi.create_connectors(ncd_interactions))
 
 interactions.extend(connectors)
 
@@ -263,14 +264,13 @@ if __name__ == '__main__':
     )
 
     sim.init()
-    housing_module.initialize(sim)
-    sim.housing_module = housing_module
+    # sim.housing_module = housing_module
         
     # Run the simulation
     sim.run()
-    sim.housing_module = housing_module
+    # sim.housing_module = housing_module
 
-    print(np.count_nonzero(housing_module.housing_unstable)) # without intervention 
+    # print(np.count_nonzero(housing_module.housing_unstable)) # without intervention
     
     
     # # Mortality rates and life table

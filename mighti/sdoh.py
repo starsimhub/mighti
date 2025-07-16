@@ -19,20 +19,10 @@ class HousingSituation(ss.Module):
         self.prob = prob
         self.housing_unstable = ss.State(name='housing_unstable', label='Unstable Housing')
 
-    def initialize(self, sim):
-        self.sim = sim
-        self.people = sim.people
-        n = len(self.people.uid)
-        self.housing_unstable.link_people(self.people)
-        self.housing_unstable.len_tot = n
-        self.housing_unstable.len_used = n
-        self.housing_unstable.raw = np.full(n, fill_value=self.housing_unstable.nan, dtype=self.housing_unstable.dtype)
-        self.housing_unstable.init_vals()
-        self.housing_unstable.set(self.people.uid, new_vals=np.random.rand(n) < self.prob)
-
-    def step(self, sim):  # ← IMPORTANT: must accept `sim` as an argument
-        if hasattr(self.people, 'employed'):
-            employed = self.people.employed
+    def step(self):
+        ppl = self.sim.people
+        if hasattr(ppl, 'employed'):
+            employed = ppl.employed
             at_risk = self.housing_unstable & employed
             to_stabilize = at_risk[np.random.rand(len(at_risk)) < 0.3]
             self.housing_unstable[to_stabilize] = False
@@ -46,10 +36,7 @@ class TransportationSituation(ss.Connector):
         self.name = 'transportation_situation'
         # Add states like self.transportation_access here
 
-    def initialize(self, sim):
-        pass
-
-    def step(self, sim):
+    def step(self):
         pass
 
 
@@ -61,10 +48,7 @@ class EducationSituation(ss.Connector):
         self.name = 'education_situation'
         # Define self.low_education = ss.State(...) if needed
 
-    def initialize(self, sim):
-        pass
-
-    def step(self, sim):
+    def step(self):
         pass
 
 
@@ -76,9 +60,6 @@ class IncomeSituation(ss.Connector):
         self.name = 'income_situation'
         # Define self.low_income = ss.State(...) if needed
 
-    def initialize(self, sim):
-        pass
-
-    def step(self, sim):
+    def step(self):
         pass
     
