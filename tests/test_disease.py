@@ -19,10 +19,13 @@ thisdir = os.path.dirname(__file__)
 param_path = os.path.join(thisdir, 'test_data', 'eswatini_parameters.csv')
 params_df = pd.read_csv(param_path)
 params_df.columns = params_df.columns.str.strip()
-
+print(params_df)
 # Disease groups
 ncd_names = params_df.query("disease_class == 'ncd'")['condition'].unique().tolist()
 id_names = params_df.query("disease_class == 'sis'")['condition'].unique().tolist()
+
+print(ncd_names)
+
 
 
 def run_test_ncd_state(disease_name, n_agents=100):
@@ -30,6 +33,7 @@ def run_test_ncd_state(disease_name, n_agents=100):
     ppl = ss.People(n_agents)
     ppl.hiv = np.zeros(n_agents, dtype=bool)
     disease_class = getattr(mi, disease_name, None)
+    
     assert disease_class is not None, f"{disease_name} class not found in MIGHTI"
     disease = disease_class(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.1)})
     sim = ss.Sim(people=ppl, diseases=[disease], start=2020, stop=2025, dt=1, copy_inputs=False)
@@ -84,7 +88,7 @@ def test_multidisease(n_agents=100):
     ppl.hiv = np.zeros(n_agents, dtype=bool)  # ensure no HIV dependency issues
 
     # Load diseases from MIGHTI
-    disease_names = ['Type2Diabetes', 'Hypertension']
+    disease_names = ['Type2Diabetes','AlcoholUseDisorder']
     diseases = [getattr(mi, name)(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.1)}) for name in disease_names]
 
     # Create and run the simulation
