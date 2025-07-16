@@ -31,7 +31,7 @@ def run_test_ncd_state(disease_name, n_agents=100):
     ppl.hiv = np.zeros(n_agents, dtype=bool)
     disease_class = getattr(mi, disease_name, None)
     assert disease_class is not None, f"{disease_name} class not found in MIGHTI"
-    disease = disease_class(csv_path=param_path, pars={'init_prev': 0.1})
+    disease = disease_class(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.1)})
     sim = ss.Sim(people=ppl, diseases=[disease], start=2020, stop=2025, dt=1, copy_inputs=False)
     sim.run()
     assert isinstance(disease.affected.sum(), (int, float, np.integer, np.floating))
@@ -48,7 +48,7 @@ def run_test_id_state(disease_name, n_agents=100):
     ppl.hiv = np.zeros(n_agents, dtype=bool)
     disease_class = getattr(mi, disease_name, None)
     assert disease_class is not None, f"{disease_name} class not found in MIGHTI"
-    disease = disease_class(csv_path=param_path, pars={'init_prev': 0.1})
+    disease = disease_class(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.1)})
     sim = ss.Sim(people=ppl, diseases=[disease], start=2020, stop=2025, dt=1, copy_inputs=False)
     sim.run()
     assert isinstance(disease.infected.sum(), (int, float, np.integer, np.floating))
@@ -85,7 +85,7 @@ def test_multidisease(n_agents=100):
 
     # Load diseases from MIGHTI
     disease_names = ['Type2Diabetes', 'Hypertension']
-    diseases = [getattr(mi, name)(csv_path=param_path, pars={'init_prev': 0.1}) for name in disease_names]
+    diseases = [getattr(mi, name)(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.1)}) for name in disease_names]
 
     # Create and run the simulation
     sim = ss.Sim(

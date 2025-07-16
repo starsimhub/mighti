@@ -54,8 +54,11 @@ def test_full_mighti_simulation():
             if len(bins) < 2:
                 print(f"[⚠] Skipping {d}: no prevalence age bins")
                 continue
-            disease_objects.append(cls(csv_path=param_path,
-                                       pars={"init_prev": ss.bernoulli(get_prev_fn(d))}))
+            init_prev = ss.bernoulli(get_prev_fn(d))
+            disease_objects.append(cls(csv_path=param_path,pars={"init_prev": init_prev}))
+    
+
+    
     
     # Load interactions
     rel_sus_path = os.path.join(thisdir, 'test_data', 'rel_sus.csv')

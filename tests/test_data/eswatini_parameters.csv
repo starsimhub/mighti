@@ -1,5 +1,5 @@
-﻿condition,p_death,incidence,dur_condition,init_prev,rel_sus,remmision_rate,max_disease_duration,disease_type,disease_class,affected_sex
-HIV,,,,,,,,chronic,,
-Type2Diabetes,0.0005653,0.010125,15.028971,13.50683346,1.95,0.024,30,remitting,ncd,both
-Hypertension,0.0002673,0.0066,,0.530333333,0.93,,,chronic,ncd,both
-AlcoholUseDisorder,0.0000111,,2.05407094,2.891861943,2.47,,,remitting,ncd,both
+﻿condition,p_death,dur_condition,rel_sus,remmision_rate,max_disease_duration,disease_type,disease_class,affected_sex
+HIV,,,,,,,chronic,,
+Type2Diabetes,0.0005653,13.50683346,1.95,0.024,30,remitting,ncd,both
+Hypertension,0.0002673,0.530333333,0.93,,,chronic,ncd,both
+AlcoholUseDisorder,0.0000111,2.891861943,2.47,,,remitting,ncd,both

@@ -31,7 +31,7 @@ def test_hiv_alcoholusedisorder():
 
     # Make diseases
     hiv = sti.HIV(init_prev=0.1, beta={'structuredsexual': [0.01, 0.01]})
-    alcoholusedisorder = mi.AlcoholUseDisorder(csv_path=param_path, init_prev=0.1)
+    alcoholusedisorder = mi.AlcoholUseDisorder(csv_path=param_path, init_prev=ss.bernoulli(0.1))
     
     pars = dict(
         start=2000,
