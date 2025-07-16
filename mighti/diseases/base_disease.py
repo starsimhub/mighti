@@ -144,13 +144,6 @@ class RemittingDisease(ss.NCD):
         # New cases
         susceptible = (~self.affected).uids
         p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
-        
-        # ##### DEBUG #####
-
-        # print(f"[{self.disease_name}] Year {self.ti}: "
-        #       f"multiplier={self.pars.p_acquire_multiplier}"
-        #       f"self.pars.p_acquire={self.pars.p_acquire}"
-        #       f"p_acq={p_acq}") 
 
         # Apply sex filtering
         if self.pars.affected_sex == "female":
@@ -301,13 +294,7 @@ class AcuteDisease(ss.NCD):
         new_cases = susceptible[draws < p_acq]
         self.affected[new_cases] = True
         self.ti_affected[new_cases] = ti
-
-        # # Death
-        # deaths = self.pars.p_death.filter(new_cases)
-        # self.sim.people.request_death(deaths)
-        # self.ti_dead[deaths] = ti
         
-                
         # New implementation of detah
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
@@ -434,12 +421,6 @@ class ChronicDisease(ss.NCD):
         self.affected[new_cases] = True
         self.ti_affected[new_cases] = ti
 
-        # # Death
-        # deaths = self.pars.p_death.filter(new_cases) 
-        # self.sim.people.request_death(deaths)
-        # self.ti_dead[deaths] = ti
-        
-                
         # New implementation of detah
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
@@ -570,12 +551,6 @@ class GenericSIS(ss.SIS):
 
         self.infected[new_cases] = True
         self.ti_infected[new_cases] = ti
-
-        # # Death
-        # deaths = self.pars.p_death.filter(new_cases) 
-        # self.sim.people.request_death(deaths)
-        # self.ti_dead[deaths] = ti
-        
                 
         # New implementation of detah
         affected_uids = self.infected.uids

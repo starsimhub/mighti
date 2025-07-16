@@ -26,7 +26,6 @@ import pandas as pd
 import prepare_data_for_year
 import starsim as ss
 import stisim as sti
-from mighti.sdoh import HousingSituation 
 
 
 # Set up logging and random seeds for reproducibility
@@ -38,8 +37,8 @@ logger.setLevel(logging.INFO)
 # Simulation Settings
 # ---------------------------------------------------------------------
 n_agents = 10_000 
-inityear = 2007  
-endyear = 2010
+inityear = 2007
+endyear = 2020
 region = 'eswatini'
 
 
@@ -87,7 +86,7 @@ df.columns = df.columns.str.strip()
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
 # healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
 # healthconditions = []
-healthconditions = ['Type2Diabetes']
+healthconditions = ['Type2Diabetes','Depression']
 diseases = ["HIV"] + healthconditions
 
 ncd_df = df[df["disease_class"] == "ncd"]
@@ -141,7 +140,7 @@ networks = [maternal, structuredsexual]
 # SDoH
 # -------------------------
 
-housing_module = HousingSituation(prob=0.4)  # You can adjust this probability as needed
+housing_module = mi.HousingSituation(prob=0.4)  # You can adjust this probability as needed
 
 # ---------------------------------------------------------------------
 # Diseases
@@ -258,7 +257,7 @@ if __name__ == '__main__':
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
         diseases=disease_objects,
         connectors=interactions,
-        # interventions = interventions3,
+        # interventions = intervention_housing,
         copy_inputs=False,
         label='With Interventions'
     )
@@ -271,7 +270,7 @@ if __name__ == '__main__':
     sim.run()
     sim.housing_module = housing_module
 
-    print(np.count_nonzero(housing_module.housing_unstable)) #s without intervention 
+    print(np.count_nonzero(housing_module.housing_unstable)) # without intervention 
     
     
     # # Mortality rates and life table
@@ -296,7 +295,7 @@ if __name__ == '__main__':
     
     # # Plot life expectancy comparison
     # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
     
     # df = death_cause_analyzer.to_df()   
     # df['HIV only'] = df['died_hiv'] & ~df['died_type2diabetes']

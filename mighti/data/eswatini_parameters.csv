@@ -1,7 +1,7 @@
-﻿condition,p_death,dur_condition,rel_sus,remmision_rate,max_disease_duration,disease_type,disease_class,affected_sex
+﻿condition,p_death,dur_condition,rel_sus,remission_rate,max_disease_duration,disease_type,disease_class,affected_sex
 HIV,,,,,,chronic,,
 Type1Diabetes,0.0005653,27.3970433,1.95,,,chronic,ncd,both
-Type2Diabetes,0.0005653,15.028971,1.61,0.00024,30,remitting,ncd,both
+Type2Diabetes,0.025,15.028971,1.61,0.00024,30,remitting,ncd,both
 Hypertension,0.0002673,,0.93,,,chronic,ncd,both
 Obesity,,,1.83,,,chronic,ncd,both
 CardiovascularDiseases,0.0016533,6.91139678,1,,,chronic,ncd,both
