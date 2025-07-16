@@ -142,6 +142,7 @@ networks = [maternal, structuredsexual]
 
 housing_module = mi.HousingSituation(prob=0.4)  # You can adjust this probability as needed
 
+
 # ---------------------------------------------------------------------
 # Diseases
 # ---------------------------------------------------------------------
@@ -177,6 +178,16 @@ connectors = mi.create_connectors(ncd_interactions)
 
 interactions.extend(connectors)
 
+# -------------------------
+# Adherence
+# -------------------------
+
+adherence_connectors = [
+    mi.create_adherence_connector('T2D_Tx'),
+    mi.create_adherence_connector('ART'),
+]
+interactions.extend(adherence_connectors)
+
 
 # ---------------------------------------------------------------------
 # Interventions 
@@ -194,7 +205,7 @@ intervention_df = pd.read_csv(csv_path_intervention)
 intervention = ss.Tx(df=intervention_df)
 
 # Define interventions using these data
-interventions = [
+interventions1 = [
     sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
     sti.ART(coverage_data=art_coverage_data),
     sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
@@ -207,12 +218,14 @@ interventions2 = [
     sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
     sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
     mi.T2D_ReduceMortalityTx(product=intervention,prob=1.0,rel_death_reduction=0.54,
-                             eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids)
+                             eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
+                             label='T2D_ReduceMortalityTx')
 ]
 
 interventions3 = [
     mi.T2D_ReduceMortalityTx(product=intervention,prob=1.0,rel_death_reduction=0.54,
-                             eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids)
+                             eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
+                             label='T2D_ReduceMortalityTx')
 ]
 
 intervention_hospital = [
@@ -225,7 +238,29 @@ intervention_hospital = [
     )
 ]
 
+
 intervention_housing = [mi.GiveHousingToDepressed(coverage=1, start_day=0)]
+
+
+import pandas as pd
+from starsim.products import Tx
+
+cbt_df = pd.DataFrame({
+    'disease': ['depression'],
+    'state': ['affected'],
+    'efficacy': [1.0],         # 100% chance of success
+    'post_state': ['at_risk']  # Treating depression moves you from 'affected' to 'at_risk'
+})
+basic_cbt = Tx(df=cbt_df, label='CBT')
+
+interventions = [
+    sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
+    sti.ART(coverage_data=art_coverage_data),
+    sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
+    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
+    mi.DepressionCare(product=basic_cbt, prob=0.8, label='depression_tx')
+    ]
+
 
 # ---------------------------------------------------------------------
 # Utility: Get Modules
@@ -242,7 +277,10 @@ def get_pregnancy_module(sim):
             return module
     raise ValueError("Pregnancy module not found in the simulation.")
 
-
+print("Intervention types and labels:")
+for i in interventions:
+    print(f"  - {type(i)} — {getattr(i, 'label', i)}")
+    
 # ---------------------------------------------------------------------
 # Main Simulation
 # ---------------------------------------------------------------------
@@ -257,11 +295,14 @@ if __name__ == '__main__':
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
         diseases=disease_objects,
         connectors=interactions,
-        # interventions = intervention_housing,
+        interventions = interventions1,
         copy_inputs=False,
         label='With Interventions'
     )
 
+
+    
+    
     sim.init()
     housing_module.initialize(sim)
     sim.housing_module = housing_module
@@ -309,7 +350,7 @@ if __name__ == '__main__':
     # # df[['had_hiv', 'died_of_hiv', 'had_type2diabetes', 'died_of_type2diabetes']].sum()
     
        
-    # #### To run 2 simulation simultaneously #####
+    #### To run 2 simulation simultaneously #####
     # sim_without = ss.Sim(
     #     n_agents=n_agents,
     #     networks=networks,
@@ -320,9 +361,9 @@ if __name__ == '__main__':
     #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
     #     diseases=disease_objects,
     #     connectors=interactions,
-    #     # interventions = interventions,
+    #     interventions = interventions,
     #     copy_inputs=False,
-    #     label='No Intervention'
+    #     label='With Intervention'
     # )
     
     # sim_with = ss.Sim(
@@ -335,7 +376,7 @@ if __name__ == '__main__':
     #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
     #     diseases=disease_objects,
     #     connectors=interactions,
-    #     interventions = interventions,
+    #     interventions = interventions1,
     #     copy_inputs=False,
     #     label='With HIV Intervention'
     # )
@@ -355,7 +396,7 @@ if __name__ == '__main__':
     #     label='With HIV and T2D ntervention'
     # )
  
-    # msim = ss.MultiSim(sims=[sim_without, sim_with, sim_with_both])
+    # msim = ss.MultiSim(sims=[sim_without, sim_with])
     # msim.run()
     
     # # Target year for evaluation
