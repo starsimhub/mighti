@@ -202,65 +202,38 @@ test_prob_data = [0.10, 0.25, 0.60, 0.70, 0.80, 0.95]
 test_years = [2003, 2005, 2007, 2010, 2014, 2016]
 
 intervention_df = pd.read_csv(csv_path_intervention)
-intervention = ss.Tx(df=intervention_df)
+unified_product = ss.Tx(df=intervention_df, label='UnifiedTx')
+
+
+hiv_test = sti.HIVTest(test_prob_data=test_prob_data, years=test_years)
+art = sti.ART(coverage_data=art_coverage_data)
+vmmc = sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}})
+prep = sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]})
+
+t2d_tx = mi.T2D_ReduceMortalityTx(product=unified_product, prob=1.0,rel_death_reduction=0.54,
+                                  eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
+                                  label='T2D_ReduceMortalityTx')
+
+depression_tx = mi.DepressionCare(product=unified_product, prob=0.1, label='depression_tx')
+
+hospital_discharge = mi.ImproveHospitalDischarge(disease_name='depression', multiplier=10.0,
+                                                 start_day=0,end_day=10,label='FastDischarge')
+
+give_housing = mi.GiveHousingToDepressed(coverage=1, start_day=0)
 
 # Define interventions using these data
-interventions1 = [
-    sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
-    sti.ART(coverage_data=art_coverage_data),
-    sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
-    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
-]
+interventions1 = [hiv_test, art, vmmc, prep]
 
-interventions2 = [
-    sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
-    sti.ART(coverage_data=art_coverage_data),
-    sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
-    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
-    mi.T2D_ReduceMortalityTx(product=intervention,prob=1.0,rel_death_reduction=0.54,
-                             eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
-                             label='T2D_ReduceMortalityTx')
-]
+interventions2 = [hiv_test, art, vmmc, prep, t2d_tx]
 
-interventions3 = [
-    mi.T2D_ReduceMortalityTx(product=intervention,prob=1.0,rel_death_reduction=0.54,
-                             eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
-                             label='T2D_ReduceMortalityTx')
-]
+interventions3 = [t2d_tx]
 
-intervention_hospital = [
-    mi.ImproveHospitalDischarge(
-        disease_name='depression',
-        multiplier=10.0,
-        start_day=0,
-        end_day=10,
-        label='FastDischarge'
-    )
-]
+interventions4 = [hospital_discharge]
 
+interventions5 = [give_housing]
 
-intervention_housing = [mi.GiveHousingToDepressed(coverage=1, start_day=0)]
-
-
-import pandas as pd
-from starsim.products import Tx
-
-cbt_df = pd.DataFrame({
-    'disease': ['depression'],
-    'state': ['affected'],
-    'efficacy': [1.0],         # 100% chance of success
-    'post_state': ['at_risk']  # Treating depression moves you from 'affected' to 'at_risk'
-})
-basic_cbt = Tx(df=cbt_df, label='CBT')
-
-interventions = [
-    sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
-    sti.ART(coverage_data=art_coverage_data),
-    sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
-    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
-    mi.DepressionCare(product=basic_cbt, prob=0.8, label='depression_tx')
-    ]
-
+interventions6 = [hiv_test, art, vmmc, prep, depression_tx]
+    
 
 # ---------------------------------------------------------------------
 # Utility: Get Modules
@@ -278,7 +251,7 @@ def get_pregnancy_module(sim):
     raise ValueError("Pregnancy module not found in the simulation.")
 
 print("Intervention types and labels:")
-for i in interventions:
+for i in interventions6:
     print(f"  - {type(i)} — {getattr(i, 'label', i)}")
     
 # ---------------------------------------------------------------------
@@ -295,7 +268,7 @@ if __name__ == '__main__':
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
         diseases=disease_objects,
         connectors=interactions,
-        interventions = interventions1,
+        interventions = interventions6,
         copy_inputs=False,
         label='With Interventions'
     )
@@ -312,7 +285,8 @@ if __name__ == '__main__':
     sim.housing_module = housing_module
 
     print(np.count_nonzero(housing_module.housing_unstable)) # without intervention 
-    
+    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Depression', prevalence_data_df, inityear, endyear)
+
     
     # # Mortality rates and life table
     # target_year = endyear - 1

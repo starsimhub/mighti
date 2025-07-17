@@ -18,7 +18,7 @@ def make_sim():
     hiv = sti.HIV(beta_m2f=0.05, beta_m2c=0.025, init_prev=0.15)
     fertility_rate = {'fertility_rate': pd.read_csv('mighti/data/eswatini_asfr.csv')}
     pregnancy = ss.Pregnancy(pars=fertility_rate)
-    death_rates = {'death_rate': pd.read_csv('mighti/data/eswatini_mortality_rates_2007.csv'), 'rate_units': 1}
+    death_rates = {'death_rate': pd.read_csv('mighti/data/eswatini_mortality_rates.csv'), 'rate_units': 1}
     death = ss.Deaths(death_rates)  # Assuming death_rate is a yearly rate
 
     sexual = sti.StructuredSexual()
@@ -146,7 +146,7 @@ if __name__ == '__main__':
         hiv_beta_m2c = dict(low=0.001, high=0.1, guess=0.025), # Network females in risk group 1 concurrent partners
     )
 
-    calib = run_calib(calib_pars=calib_pars, total_trials=100, keep_db=False)
+    calib = run_calib(calib_pars=calib_pars, total_trials=3, keep_db=False)
 
     sc.toc(T)
     print('Done.')

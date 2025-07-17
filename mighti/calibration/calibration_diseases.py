@@ -14,8 +14,8 @@ import stisim as sti
 
 
 # Set the name of the disease to calibrate
-from mighti.calibration.diseases_for_calibration import Type1Diabetes as DiseaseClass  
-disease_name = 'Type1Diabetes'  
+from mighti.calibration.diseases_for_calibration import Type2Diabetes as DiseaseClass  
+disease_name = 'Type2Diabetes'  
 
 # Set the starting year for calibration
 init_year = 2007                
