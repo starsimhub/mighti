@@ -143,6 +143,7 @@ networks = [maternal, structuredsexual]
 housing_module = mi.HousingSituation(prob=0.4)  # You can adjust this probability as needed
 connectors = [housing_module]
 
+
 # ---------------------------------------------------------------------
 # Diseases
 # ---------------------------------------------------------------------
@@ -178,6 +179,16 @@ connectors.extend(mi.create_connectors(ncd_interactions))
 
 interactions.extend(connectors)
 
+# -------------------------
+# Adherence
+# -------------------------
+
+adherence_connectors = [
+    mi.create_adherence_connector('T2D_Tx'),
+    mi.create_adherence_connector('ART'),
+]
+interactions.extend(adherence_connectors)
+
 
 # ---------------------------------------------------------------------
 # Interventions 
@@ -192,41 +203,38 @@ test_prob_data = [0.10, 0.25, 0.60, 0.70, 0.80, 0.95]
 test_years = [2003, 2005, 2007, 2010, 2014, 2016]
 
 intervention_df = pd.read_csv(csv_path_intervention)
-intervention = ss.Tx(df=intervention_df)
+unified_product = ss.Tx(df=intervention_df, label='UnifiedTx')
+
+
+hiv_test = sti.HIVTest(test_prob_data=test_prob_data, years=test_years)
+art = sti.ART(coverage_data=art_coverage_data)
+vmmc = sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}})
+prep = sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]})
+
+t2d_tx = mi.T2D_ReduceMortalityTx(product=unified_product, prob=1.0,rel_death_reduction=0.54,
+                                  eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
+                                  label='T2D_ReduceMortalityTx')
+
+depression_tx = mi.DepressionCare(product=unified_product, prob=0.1, label='depression_tx')
+
+hospital_discharge = mi.ImproveHospitalDischarge(disease_name='depression', multiplier=10.0,
+                                                 start_day=0,end_day=10,label='FastDischarge')
+
+give_housing = mi.GiveHousingToDepressed(coverage=1, start_day=0)
 
 # Define interventions using these data
-interventions = [
-    sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
-    sti.ART(coverage_data=art_coverage_data),
-    sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
-    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
-]
+interventions1 = [hiv_test, art, vmmc, prep]
 
-interventions2 = [
-    sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
-    sti.ART(coverage_data=art_coverage_data),
-    sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
-    sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
-    mi.T2D_ReduceMortalityTx(product=intervention,prob=1.0,rel_death_reduction=0.54,
-                             eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids)
-]
+interventions2 = [hiv_test, art, vmmc, prep, t2d_tx]
 
-interventions3 = [
-    mi.T2D_ReduceMortalityTx(product=intervention,prob=1.0,rel_death_reduction=0.54,
-                             eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids)
-]
+interventions3 = [t2d_tx]
 
-intervention_hospital = [
-    mi.ImproveHospitalDischarge(
-        disease_name='depression',
-        multiplier=10.0,
-        start_day=0,
-        end_day=10,
-        label='FastDischarge'
-    )
-]
+interventions4 = [hospital_discharge]
 
-intervention_housing = [mi.GiveHousingToDepressed(coverage=1, start_day=0)]
+interventions5 = [give_housing]
+
+interventions6 = [hiv_test, art, vmmc, prep, depression_tx]
+    
 
 # ---------------------------------------------------------------------
 # Utility: Get Modules
@@ -243,7 +251,10 @@ def get_pregnancy_module(sim):
             return module
     raise ValueError("Pregnancy module not found in the simulation.")
 
-
+print("Intervention types and labels:")
+for i in interventions6:
+    print(f"  - {type(i)} — {getattr(i, 'label', i)}")
+    
 # ---------------------------------------------------------------------
 # Main Simulation
 # ---------------------------------------------------------------------
@@ -258,20 +269,20 @@ if __name__ == '__main__':
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
         diseases=disease_objects,
         connectors=interactions,
-        # interventions = intervention_housing,
+        interventions = interventions6,
         copy_inputs=False,
         label='With Interventions'
     )
 
+
+    
+    
     sim.init()
     # sim.housing_module = housing_module
         
     # Run the simulation
     sim.run()
     # sim.housing_module = housing_module
-
-    # print(np.count_nonzero(housing_module.housing_unstable)) # without intervention
-    
     
     # # Mortality rates and life table
     # target_year = endyear - 1
@@ -309,7 +320,7 @@ if __name__ == '__main__':
     # # df[['had_hiv', 'died_of_hiv', 'had_type2diabetes', 'died_of_type2diabetes']].sum()
     
        
-    # #### To run 2 simulation simultaneously #####
+    #### To run 2 simulation simultaneously #####
     # sim_without = ss.Sim(
     #     n_agents=n_agents,
     #     networks=networks,
@@ -320,9 +331,9 @@ if __name__ == '__main__':
     #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
     #     diseases=disease_objects,
     #     connectors=interactions,
-    #     # interventions = interventions,
+    #     interventions = interventions,
     #     copy_inputs=False,
-    #     label='No Intervention'
+    #     label='With Intervention'
     # )
     
     # sim_with = ss.Sim(
@@ -335,7 +346,7 @@ if __name__ == '__main__':
     #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
     #     diseases=disease_objects,
     #     connectors=interactions,
-    #     interventions = interventions,
+    #     interventions = interventions1,
     #     copy_inputs=False,
     #     label='With HIV Intervention'
     # )
@@ -355,7 +366,7 @@ if __name__ == '__main__':
     #     label='With HIV and T2D ntervention'
     # )
  
-    # msim = ss.MultiSim(sims=[sim_without, sim_with, sim_with_both])
+    # msim = ss.MultiSim(sims=[sim_without, sim_with])
     # msim.run()
     
     # # Target year for evaluation

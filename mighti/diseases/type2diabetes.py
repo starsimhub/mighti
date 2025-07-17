@@ -10,7 +10,6 @@ from starsim.interventions import treat_num
 
 class Type2Diabetes(RemittingDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
-        print("T2D called")
         self.disease_name = 'Type2Diabetes'
         super().__init__(csv_path, pars, **kwargs)
 
