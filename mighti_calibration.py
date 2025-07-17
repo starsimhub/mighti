@@ -146,7 +146,7 @@ if __name__ == '__main__':
         hiv_beta_m2c = dict(low=0.001, high=0.1, guess=0.025), # Network females in risk group 1 concurrent partners
     )
 
-    calib = run_calib(calib_pars=calib_pars, total_trials=100, keep_db=False)
+    calib = run_calib(calib_pars=calib_pars, total_trials=3, keep_db=False)
 
     sc.toc(T)
     print('Done.')
