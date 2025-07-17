@@ -36,9 +36,9 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 # Simulation Settings
 # ---------------------------------------------------------------------
-n_agents = 10_000 
+n_agents = 100_000 
 inityear = 2007
-endyear = 2020
+endyear = 2024
 region = 'eswatini'
 
 
@@ -86,7 +86,7 @@ df.columns = df.columns.str.strip()
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
 # healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
 # healthconditions = []
-healthconditions = ['Type2Diabetes','Depression']
+healthconditions = ['CardiovascularDiseases']
 diseases = ["HIV"] + healthconditions
 
 ncd_df = df[df["disease_class"] == "ncd"]
@@ -113,13 +113,13 @@ prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, dis
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
-death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
-    conditions=['hiv', 'type2diabetes'],
-    condition_attr_map={
-        'hiv': 'infected',
-        'type2diabetes': 'affected'  
-    }
-)
+# death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
+#     conditions=['hiv', 'type2diabetes'],
+#     condition_attr_map={
+#         'hiv': 'infected',
+#         'type2diabetes': 'affected'  
+#     }
+# )
 
 # ---------------------------------------------------------------------
 # Demographics and Networks
@@ -140,7 +140,7 @@ networks = [maternal, structuredsexual]
 # SDoH
 # -------------------------
 
-housing_module = mi.HousingSituation(prob=0.4)  # You can adjust this probability as needed
+housing_module = mi.HousingSituation(prob=1)  # You can adjust this probability as needed
 connectors = [housing_module]
 
 
@@ -266,23 +266,21 @@ if __name__ == '__main__':
         stop=endyear,
         people=ppl,
         demographics=[pregnancy, death],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+        # analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
         connectors=interactions,
-        interventions = interventions6,
+        # interventions = interventions5,
         copy_inputs=False,
         label='With Interventions'
     )
 
-
-    
-    
-    sim.init()
-    # sim.housing_module = housing_module
-        
     # Run the simulation
     sim.run()
-    # sim.housing_module = housing_module
+    
+    print(np.count_nonzero(housing_module.housing_unstable)) # without intervention 
+
+
     
     # # Mortality rates and life table
     # target_year = endyear - 1
@@ -307,7 +305,7 @@ if __name__ == '__main__':
     # # Plot life expectancy comparison
     # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
     # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
-    
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CardiovascularDiseases')
     # df = death_cause_analyzer.to_df()   
     # df['HIV only'] = df['died_hiv'] & ~df['died_type2diabetes']
     # df['T2D only'] = df['died_type2diabetes'] & ~df['died_hiv']

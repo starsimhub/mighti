@@ -3,7 +3,8 @@ Calibrate disease acquisition parameter (p_acquire) for a specified condition
 using MIGHTI and prevalence data. Outputs best-fit parameter and comparison
 of observed vs. simulated prevalence by age and sex.
 """
-
+import sys
+sys.path.append('/Users/yamamn02/Documents/MIGHTI')  # path to folder containing `mighti/`
 
 import optuna
 import mighti as mi
@@ -15,14 +16,14 @@ import stisim as sti
 
 # Set the name of the disease to calibrate
 from mighti.calibration.diseases_for_calibration import Type2Diabetes as DiseaseClass  
-disease_name = 'Type2Diabetes'  
+disease_name = 'CardiovascularDiseases'  
 
 # Set the starting year for calibration
 init_year = 2007                
 total_trials = 10   # Use a small number for testing; increase to 100+ for full calibration
 
 path_prevalence = '../data/eswatini_prevalence.csv'
-path_parameters = '../data/eswatini_parameters.csv'
+path_parameters = '../data/eswatini_parameters_new.csv'
 
 
 def make_sim():
@@ -88,6 +89,30 @@ def build_sim(sim, calib_pars):
     return sim
 
 
+def make_eval_fn(data):
+    def eval_fn(sim, sim_result_list=None, weights=None, df_res_list=None):
+        if isinstance(sim, ss.MultiSim):
+            sim = sim.sims[0]
+
+        fit = 0
+        prev_analyzer = sim.analyzers.prevalence_analyzer
+        prev_results = sim.results.prevalence_analyzer
+
+        for index, (age_low, age_high) in enumerate(prev_analyzer.age_bins):
+            obs = data[data['Age'] == age_low][['Year', 'Age', f'{disease_name}_female', f'{disease_name}_male']]
+            sim_df = pd.DataFrame({
+                'Year': prev_analyzer.timevec,
+                'Age': age_low,
+                'sim_female': prev_results[f'{disease_name}_prev_female_{index}'],
+                'sim_male': prev_results[f'{disease_name}_prev_male_{index}']
+            })
+            merged = pd.merge(obs, sim_df, on=['Year', 'Age'], how='inner')
+            merged['error'] = abs(merged['sim_female'] - merged[f'{disease_name}_female']) + abs(merged['sim_male'] - merged[f'{disease_name}_male'])
+            fit += merged['error'].sum()
+        return fit
+    return eval_fn
+
+
 def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None):
 
     if isinstance(sim, ss.MultiSim):
@@ -117,12 +142,20 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
     sim = make_sim()
     data = pd.read_csv(path_prevalence)
 
+    eval_fn = make_eval_fn(data) 
+
     calib = ss.Calibration(
         sim=sim,
         calib_pars=calib_pars,
         build_fn=build_sim,
         eval_fn=eval_fn,
-        eval_kw={'data': data},
+        
+    # calib = ss.Calibration(
+    #     sim=sim,
+    #     calib_pars=calib_pars,
+    #     build_fn=build_sim,
+    #     eval_fn=eval_fn,
+    #     eval_kw={'data': data},
         total_trials=total_trials,
         n_workers=1,
         keep_db=keep_db,

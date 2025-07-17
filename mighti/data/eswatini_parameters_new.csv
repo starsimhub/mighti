@@ -1,0 +1,28 @@
+condition,p_death,dur_condition,rel_sus,remission_rate,max_disease_duration,disease_type,disease_class,affected_sex
+Type1Diabetes,,,,,,,chronic ,both
+Type2Diabetes,0.025,15.028971,1.61,0.024,30,remitting,ncd,both
+Hypertension,,,0.93,,,,chronic ,both
+Obesity,,,,,,,chronic ,both
+CardiovascularDiseases,0.042,9.22,1.61,,,,chronic ,both
+ChronicKidneyDisease,,,,,,,chronic ,both
+Hyperlipidemia,,,,,,,chronic ,both
+CervicalCancer,0.0036,3.32,6.087,,,,chronic ,female
+ColorectalCancer,,,0.9,,,,chronic ,both
+BreastCancer,,,,,,,chronic ,both
+LungCancer,,,1.7,,,,chronic ,both
+ProstateCancer,0.0013,3.78,2.9,,,,chronic ,male
+AlcoholUseDisorder,,,2.47,,,,remitting,both
+TobaccoUse,,,2.285,,,,remitting,both
+Dementia,,,1.28,,,,chronic,both
+PTSD,,,,,,,remitting,both
+MajorDepressiveDisorder,,,,,,,remitting,both
+HPV,,,,,,,remitting,both
+Flu,,,5.5,,,,sis,both
+ViralHepatitis,,,,,,,sis,both
+InterpersonalViolence,,,1.28,,,,acute,both
+RoadInjury,,,,,,,acute,both
+ChronicLiverDisease,,,1.5,,,,chronic,both
+Asthma,,,1.72,,,,chronic,both
+COPD,,,,,,,chronic,both
+AlzheimersDisease,,,,,,,chronic,both
+ParkinsonsDisease,,,,,,,chronic,both

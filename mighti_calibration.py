@@ -84,14 +84,30 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
     # if calib_pars is not None:
     #     sim = build_sim(sim, calib_pars)
 
-    data = pd.read_csv('mighti/data/eswatini_prevalence.csv')
+    # data = pd.read_csv('mighti/data/eswatini_prevalence.csv')
 
+    # calib = ss.Calibration(
+    #     sim=sim,
+    #     calib_pars=calib_pars,
+    #     build_fn=build_sim,
+    #     eval_fn=eval_fn,
+    #     eval_kw={'data': data},
+    #     total_trials=total_trials,
+    #     n_workers=1,
+    #     keep_db=keep_db,
+    #     die=True,
+    #     reseed=False,
+    #     sampler=optuna.samplers.TPESampler(seed=12345) 
+    # )
+    
+    data = pd.read_csv('mighti/data/eswatini_prevalence.csv')
+    eval_fn = make_eval_fn(data)
+    
     calib = ss.Calibration(
         sim=sim,
         calib_pars=calib_pars,
         build_fn=build_sim,
-        eval_fn=eval_fn,
-        eval_kw={'data': data},
+        eval_fn=eval_fn,  
         total_trials=total_trials,
         n_workers=1,
         keep_db=keep_db,
@@ -106,6 +122,32 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
     # Return the results for further analysisz
     return calib
 
+
+### Added on Jul 17 to resolve eval_kw issue
+def make_eval_fn(data):
+    def eval_fn(sim, sim_result_list=None, weights=None, df_res_list=None):
+        if isinstance(sim, ss.MultiSim):
+            sim = sim.sims[0]
+
+        fit = 0
+        prev_analyzer = sim.analyzers.prevalence_analyzer
+        prev_results = sim.results.prevalence_analyzer
+
+        for index, (age_low, age_high) in enumerate(prev_analyzer.age_bins):
+            prev_observed_data = data[data['Age'] == age_low][['Year', 'Age', 'HIV_female', 'HIV_male']]
+            prev_sim_data = pd.DataFrame({
+                'Year': prev_analyzer.timevec,
+                'Age': age_low,
+                'sim_HIV_female': prev_results[f'HIV_prev_female_{index}'],
+                'sim_HIV_male': prev_results[f'HIV_prev_male_{index}']
+            })
+            merged = pd.merge(prev_observed_data, prev_sim_data, on=['Year', 'Age'], how='inner')
+            merged['error'] = abs(merged['sim_HIV_female'] - merged['HIV_female']) + abs(merged['sim_HIV_male'] - merged['HIV_male'])
+
+            fit += merged['error'].sum()
+
+        return fit
+    return eval_fn
 
 
 def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None):

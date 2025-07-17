@@ -14,10 +14,10 @@ LungCancer,,1.00051151,1.7,,,chronic,ncd,both
 ProstateCancer,0.0000505,4.28571429,1,,,chronic,ncd,male
 AlcoholUseDisorder,0.0000111,2.05407094,2.47,,,remitting,ncd,both
 TobaccoUse,,,2.285,,,remitting,ncd,both
-HIVAssociatedDementia,,,1.8,,,chronic,ncd,both
+Dementia,,,1.8,,,chronic,ncd,both
 PTSD,,,1,,,remitting,ncd,both
-Depression,,0.83248621,1,,,remitting,ncd,both
-DomesticViolence,0.0002302,,1,,,acute,ncd,both
+MajorDepressiveDisorder,,0.83248621,1,,,remitting,ncd,both
+InterpersonalViolence,0.0002302,,1,,,acute,ncd,both
 RoadInjuries,0.0005586,,1,,,acute,ncd,both
 ChronicLiverDisease,0.0002425,25.8234006,1,,,chronic,ncd,both
 Asthma,0.000148,7.01424332,1.72,,,chronic,ncd,both

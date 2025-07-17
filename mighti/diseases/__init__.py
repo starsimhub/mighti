@@ -11,7 +11,7 @@ from .chronickidneydisease import *
 from .chronicliverdisease import *
 from .copd import *
 from .colorectalcancer import *
-from .depression import *
+from .majordepressivedisorder import *
 from .domesticviolence import *
 from .flu import *
 from .hivassociateddementia import *
