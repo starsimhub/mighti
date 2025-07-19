@@ -12,9 +12,9 @@ from .chronicliverdisease import *
 from .copd import *
 from .colorectalcancer import *
 from .majordepressivedisorder import *
-from .domesticviolence import *
+from .interpersonalviolence import *
 from .flu import *
-from .hivassociateddementia import *
+from .dementia import *
 from .hpv import *
 from .hyperlipidemia import *
 from .hypertension import *

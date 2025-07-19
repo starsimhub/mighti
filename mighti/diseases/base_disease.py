@@ -205,7 +205,6 @@ class AcuteDisease(ss.NCD):
         # Define parameters using extracted values
         self.define_pars(
             dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # Log-normal distribution for duration
-            p_acquire=disease_params["incidence"],
             p_death=ss.bernoulli(disease_params["p_death"]),  
             max_disease_duration=disease_params["max_disease_duration"],
             rel_sus_hiv=disease_params["rel_sus_hiv"],  

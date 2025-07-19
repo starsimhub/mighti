@@ -1,4 +1,5 @@
 """
+NOTICE; THIS DOES NOT WORK WITH STARSIM==2.3.1, starsim==2.2.0, stisim==1.0.1, numpy==2.2.6
 Calibrate disease acquisition parameter (p_acquire) for a specified condition
 using MIGHTI and prevalence data. Outputs best-fit parameter and comparison
 of observed vs. simulated prevalence by age and sex.
@@ -16,11 +17,11 @@ import stisim as sti
 
 # Set the name of the disease to calibrate
 from mighti.calibration.diseases_for_calibration import Type2Diabetes as DiseaseClass  
-disease_name = 'CardiovascularDiseases'  
+disease_name = 'Type2Diabetes'  
 
 # Set the starting year for calibration
 init_year = 2007                
-total_trials = 10   # Use a small number for testing; increase to 100+ for full calibration
+total_trials = 100   # Use a small number for testing; increase to 100+ for full calibration
 
 path_prevalence = '../data/eswatini_prevalence.csv'
 path_parameters = '../data/eswatini_parameters_new.csv'
@@ -184,7 +185,16 @@ if __name__ == '__main__':
     )
 
     calib = run_calib(calib_pars=calib_pars, total_trials=total_trials, keep_db=False)
+    sc.saveobj(f'results/calib_{disease_name}_{sc.getdate()}.obj', calib)
 
     sc.toc(T)
     print('Done.')
+    
+    # Save calibration results
+    with open(f'results/calibration_results_{disease_name}.txt', 'w') as f:
+        f.write('Best parameters:\n')
+        for k, v in calib.best_pars.items():
+            f.write(f'{k}: {v}\n')
+    
+        f.write(f'\nCalibration successful: {"✓" if calib.fit_improved else "✗"}\n')
     

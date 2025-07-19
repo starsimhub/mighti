@@ -36,7 +36,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 # Simulation Settings
 # ---------------------------------------------------------------------
-n_agents = 100_000 
+n_agents = 10_000 
 inityear = 2007
 endyear = 2024
 region = 'eswatini'
@@ -82,11 +82,11 @@ ex_path = f'mighti/data/{region}_ex.csv'
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
-#healthconditions = [condition for condition in df.condition if condition != "HIV"]
-# healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
+# healthconditions = [condition for condition in df.condition if condition != "HIV"]
+# healthconditions = [condition for condition in df.condition if condition not in ["HIV",  "HPV", "Flu", "ViralHepatitis"]]
 # healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
 # healthconditions = []
-healthconditions = ['CardiovascularDiseases']
+healthconditions = ['Type2Diabetes']
 diseases = ["HIV"] + healthconditions
 
 ncd_df = df[df["disease_class"] == "ncd"]
@@ -305,7 +305,7 @@ if __name__ == '__main__':
     # # Plot life expectancy comparison
     # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
     # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'CardiovascularDiseases')
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer,'Type2Diabetes')
     # df = death_cause_analyzer.to_df()   
     # df['HIV only'] = df['died_hiv'] & ~df['died_type2diabetes']
     # df['T2D only'] = df['died_type2diabetes'] & ~df['died_hiv']
