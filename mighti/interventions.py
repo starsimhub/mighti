@@ -26,7 +26,6 @@ class ImproveHospitalDischarge(ss.Intervention):
         if not hasattr(self, 'disease') or self.disease is None:
             try:
                 self.disease = self.sim.diseases[self.disease_name]
-                print(f"[{ti}] Reassigned self.disease to {self.disease_name}")
             except KeyError:
                 raise ValueError(f"Disease '{self.disease_name}' not found. Available: {self.sim.diseases.keys()}")
     

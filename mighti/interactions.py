@@ -27,14 +27,7 @@ class NCDHIVConnector(ss.Connector):
     """
 
     def __init__(self, rel_sus_dict, pars=None, **kwargs):
-        """
-        Initialize the NCD-HIV connector.
 
-        Args:
-            rel_sus_dict (dict): Mapping from NCD names to relative susceptibility values.
-            pars (dict, optional): Additional parameters (unused, for compatibility).
-            **kwargs: Additional keyword arguments passed to `update_pars`.
-        """
         super().__init__(label='NCD-HIV')
         self.rel_sus_dict = rel_sus_dict
         self.update_pars(pars, **kwargs)
@@ -45,9 +38,7 @@ class NCDHIVConnector(ss.Connector):
         self.hiv_prev = sc.autolist()
         
     def step(self):
-        """
-        Apply increased susceptibility to NCDs for HIV-infected agents and record values for plotting.
-        """
+
         hiv = self.sim.diseases.hiv
         
         for ncd, rel_sus_val in self.rel_sus_dict.items():
@@ -63,12 +54,7 @@ class NCDHIVConnector(ss.Connector):
         return
     
     def plot(self):
-        """
-        Plot time-series of NCD susceptibility, NCD prevalence, and HIV prevalence.
 
-        Returns:
-            matplotlib.figure.Figure: The figure object containing the plot.
-        """
         sc.options(dpi=200)
         fig, ax = plt.subplots(len(self.rel_sus_dict), 1, figsize=(10, 8))
         

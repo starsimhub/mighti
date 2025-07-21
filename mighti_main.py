@@ -82,11 +82,9 @@ ex_path = f'mighti/data/{region}_ex.csv'
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
-# healthconditions = [condition for condition in df.condition if condition != "HIV"]
+healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV",  "HPV", "Flu", "ViralHepatitis"]]
-# healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
-# healthconditions = []
-healthconditions = ['Type2Diabetes']
+# healthconditions = ['Type2Diabetes']
 diseases = ["HIV"] + healthconditions
 
 ncd_df = df[df["disease_class"] == "ncd"]
@@ -113,13 +111,13 @@ prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, dis
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
-# death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
-#     conditions=['hiv', 'type2diabetes'],
-#     condition_attr_map={
-#         'hiv': 'infected',
-#         'type2diabetes': 'affected'  
-#     }
-# )
+death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
+    conditions=['hiv', 'type2diabetes'],
+    condition_attr_map={
+        'hiv': 'infected',
+        'type2diabetes': 'affected'  
+    }
+)
 
 # ---------------------------------------------------------------------
 # Demographics and Networks
@@ -140,7 +138,7 @@ networks = [maternal, structuredsexual]
 # SDoH
 # -------------------------
 
-housing_module = mi.HousingSituation(prob=1)  # You can adjust this probability as needed
+housing_module = mi.HousingSituation(prob=1)  
 connectors = [housing_module]
 
 
@@ -178,6 +176,7 @@ ncd_interactions = mi.read_interactions(csv_path_interactions)
 connectors.extend(mi.create_connectors(ncd_interactions))
 
 interactions.extend(connectors)
+
 
 # -------------------------
 # Adherence
@@ -266,8 +265,7 @@ if __name__ == '__main__':
         stop=endyear,
         people=ppl,
         demographics=[pregnancy, death],
-        # analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
         diseases=disease_objects,
         connectors=interactions,
         # interventions = interventions5,

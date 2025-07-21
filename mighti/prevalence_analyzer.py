@@ -19,15 +19,7 @@ import sciris as sc
 
 
 class PrevalenceAnalyzer(ss.Analyzer):
-    """
-    Analyzer for computing and storing prevalence of multiple diseases by age, sex, and HIV status.
-    
-    Attributes:
-        prevalence_data (dict): Optional data reference (e.g., for plotting).
-        diseases (list): List of disease names to track (must match keys in `sim.diseases`).
-        age_bins (list of tuple): Age group intervals used for stratification.
-        results_defined (bool): Tracks whether results have been initialized.
-    """
+
     @staticmethod
     def cond_prob(numerator, denominator):
         numer = len((denominator & numerator).uids)
@@ -107,7 +99,7 @@ class PrevalenceAnalyzer(ss.Analyzer):
 
         for disease in self.diseases:
             dis = getattr(sim.diseases, disease.lower())
-            status_attr = 'infected' if disease in ['HIV', 'HPV', 'Flu'] else 'affected'
+            status_attr = 'infected' if disease in ['HIV', 'HPV', 'Flu', 'ViralHepatitis', 'TB'] else 'affected'
             has_disease = denom & getattr(dis, status_attr)
 
             has_disease_f = has_disease & ppl.female  # Women with disease

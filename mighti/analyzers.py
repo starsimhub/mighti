@@ -58,8 +58,8 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
         self.conditions = [c.lower() for c in (conditions or [])]
         self.condition_attr_map = condition_attr_map or {}
         self.records = []
-        self.condition_snapshots = {}  # (uid, condition) → True/False
-
+        self.condition_snapshots = {} 
+        
     def init_results(self):
         super().init_results()
         self.records = []
@@ -69,9 +69,6 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
         ppl = self.sim.people
         ti = self.sim.ti
         year = self.sim.t.yearvec[ti]
-
-        # print(f"\n[ConditionAtDeathAnalyzer] Step {ti}, Year {year}")
-        # print(f"Number of deaths this step: {len(ppl.dead.uids)}")
         
         for uid in ppl.dead.uids:
             record = {
@@ -82,17 +79,6 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
             }
         
         for cond in self.conditions:
-            # ti_dead_val = ppl[cond].ti_dead[uid]
-        
-            # if not np.isnan(ti_dead_val):
-            #     ti_dead_idx = int(ti_dead_val)
-            #     if ti_dead_idx < len(self.sim.diseases[cond].t.abstvec):
-            #         condition_ti = self.sim.diseases[cond].t.abstvec[ti_dead_idx]
-            #         died_of_cond = (condition_ti > ti - 1) and (condition_ti <= ti)
-            #     else:
-            #         died_of_cond = False  # dead, but beyond current abstvec — skip tagging
-            # else:
-            #     died_of_cond = False
             ti_dead = ppl[cond].ti_dead[uid]
             if not np.isnan(ti_dead):
                 condition_ti = self.sim.diseases[cond].t.abstvec[int(ti_dead)]
@@ -102,12 +88,9 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
                 died_of_cond = False
         
             record[f'died_{cond}'] = died_of_cond
-        
-                # print(f"UID {uid}: condition={cond}, ti_dead={ppl[cond].ti_dead[uid]}, condition_ti={condition_ti if not np.isnan(ppl[cond].ti_dead[uid]) else 'nan'}, died_{cond}={died_of_cond}")
-        
+                
             self.records.append(record)
             
     def to_df(self):
         return pd.DataFrame(self.records)
-    
     

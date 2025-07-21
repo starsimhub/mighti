@@ -13,6 +13,6 @@ class AlcoholUseDisorder(RemittingDisease):
         
         self.define_pars(label = 'AlcoholUseDisorder')
         if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire = 0.001
+            self.pars.p_acquire = 1
         return
 

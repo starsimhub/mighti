@@ -133,7 +133,6 @@ class RemittingDisease(ss.NCD):
             self.reversed[going_into_remission] = True
             self.ti_reversed[going_into_remission] = self.ti
 
-            # Handle recovery, beta-cell function exhaustion
             recovered = (self.reversed & (self.ti_reversed <= self.ti)).uids
             self.reversed[recovered] = False
             self.susceptible[recovered] = True  
@@ -145,13 +144,11 @@ class RemittingDisease(ss.NCD):
         susceptible = (~self.affected).uids
         p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
 
-        # Apply sex filtering
         if self.pars.affected_sex == "female":
             p_acq[self.sim.people.male[susceptible]] = 0
         elif self.pars.affected_sex == "male":
             p_acq[self.sim.people.female[susceptible]] = 0
 
-        # Apply rel_sus and rel_sus_hiv
         try:
             p_acq *= self.rel_sus[susceptible]
             if hasattr(self.sim.people, 'hiv'):
@@ -463,7 +460,7 @@ class GenericSIS(ss.SIS):
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
-            init_prev=None
+            init_prev=pars.get("init_prev", ss.bernoulli(0)) if pars else ss.bernoulli(0)
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -599,4 +596,5 @@ def calculate_p_acquire_generic(disease, sim, uids):
     try:
         return p_base * disease.rel_sus[uids]
     except Exception:
-        return p_base           
+        return p_base       
+    

@@ -10,8 +10,8 @@ class Hypertension(ChronicDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
         self.disease_name = 'Hypertension'
         super().__init__(csv_path, pars, **kwargs)
-        self.define_pars(
-            label = 'Hypertension'
-        )
+        self.define_pars(label = 'Hypertension')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire = 1
         return
 
