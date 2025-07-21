@@ -82,11 +82,8 @@ ex_path = f'mighti/data/{region}_ex.csv'
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
+healthconditions =['HPV']
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
-# healthconditions = [condition for condition in df.condition if condition not in ["HIV",  "HPV", "Flu", "ViralHepatitis"]]
-# healthconditions = ['Type2Diabetes', 'ChronicKidneyDisease', 'CervicalCancer', 'ProstateCancer', 'RoadInjuries', 'DomesticViolence']
-# healthconditions = []
-healthconditions = ['Type2Diabetes']
 diseases = ["HIV"] + healthconditions
 
 ncd_df = df[df["disease_class"] == "ncd"]
@@ -108,18 +105,26 @@ def get_prevalence_function(disease):
     return lambda module, sim, size: mi.age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size)
 
 
-# Initialize the PrevalenceAnalyzer
 prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
-# death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
-#     conditions=['hiv', 'type2diabetes'],
-#     condition_attr_map={
-#         'hiv': 'infected',
-#         'type2diabetes': 'affected'  
-#     }
-# )
+class_to_attr = {'ncd': 'affected','sis': 'infected'}
+condition_attr_map = {}
+for condition in healthconditions:
+    row = df[df['condition'].str.lower() == condition.lower()]
+    if not row.empty:
+        disease_class = row.iloc[0]['disease_class'].lower()
+        condition_attr_map[condition] = class_to_attr.get(disease_class, 'affected')  # fallback: 'affected'
+    else:
+        print(f"⚠️ Warning: Disease '{condition}' not found in parameters CSV. Defaulting to 'affected'.")
+        condition_attr_map[condition] = 'affected'
+
+# Now initialize the analyzer
+death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
+    conditions=healthconditions,
+    condition_attr_map=condition_attr_map
+)
 
 # ---------------------------------------------------------------------
 # Demographics and Networks
@@ -205,12 +210,13 @@ test_years = [2003, 2005, 2007, 2010, 2014, 2016]
 intervention_df = pd.read_csv(csv_path_intervention)
 unified_product = ss.Tx(df=intervention_df, label='UnifiedTx')
 
-
+#HIV related interventions
 hiv_test = sti.HIVTest(test_prob_data=test_prob_data, years=test_years)
 art = sti.ART(coverage_data=art_coverage_data)
 vmmc = sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}})
 prep = sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]})
 
+# Other interventions
 t2d_tx = mi.T2D_ReduceMortalityTx(product=unified_product, prob=1.0,rel_death_reduction=0.54,
                                   eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
                                   label='T2D_ReduceMortalityTx')
@@ -221,6 +227,7 @@ hospital_discharge = mi.ImproveHospitalDischarge(disease_name='depression', mult
                                                  start_day=0,end_day=10,label='FastDischarge')
 
 give_housing = mi.GiveHousingToDepressed(coverage=1, start_day=0)
+
 
 # Define interventions using these data
 interventions1 = [hiv_test, art, vmmc, prep]
@@ -255,6 +262,7 @@ print("Intervention types and labels:")
 for i in interventions6:
     print(f"  - {type(i)} — {getattr(i, 'label', i)}")
     
+    
 # ---------------------------------------------------------------------
 # Main Simulation
 # ---------------------------------------------------------------------
@@ -266,8 +274,8 @@ if __name__ == '__main__':
         stop=endyear,
         people=ppl,
         demographics=[pregnancy, death],
-        # analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+        # analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
         diseases=disease_objects,
         connectors=interactions,
         # interventions = interventions5,
@@ -304,7 +312,7 @@ if __name__ == '__main__':
     
     # # Plot life expectancy comparison
     # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
+    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
     mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer,'Type2Diabetes')
     # df = death_cause_analyzer.to_df()   
     # df['HIV only'] = df['died_hiv'] & ~df['died_type2diabetes']

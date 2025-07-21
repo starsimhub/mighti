@@ -15,7 +15,7 @@ class Type2Diabetes(RemittingDisease):
 
         self.define_pars(label='Type2Diabetes')  
         if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire = 0.0029471097772140243  
+            self.pars.p_acquire = 0.018
         return
 
    
@@ -23,7 +23,7 @@ class T2D_ReduceMortalityTx(treat_num):
     def __init__(self, *args, product=None, prob=1.0, rel_death_reduction=0.5, eligibility=None, **kwargs):
         super().__init__(*args, product=product, prob=prob, eligibility=eligibility, **kwargs)
         self.rel_death_reduction = rel_death_reduction
-        self.disease = 'type2diabetes'  # fixed for T2D
+        self.disease = 'type2diabetes'  
 
     def initialize(self, sim):
         super().initialize(sim)
@@ -42,6 +42,5 @@ class T2D_ReduceMortalityTx(treat_num):
             successful = self.outcomes['successful']
             if len(successful):
                 self.sim.diseases[self.disease].rel_death[ss.uids(successful)] *= self.rel_death_reduction
-                print(f"[{self.label}] Successfully treated {len(successful)} T2D agents at step {self.ti}")
         return treat_inds
     
