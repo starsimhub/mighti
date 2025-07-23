@@ -15,7 +15,7 @@ class Type2Diabetes(RemittingDisease):
 
         self.define_pars(label='Type2Diabetes')  
         if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire = 0.0029471097772140243  
+            self.pars.p_acquire = 0.018473489286541737
         return
 
    

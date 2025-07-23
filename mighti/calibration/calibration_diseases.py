@@ -16,12 +16,12 @@ import stisim as sti
 
 
 # Set the name of the disease to calibrate
-from mighti.calibration.diseases_for_calibration import Type2Diabetes as DiseaseClass  
-disease_name = 'Type2Diabetes'  
+from mighti.calibration.diseases_for_calibration import CardiovascularDiseases as DiseaseClass  
+disease_name = 'CardiovascularDiseases'  
 
 # Set the starting year for calibration
 init_year = 2007                
-total_trials = 3   # Use a small number for testing; increase to 100+ for full calibration
+total_trials = 100   # Use a small number for testing; increase to 100+ for full calibration
 
 path_prevalence = '../data/eswatini_prevalence.csv'
 path_parameters = '../data/eswatini_parameters_new.csv'
@@ -30,21 +30,21 @@ path_parameters = '../data/eswatini_parameters_new.csv'
 def make_sim():
     # Best pars: {'hiv_beta_m2f': 0.011023883426646121, 'hiv_beta_m2c': 0.044227226248848076} seed: 12345
     hiv = sti.HIV(beta_m2f=0.011023883426646121, beta_m2c=0.044227226248848076, init_prev=0.15)
-    
+
     # Dynamically select disease constructor
     health_condition_cls = DiseaseClass
 
     prev_data = pd.read_csv(path_prevalence)
     prev_data, age_bins = mi.initialize_prevalence_data([disease_name], prev_data, init_year)  # 2007 = init_year
-    
+
     def get_prev_fn(disease):
         return lambda mod, sim, size: mi.age_sex_dependent_prevalence(disease, prev_data, age_bins, sim, size)
-    
+
     health_condition = health_condition_cls(
         pars={'init_prev': ss.bernoulli(get_prev_fn(disease_name))},
         csv_path=path_parameters
     )
-    
+
     fertility_rate = {'fertility_rate': pd.read_csv('../data/eswatini_asfr.csv')}
     pregnancy = ss.Pregnancy(pars=fertility_rate)
     death_rates = {'death_rate': pd.read_csv('../data/eswatini_mortality_rates.csv'), 'rate_units': 1}
@@ -79,7 +79,7 @@ def build_sim(sim, calib_pars):
         if k == 'rand_seed':
             sim.pars.rand_seed = pars
             continue
-        
+
         v = pars['value']
         if 'hc_' in k: 
             k = k.replace('hc_', '')
@@ -88,30 +88,6 @@ def build_sim(sim, calib_pars):
             raise NotImplementedError(f'Parameter {k} not recognized in build_sim()')
 
     return sim
-
-
-def make_eval_fn(data):
-    def eval_fn(sim, sim_result_list=None, weights=None, df_res_list=None):
-        if isinstance(sim, ss.MultiSim):
-            sim = sim.sims[0]
-
-        fit = 0
-        prev_analyzer = sim.analyzers.prevalence_analyzer
-        prev_results = sim.results.prevalence_analyzer
-
-        for index, (age_low, age_high) in enumerate(prev_analyzer.age_bins):
-            obs = data[data['Age'] == age_low][['Year', 'Age', f'{disease_name}_female', f'{disease_name}_male']]
-            sim_df = pd.DataFrame({
-                'Year': prev_analyzer.timevec,
-                'Age': age_low,
-                'sim_female': prev_results[f'{disease_name}_prev_female_{index}'],
-                'sim_male': prev_results[f'{disease_name}_prev_male_{index}']
-            })
-            merged = pd.merge(obs, sim_df, on=['Year', 'Age'], how='inner')
-            merged['error'] = abs(merged['sim_female'] - merged[f'{disease_name}_female']) + abs(merged['sim_male'] - merged[f'{disease_name}_male'])
-            fit += merged['error'].sum()
-        return fit
-    return eval_fn
 
 
 def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None):
@@ -143,20 +119,12 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
     sim = make_sim()
     data = pd.read_csv(path_prevalence)
 
-    eval_fn = make_eval_fn(data) 
-
     calib = ss.Calibration(
         sim=sim,
         calib_pars=calib_pars,
         build_fn=build_sim,
         eval_fn=eval_fn,
-        
-    # calib = ss.Calibration(
-    #     sim=sim,
-    #     calib_pars=calib_pars,
-    #     build_fn=build_sim,
-    #     eval_fn=eval_fn,
-    #     eval_kw={'data': data},
+        eval_kw={'data': data},
         total_trials=total_trials,
         n_workers=1,
         keep_db=keep_db,
@@ -170,7 +138,7 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
     # Best-fit summary
     best_val = calib.best_pars['hc_p_acquire_multiplier']
     print(f'\nBest-fit p_acquire for {disease_name} = {best_val:.3f}\n')
-    
+
     return calib
 
 
@@ -196,5 +164,4 @@ if __name__ == '__main__':
         for k, v in calib.best_pars.items():
             f.write(f'{k}: {v}\n')
     
-        f.write(f'\nCalibration successful: {"✓" if calib.fit_improved else "✗"}\n')
     

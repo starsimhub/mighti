@@ -1,3 +1,21 @@
+"""
+MIGHTI Life Expectancy Over Time Simulation Script for Eswatini
+
+This script uses the MIGHTI framework to simulate and compare the evolution of
+life expectancy over time across multiple health intervention scenarios.
+
+Here, we loop over years to generate a time series of life expectancy estimates
+under different conditions.
+
+Key features:
+- Computes life expectancy (ex) annually by sex and scenario.
+- Supports intervention comparison: No intervention, HIV only, T2D only, and combined HIV + T2D.
+- Integrates demographic modules (age structure, mortality, fertility).
+- Includes HIV and Type 2 Diabetes disease modules and interactions.
+- Applies time-varying interventions (ART, HIV testing, VMMC, PrEP, and T2D treatment).
+- Uses MIGHTI’s life table utilities to compute sex-specific and combined e₀ values.
+"""
+
 import logging
 import mighti as mi
 import numpy as np
@@ -325,6 +343,5 @@ le_df = pd.DataFrame(life_expectancy_by_year)
 pivot_df = le_df.pivot_table(index='year', columns=['scenario', 'sex'], values='e0').reset_index()
 
 # Display result
-print(pivot_df)
 pivot_df.to_csv("result_hivtest.csv", index=False)
  
