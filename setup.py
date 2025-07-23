@@ -38,6 +38,7 @@ setup(
     install_requires=[
         'numpy',
         'starsim>=2.0',
+        'stisim>=1.0.1',
         'scipy',
         'pandas>=2.0.0',
         'sciris>=3.0.0',

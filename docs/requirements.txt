@@ -1,0 +1,8 @@
+starsim
+stisim
+pandas
+matplotlib
+pytest
+sphinx
+sphinx_rtd_theme
+numpydoc

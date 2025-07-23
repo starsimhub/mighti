@@ -1,12 +1,12 @@
-has_condition,Type1Diabetes,Type2Diabetes,Hypertension,Obesity,Depression,RoadInjuries,AlzheimersDisease,DomesticViolence,CardiovascularDiseases,ChronicLiverDisease,Asthma,ChronicKidneyDisease,Flu,HPV,CervicalCancer,ColorectalCancer,BreastCancer,LungCancer,ProstateCancer,ParkinsonsDisease,TobaccoUse,AlcoholUseDisorder,ViralHepatitis
+has_condition,Type1Diabetes,Type2Diabetes,Hypertension,Obesity,MajorDepressiveDisorder,RoadInjuries,AlzheimersDisease,InterpersonalViolence,CardiovascularDiseases,ChronicLiverDisease,Asthma,ChronicKidneyDisease,Flu,HPV,CervicalCancer,ColorectalCancer,BreastCancer,LungCancer,ProstateCancer,ParkinsonsDisease,TobaccoUse,AlcoholUseDisorder,ViralHepatitis
 Type1Diabetes,,1,3.3,,,1,1,,2.47,1,1,,1,,1,1.3,1.2,1.11,1,,,,
 Type2Diabetes,1,,3.3,,,1,1,,2.47,1,1,,1,,1,1.3,1.2,1.11,1,,,,
 Hypertension,,,,,,1,1,,1.44,1,1,,1,,1,1,1,1,1,,,,
 Obesity,1,7.37,1.87,,,1,1.54,,1.23,1.74,1,,1,,1,1.38,1.25,1,1,,,,
-Depression,1,1.37,1.42,,,19.5,1,,1,1,1,,,,1,1,1,1,1,,,,
+MajorDepressiveDisorder,1,1.37,1.42,,,19.5,1,,1,1,1,,,,1,1,1,1,1,,,,
 RoadInjuries,,,,,,,,,,,,,,,,,,,,,,,
 AlzheimersDisease,,,,,,,,,,,,,,,,,,,,,,,
-DomesticViolence,,,,,,,,,,,,,,,,,,,,,,,
+InterpersonalViolence,,,,,,,,,,,,,,,,,,,,,,,
 CardiovascularDiseases,,,,,,,,,,,,,,,,,,,,,,,
 ChronicLiverDisease,,,,,,,,,,,,,,,,,,,,,,,
 Asthma,,,,,,,,,,,,,,,,,,,,,,,

@@ -1,41 +1,108 @@
-import pandas as pd
+"""
+Data preparation utility for extracting year-specific mortality rates and age distributions
+for use in life table and simulation analyses.
+"""
+
+
+import logging
 import os
+import pandas as pd
 
-def prepare_data_for_year(year):
-    # Define file paths
-    csv_path_death = f'mighti/data/eswatini_mortality_rates_{year}.csv'
-    csv_path_age = f'mighti/data/eswatini_age_distribution_{year}.csv'
+
+logger = logging.getLogger(__name__)
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+
+def prepare_data_for_year(region, year):
+    """
+    Prepare year-specific mortality rates and age distribution files from wide-format input.
+
+    Args:
+        region (str): Region or country identifier (used in file naming).
+        year (int): Year to extract data for.
+
+    Outputs:
+        - {region}_mortality_rates_{year}.csv
+        - {region}_age_distribution_{year}.csv
+        (Both saved in mighti/data/)
+    """
+    # ------------------------------------------------------------------
+    # Extract mortality rates
+    # ------------------------------------------------------------------
+    input_mx_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_mx.csv')
+    output_mx_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_mortality_rates_{year}.csv')
+
+    df_mx = pd.read_csv(input_mx_path)
+    df_mx = df_mx.melt(id_vars=['Age', 'Sex'], var_name='Time', value_name='mx')
+    df_mx['Time'] = pd.to_numeric(df_mx['Time'], errors='coerce')
+    df_mx['mx'] = pd.to_numeric(df_mx['mx'], errors='coerce')
+    df_mx_year = df_mx[df_mx['Time'] == year].dropna(subset=['mx'])
+
+    df_mx_year = df_mx_year.rename(columns={'Age': 'AgeGrpStart'})
+    # df_mx_year.to_csv(output_mx_path, index=False)
+    logger.info(f"Mortality rates for {year} saved to '{output_mx_path}'")
+
+    # ------------------------------------------------------------------
+    # Extract age distribution
+    # ------------------------------------------------------------------
+    input_age_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_age_distribution.csv')
+    output_age_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_age_distribution_{year}.csv')
+
+    df_age = pd.read_csv(input_age_path)
+    if str(year) not in df_age.columns:
+        raise ValueError(f"Year {year} not found in age distribution file: {input_age_path}")
+
+    df_age_year = df_age[['age', 'sex', str(year)]]
+    df_age_year = df_age_year.groupby('age')[str(year)].sum().reset_index()
+    df_age_year.columns = ['age', 'value']
+    df_age_year.to_csv(output_age_path, index=False)
+    logger.info(f"Age distribution for {year} saved to '{output_age_path}'")
+
+
+def prepare_data(region):
+    """
+    Prepare year-specific mortality rates and age distribution files from wide-format input.
+
+    Args:
+        region (str): Region or country identifier (used in file naming).
+        year (int): Year to extract data for.
+
+    Outputs:
+        - {region}_mortality_rates_{year}.csv
+        - {region}_age_distribution_{year}.csv
+        (Both saved in mighti/data/)
+    """
+    # ------------------------------------------------------------------
+    # Extract mortality rates
+    # ------------------------------------------------------------------
+    input_mx_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_mx.csv')
+    output_mx_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_mortality_rates.csv')
+
+    df_mx = pd.read_csv(input_mx_path)
+    df_mx = df_mx.melt(id_vars=['Age', 'Sex'], var_name='Time', value_name='mx')
+    df_mx['Time'] = pd.to_numeric(df_mx['Time'], errors='coerce')
+    df_mx['mx'] = pd.to_numeric(df_mx['mx'], errors='coerce')
+
+    df_mx_year = df_mx.rename(columns={'Age': 'AgeGrpStart'})
+    df_mx_year.to_csv(output_mx_path, index=False)
+    logger.info(f"Mortality rates saved to '{output_mx_path}'")
     
-    # Check if the files already exist
-    if not os.path.exists(csv_path_death):
-        # Load the mortality rates data
-        mortality_rates = pd.read_csv('demography/eswatini_mortality_rates.csv')
-        
-        # Extract rows for the specified year
-        mortality_rates_year = mortality_rates[mortality_rates['Time'] == year]
-        
-        # Save the extracted data to a new CSV file
-        mortality_rates_year.to_csv(csv_path_death, index=False)
-        print(f"Mortality rates for {year} saved to '{csv_path_death}'")
-    else:
-        print(f"File '{csv_path_death}' already exists.")
+    
+def extract_indicator_for_plot(csv_path, year, value_column_name='mx'):
+    """
+    Convert a wide-format indicator file (e.g., mx or ex) into long-format for a single year.
 
-    if not os.path.exists(csv_path_age):
-        # Load the age distribution data
-        age_distribution = pd.read_csv('demography/eswatini_age_distribution.csv')
-        
-        # Extract rows for the specified year
-        age_distribution_year = age_distribution[['age', 'sex', str(year)]]
-        
-        # Calculate the total population for each age
-        age_distribution_year = age_distribution_year.groupby('age')[str(year)].sum().reset_index()
-        age_distribution_year.columns = ['age', 'value']
-        
-        # Save the extracted data to a new CSV file
-        age_distribution_year.to_csv(csv_path_age, index=False)
-        print(f"Age distribution for {year} saved to '{csv_path_age}'")
-    else:
-        print(f"File '{csv_path_age}' already exists.")
+    Args:
+        csv_path: Path to the wide-format CSV file (e.g., region_mx.csv or region_ex.csv)
+        year: Target year to extract
+        value_column_name: Name to assign to the melted value column (e.g., 'mx', 'ex')
 
-if __name__ == "__main__":
-    year = 2007
+    Returns:
+        DataFrame with columns: ['Age', 'Sex', 'Time', value_column_name]
+    """
+    df = pd.read_csv(csv_path)
+    df = df.melt(id_vars=['Age', 'Sex'], var_name='Time', value_name=value_column_name)
+    df['Time'] = pd.to_numeric(df['Time'], errors='coerce')
+    df[value_column_name] = pd.to_numeric(df[value_column_name], errors='coerce')
+    df = df[df['Time'] == year].dropna(subset=[value_column_name])
+    return df    

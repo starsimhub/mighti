@@ -1,21 +1,30 @@
+"""
+Calibrate betas for HIV
+"""
+
+
+import optuna
+import mighti as mi
+import pandas as pd
 import sciris as sc
 import starsim as ss
 import stisim as sti
-import mighti as mi
-import pandas as pd
 
 
 def make_sim():
-    fertility_rates = pd.read_csv('mighti/data/eswatini_asfr.csv')
-    death_rates = pd.read_csv('mighti/data/eswatini_mortality_rates_2007.csv') # TODO update to use yearly mortality rate data if desired
+    # fertility_rates = pd.read_csv('mighti/data/eswatini_asfr.csv')
+    # death_rates = pd.read_csv('mighti/data/eswatini_mortality_rates_2007.csv') # TODO update to use yearly mortality rate data if desired
 
     hiv = sti.HIV(beta_m2f=0.05, beta_m2c=0.025, init_prev=0.15)
-    pregnancy = ss.Pregnancy(fertility_rate=fertility_rates)
-    death = ss.Deaths(death_rate=death_rates, rate_units=1)  # Assuming death_rate is a yearly rate
+    fertility_rate = {'fertility_rate': pd.read_csv('mighti/data/eswatini_asfr.csv')}
+    pregnancy = ss.Pregnancy(pars=fertility_rate)
+    death_rates = {'death_rate': pd.read_csv('mighti/data/eswatini_mortality_rates.csv'), 'rate_units': 1}
+    death = ss.Deaths(death_rates)  # Assuming death_rate is a yearly rate
+
     sexual = sti.StructuredSexual()
     maternal = ss.MaternalNet()
 
-    prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=pd.read_csv('mighti/data/prevalence_data_eswatini.csv'), diseases=['HIV'])
+    prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=pd.read_csv('mighti/data/eswatini_prevalence.csv'), diseases=['HIV'])
 
     sim = ss.Sim(
         dt=1,
@@ -70,30 +79,75 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
         keep_db (bool): Whether to keep the database after calibration. If kept it can be used to continue a calibration with more trials
     """
     sim = make_sim()
+
     #
     # if calib_pars is not None:
     #     sim = build_sim(sim, calib_pars)
 
-    data = pd.read_csv('mighti/data/prevalence_data_eswatini.csv')
+    # data = pd.read_csv('mighti/data/eswatini_prevalence.csv')
 
+    # calib = ss.Calibration(
+    #     sim=sim,
+    #     calib_pars=calib_pars,
+    #     build_fn=build_sim,
+    #     eval_fn=eval_fn,
+    #     eval_kw={'data': data},
+    #     total_trials=total_trials,
+    #     n_workers=1,
+    #     keep_db=keep_db,
+    #     die=True,
+    #     reseed=False,
+    #     sampler=optuna.samplers.TPESampler(seed=12345) 
+    # )
+    
+    data = pd.read_csv('mighti/data/eswatini_prevalence.csv')
+    eval_fn = make_eval_fn(data)
+    
     calib = ss.Calibration(
         sim=sim,
         calib_pars=calib_pars,
         build_fn=build_sim,
-        eval_fn=eval_fn,
-        eval_kw={'data': data},
+        eval_fn=eval_fn,  
         total_trials=total_trials,
         n_workers=1,
         keep_db=keep_db,
         die=True,
+        reseed=False,
+        sampler=optuna.samplers.TPESampler(seed=12345) 
     )
 
     calib.calibrate()
     calib.check_fit()
 
-    # Return the results for further analysis
+    # Return the results for further analysisz
     return calib
 
+
+### Added on Jul 17 to resolve eval_kw issue
+def make_eval_fn(data):
+    def eval_fn(sim, sim_result_list=None, weights=None, df_res_list=None):
+        if isinstance(sim, ss.MultiSim):
+            sim = sim.sims[0]
+
+        fit = 0
+        prev_analyzer = sim.analyzers.prevalence_analyzer
+        prev_results = sim.results.prevalence_analyzer
+
+        for index, (age_low, age_high) in enumerate(prev_analyzer.age_bins):
+            prev_observed_data = data[data['Age'] == age_low][['Year', 'Age', 'HIV_female', 'HIV_male']]
+            prev_sim_data = pd.DataFrame({
+                'Year': prev_analyzer.timevec,
+                'Age': age_low,
+                'sim_HIV_female': prev_results[f'HIV_prev_female_{index}'],
+                'sim_HIV_male': prev_results[f'HIV_prev_male_{index}']
+            })
+            merged = pd.merge(prev_observed_data, prev_sim_data, on=['Year', 'Age'], how='inner')
+            merged['error'] = abs(merged['sim_HIV_female'] - merged['HIV_female']) + abs(merged['sim_HIV_male'] - merged['HIV_male'])
+
+            fit += merged['error'].sum()
+
+        return fit
+    return eval_fn
 
 
 def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None):
@@ -110,8 +164,10 @@ def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None
     # HIV prevalence
     for index, (age_low, age_high) in enumerate(sim.analyzers.prevalence_analyzer.age_bins):
         prev_observed_data = data[data['Age'] == age_low][['Year', 'Age', 'HIV_female', 'HIV_male']]
-        prev_sim_data = pd.DataFrame({'Year': prev_analyzer.timevec, 'Age': age_low, 'sim_HIV_female': prev_results[f'HIV_prev_female_{index}'],
-                                 'sim_HIV_male': prev_results[f'HIV_prev_male_{index}']})
+        prev_sim_data = pd.DataFrame({'Year': prev_analyzer.timevec, 
+                                      'Age': age_low, 
+                                      'sim_HIV_female': prev_results[f'HIV_prev_female_{index}'],
+                                      'sim_HIV_male': prev_results[f'HIV_prev_male_{index}']})
         merged = pd.merge(prev_observed_data, prev_sim_data, on=['Year', 'Age'], how='inner')
         merged['error'] = abs(merged['sim_HIV_female'] - merged['HIV_female']) + abs(merged['sim_HIV_male'] - merged['HIV_male'])
 
@@ -132,7 +188,8 @@ if __name__ == '__main__':
         hiv_beta_m2c = dict(low=0.001, high=0.1, guess=0.025), # Network females in risk group 1 concurrent partners
     )
 
-    calib = run_calib(calib_pars=calib_pars, total_trials=10, keep_db=False)
+    calib = run_calib(calib_pars=calib_pars, total_trials=3, keep_db=False)
 
     sc.toc(T)
     print('Done.')
+    
