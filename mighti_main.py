@@ -35,7 +35,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 # Simulation Settings
 # ---------------------------------------------------------------------
-n_agents = 100_000 
+n_agents = 10_000 
 inityear = 2007
 endyear = 2010
 region = 'eswatini'
@@ -127,19 +127,20 @@ death.death_rate_data *= 0.4 # 0.4 for only T2D
 fertility_rate = {'fertility_rate': pd.read_csv(csv_path_fertility)}
 pregnancy = ss.Pregnancy(pars=fertility_rate)
 
-ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age))
+# SDoH states
+extra_sdoh_states = [
+    ss.BoolArr('neighbourhood_situation'),
+    ss.BoolArr('social_context'),
+    ss.BoolArr('education_situation'),
+    ss.BoolArr('economic_situation'),
+    ss.BoolArr('healthcare_system'),
+]
+
+ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age), extra_states=extra_sdoh_states)
 
 maternal = ss.MaternalNet()
 structuredsexual = sti.StructuredSexual()
 networks = [maternal, structuredsexual]
-
-
-# -------------------------
-# SDoH
-# -------------------------
-
-housing_module = mi.HousingSituation(prob=1)  
-connectors = [housing_module]
 
 
 # ---------------------------------------------------------------------
@@ -170,23 +171,21 @@ disease_objects.append(hiv_disease)
 # ---------------------------------------------------------------------
 ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
 ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
-interactions = [ncd_hiv_connector]
+connectors = [ncd_hiv_connector]
 
 ncd_interactions = mi.read_interactions(csv_path_interactions) 
 connectors.extend(mi.create_connectors(ncd_interactions))
-
-interactions.extend(connectors)
 
 
 # -------------------------
 # Adherence
 # -------------------------
 
-adherence_connectors = [
-    mi.create_adherence_connector('T2D_Tx'),
-    mi.create_adherence_connector('ART'),
-]
-interactions.extend(adherence_connectors)
+# adherence_connectors = [
+#     mi.create_adherence_connector('T2D_Tx'),
+#     mi.create_adherence_connector('ART'),
+# ]
+# interactions.extend(adherence_connectors)
 
 
 # ---------------------------------------------------------------------
@@ -264,7 +263,7 @@ if __name__ == '__main__':
         demographics=[pregnancy, death],
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
         diseases=disease_objects,
-        connectors=interactions,
+        connectors=connectors,
         interventions = interventions2,
         copy_inputs=False,
         label='With Interventions'
@@ -274,30 +273,30 @@ if __name__ == '__main__':
     sim.run()
 
     
-    # Mortality rates and life table
-    target_year = endyear - 1
+    # # Mortality rates and life table
+    # target_year = endyear - 1
     
-    obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
-    obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
+    # obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
+    # obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
     
-    # Get the modules
-    deaths_module = get_deaths_module(sim)
-    pregnancy_module = get_pregnancy_module(sim)
+    # # Get the modules
+    # deaths_module = get_deaths_module(sim)
+    # pregnancy_module = get_pregnancy_module(sim)
     
-    df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
+    # df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
 
-    df_mx_male = df_mx[df_mx['sex'] == 'Male']
-    df_mx_female = df_mx[df_mx['sex'] == 'Female']
+    # df_mx_male = df_mx[df_mx['sex'] == 'Male']
+    # df_mx_female = df_mx[df_mx['sex'] == 'Female']
     
     
-    life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
+    # life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
     
-    mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
+    # mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
     
-    # Plot life expectancy comparison
-    mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer,'Type2Diabetes')
+    # # Plot life expectancy comparison
+    # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer,'Type2Diabetes')
        
     # ### To run 2 simulation simultaneously #####
     # sim_without = ss.Sim(
