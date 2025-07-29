@@ -2,64 +2,55 @@
 Defines social determinants of health modules for housing, transportation, education, and income
 """
 
-
 import starsim as ss
 import numpy as np
 
+__all__ = ['NeighbourhoodSituation', 'SocialContext', 'EducationSituation', 'EconomicSituation', 'HealthCareSystem']
 
-__all__ = ["HousingSituation", "TransportationSituation", "EducationSituation", "IncomeSituation"]
+class NeighbourhoodSituation(ss.Module):
+    def __init__(self):
+        super().__init__(name='neighbourhood_situation')
 
-
-class HousingSituation(ss.Module):
-    """Models unstable housing as a binary state influenced by employment."""
-
-    def __init__(self, prob=0.3):
-        super().__init__()
-        self.name = 'housing_situation'
-        self.prob = prob
-        self.housing_unstable = ss.State(name='housing_unstable', label='Unstable Housing')
-
-    def step(self):
+    def on_birth(self, mother_uids, child_uids):
         ppl = self.sim.people
-        if hasattr(ppl, 'employed'):
-            employed = ppl.employed
-            at_risk = self.housing_unstable & employed
-            to_stabilize = at_risk[np.random.rand(len(at_risk)) < 0.3]
-            self.housing_unstable[to_stabilize] = False
+        # Inherit status from mother
+        ppl.neighbourhood_situation[child_uids] = ppl.neighbourhood_situation[mother_uids]
+
+    # def init_pre(self, sim):
+    #     self.sim = sim
+        # ppl = sim.people
+        # Set all agents to True = good neighborhood situation, randomly for now
+        # good = ss.bernoulli(0.7)  # 70% "good" neighborhood
+        # ppl.neighbourhood_situation[:] = good
+
+    def update(self):
+        # If neighborhood conditions can evolve over time, define logic here
+        pass
+
+
+        
             
 
-class TransportationSituation(ss.Connector):
-    """Placeholder module for modeling access to transportation."""
+class SocialContext(ss.Connector):
+    """Placeholder module for modeling access to SocialContext."""
     
-    def __init__(self):
-        super().__init__()
-        self.name = 'transportation_situation'
-        # Add states like self.transportation_access here
-
-    def step(self):
-        pass
+pass
 
 
 class EducationSituation(ss.Connector):
     """Placeholder module for modeling educational attainment."""
     
-    def __init__(self):
-        super().__init__()
-        self.name = 'education_situation'
-        # Define self.low_education = ss.State(...) if needed
-
-    def step(self):
-        pass
+pass
 
 
-class IncomeSituation(ss.Connector):
+class EconomicSituation(ss.Connector):
     """Placeholder module for modeling income level or poverty status."""
     
-    def __init__(self):
-        super().__init__()
-        self.name = 'income_situation'
-        # Define self.low_income = ss.State(...) if needed
-
-    def step(self):
-        pass
+pass
     
+    
+class HealthCareSystem(ss.Connector):
+    """Placeholder module for modeling healthcare system."""
+    
+pass
+        
