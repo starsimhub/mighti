@@ -21,10 +21,10 @@ disease_name = 'CardiovascularDiseases'
 
 # Set the starting year for calibration
 init_year = 2007                
-total_trials = 100   # Use a small number for testing; increase to 100+ for full calibration
+total_trials = 3   # Use a small number for testing; increase to 100+ for full calibration
 
 path_prevalence = '../data/eswatini_prevalence.csv'
-path_parameters = '../data/eswatini_parameters_new.csv'
+path_parameters = '../data/eswatini_parameters.csv'
 
 
 def make_sim():

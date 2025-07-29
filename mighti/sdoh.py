@@ -16,15 +16,7 @@ class NeighbourhoodSituation(ss.Module):
         # Inherit status from mother
         ppl.neighbourhood_situation[child_uids] = ppl.neighbourhood_situation[mother_uids]
 
-    # def init_pre(self, sim):
-    #     self.sim = sim
-        # ppl = sim.people
-        # Set all agents to True = good neighborhood situation, randomly for now
-        # good = ss.bernoulli(0.7)  # 70% "good" neighborhood
-        # ppl.neighbourhood_situation[:] = good
-
-    def update(self):
-        # If neighborhood conditions can evolve over time, define logic here
+    def step(self):
         pass
 
 

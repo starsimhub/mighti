@@ -144,18 +144,6 @@ networks = [maternal, structuredsexual]
 
 
 # ---------------------------------------------------------------------
-# SDoH
-# ---------------------------------------------------------------------
-
-sdoh_modules = [
-    mi.NeighbourhoodSituation(),
-    mi.SocialContext(),
-    mi.EducationSituation(),
-    mi.EconomicSituation(),
-    mi.HealthCareSystem()
-]
-
-# ---------------------------------------------------------------------
 # Diseases
 # ---------------------------------------------------------------------
 hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
@@ -272,7 +260,7 @@ if __name__ == '__main__':
         start=inityear,
         stop=endyear,
         people=ppl,
-        demographics=[pregnancy, death] + sdoh_modules,
+        demographics=[pregnancy, death],
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
         diseases=disease_objects,
         connectors=connectors,
@@ -284,10 +272,6 @@ if __name__ == '__main__':
     # Run the simulation
     sim.run()
 
-    # import numpy as np
-    # print('Housing stable:', np.count_nonzero(sim.housing_stable))
-    # print('Housing unstable:', np.count_nonzero(sim.housing_unstable))
-    
     
     # # Mortality rates and life table
     # target_year = endyear - 1
