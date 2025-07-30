@@ -60,7 +60,7 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     ax.legend(loc='lower right', fontsize=14, frameon=False)   
     ax.grid()
 
-    plt.show()
+    # plt.show()
 
 
 def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year):
@@ -139,7 +139,7 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
     plt.title(f'Mean {disease.capitalize()} Prevalence Over Time (All Ages)')
     plt.grid()
     
-    plt.show()
+    # plt.show()
 
 
 def plot_age_group_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year, age_groups=None):
@@ -245,7 +245,7 @@ def plot_age_group_prevalence(sim, prevalence_analyzer, disease, prevalence_data
     fig.legend(unique_labels.values(), unique_labels.keys(), loc='lower center', ncol=5)
 
     plt.tight_layout(rect=[0, 0.1, 1, 1])
-    plt.show()
+    # plt.show()
     
     
 # ---------------------------------------------------------------------
@@ -294,7 +294,7 @@ def plot_mx_comparison(sim_mx_df, observed_mx_csv, year, age_interval=5, figsize
 
     axes[-1].set_xlabel('Age Group', fontsize=24)
     plt.tight_layout()
-    plt.show()    
+    # plt.show()    
     
 
 def plot_life_expectancy(life_table, observed_data, year, max_age=100, figsize=(14, 10), title=None):
@@ -340,5 +340,5 @@ def plot_life_expectancy(life_table, observed_data, year, max_age=100, figsize=(
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.subplots_adjust(bottom=0.1)
-    plt.show()
+    # plt.show()
     return fig, (ax1, ax2)

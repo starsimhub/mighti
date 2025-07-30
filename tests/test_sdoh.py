@@ -78,7 +78,7 @@ def test_neighbourhood_situation_inheritance():
     n_matches = matches.sum()
     n_total = len(matches)
     
-    print(f"✅ Inherited housing: {n_matches} / {n_total} match")
+    print(f"Inherited housing: {n_matches} / {n_total} match")
 
 if __name__ == '__main__':
     test_neighbourhood_situation_inheritance()
