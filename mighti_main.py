@@ -65,6 +65,9 @@ csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
 # Intervention 
 csv_path_intervention = f'mighti/data/{region}_intervention.csv'
 
+# SDoH 
+csv_path_sdoh = f'mighti/data/sdoh.csv'
+
 
 # Ensure required demographic files are prepared
 prepare_data_for_year.prepare_data_for_year(region,inityear)
@@ -146,13 +149,12 @@ networks = [maternal, structuredsexual]
 # ---------------------------------------------------------------------
 # SDoH
 # ---------------------------------------------------------------------
-# Initialize SDoH modules
 sdoh_modules = [
-    mi.NeighbourhoodSituation(),
-    mi.SocialContext(),
-    mi.EducationSituation(),
-    mi.EconomicSituation(),
-    mi.HealthCareSystem(),
+    mi.NeighbourhoodSituation(csv_path=csv_path_sdoh,condition_name='NeighbourhoodSituation'),
+    mi.SocialContext(csv_path=csv_path_sdoh,condition_name='SocialContext'),
+    mi.EducationSituation(csv_path=csv_path_sdoh,condition_name='EducationSituation'),
+    mi.EconomicSituation(csv_path=csv_path_sdoh,condition_name='EconomicSituation'),
+    mi.HealthCareSystem(csv_path=csv_path_sdoh,condition_name='HealthCareSystem'),
 ]
 
 # ---------------------------------------------------------------------
@@ -295,10 +297,27 @@ if __name__ == '__main__':
     
     ppl = sim.people  # or sim.people at the point you want to inspect
 
-    n_true = ppl.neighbourhood_situation.sum()
-    n_false = (~ppl.neighbourhood_situation).sum()
+    # Summary of SDoH states
+    def print_sdoh_summary(ppl):
+        n_true = ppl.neighbourhood_situation.sum()
+        n_false = (~ppl.neighbourhood_situation).sum()
+        print(f"🏘️ NeighbourhoodSituation:\n  Good (True):  {n_true:,}\n  Bad (False): {n_false:,}")
     
-    print(f"🏘️ NeighbourhoodSituation:\n  Good (True):  {n_true:,}\n  Bad (False): {n_false:,}")
+        n_true = ppl.social_context.sum()
+        n_false = (~ppl.social_context).sum()
+        print(f"🧠 SocialContext:\n  Positive (True):  {n_true:,}\n  Negative (False): {n_false:,}")
+    
+        n_true = ppl.education_situation.sum()
+        n_false = (~ppl.education_situation).sum()
+        print(f"🎓 EducationSituation:\n  Educated (True):  {n_true:,}\n  Uneducated (False): {n_false:,}")
+    
+        n_true = ppl.economic_situation.sum()
+        n_false = (~ppl.economic_situation).sum()
+        print(f"💰 EconomicSituation:\n  Stable (True):  {n_true:,}\n  Unstable (False): {n_false:,}")
+    
+        n_true = ppl.healthcare_system.sum()
+        n_false = (~ppl.healthcare_system).sum()
+        print(f"🏥 HealthCareSystem:\n  Access (True):  {n_true:,}\n  No Access (False): {n_false:,}")
     
 
 
