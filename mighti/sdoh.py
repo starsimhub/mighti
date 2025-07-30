@@ -33,17 +33,26 @@ class NeighbourhoodSituation(ss.Module):
         # Get mother-baby pairs from maternal network
         maternal = self.sim.networks['maternalnet']
         edges = maternal.edges
-
+    
         # Select newborns whose connections started this timestep
         new_birth_inds = np.where(edges.start == self.sim.ti)[0]
         if len(new_birth_inds) == 0:
             return
-
+    
         mother_inds = edges.p1[new_birth_inds]
         baby_inds   = edges.p2[new_birth_inds]
-
-        # Inherit SDoH state from mothers (copied one timestep late)
-        self.state[baby_inds] = self.state[mother_inds]
+    
+        # Partial inheritance: with prob=0.9 inherit, else random
+        inherit_prob = 0.9
+        n = len(baby_inds)
+        inherit_mask = np.random.rand(n) < inherit_prob
+    
+        # Apply inheritance
+        self.state[baby_inds[inherit_mask]] = self.state[mother_inds[inherit_mask]]
+    
+        # Assign new values for the rest (e.g., baseline distribution)
+        random_vals = np.random.rand(n - inherit_mask.sum()) < self.p_stable
+        self.state[baby_inds[~inherit_mask]] = random_vals
 
 
 

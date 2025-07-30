@@ -299,6 +299,8 @@ if __name__ == '__main__':
     n_false = (~ppl.neighbourhood_situation).sum()
     
     print(f"🏘️ NeighbourhoodSituation:\n  Good (True):  {n_true:,}\n  Bad (False): {n_false:,}")
+    
+
 
  
     # import numpy as np
