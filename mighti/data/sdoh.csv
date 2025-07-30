@@ -1,0 +1,6 @@
+﻿state,state_prob,inherit_prob
+neighbourhood,0.7,0.85
+social,0.6,0.9
+education,0.5,0.6
+economic,0.4,0.9
+healthcare,0.4,0.9
