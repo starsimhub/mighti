@@ -20,11 +20,12 @@ from .hyperlipidemia import *
 from .hypertension import *
 from .lungcancer import *
 from .obesity import *
+from .opioidusedisorder import *
 from .parkinsonsdisease import *
 from .prostatecancer import *
 from .ptsd import *
 from .roadinjuries import *
-from .substanceusedisorder import *
+from .stimulantusedisorder import *
 from .tb import *
 from .tobaccouse import *
 from .type1diabetes import *

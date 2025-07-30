@@ -22,6 +22,8 @@ thisdir = os.path.dirname(__file__)
 param_path = os.path.join(thisdir, 'test_data', 'sdoh.csv')  # must contain state, state_prob, inherit_prob
 age_path = os.path.join(thisdir, 'test_data', 'eswatini_age_distribution_2007.csv')  # simple flat age distribution
 fertility_path = os.path.join(thisdir,'test_data', 'eswatini_asfr.csv')
+
+
 def test_neighbourhood_situation_inheritance():
     
     fertility_rate = {'fertility_rate': pd.read_csv(fertility_path)}

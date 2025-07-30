@@ -729,7 +729,29 @@ class AlcoholUseDisorder(RemittingDisease):
             self.pars.p_acquire_multiplier = 1  
         return
 
+    
+class StimulantUseDisorder(RemittingDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'StimulantUseDisorder'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'StimulantUseDisorder')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return    
+    
 
+class OpioidUseDisorder(RemittingDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'OpioidUseDisorder'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'OpioidUseDisorder')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+    
+    
 class TobaccoUse(RemittingDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
         self.disease_name = 'TobaccoUse'
@@ -739,13 +761,14 @@ class TobaccoUse(RemittingDisease):
         if not hasattr(self.pars, 'p_acquire'):
             self.pars.p_acquire_multiplier = 1  
         return
+    
 
-class HIVAssociatedDementia(ChronicDisease):
+class Dementia(ChronicDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
-        self.disease_name = 'HIVAssociatedDementia'
+        self.disease_name = 'Dementia'
         super().__init__(csv_path, pars, **kwargs)
        
-        self.define_pars(label = 'HIVAssociatedDementia')
+        self.define_pars(label = 'Dementia')
         if not hasattr(self.pars, 'p_acquire'):
             self.pars.p_acquire_multiplier = 1  
         return
@@ -762,12 +785,12 @@ class PTSD(RemittingDisease):
         return
 
 
-class Depression(RemittingDisease):
+class MajorDepressiveDisorder(RemittingDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
-        self.disease_name = 'Depression'
+        self.disease_name = 'MajorDepressiveDisorder'
         super().__init__(csv_path, pars, **kwargs)
         
-        self.define_pars(label = 'Depression')
+        self.define_pars(label = 'MajorDepressiveDisorder')
         if not hasattr(self.pars, 'p_acquire'):
             self.pars.p_acquire_multiplier = 1  
         return
