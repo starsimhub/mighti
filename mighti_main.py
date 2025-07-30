@@ -144,6 +144,18 @@ networks = [maternal, structuredsexual]
 
 
 # ---------------------------------------------------------------------
+# SDoH
+# ---------------------------------------------------------------------
+# Initialize SDoH modules
+sdoh_modules = [
+    mi.NeighbourhoodSituation(),
+    mi.SocialContext(),
+    mi.EducationSituation(),
+    mi.EconomicSituation(),
+    mi.HealthCareSystem(),
+]
+
+# ---------------------------------------------------------------------
 # Diseases
 # ---------------------------------------------------------------------
 hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
@@ -263,7 +275,7 @@ if __name__ == '__main__':
         demographics=[pregnancy, death],
         analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
         diseases=disease_objects,
-        connectors=connectors,
+        connectors=connectors + sdoh_modules,
         interventions = interventions2,
         copy_inputs=False,
         label='With Interventions'
@@ -271,8 +283,46 @@ if __name__ == '__main__':
 
     # Run the simulation
     sim.run()
-
     
+    maternal = sim.networks['maternalnet']
+    newborns = maternal.edges.p2
+    mothers = maternal.edges.p1
+    
+    sdoh = sim.people.neighbourhood_situation
+    matches = (sdoh[newborns] == sdoh[mothers])
+    
+    print(f"✅ Inherited housing: {matches.sum()} / {len(matches)} match")
+    
+    ppl = sim.people  # or sim.people at the point you want to inspect
+
+    n_true = ppl.neighbourhood_situation.sum()
+    n_false = (~ppl.neighbourhood_situation).sum()
+    
+    print(f"🏘️ NeighbourhoodSituation:\n  Good (True):  {n_true:,}\n  Bad (False): {n_false:,}")
+
+ 
+    # import numpy as np
+    # ppl = sim.people
+    
+    # # Get raw parent UID values (as NumPy array)
+    # parent_vals = ppl.parent.values
+    
+    # # Get child indices where parent is defined (i.e., not nan)
+    # is_child = ~np.isnan(parent_vals)
+    # child_uids = np.where(is_child)[0]
+    
+    # # Get corresponding mother UIDs and cast to int
+    # mother_uids = parent_vals[child_uids].astype(int)
+    
+    # # Compare state between child and mother
+    # child_state = ppl.neighbourhood_situation[child_uids]
+    # mother_state = ppl.neighbourhood_situation[mother_uids]
+    
+    # matches = (child_state == mother_state)
+    
+    # print(f"\n👶 Inheritance check on {len(child_uids)} children:")
+    # print(f"  Matches:    {matches.sum()}")
+    # print(f"  Mismatches: {(~matches).sum()}")
     # # Mortality rates and life table
     # target_year = endyear - 1
     
