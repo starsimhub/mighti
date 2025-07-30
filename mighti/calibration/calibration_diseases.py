@@ -16,12 +16,12 @@ import stisim as sti
 
 
 # Set the name of the disease to calibrate
-from mighti.calibration.diseases_for_calibration import CardiovascularDiseases as DiseaseClass  
-disease_name = 'CardiovascularDiseases'  
+from mighti.calibration.diseases_for_calibration import MajorDepressiveDisorder as DiseaseClass  
+disease_name = 'MajorDepressiveDisorder'  
 
 # Set the starting year for calibration
 init_year = 2007                
-total_trials = 3   # Use a small number for testing; increase to 100+ for full calibration
+total_trials = 100   # Use a small number for testing; increase to 100+ for full calibration
 
 path_prevalence = '../data/eswatini_prevalence.csv'
 path_parameters = '../data/eswatini_parameters.csv'

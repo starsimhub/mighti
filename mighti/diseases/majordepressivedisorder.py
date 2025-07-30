@@ -5,6 +5,8 @@ Module defining Major Depressive Disorder as a remitting disease model.
 
 from mighti.diseases.base_disease import RemittingDisease
 from starsim.interventions import treat_num
+import starsim as ss
+import numpy as np
 
 
 class MajorDepressiveDisorder(RemittingDisease):

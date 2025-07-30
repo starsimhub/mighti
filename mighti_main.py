@@ -65,6 +65,9 @@ csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
 # Intervention 
 csv_path_intervention = f'mighti/data/{region}_intervention.csv'
 
+# SDoH 
+csv_path_sdoh = f'mighti/data/sdoh.csv'
+
 
 # Ensure required demographic files are prepared
 prepare_data_for_year.prepare_data_for_year(region,inityear)
@@ -83,7 +86,7 @@ df.columns = df.columns.str.strip()
 
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV",  "HPV", "Flu", "ViralHepatitis"]]
-healthconditions = ['Type2Diabetes']
+healthconditions = ['MajorDepressiveDisorder']
 diseases = ["HIV"] + healthconditions
 
 ncd_df = df[df["disease_class"] == "ncd"]
@@ -110,13 +113,13 @@ prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, dis
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
-death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
-    conditions=['hiv', 'type2diabetes'],
-    condition_attr_map={
-        'hiv': 'infected',
-        'type2diabetes': 'affected'  
-    }
-)
+# death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
+#     conditions=['hiv', 'type2diabetes'],
+#     condition_attr_map={
+#         'hiv': 'infected',
+#         'type2diabetes': 'affected'  
+#     }
+# )
 
 # ---------------------------------------------------------------------
 # Demographics and Networks
@@ -142,6 +145,17 @@ maternal = ss.MaternalNet()
 structuredsexual = sti.StructuredSexual()
 networks = [maternal, structuredsexual]
 
+
+# ---------------------------------------------------------------------
+# SDoH
+# ---------------------------------------------------------------------
+sdoh_modules = [
+    mi.NeighbourhoodSituation(csv_path=csv_path_sdoh,condition_name='NeighbourhoodSituation'),
+    mi.SocialContext(csv_path=csv_path_sdoh,condition_name='SocialContext'),
+    mi.EducationSituation(csv_path=csv_path_sdoh,condition_name='EducationSituation'),
+    mi.EconomicSituation(csv_path=csv_path_sdoh,condition_name='EconomicSituation'),
+    mi.HealthCareSystem(csv_path=csv_path_sdoh,condition_name='HealthCareSystem'),
+]
 
 # ---------------------------------------------------------------------
 # Diseases
@@ -254,25 +268,51 @@ def get_pregnancy_module(sim):
 # Main Simulation
 # ---------------------------------------------------------------------
 if __name__ == '__main__':
-    sim = ss.Sim(
-        n_agents=n_agents,
-        networks=networks,
-        start=inityear,
-        stop=endyear,
-        people=ppl,
-        demographics=[pregnancy, death],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-        diseases=disease_objects,
-        connectors=connectors,
-        interventions = interventions2,
-        copy_inputs=False,
-        label='With Interventions'
-    )
+    # sim = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=endyear,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=connectors + sdoh_modules,
+    #     interventions = interventions5,
+    #     copy_inputs=False,
+    #     label='With Interventions'
+    # )
 
-    # Run the simulation
-    sim.run()
-
+    # # Run the simulation
+    # sim.run()
     
+    # # maternal = sim.networks['maternalnet']
+    # # newborns = maternal.edges.p2
+    # # mothers = maternal.edges.p1
+    
+    # # sdoh = sim.people.neighbourhood_situation
+    # # matches = (sdoh[newborns] == sdoh[mothers])
+    
+    # # print(f" Inherited housing: {matches.sum()} / {len(matches)} match")
+    
+    def print_sdoh_summary(sim):
+
+        ppl = sim.people
+    
+        def summarize(label, arr):
+            n_true = arr.sum()
+            n_false = (~arr).sum()
+            print(f"{label}:\n   Good (True):  {n_true:,}\n   Bad  (False): {n_false:,}\n")
+    
+        print("Social Determinants of Health Summary:")
+        summarize("NeighbourhoodSituation", ppl.neighbourhood_situation)
+        # summarize("SocialContext",           ppl.social_context)
+        # summarize("EducationSituation",      ppl.education_situation)
+        # summarize("EconomicSituation",       ppl.economic_situation)
+        # summarize("HealthCareSystem",        ppl.healthcare_system)
+    
+
+
     # # Mortality rates and life table
     # target_year = endyear - 1
     
@@ -293,55 +333,48 @@ if __name__ == '__main__':
     
     # mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
     
-    # # Plot life expectancy comparison
+    # # # Plot life expectancy comparison
     # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer,'Type2Diabetes')
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'MajorDepressiveDisorder', prevalence_data_df, inityear, endyear)
+    # # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer,'Type2Diabetes')
        
-    # ### To run 2 simulation simultaneously #####
-    # sim_without = ss.Sim(
-    #     n_agents=n_agents,
-    #     networks=networks,
-    #     start=inityear,
-    #     stop=endyear,
-    #     people=ppl,
-    #     demographics=[pregnancy, death],
-    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-    #     diseases=disease_objects,
-    #     connectors=interactions,
-    #     copy_inputs=False,
-    #     label='With Intervention'
-    # )
+    ### To run 2 simulation simultaneously #####
+    sim_without = ss.Sim(
+        n_agents=n_agents,
+        networks=networks,
+        start=inityear,
+        stop=endyear,
+        people=ppl,
+        demographics=[pregnancy, death],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+        diseases=disease_objects,
+        connectors=connectors + sdoh_modules,
+        copy_inputs=False,
+        label='Without Intervention'
+    )
     
-    # sim_with = ss.Sim(
-    #     n_agents=n_agents,
-    #     networks=networks,
-    #     start=inityear,
-    #     stop=endyear,
-    #     people=ppl,
-    #     demographics=[pregnancy, death],
-    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-    #     diseases=disease_objects,
-    #     connectors=interactions,
-    #     interventions = interventions1,
-    #     copy_inputs=False,
-    #     label='With HIV Intervention'
-    # )
+    sim_with = ss.Sim(
+        n_agents=n_agents,
+        networks=networks,
+        start=inityear,
+        stop=endyear,
+        people=ppl,
+        demographics=[pregnancy, death],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+        diseases=disease_objects,
+        connectors=connectors + sdoh_modules,
+        interventions = interventions5,
+        copy_inputs=False,
+        label='With Intervention'
+    )
     
-    # sim_with_both = ss.Sim(
-    #     n_agents=n_agents,
-    #     networks=networks,
-    #     start=inityear,
-    #     stop=endyear,
-    #     people=ppl,
-    #     demographics=[pregnancy, death],
-    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-    #     diseases=disease_objects,
-    #     connectors=interactions,
-    #     interventions = interventions2,
-    #     copy_inputs=False,
-    #     label='With HIV and T2D ntervention'
-    # )
  
-    # msim = ss.MultiSim(sims=[sim_without, sim_with])
-    # msim.run()
+    msim = ss.MultiSim(sims=[sim_without, sim_with])
+    msim.run()
+    
+    
+    for sim in msim.sims:
+        print(f"\n SDoH summary for: {sim.label}")
+        print_sdoh_summary(sim)
+        
+        

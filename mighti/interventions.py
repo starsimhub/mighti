@@ -41,34 +41,42 @@ class ImproveHospitalDischarge(ss.Intervention):
     
 
 class GiveHousingToDepressed(ss.Intervention):
+    """
+    Intervention that provides stable housing to individuals with Major Depressive Disorder
+    who currently have unstable housing.
+    """
     def __init__(self, coverage=0.5, start_day=0, label=None):
         super().__init__(label=label or "GiveHousingToDepressed")
         self.coverage = coverage
         self.start_day = start_day
 
     def initialize(self, sim):
-        self.sim = sim  # Store reference to the simulation
+        self.sim = sim
 
     def apply(self):
-        sim = self.sim  # Use stored sim object
+        sim = self.sim
         if sim.ti < self.start_day:
             return
 
-        depression = sim.diseases.get('Depression', None)
-        if depression is None or not hasattr(depression, 'depressed'):
+        depression = sim.diseases.get('majordepressivedisorder', None)
+        if depression is None or not hasattr(depression, 'affected'):
+            print(f"[{sim.year}] MajorDepressiveDisorder not found or missing 'affected'")
             return
 
-        housing_module = getattr(sim, 'housing_module', None)
-        if housing_module is None or not hasattr(housing_module, 'housing_unstable'):
-            return
-
-        depressed = depression.depressed
-        housing_unstable = housing_module.housing_unstable
+        # Target depressed + unstably housed
+        ppl = sim.people
+        depressed = depression.affected
+        housing_unstable = ~ppl.neighbourhood_situation
         target = depressed & housing_unstable
-        to_house = target[np.random.rand(len(target)) < self.coverage]
 
-        housing_unstable[to_house] = False
+        # Apply intervention with given coverage
+        target_uids = target.uids
+        n = len(target_uids)
+        mask = np.random.rand(n) < self.coverage
+        to_house = target_uids[mask]        
+        ppl.neighbourhood_situation[to_house] = True
 
+        
     def step(self):
         self.apply()
         
