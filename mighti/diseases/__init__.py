@@ -3,12 +3,14 @@ from .base_disease import RemittingDisease, AcuteDisease, ChronicDisease, Generi
 
 from .alcoholusedisorder import *
 from .alzheimersdisease import *
+from .anxietydisorder import *
 from .asthma import *
 from .breastcancer import *
 from .cardiovasculardiseases import *
 from .cervicalcancer import *
 from .chronickidneydisease import *
 from .chronicliverdisease import *
+from .chronicpain import *
 from .copd import *
 from .colorectalcancer import *
 from .majordepressivedisorder import *
