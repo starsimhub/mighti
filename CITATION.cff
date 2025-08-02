@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use MIGHTI, please cite it using the metadata below."
+title: "MIGHTI: Model of Inter-Generational Health, Transmission, and Interventions"
+version: 1.0.0
+authors:
+  - family-names: Yamamoto
+    given-names: Nao
+    orcid: https://orcid.org/0000-0003-3131-2368
+date-released: 2025-08-01
+identifiers:
+  - type: doi
+repository-code: https://github.com/starsimhub/mighti
+url: https://github.com/starsimhub/mighti
+license: MIT
+keywords:
+  - epidemiology
+  - simulation
+  - agent-based model
+  - social determinants of health
+  - multi-disease modeling
