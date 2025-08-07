@@ -3,6 +3,22 @@ message: "If you use MIGHTI, please cite it using the metadata below."
 title: "MIGHTI: Model of Inter-Generational Health, Transmission, and Interventions"
 version: 1.0.0
 authors:
+  - family-names: Assefa
+    given-names: Frey
+  - family-names: Bershteyn
+    given-names: Anna
+  - family-names: Bjamidipati
+    given-names: Kasturi
+  - family-names: Ferrara
+    given-names: Gianna
+  - family-names: Kaftan
+    given-names: David
+  - family-names: Kim
+    given-names: Hae Young
+  - family-names: Osei-Ntansah
+    given-names: Afia
+  - family-names: Platais
+    given-names: Ingrida
   - family-names: Yamamoto
     given-names: Nao
     orcid: https://orcid.org/0000-0003-3131-2368
@@ -18,3 +34,5 @@ keywords:
   - agent-based model
   - social determinants of health
   - multi-disease modeling
+
+
