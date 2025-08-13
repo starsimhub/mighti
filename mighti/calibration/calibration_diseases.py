@@ -4,8 +4,6 @@ Calibrate disease acquisition parameter (p_acquire) for a specified condition
 using MIGHTI and prevalence data. Outputs best-fit parameter and comparison
 of observed vs. simulated prevalence by age and sex.
 """
-import sys
-sys.path.append('/Users/yamamn02/Documents/MIGHTI')  # path to folder containing `mighti/`
 
 import optuna
 import mighti as mi
