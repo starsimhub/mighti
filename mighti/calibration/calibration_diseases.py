@@ -4,8 +4,7 @@ Calibrate disease acquisition parameter (p_acquire) for a specified condition
 using MIGHTI and prevalence data. Outputs best-fit parameter and comparison
 of observed vs. simulated prevalence by age and sex.
 """
-import sys
-sys.path.append('/Users/yamamn02/Documents/MIGHTI')  # path to folder containing `mighti/`
+
 
 import optuna
 import mighti as mi
@@ -16,8 +15,8 @@ import stisim as sti
 
 
 # Set the name of the disease to calibrate
-from mighti.calibration.diseases_for_calibration import MajorDepressiveDisorder as DiseaseClass  
-disease_name = 'MajorDepressiveDisorder'  
+from mighti.calibration.diseases_for_calibration import Type2Diabetes as DiseaseClass  
+disease_name = 'Type2Diabetes'  
 
 # Set the starting year for calibration
 init_year = 2007                
