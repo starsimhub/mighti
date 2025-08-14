@@ -5,6 +5,7 @@ using MIGHTI and prevalence data. Outputs best-fit parameter and comparison
 of observed vs. simulated prevalence by age and sex.
 """
 
+
 import optuna
 import mighti as mi
 import pandas as pd
@@ -14,12 +15,12 @@ import stisim as sti
 
 
 # Set the name of the disease to calibrate
-from mighti.calibration.diseases_for_calibration import MajorDepressiveDisorder as DiseaseClass  
-disease_name = 'MajorDepressiveDisorder'  
+from mighti.calibration.diseases_for_calibration import Type2Diabetes as DiseaseClass  
+disease_name = 'Type2Diabetes'  
 
 # Set the starting year for calibration
 init_year = 2007                
-total_trials = 100   # Use a small number for testing; increase to 100+ for full calibration
+total_trials = 200   # Use a small number for testing; increase to 100+ for full calibration
 
 path_prevalence = '../data/eswatini_prevalence.csv'
 path_parameters = '../data/eswatini_parameters.csv'
@@ -161,5 +162,4 @@ if __name__ == '__main__':
         f.write('Best parameters:\n')
         for k, v in calib.best_pars.items():
             f.write(f'{k}: {v}\n')
-    
     
