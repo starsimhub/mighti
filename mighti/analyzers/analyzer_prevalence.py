@@ -17,8 +17,11 @@ import starsim as ss
 import numpy as np
 import sciris as sc
 
+__all__ = ["PrevalenceAnalyzer_HIV", "PrevalenceAnalyzer_SDoH"]
 
-class PrevalenceAnalyzer(ss.Analyzer):
+
+
+class PrevalenceAnalyzer_HIV(ss.Analyzer):
 
     @staticmethod
     def cond_prob(numerator, denominator):
@@ -160,4 +163,8 @@ class PrevalenceAnalyzer(ss.Analyzer):
             self.results[f'{disease}_prev_has_hiv_m'][ti] = self.cond_prob(has_disease_m, has_hiv_m)
             self.results[f'{disease}_num_total'][ti] = total_num_with_HIV
             self.results[f'{disease}_den_total'][ti] = total_den_with_HIV
-    
+
+
+
+class PrevalenceAnalyzer_SDoH(ss.Analyzer):    
+    pass

@@ -40,9 +40,9 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 # Simulation Settings
 # ---------------------------------------------------------------------
-n_agents = 10_000 
+n_agents = 1_000 
 inityear = 2007
-endyear = 2010
+endyear = 2026
 region = 'eswatini'
 
 
@@ -114,7 +114,7 @@ def get_prevalence_function(disease):
 
 
 # Initialize the PrevalenceAnalyzer
-prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
+prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=diseases)
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
@@ -173,11 +173,6 @@ hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
                             'maternal': [0.044227226248848076, 0.044227226248848076]})
     # Best pars: {'hiv_beta_m2f': 0.011023883426646121, 'hiv_beta_m2c': 0.044227226248848076} seed: 12345
 
-tb = mtb.TB(dict(
-        beta = 0.01, 
-        init_prev = 0.25,
-        ))
-    
 disease_objects = []
 
 for disease in healthconditions:
@@ -188,7 +183,6 @@ for disease in healthconditions:
         disease_objects.append(disease_obj)
         
 disease_objects.append(hiv_disease)
-disease_objects.append(tb)
 
 
 # ---------------------------------------------------------------------
@@ -259,6 +253,22 @@ interventions5 = [give_housing]
 interventions6 = [hiv_test, art, vmmc, prep, depression_tx]
     
 
+
+# ---------------------------------------------------------------------
+# Microcosting 
+# ---------------------------------------------------------------------
+
+intervention_analyzer = mi.InterventionAnalyzer(interventions=['art'],name='intervention_analyzer'  )
+
+microcosting_analyzer = mi.MicrocostingAnalyzer(
+    unit_costs={'art': 50},
+    disability_weights={'hiv': 0.2},
+    discount_rate=0.03
+)
+
+analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, 
+             intervention_analyzer, microcosting_analyzer]
+
 # ---------------------------------------------------------------------
 # Utility: Get Modules
 # ---------------------------------------------------------------------
@@ -286,10 +296,10 @@ if __name__ == '__main__':
         stop=endyear,
         people=ppl,
         demographics=[pregnancy, death],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+        analyzers=analyzers,
         diseases=disease_objects,
         connectors=connectors + sdoh_modules,
-        # interventions = interventions5,
+        interventions = interventions1,
         copy_inputs=False,
         label='With Interventions'
     )
@@ -306,23 +316,29 @@ if __name__ == '__main__':
     
     # # print(f" Inherited housing: {matches.sum()} / {len(matches)} match")
     
-    def print_sdoh_summary(sim):
+    # def print_sdoh_summary(sim):
 
-        ppl = sim.people
+    #     ppl = sim.people
     
-        def summarize(label, arr):
-            n_true = arr.sum()
-            n_false = (~arr).sum()
-            print(f"{label}:\n   Good (True):  {n_true:,}\n   Bad  (False): {n_false:,}\n")
+    #     def summarize(label, arr):
+    #         n_true = arr.sum()
+    #         n_false = (~arr).sum()
+    #         print(f"{label}:\n   Good (True):  {n_true:,}\n   Bad  (False): {n_false:,}\n")
     
-        print("Social Determinants of Health Summary:")
-        summarize("NeighbourhoodSituation", ppl.neighbourhood_situation)
-        # summarize("SocialContext",           ppl.social_context)
-        # summarize("EducationSituation",      ppl.education_situation)
-        # summarize("EconomicSituation",       ppl.economic_situation)
-        # summarize("HealthCareSystem",        ppl.healthcare_system)
+    #     print("Social Determinants of Health Summary:")
+    #     summarize("NeighbourhoodSituation", ppl.neighbourhood_situation)
+    #     # summarize("SocialContext",           ppl.social_context)
+    #     # summarize("EducationSituation",      ppl.education_situation)
+    #     # summarize("EconomicSituation",       ppl.economic_situation)
+    #     # summarize("HealthCareSystem",        ppl.healthcare_system)
     
 
+    # Access results
+    df = microcosting_analyzer.to_df()
+    print(df.head())
+    
+    total_cost = df['total_cost'].sum()
+    print(f"Total cost across all agents = ${total_cost:,.2f}")
 
     # # Mortality rates and life table
     # target_year = endyear - 1
