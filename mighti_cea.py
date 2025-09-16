@@ -15,13 +15,9 @@ Key components:
 - Applies HIV interventions (e.g., ART, VMMC).
 - Computes and plots prevalence, mortality rates, and life expectancy.
 
-To run: `python mighti_main.py`
+To run: `python mighti_cea.py`
 """
 
-
-# TO DO:
-    # microcosting
-    # tbsim, hpvsim
 
 import logging
 import mighti as mi
@@ -118,13 +114,19 @@ prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data,
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
-# death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
-#     conditions=['hiv', 'type2diabetes'],
-#     condition_attr_map={
-#         'hiv': 'infected',
-#         'type2diabetes': 'affected'  
-#     }
-# )
+# Analyzers
+microcosting_analyzer_base = mi.MicrocostingAnalyzer(unit_costs={'art': 50}, 
+                                                     disability_weights={'hiv': 0.2}, discount_rate=0.03, name='microcostinganalyzer' )
+microcosting_analyzer_intv = mi.MicrocostingAnalyzer(unit_costs={'art': 50}, 
+                                                     disability_weights={'hiv': 0.2}, discount_rate=0.03, name='microcostinganalyzer' )
+intervention_analyzer = mi.InterventionAnalyzer(interventions=['art'], name='intervention_analyzer')
+
+analyzers_base = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, 
+                  intervention_analyzer, microcosting_analyzer_base]
+
+analyzers_intv = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, 
+                  intervention_analyzer, microcosting_analyzer_intv]
+
 
 # ---------------------------------------------------------------------
 # Demographics and Networks
@@ -253,22 +255,6 @@ interventions5 = [give_housing]
 interventions6 = [hiv_test, art, vmmc, prep, depression_tx]
     
 
-
-# ---------------------------------------------------------------------
-# Microcosting 
-# ---------------------------------------------------------------------
-
-intervention_analyzer = mi.InterventionAnalyzer(interventions=['art'],name='intervention_analyzer'  )
-
-microcosting_analyzer = mi.MicrocostingAnalyzer(
-    unit_costs={'art': 50},
-    disability_weights={'hiv': 0.2},
-    discount_rate=0.03
-)
-
-analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, 
-             intervention_analyzer, microcosting_analyzer]
-
 # ---------------------------------------------------------------------
 # Utility: Get Modules
 # ---------------------------------------------------------------------
@@ -284,128 +270,57 @@ def get_pregnancy_module(sim):
             return module
     raise ValueError("Pregnancy module not found in the simulation.")
 
+def get_microcosting_analyzer(sim):
+    for analyzer in sim.analyzers:
+        if isinstance(analyzer, mi.MicrocostingAnalyzer):
+            return analyzer
+    raise ValueError("MicrocostingAnalyzer not found in simulation analyzers.")
+    
+    
     
 # ---------------------------------------------------------------------
 # Main Simulation
 # ---------------------------------------------------------------------
 if __name__ == '__main__':
-    # sim = ss.Sim(
-    #     n_agents=n_agents,
-    #     networks=networks,
-    #     start=inityear,
-    #     stop=endyear,
-    #     people=ppl,
-    #     demographics=[pregnancy, death],
-    #     analyzers=analyzers,
-    #     diseases=disease_objects,
-    #     connectors=connectors + sdoh_modules,
-    #     interventions = interventions1,
-    #     copy_inputs=False,
-    #     label='With Interventions'
-    # )
-
-    # # Run the simulation
-    # sim.run()
-    
-    # # maternal = sim.networks['maternalnet']
-    # # newborns = maternal.edges.p2
-    # # mothers = maternal.edges.p1
-    
-    # # sdoh = sim.people.neighbourhood_situation
-    # # matches = (sdoh[newborns] == sdoh[mothers])
-    
-    # # print(f" Inherited housing: {matches.sum()} / {len(matches)} match")
-    
-    # def print_sdoh_summary(sim):
-
-    #     ppl = sim.people
-    
-    #     def summarize(label, arr):
-    #         n_true = arr.sum()
-    #         n_false = (~arr).sum()
-    #         print(f"{label}:\n   Good (True):  {n_true:,}\n   Bad  (False): {n_false:,}\n")
-    
-    #     print("Social Determinants of Health Summary:")
-    #     summarize("NeighbourhoodSituation", ppl.neighbourhood_situation)
-    #     # summarize("SocialContext",           ppl.social_context)
-    #     # summarize("EducationSituation",      ppl.education_situation)
-    #     # summarize("EconomicSituation",       ppl.economic_situation)
-    #     # summarize("HealthCareSystem",        ppl.healthcare_system)
-    
-
-    # # Access results
-    # df = microcosting_analyzer.to_df()
-    # print(df.head())
-    
-    # total_cost = df['total_cost'].sum()
-    # print(f"Total cost across all agents = ${total_cost:,.2f}")
-
-    # # Mortality rates and life table
-    # target_year = endyear - 1
-    
-    # obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name='mx')
-    # obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name='ex')
-    
-    # # Get the modules
-    # deaths_module = get_deaths_module(sim)
-    # pregnancy_module = get_pregnancy_module(sim)
-    
-    # df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
-
-    # df_mx_male = df_mx[df_mx['sex'] == 'Male']
-    # df_mx_female = df_mx[df_mx['sex'] == 'Female']
-    
-    
-    # life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
-    
-    # mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
-    
-    # # # Plot life expectancy comparison
-    # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'MajorDepressiveDisorder', prevalence_data_df, inityear, endyear)
-    # # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer,'Type2Diabetes')
-       
-    ### To run 2 simulation simultaneously #####
-    sim_without = ss.Sim(
+    sim_base = ss.Sim(
         n_agents=n_agents,
         networks=networks,
         start=inityear,
         stop=endyear,
         people=ppl,
         demographics=[pregnancy, death],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+        analyzers=analyzers_base,
         diseases=disease_objects,
         connectors=connectors + sdoh_modules,
-        copy_inputs=False,
-        label='Without Intervention'
+        label='Baseline'
     )
-    
-    sim_with = ss.Sim(
+
+    sim_intv = ss.Sim(
         n_agents=n_agents,
         networks=networks,
         start=inityear,
         stop=endyear,
         people=ppl,
         demographics=[pregnancy, death],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+        analyzers=analyzers_intv,
         diseases=disease_objects,
         connectors=connectors + sdoh_modules,
-        interventions = interventions5,
-        copy_inputs=False,
-        label='With Intervention'
+        interventions=[art],
+        label='With ART'
     )
-    
- 
-    msim = ss.MultiSim(sims=[sim_without, sim_with])
+
+    msim = ss.MultiSim([sim_base, sim_intv])
     msim.run()
-    
-    
-    # for sim in msim.sims:
-    #     print(f"\n SDoH summary for: {sim.label}")
-    #     print_sdoh_summary(sim)
-        
-    # Extract the individual sims
-    sim_base = msim.sims[0]  # Without intervention
-    sim_intv = msim.sims[1]  # With intervention
 
-      
+    # Extract analyzers
+    analyzer_base = get_microcosting_analyzer(sim_base)
+    analyzer_intv = get_microcosting_analyzer(sim_intv)
+    
+    # Compute ICER
+    icer = analyzer_intv.compute_icer(analyzer_base)
+    
+    # Print results
+    print("\nIncremental Cost-Effectiveness Results:")
+    print(f"  ΔCost  = ${icer['delta_cost']:,.2f}")
+    print(f"  ΔDALY  = {icer['delta_daly']:,.2f}")
+    print(f"  ICER   = ${icer['icer']:,.2f} per DALY averted")

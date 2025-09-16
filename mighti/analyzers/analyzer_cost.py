@@ -104,6 +104,43 @@ class MicrocostingAnalyzer(ss.Analyzer):
 
         self.detailed_outputs = df
         return
+    
+    
+    def compute_icer(self, other_analyzer):
+        """
+        Compute ICER relative to another simulation.
+    
+        Args:
+            other_analyzer (MicrocostingAnalyzer): The baseline or comparison analyzer.
+    
+        Returns:
+            dict: {'delta_cost': ..., 'delta_daly': ..., 'icer': ...}
+        """
+        df_self = self.to_df()
+        df_other = other_analyzer.to_df()
+    
+        # Align on uids
+        df_self = df_self.set_index('uid')
+        df_other = df_other.set_index('uid')
+        df_common = df_self.join(df_other, lsuffix='_intv', rsuffix='_base', how='inner')
+    
+        # Add YLL if available in future
+        df_common['total_daly_intv'] = df_common['total_yld_intv']
+        df_common['total_daly_base'] = df_common['total_yld_base']
+    
+        # Aggregate
+        delta_cost = df_common['total_cost_intv'].sum() - df_common['total_cost_base'].sum()
+        delta_daly = df_common['total_daly_base'].sum() - df_common['total_daly_intv'].sum()  # DALY averted
+    
+        icer = delta_cost / delta_daly if delta_daly != 0 else np.inf
+    
+        return {
+            'delta_cost': delta_cost,
+            'delta_daly': delta_daly,
+            'icer': icer,
+        }
+    
 
     def to_df(self):
         return self.detailed_outputs
+    
