@@ -56,7 +56,7 @@ def make_sim():
 
     sim = ss.Sim(
         dt=1,
-        unit='month',
+        unit='year',
         n_agents=10000,
         total_pop=9980999,
         start=init_year,
