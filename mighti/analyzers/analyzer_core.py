@@ -53,44 +53,50 @@ class SurvivorshipAnalyzer(ss.Analyzer):
  
 
 class ConditionAtDeathAnalyzer(ss.Analyzer):
-    def __init__(self, conditions=None, condition_attr_map=None, **kwargs):
+    def __init__(self, conditions=None, condition_attr_map=None, ex_life_expectancy=80.0, **kwargs):
         super().__init__(**kwargs)
         self.conditions = [c.lower() for c in (conditions or [])]
         self.condition_attr_map = condition_attr_map or {}
+        self.ex_life_expectancy = ex_life_expectancy  # Default life expectancy for YLL
         self.records = []
-        self.condition_snapshots = {} 
+        self.name = 'condition_at_death_analyzer'
         
     def init_results(self):
-        super().init_results()
         self.records = []
-        self.condition_snapshots = {}
 
     def step(self):
         ppl = self.sim.people
         ti = self.sim.ti
         year = self.sim.t.yearvec[ti]
-        
+    
+        # Rough fixed life expectancy by sex (replace with actual `ex` lookup later)
+        life_expectancy_female = 75
+        life_expectancy_male = 70
+    
         for uid in ppl.dead.uids:
+            age = ppl.age[uid]
+            sex = 'Female' if ppl.female[uid] else 'Male'
+            expected_le = life_expectancy_female if sex == 'Female' else life_expectancy_male
+            yll = max(0, expected_le - age)
+    
             record = {
                 'uid': uid,
                 'year': year,
-                'age': ppl.age[uid],
-                'sex': 'Female' if ppl.female[uid] else 'Male',
+                'age': age,
+                'sex': sex,
+                'yll': yll,
             }
-        
-        for cond in self.conditions:
-            ti_dead = ppl[cond].ti_dead[uid]
-            if not np.isnan(ti_dead):
-                condition_ti = self.sim.diseases[cond].t.abstvec[int(ti_dead)]
-                died_of_cond = (condition_ti > ti - 1) and (condition_ti <= ti)
-            else:
-                condition_ti = np.nan
-                died_of_cond = False
-        
-            record[f'died_{cond}'] = died_of_cond
-                
+    
+            for cond in self.conditions:
+                ti_dead = ppl[cond].ti_dead[uid]
+                if not np.isnan(ti_dead):
+                    condition_ti = self.sim.diseases[cond].t.abstvec[int(ti_dead)]
+                    died_of_cond = (condition_ti > ti - 1) and (condition_ti <= ti)
+                else:
+                    died_of_cond = False
+    
+                record[f'died_{cond}'] = died_of_cond
+    
             self.records.append(record)
-            
     def to_df(self):
         return pd.DataFrame(self.records)
-    

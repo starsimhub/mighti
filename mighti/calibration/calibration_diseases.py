@@ -20,15 +20,15 @@ disease_name = 'Type2Diabetes'
 
 # Set the starting year for calibration
 init_year = 2007                
-total_trials = 200   # Use a small number for testing; increase to 100+ for full calibration
+total_trials = 100   # Use a small number for testing; increase to 100+ for full calibration
 
 path_prevalence = '../data/eswatini_prevalence.csv'
 path_parameters = '../data/eswatini_parameters.csv'
 
 
 def make_sim():
-    # Best pars: {'hiv_beta_m2f': 0.011023883426646121, 'hiv_beta_m2c': 0.044227226248848076} seed: 12345
-    hiv = sti.HIV(beta_m2f=0.011023883426646121, beta_m2c=0.044227226248848076, init_prev=0.15)
+    # Best pars: {'hiv_beta_m2f': 0.029594299274445842, 'hiv_beta_m2c': 0.0011249414706988527}
+    hiv = sti.HIV(beta_m2f=0.029594299274445842, beta_m2c=0.0011249414706988527, init_prev=0.15)
 
     # Dynamically select disease constructor
     health_condition_cls = DiseaseClass
@@ -52,11 +52,11 @@ def make_sim():
     sexual = sti.StructuredSexual()
     maternal = ss.MaternalNet()
 
-    prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=pd.read_csv(path_prevalence), diseases=['HIV', disease_name])
+    prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(prevalence_data=pd.read_csv(path_prevalence), diseases=['HIV', disease_name])
 
     sim = ss.Sim(
         dt=1,
-        unit='month',
+        unit='year',
         n_agents=10000,
         total_pop=9980999,
         start=init_year,

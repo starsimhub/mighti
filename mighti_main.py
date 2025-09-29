@@ -19,18 +19,13 @@ To run: `python mighti_main.py`
 """
 
 
-# TO DO:
-    # microcosting
-    # tbsim, hpvsim
-
 import logging
 import mighti as mi
 import pandas as pd
 import prepare_data_for_year
 import starsim as ss
 import stisim as sti
-import tbsim as mtb
-import hpvsim as hpv
+
 
 # Set up logging and random seeds for reproducibility
 logger = logging.getLogger('MIGHTI')
@@ -91,7 +86,7 @@ df.columns = df.columns.str.strip()
 
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV", "HPV", "Flu", "ViralHepatitis"]]
-healthconditions = []
+healthconditions = ["Type2Diabetes"]
 diseases = ["HIV"] + healthconditions
 
 ncd_df = df[df["disease_class"] == "ncd"]
@@ -118,13 +113,15 @@ prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data,
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
-# death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
-#     conditions=['hiv', 'type2diabetes'],
-#     condition_attr_map={
-#         'hiv': 'infected',
-#         'type2diabetes': 'affected'  
-#     }
-# )
+death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
+    conditions=['hiv', 'type2diabetes'],
+    condition_attr_map={
+        'hiv': 'infected',
+        'type2diabetes': 'affected'  
+    }
+)
+
+analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer]
 
 # ---------------------------------------------------------------------
 # Demographics and Networks
@@ -169,8 +166,8 @@ hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
                       init_prev_data=None,   
                       p_hiv_death=None, 
                       include_aids_deaths=False, 
-                      beta={'structuredsexual': [0.011023883426646121, 0.011023883426646121], 
-                            'maternal': [0.044227226248848076, 0.044227226248848076]})
+                      beta={'structuredsexual': [0.029594299274445842, 0.029594299274445842], 
+                            'maternal': [0.0011249414706988527, 0.0011249414706988527]})
     # Best pars: {'hiv_beta_m2f': 0.011023883426646121, 'hiv_beta_m2c': 0.044227226248848076} seed: 12345
 
 disease_objects = []
@@ -253,22 +250,6 @@ interventions5 = [give_housing]
 interventions6 = [hiv_test, art, vmmc, prep, depression_tx]
     
 
-
-# ---------------------------------------------------------------------
-# Microcosting 
-# ---------------------------------------------------------------------
-
-intervention_analyzer = mi.InterventionAnalyzer(interventions=['art'],name='intervention_analyzer'  )
-
-microcosting_analyzer = mi.MicrocostingAnalyzer(
-    unit_costs={'art': 50},
-    disability_weights={'hiv': 0.2},
-    discount_rate=0.03
-)
-
-analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, 
-             intervention_analyzer, microcosting_analyzer]
-
 # ---------------------------------------------------------------------
 # Utility: Get Modules
 # ---------------------------------------------------------------------
@@ -289,32 +270,32 @@ def get_pregnancy_module(sim):
 # Main Simulation
 # ---------------------------------------------------------------------
 if __name__ == '__main__':
-    # sim = ss.Sim(
-    #     n_agents=n_agents,
-    #     networks=networks,
-    #     start=inityear,
-    #     stop=endyear,
-    #     people=ppl,
-    #     demographics=[pregnancy, death],
-    #     analyzers=analyzers,
-    #     diseases=disease_objects,
-    #     connectors=connectors + sdoh_modules,
-    #     interventions = interventions1,
-    #     copy_inputs=False,
-    #     label='With Interventions'
-    # )
+    sim = ss.Sim(
+        n_agents=n_agents,
+        networks=networks,
+        start=inityear,
+        stop=endyear,
+        people=ppl,
+        demographics=[pregnancy, death],
+        analyzers=analyzers,
+        diseases=disease_objects,
+        connectors=connectors + sdoh_modules,
+        interventions = interventions1,
+        copy_inputs=False,
+        label='With Interventions'
+    )
 
-    # # Run the simulation
-    # sim.run()
+    # Run the simulation
+    sim.run()
     
-    # # maternal = sim.networks['maternalnet']
-    # # newborns = maternal.edges.p2
-    # # mothers = maternal.edges.p1
+    # maternal = sim.networks['maternalnet']
+    # newborns = maternal.edges.p2
+    # mothers = maternal.edges.p1
     
-    # # sdoh = sim.people.neighbourhood_situation
-    # # matches = (sdoh[newborns] == sdoh[mothers])
+    # sdoh = sim.people.neighbourhood_situation
+    # matches = (sdoh[newborns] == sdoh[mothers])
     
-    # # print(f" Inherited housing: {matches.sum()} / {len(matches)} match")
+    # print(f" Inherited housing: {matches.sum()} / {len(matches)} match")
     
     # def print_sdoh_summary(sim):
 
@@ -333,12 +314,6 @@ if __name__ == '__main__':
     #     # summarize("HealthCareSystem",        ppl.healthcare_system)
     
 
-    # # Access results
-    # df = microcosting_analyzer.to_df()
-    # print(df.head())
-    
-    # total_cost = df['total_cost'].sum()
-    # print(f"Total cost across all agents = ${total_cost:,.2f}")
 
     # # Mortality rates and life table
     # target_year = endyear - 1
@@ -360,52 +335,52 @@ if __name__ == '__main__':
     
     # mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
     
-    # # # Plot life expectancy comparison
+    # # Plot life expectancy comparison
     # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, 'MajorDepressiveDisorder', prevalence_data_df, inityear, endyear)
-    # # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer,'Type2Diabetes')
+    mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer,'Type2Diabetes')
        
-    ### To run 2 simulation simultaneously #####
-    sim_without = ss.Sim(
-        n_agents=n_agents,
-        networks=networks,
-        start=inityear,
-        stop=endyear,
-        people=ppl,
-        demographics=[pregnancy, death],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
-        diseases=disease_objects,
-        connectors=connectors + sdoh_modules,
-        copy_inputs=False,
-        label='Without Intervention'
-    )
+    # ### To run 2 simulation simultaneously #####
+    # sim_without = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=endyear,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=connectors + sdoh_modules,
+    #     copy_inputs=False,
+    #     label='Without Intervention'
+    # )
     
-    sim_with = ss.Sim(
-        n_agents=n_agents,
-        networks=networks,
-        start=inityear,
-        stop=endyear,
-        people=ppl,
-        demographics=[pregnancy, death],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
-        diseases=disease_objects,
-        connectors=connectors + sdoh_modules,
-        interventions = interventions5,
-        copy_inputs=False,
-        label='With Intervention'
-    )
+    # sim_with = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=endyear,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=connectors + sdoh_modules,
+    #     interventions = interventions1,
+    #     copy_inputs=False,
+    #     label='With Intervention'
+    # )
     
  
-    msim = ss.MultiSim(sims=[sim_without, sim_with])
-    msim.run()
+    # msim = ss.MultiSim(sims=[sim_without, sim_with])
+    # msim.run()
     
     
     # for sim in msim.sims:
     #     print(f"\n SDoH summary for: {sim.label}")
     #     print_sdoh_summary(sim)
         
-    # Extract the individual sims
-    sim_base = msim.sims[0]  # Without intervention
-    sim_intv = msim.sims[1]  # With intervention
+    # # Extract the individual sims
+    # sim_base = msim.sims[0]  # Without intervention
+    # sim_intv = msim.sims[1]  # With intervention
 
       

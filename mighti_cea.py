@@ -25,8 +25,6 @@ import pandas as pd
 import prepare_data_for_year
 import starsim as ss
 import stisim as sti
-import tbsim as mtb
-import hpvsim as hpv
 
 # Set up logging and random seeds for reproducibility
 logger = logging.getLogger('MIGHTI')
@@ -38,7 +36,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 n_agents = 1_000 
 inityear = 2007
-endyear = 2026
+endyear = 2020
 region = 'eswatini'
 
 
@@ -87,7 +85,7 @@ df.columns = df.columns.str.strip()
 
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [condition for condition in df.condition if condition not in ["HIV", "HPV", "Flu", "ViralHepatitis"]]
-healthconditions = []
+healthconditions = ["Type2Diabetes"]
 diseases = ["HIV"] + healthconditions
 
 ncd_df = df[df["disease_class"] == "ncd"]
@@ -115,17 +113,34 @@ survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
 # Analyzers
-microcosting_analyzer_base = mi.MicrocostingAnalyzer(unit_costs={'art': 50}, 
-                                                     disability_weights={'hiv': 0.2}, discount_rate=0.03, name='microcostinganalyzer' )
-microcosting_analyzer_intv = mi.MicrocostingAnalyzer(unit_costs={'art': 50}, 
-                                                     disability_weights={'hiv': 0.2}, discount_rate=0.03, name='microcostinganalyzer' )
+microcosting_analyzer_base = mi.MicrocostingAnalyzer(
+    unit_costs={'art': 50}, 
+    disability_weights={'hiv': 0.2},
+    discount_rate_costs=0.03,
+    discount_rate_outcomes=0.03,
+    name='microcostinganalyzer'
+)
+microcosting_analyzer_intv = mi.MicrocostingAnalyzer(
+    unit_costs={'art': 50}, 
+    disability_weights={'hiv': 0.2}, 
+    discount_rate=0.03,
+    discount_rate_costs=0.03,
+    discount_rate_outcomes=0.03,
+    name='microcostinganalyzer' )
+
 intervention_analyzer = mi.InterventionAnalyzer(interventions=['art'], name='intervention_analyzer')
 
+death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
+    conditions=['hiv'],
+    condition_attr_map={'hiv': 'infected'},
+    ex_life_expectancy=80
+)
+
 analyzers_base = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, 
-                  intervention_analyzer, microcosting_analyzer_base]
+                  intervention_analyzer, death_cause_analyzer, microcosting_analyzer_base]
 
 analyzers_intv = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, 
-                  intervention_analyzer, microcosting_analyzer_intv]
+                  intervention_analyzer, death_cause_analyzer, microcosting_analyzer_intv]
 
 
 # ---------------------------------------------------------------------
@@ -230,30 +245,8 @@ art = sti.ART(coverage_data=art_coverage_data)
 vmmc = sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}})
 prep = sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]})
 
-t2d_tx = mi.T2D_ReduceMortalityTx(product=unified_product, prob=1.0,rel_death_reduction=0.54,
-                                  eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
-                                  label='T2D_ReduceMortalityTx')
-
-depression_tx = mi.DepressionCare(product=unified_product, prob=0.1, label='depression_tx')
-
-hospital_discharge = mi.ImproveHospitalDischarge(disease_name='depression', multiplier=10.0,
-                                                 start_day=0,end_day=10,label='FastDischarge')
-
-give_housing = mi.GiveHousingToDepressed(coverage=1, start_day=0)
-
-# Define interventions using these data
 interventions1 = [hiv_test, art, vmmc, prep]
 
-interventions2 = [hiv_test, art, vmmc, prep, t2d_tx]
-
-interventions3 = [t2d_tx]
-
-interventions4 = [hospital_discharge]
-
-interventions5 = [give_housing]
-
-interventions6 = [hiv_test, art, vmmc, prep, depression_tx]
-    
 
 # ---------------------------------------------------------------------
 # Utility: Get Modules
@@ -269,13 +262,6 @@ def get_pregnancy_module(sim):
         if isinstance(module, ss.Pregnancy):
             return module
     raise ValueError("Pregnancy module not found in the simulation.")
-
-def get_microcosting_analyzer(sim):
-    for analyzer in sim.analyzers:
-        if isinstance(analyzer, mi.MicrocostingAnalyzer):
-            return analyzer
-    raise ValueError("MicrocostingAnalyzer not found in simulation analyzers.")
-    
     
     
 # ---------------------------------------------------------------------
@@ -291,7 +277,7 @@ if __name__ == '__main__':
         demographics=[pregnancy, death],
         analyzers=analyzers_base,
         diseases=disease_objects,
-        connectors=connectors + sdoh_modules,
+        # connectors=connectors + sdoh_modules,
         label='Baseline'
     )
 
@@ -304,23 +290,29 @@ if __name__ == '__main__':
         demographics=[pregnancy, death],
         analyzers=analyzers_intv,
         diseases=disease_objects,
-        connectors=connectors + sdoh_modules,
-        interventions=[art],
+        # connectors=connectors + sdoh_modules,
+        interventions=[hiv_test, art],
         label='With ART'
     )
 
     msim = ss.MultiSim([sim_base, sim_intv])
     msim.run()
-
-    # Extract analyzers
-    analyzer_base = get_microcosting_analyzer(sim_base)
-    analyzer_intv = get_microcosting_analyzer(sim_intv)
     
-    # Compute ICER
+    analyzer_base = sim_base.analyzers.microcostinganalyzer
+    analyzer_intv = sim_intv.analyzers.microcostinganalyzer
+    
+    # # Compute ICER
     icer = analyzer_intv.compute_icer(analyzer_base)
     
     # Print results
+    df_art = sim_intv.analyzers.intervention_analyzer.to_df()
+    n_art = df_art[df_art['received_art'] == True]['uid'].nunique()
+    print(f" {n_art:,} agents received ART during the intervention.")
+    
+    
     print("\nIncremental Cost-Effectiveness Results:")
     print(f"  ΔCost  = ${icer['delta_cost']:,.2f}")
     print(f"  ΔDALY  = {icer['delta_daly']:,.2f}")
     print(f"  ICER   = ${icer['icer']:,.2f} per DALY averted")
+    
+    
