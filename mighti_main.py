@@ -35,9 +35,9 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 # Simulation Settings
 # ---------------------------------------------------------------------
-n_agents = 1_000 
+n_agents = 100_000 
 inityear = 2007
-endyear = 2026
+endyear = 2024
 region = 'eswatini'
 
 
@@ -128,7 +128,7 @@ analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer]
 # ---------------------------------------------------------------------
 death_rates = {'death_rate': pd.read_csv(csv_path_death), 'rate_units': 1}
 death = ss.Deaths(death_rates) 
-death.death_rate_data *= 0.4 # 0.4 for only T2D
+# death.death_rate_data *= 0.4 # 0.4 for only T2D
 fertility_rate = {'fertility_rate': pd.read_csv(csv_path_fertility)}
 pregnancy = ss.Pregnancy(pars=fertility_rate)
 
@@ -168,7 +168,7 @@ hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prevalence_function('HIV')),
                       include_aids_deaths=False, 
                       beta={'structuredsexual': [0.029594299274445842, 0.029594299274445842], 
                             'maternal': [0.0011249414706988527, 0.0011249414706988527]})
-    # Best pars: {'hiv_beta_m2f': 0.011023883426646121, 'hiv_beta_m2c': 0.044227226248848076} seed: 12345
+    # Best pars: {'hiv_beta_m2f': 0.029594299274445842, 'hiv_beta_m2c': 0.0011249414706988527}
 
 disease_objects = []
 
@@ -336,6 +336,8 @@ if __name__ == '__main__':
     # mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
     
     # # Plot life expectancy comparison
+    prevalence_data_df = pd.read_csv(f"mighti/data/{region}_postprocess_check_prevalence.csv")
+
     # mi.plot_life_expectancy(life_table, obs_ex, year = target_year, max_age=100, figsize=(14, 10), title=None)
     mi.plot_mean_prevalence(sim, prevalence_analyzer, 'Type2Diabetes', prevalence_data_df, inityear, endyear)
     # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer,'Type2Diabetes')

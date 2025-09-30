@@ -11,7 +11,6 @@ class CervicalCancer(ChronicDisease):
         self.disease_name = 'CervicalCancer'
         super().__init__(csv_path, pars, **kwargs)
         self.define_pars(label = 'CervicalCancer')
-        if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire = 1
+
         return
 

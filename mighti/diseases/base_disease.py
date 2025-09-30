@@ -54,6 +54,7 @@ def get_disease_parameters(csv_path, disease_name):
         "remission_rate": get_value_safe("remission_rate", 0.0),
         "max_disease_duration": get_value_safe("max_disease_duration", 30),
         "affected_sex": get_value_safe("affected_sex", "both"),
+        "p_acquire": get_value_safe("p_acquire", 0.01),   
     }
 
 
@@ -78,6 +79,7 @@ class RemittingDisease(ss.NCD):
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
+            p_acquire=disease_params["p_acquire"],
             init_prev=None
         )
         
@@ -207,6 +209,7 @@ class AcuteDisease(ss.NCD):
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
+            p_acquire=disease_params["p_acquire"],
             init_prev=None
         )
 
@@ -333,6 +336,7 @@ class ChronicDisease(ss.NCD):
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
+            p_acquire=disease_params["p_acquire"],
             init_prev=None
         )
         
@@ -460,6 +464,7 @@ class GenericSIS(ss.SIS):
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
+            p_acquire=disease_params["p_acquire"],
             init_prev=pars.get("init_prev", ss.bernoulli(0)) if pars else ss.bernoulli(0)
         )
 

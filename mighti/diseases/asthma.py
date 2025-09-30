@@ -12,8 +12,7 @@ class Asthma(ChronicDisease):
         super().__init__(csv_path, pars, **kwargs)
         
         self.define_pars(label = 'Asthma')
-        if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire = 1
+
 
         return
 
