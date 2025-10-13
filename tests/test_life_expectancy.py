@@ -15,10 +15,19 @@ do_plot = False
 sc.options(interactive=do_plot)
 
 def get_deaths_module(sim):
-    for module in sim.modules:
-        if isinstance(module, mi.DeathsByAgeSexAnalyzer):
-            return module
-    raise ValueError("Deaths module not found in the simulation. Make sure you've added the DeathsByAgeSexAnalyzer to your simulation configuration")
+    """
+    Retrieve the DeathsByAgeSexAnalyzer from a Starsim 3.x simulation.
+    Works whether analyzers are stored in sim.analyzers, sim.results, or sim.modules.
+    """
+    if hasattr(sim, "analyzers") and isinstance(sim.analyzers, dict):
+        for a in sim.analyzers.values():
+            if isinstance(a, mi.DeathsByAgeSexAnalyzer):
+                return a
+    raise ValueError(
+        "Deaths analyzer not found. Available keys: "
+        f"{list(sim.results.keys()) if hasattr(sim, 'results') else 'None'}"
+    )
+
 
 def get_pregnancy_module(sim):
     for module in sim.modules:

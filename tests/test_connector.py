@@ -33,9 +33,9 @@ def test_hiv_alcoholusedisorder():
 
     pars = dict(
         start=2000,
-        stop=2030,  # more years
+        stop=2030,
         dt=1,
-        n_agents=5000,  # more agents
+        n_agents=5000,
         networks=sti.StructuredSexual(),
         diseases=[hiv, alcoholusedisorder]
     )
@@ -48,17 +48,11 @@ def test_hiv_alcoholusedisorder():
     res1 = sim1.results.alcoholusedisorder.prevalence.mean()
     assert res1 >= res0 - 0.01, f'AlcoholUseDisorder should be higher with connector: {res1=} vs {res0=}'
     print(f'[✓] Alcohol Use Disorder prevalence increased or remained similar: {res0:.3f} → {res1:.3f}')
-
+    return sim0, sim1  
 
 # %% Run as a script
-    if __name__ == '__main__':
-        # Run `%matplotlib inline` to see the figure.
-        pl.plot(sim0.results.alcoholusedisorder.timevec, sim0.results.alcoholusedisorder.prevalence, label='No connector')
-        pl.plot(sim1.results.alcoholusedisorder.timevec, sim1.results.alcoholusedisorder.prevalence, label='With connector')
-        pl.xlabel('Year')
-        pl.ylabel('AUD Prevalence')
-        pl.legend()
-        pl.title('HIV ↔ Alcohol Use Disorder Connector Effect')
-        pl.show()
+if __name__ == '__main__':
+    sim0, sim1 = test_hiv_alcoholusedisorder()
+
         
         

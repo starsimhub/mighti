@@ -53,50 +53,59 @@ class SurvivorshipAnalyzer(ss.Analyzer):
  
 
 class ConditionAtDeathAnalyzer(ss.Analyzer):
+    """Tracks which conditions individuals had at the time of death and computes YLLs."""
+
     def __init__(self, conditions=None, condition_attr_map=None, ex_life_expectancy=80.0, **kwargs):
         super().__init__(**kwargs)
         self.conditions = [c.lower() for c in (conditions or [])]
         self.condition_attr_map = condition_attr_map or {}
-        self.ex_life_expectancy = ex_life_expectancy  # Default life expectancy for YLL
+        self.ex_life_expectancy = ex_life_expectancy
         self.records = []
         self.name = 'condition_at_death_analyzer'
-        
+
     def init_results(self):
         self.records = []
 
     def step(self):
         ppl = self.sim.people
-        ti = self.sim.ti
-        year = self.sim.t.yearvec[ti]
-    
-        # Rough fixed life expectancy by sex (replace with actual `ex` lookup later)
+        ti = self.sim.t.ti
+        current_year = self.sim.t.yearvec[ti]
+
+        # Reference life expectancy (replace with country/sex-specific later if desired)
         life_expectancy_female = 75
         life_expectancy_male = 70
-    
+
+        # Loop over everyone who died this step
         for uid in ppl.dead.uids:
             age = ppl.age[uid]
             sex = 'Female' if ppl.female[uid] else 'Male'
             expected_le = life_expectancy_female if sex == 'Female' else life_expectancy_male
             yll = max(0, expected_le - age)
-    
-            record = {
-                'uid': uid,
-                'year': year,
-                'age': age,
-                'sex': sex,
-                'yll': yll,
-            }
-    
+
+            record = dict(uid=uid, year=current_year, age=age, sex=sex, yll=yll)
+
+            # For each condition, check if the person had it at death
             for cond in self.conditions:
-                ti_dead = ppl[cond].ti_dead[uid]
-                if not np.isnan(ti_dead):
-                    condition_ti = self.sim.diseases[cond].t.abstvec[int(ti_dead)]
-                    died_of_cond = (condition_ti > ti - 1) and (condition_ti <= ti)
+                disease = getattr(self.sim.diseases, cond, None)
+                if disease is None:
+                    record[f'died_{cond}'] = False
+                    continue
+
+                # Choose attribute depending on disease type
+                if hasattr(disease, 'infected'):
+                    had_cond = disease.infected[uid]
+                elif hasattr(disease, 'affected'):
+                    had_cond = disease.affected[uid]
+                elif hasattr(disease, 'active'):
+                    had_cond = disease.active[uid]
                 else:
-                    died_of_cond = False
-    
-                record[f'died_{cond}'] = died_of_cond
-    
+                    had_cond = False
+
+                record[f'died_{cond}'] = bool(had_cond)
+
             self.records.append(record)
+
     def to_df(self):
+        """Return a DataFrame of all recorded deaths and associated conditions."""
         return pd.DataFrame(self.records)
+    

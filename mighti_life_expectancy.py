@@ -23,7 +23,7 @@ import pandas as pd
 import prepare_data_for_year
 import starsim as ss
 import stisim as sti
-from mighti.diseases.type2diabetes import ReduceMortalityTx
+from mighti.diseases.type2diabetes import T2D_ReduceMortalityTx
 
 
 # Set up logging and random seeds for reproducibility
@@ -34,7 +34,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 # Simulation Settings
 # ---------------------------------------------------------------------
-n_agents = 100_000 
+n_agents = 10_000 
 inityear = 2007
 # endyear = 2008
 region = 'eswatini'
@@ -44,7 +44,7 @@ region = 'eswatini'
 # File paths
 # ---------------------------------------------------------------------
 # Parameters
-csv_path_params = f'mighti/data/{region}_parameters_gbd.csv'
+csv_path_params = f'mighti/data/{region}_parameters.csv'
 
 # Relative Risks
 csv_path_interactions = "mighti/data/rel_sus.csv"
@@ -60,6 +60,9 @@ csv_path_death = f'mighti/data/{region}_mortality_rates.csv'
 
 # Age distribution data
 csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
+
+# Intervention 
+csv_path_intervention = f'mighti/data/{region}_intervention.csv'
 
 # Ensure required demographic files are prepared
 prepare_data_for_year.prepare_data_for_year(region,inityear)
@@ -102,7 +105,7 @@ get_prev_fn = lambda d: lambda mod, sim, size: mi.age_sex_dependent_prevalence(d
 # ---------------------------------------------------------------------
 def make_sim(year):
     # Initialize the PrevalenceAnalyzer
-    prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=prevalence_data, diseases=diseases)
+    prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=diseases)
     survivorship_analyzer = mi.SurvivorshipAnalyzer()
     deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
     
@@ -150,50 +153,50 @@ def make_sim(year):
     connectors = mi.create_connectors(ncd_interactions)
     
     interactions.extend(connectors)
-    
         
+            
     # ART coverage among PLHIV (from 95-95-95 cascade estimates and Lancet data)
     art_coverage_data = pd.DataFrame({
         'p_art': [0.10, 0.34, 0.50, 0.65, 0.741, 0.85]
-        # 'p_art': [1,1,1,1,1,1]
     }, index=[2003, 2010, 2013, 2014, 2016, 2022])
-    
+
     # HIV testing probabilities over time (estimated testing uptake)
     test_prob_data = [0.10, 0.25, 0.60, 0.70, 0.80, 0.95]
-    # test_prob_data = [1,1,1,1,1,1]
     test_years = [2003, 2005, 2007, 2010, 2014, 2016]
-    
-    tx_df = pd.read_csv("mighti/data/t2d_tx.csv")
-    t2d_tx = ss.Tx(df=tx_df)
-    
-    t2d_treatment = ReduceMortalityTx(
-        label='T2D Mortality Reduction',
-        product=t2d_tx,
-        prob=1.0,
-        rel_death_reduction=0.5,
-        eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids
-    )
-    
-    # Define interventions using these data
-    interventions = [
-        sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
-        sti.ART(coverage_data=art_coverage_data),
-        sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
-        sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
-    ]
-    
-    interventions2 = [
-        sti.HIVTest(test_prob_data=test_prob_data, years=test_years),
-        sti.ART(coverage_data=art_coverage_data),
-        sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}}),
-        sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]}),
-        t2d_treatment
-    ]
-    
-    interventions3 = [
-        t2d_treatment
-    ]
 
+    intervention_df = pd.read_csv(csv_path_intervention)
+    unified_product = ss.Tx(df=intervention_df, label='UnifiedTx')
+
+
+    hiv_test = sti.HIVTest(test_prob_data=test_prob_data, years=test_years)
+    art = sti.ART(coverage_data=art_coverage_data)
+    vmmc = sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}})
+    prep = sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]})
+
+    t2d_tx = mi.T2D_ReduceMortalityTx(product=unified_product, prob=1.0,rel_death_reduction=0.54,
+                                    eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
+                                    label='T2D_ReduceMortalityTx')
+
+    depression_tx = mi.DepressionCare(product=unified_product, prob=0.1, label='depression_tx')
+
+    hospital_discharge = mi.ImproveHospitalDischarge(disease_name='depression', multiplier=10.0,
+                                                    start_day=0,end_day=10,label='FastDischarge')
+
+    give_housing = mi.GiveHousingToDepressed(coverage=1, start_day=0)
+
+    # Define interventions using these data
+    interventions1 = [hiv_test, art, vmmc, prep]
+
+    interventions2 = [hiv_test, art, vmmc, prep, t2d_tx]
+
+    interventions3 = [t2d_tx]
+
+    interventions4 = [hospital_discharge]
+
+    interventions5 = [give_housing]
+
+    interventions6 = [hiv_test, art, vmmc, prep, depression_tx]
+        
 
     # sim = ss.Sim(
     #     n_agents=n_agents,
@@ -227,20 +230,19 @@ def make_sim(year):
         label='No_intervention'
     )
     
-    sim_with = ss.Sim(
-        n_agents=n_agents,
-        networks=networks,
-        start=inityear,
-        stop=year,
-        people=ppl,
-        demographics=[pregnancy, death],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-        diseases=disease_objects,
-        connectors=interactions,
-        interventions = interventions,
-        copy_inputs=False,
-        label='HIV_intervention'
-    )
+    # sim_with = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=year,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=interactions,
+    #     copy_inputs=False,
+    #     label='HIV_intervention'
+    # )
     
     sim_with_t2d = ss.Sim(
         n_agents=n_agents,
@@ -257,22 +259,22 @@ def make_sim(year):
         label='T2D_intervention'
     )
     
-    sim_with_both = ss.Sim(
-        n_agents=n_agents,
-        networks=networks,
-        start=inityear,
-        stop=year,
-        people=ppl,
-        demographics=[pregnancy, death],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-        diseases=disease_objects,
-        connectors=interactions,
-        interventions = interventions2,
-        copy_inputs=False,
-        label='Both_intervention'
-    )
+    # sim_with_both = ss.Sim(
+    #     n_agents=n_agents,
+    #     networks=networks,
+    #     start=inityear,
+    #     stop=year,
+    #     people=ppl,
+    #     demographics=[pregnancy, death],
+    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
+    #     diseases=disease_objects,
+    #     connectors=interactions,
+    #     interventions = interventions2,
+    #     copy_inputs=False,
+    #     label='Both_intervention'
+    # )
  
-    msim = ss.MultiSim(sims=[sim_without, sim_with, sim_with_t2d, sim_with_both])
+    msim = ss.MultiSim(sims=[sim_without, sim_with_t2d])
 
     return msim
 

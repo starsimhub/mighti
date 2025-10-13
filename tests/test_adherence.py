@@ -16,13 +16,10 @@ sc.options(interactive=do_plot)
 # File path to parameter file
 thisdir = os.path.dirname(__file__)
 age_path = os.path.join(thisdir, 'test_data', 'eswatini_age_distribution_2007.csv')  # simple flat age distribution
-prev_path = os.path.join(thisdir,'test_data', 'eswatini_prevalence.csv')
+prev_path = os.path.join(thisdir,'test_data', 'eswatini_parameters.csv')
 
 def test_adherence_connector_runs():
     n = 1000
-    seed = 42
-    ss.set_seed(seed)
-
 
     # Manually set 10% prevalence for CASM conditions
     casm_conditions = ['MajorDepressiveDisorder','AlcoholUseDisorder','AnxietyDisorder',
@@ -59,6 +56,7 @@ def test_adherence_connector_runs():
         people=ss.People(n, age_data=pd.read_csv(age_path)),
         diseases=disease_objects,
         interventions=[art],
+        seed = 42,
         connectors=[create_adherence_connector('ART')],
         label='Adherence Test'
     )
@@ -90,6 +88,7 @@ def test_depression_treatment_boost():
         start=2020,
         stop=2021,
         people=ppl,
+        rand_seed = 42,
         interventions=[art, depression_tx],
         connectors=[DepressionTreatmentEffectConnector()],
         label='Depression Boost Test'
