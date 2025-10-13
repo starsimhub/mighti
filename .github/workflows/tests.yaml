@@ -1,6 +1,5 @@
 name: Run tests and build docs
 
-
 on:
   push:
     branches: [ main, main_nao_aug2025 ]
@@ -23,6 +22,8 @@ jobs:
       run: |
         pip install -r docs/requirements.txt
         pip install .
+        # --- Ensure correct Starsim/STIsim versions (override cache) ---
+        pip install --force-reinstall starsim==3.0.3 STIsim==1.4.0
 
     - name: Run tests
       run: |
@@ -31,3 +32,4 @@ jobs:
     - name: Build documentation
       run: |
         sphinx-build -b html docs docs/_build/html
+        
