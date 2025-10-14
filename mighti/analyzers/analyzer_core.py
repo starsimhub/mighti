@@ -50,62 +50,105 @@ class SurvivorshipAnalyzer(ss.Analyzer):
         for age in range(self.max_age):
             for sex in ['Male', 'Female']:
                 self.survivorship_data[sex][age] += len(ppl.age[(ppl.age >= age) & (ppl.age < age+1) & (ppl.female == (sex=='Female'))])
- 
+
 
 class ConditionAtDeathAnalyzer(ss.Analyzer):
-    """Tracks which conditions individuals had at the time of death and computes YLLs."""
+    """
+    Simple analyzer that records who died, their age/sex/YLL,
+    and which non-HIV conditions they had or died from.
 
-    def __init__(self, conditions=None, condition_attr_map=None, ex_life_expectancy=80.0, **kwargs):
+    Notes:
+    - HIV deaths are excluded (use the HIV module directly).
+    - Analyzer still records HIV-positive status at death.
+    - No cause grouping logic here (handled in main scripts).
+    """
+
+    def __init__(self, conditions=None, ex_life_expectancy=80.0, **kwargs):
         super().__init__(**kwargs)
-        self.conditions = [c.lower() for c in (conditions or [])]
-        self.condition_attr_map = condition_attr_map or {}
+        # Store non-HIV conditions only (HIV tracked separately)
+        self.conditions = [c.lower() for c in (conditions or []) if c.lower() != "hiv"]
         self.ex_life_expectancy = ex_life_expectancy
         self.records = []
-        self.name = 'condition_at_death_analyzer'
+        self.name = "condition_at_death_analyzer"
 
     def init_results(self):
         self.records = []
 
+    def _had_condition(self, disease, uid):
+        """Return True if agent had this condition at death."""
+        if disease is None:
+            return False
+        for attr in ("infected", "affected", "active"):
+            if hasattr(disease, attr):
+                arr = getattr(disease, attr)
+                try:
+                    return bool(arr[uid])
+                except Exception:
+                    return False
+        return False
+
+    def _died_of_condition(self, disease, uid, ti):
+        """Return True if this module has ti_dead and matches current step."""
+        if disease is None or not hasattr(disease, "ti_dead"):
+            return False
+        ti_dead = getattr(disease, "ti_dead")
+        try:
+            return bool((ti_dead == ti)[uid])
+        except Exception:
+            raw = getattr(ti_dead, "raw", None)
+            if raw is None:
+                return False
+            return bool(np.isfinite(raw[uid]) and raw[uid] == ti)
+
     def step(self):
         ppl = self.sim.people
         ti = self.sim.t.ti
-        current_year = self.sim.t.yearvec[ti]
+        year = float(self.sim.t.yearvec[ti])
+        died_now = ppl.dead.uids
+        if not len(died_now):
+            return
 
-        # Reference life expectancy (replace with country/sex-specific later if desired)
-        life_expectancy_female = 75
-        life_expectancy_male = 70
+        # Reference HIV module to check HIV infection at death
+        hiv_mod = getattr(self.sim.diseases, "hiv", None)
 
-        # Loop over everyone who died this step
-        for uid in ppl.dead.uids:
-            age = ppl.age[uid]
-            sex = 'Female' if ppl.female[uid] else 'Male'
-            expected_le = life_expectancy_female if sex == 'Female' else life_expectancy_male
-            yll = max(0, expected_le - age)
+        for uid in died_now:
+            age = float(ppl.age[uid])
+            sex = "Female" if ppl.female[uid] else "Male"
 
-            record = dict(uid=uid, year=current_year, age=age, sex=sex, yll=yll)
+            # Simple YLL estimate (replace later with life-table lookup if needed)
+            le = 75 if sex == "Female" else 70
+            if isinstance(self.ex_life_expectancy, (int, float)):
+                le = float(self.ex_life_expectancy)
+            yll = max(0.0, le - age)
 
-            # For each condition, check if the person had it at death
+            rec = dict(uid=int(uid), year=year, age=age, sex=sex, yll=yll)
+
+            # Record presence and cause flags for each disease
             for cond in self.conditions:
                 disease = getattr(self.sim.diseases, cond, None)
-                if disease is None:
-                    record[f'died_{cond}'] = False
-                    continue
+                rec[f"died_{cond}"] = self._had_condition(disease, uid)
+                rec[f"cause_{cond}"] = self._died_of_condition(disease, uid, ti)
 
-                # Choose attribute depending on disease type
-                if hasattr(disease, 'infected'):
-                    had_cond = disease.infected[uid]
-                elif hasattr(disease, 'affected'):
-                    had_cond = disease.affected[uid]
-                elif hasattr(disease, 'active'):
-                    had_cond = disease.active[uid]
-                else:
-                    had_cond = False
+            # Record HIV infection status (not death cause)
+            rec["hiv_positive"] = False
+            if hiv_mod is not None and hasattr(hiv_mod, "infected"):
+                try:
+                    rec["hiv_positive"] = bool(hiv_mod.infected[uid])
+                except Exception:
+                    pass
 
-                record[f'died_{cond}'] = bool(had_cond)
+            # Determine primary cause (non-HIV only)
+            causes = [c for c in self.conditions if rec.get(f"cause_{c}", False)]
+            if len(causes) == 1:
+                rec["primary_cause"] = causes[0]
+            elif len(causes) > 1:
+                rec["primary_cause"] = "multiple"
+            else:
+                rec["primary_cause"] = None
 
-            self.records.append(record)
+            self.records.append(rec)
 
     def to_df(self):
-        """Return a DataFrame of all recorded deaths and associated conditions."""
+        """Return DataFrame of recorded deaths and conditions."""
         return pd.DataFrame(self.records)
     

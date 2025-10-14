@@ -1,5 +1,5 @@
 condition,p_death,dur_condition,rel_sus,remission_rate,max_disease_duration,p_acquire,disease_type,disease_class,affected_sex
-Type1Diabetes,0.0034,22.27,,0,30,0.00013109,chronic,ncd,both
+Type1Diabetes,0.0034,22.27,1.9,0,30,0.00013109,chronic,ncd,both
 Type2Diabetes,0.025,15.028971,1.61,0.024,30.057942,0.003821946,remitting,ncd,both
 Hypertension,,,0.93,0,30,,chronic,ncd,both
 Obesity,,,,0,10,,chronic,ncd,both
