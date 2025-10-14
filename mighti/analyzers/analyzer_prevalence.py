@@ -258,6 +258,166 @@ class PrevalenceAnalyzer_HIV(ss.Analyzer):
             self.results[f'{disease}_num_total'][ti] = total_num_with_HIV
             self.results[f'{disease}_den_total'][ti] = total_den_with_HIV
 
+class PrevalenceAnalyzer_SDoH(ss.Analyzer):
+    """
+    Stratifies disease prevalence by an SDoH boolean (e.g., housing), sex, age.
+    """
 
-class PrevalenceAnalyzer_SDoH(ss.Analyzer):    
-    pass
+    def initialize(self, sim):
+        super().initialize(sim)
+        self.sim = sim
+        self.init_results()
+
+    @staticmethod
+    def cond_prob_bool(numerator_bool, denominator_bool):
+        # Works on NumPy bool arrays or any array-like that casts to boolean
+        num = int(np.sum(numerator_bool & denominator_bool))
+        den = int(np.sum(denominator_bool))
+        return sc.safedivide(num, den)
+
+    def __init__(self, prevalence_data, diseases=None, sdoh_attr="neighbourhood_situation", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.name = "prevalence_analyzer_sdoh"
+        self.prevalence_data = prevalence_data
+        self.diseases = diseases or []
+        self.sdoh_attr = sdoh_attr
+        self.age_bins = [
+            (0,15),(15,20),(20,25),(25,30),(30,35),
+            (35,40),(40,45),(45,50),(50,55),(55,60),
+            (60,65),(65,70),(70,75),(75,80),(80,float("inf"))
+        ]
+        self.results_defined = False
+
+    def init_results(self):
+        if self.results_defined:
+            return
+        
+        if "sdoh_prop_adults" not in self.results:
+            self.define_results(ss.Result("sdoh_prop_adults", dtype=float, scale=False))
+
+        existing = set(self.results.keys())
+        new = []
+
+        for disease in self.diseases:
+            for i, _ in enumerate(self.age_bins):
+                for sex in ("male","female"):
+                    for key in (
+                        f"{disease}_num_{sex}_{i}",
+                        f"{disease}_den_{sex}_{i}",
+                        f"{disease}_prev_{sex}_{i}",
+                        f"{disease}_num_with_SDoH_{sex}_{i}",
+                        f"{disease}_den_with_SDoH_{sex}_{i}",
+                        f"{disease}_prev_with_SDoH_{sex}_{i}",
+                        f"{disease}_num_without_SDoH_{sex}_{i}",
+                        f"{disease}_den_without_SDoH_{sex}_{i}",
+                        f"{disease}_prev_without_SDoH_{sex}_{i}",
+                    ):
+                        if key not in existing:
+                            new.append(ss.Result(key, dtype=float if "prev" in key else int, scale=False))
+                            existing.add(key)
+
+            for key in (
+                f"{disease}_prev_no_sdoh", f"{disease}_prev_has_sdoh",
+                f"{disease}_prev_no_sdoh_f", f"{disease}_prev_has_sdoh_f",
+                f"{disease}_prev_no_sdoh_m", f"{disease}_prev_has_sdoh_m",
+                f"{disease}_num_total", f"{disease}_den_total",
+            ):
+                if key not in existing:
+                    new.append(ss.Result(key, dtype=float if "prev" in key else int, scale=False))
+                    existing.add(key)
+
+        if new:
+            self.define_results(*new)
+        self.results_defined = True
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        npts = len(sim.t)
+        self.results["population_age_distribution"] = np.zeros((npts, 101))
+
+    def step(self):
+        sim = self.sim
+        ti  = self.ti
+        ppl = sim.people
+
+        # Make sure SDoH is a *boolean array*
+        if hasattr(ppl, self.sdoh_attr):
+            sdoh = np.asarray(getattr(ppl, self.sdoh_attr), dtype=bool)
+        else:
+            sdoh = np.zeros(len(ppl), dtype=bool)
+
+        no_sdoh = ~sdoh
+        alive   = np.asarray(ppl.alive, dtype=bool)
+        male    = np.asarray(ppl.male,  dtype=bool)
+        female  = np.asarray(ppl.female,dtype=bool)
+
+        for disease in self.diseases:
+            dis = getattr(sim.diseases, disease.lower())
+            status_attr = "infected" if disease.lower() in ["hiv","hpv","flu","viralhepatitis","tb"] else "affected"
+            has_disease = alive & np.asarray(getattr(dis, status_attr), dtype=bool)
+
+            has_disease_f = has_disease & female
+            has_disease_m = has_disease & male
+            sdoh_f        = sdoh & female
+            sdoh_m        = sdoh & male
+            nosdoh_f      = no_sdoh & female
+            nosdoh_m      = no_sdoh & male
+
+            total_num_with = 0
+            total_den_with = 0
+
+            for i,(a0,a1) in enumerate(self.age_bins):
+                age_group = (ppl.age >= a0) & (ppl.age < a1)
+
+                num_m   = int(np.sum(age_group & has_disease_m))
+                den_m   = int(np.sum(age_group & male))
+                num_f   = int(np.sum(age_group & has_disease_f))
+                den_f   = int(np.sum(age_group & female))
+
+                num_w_m = int(np.sum(age_group & has_disease_m & sdoh))
+                den_w_m = int(np.sum(age_group & male & sdoh))
+                num_w_f = int(np.sum(age_group & has_disease_f & sdoh))
+                den_w_f = int(np.sum(age_group & female & sdoh))
+
+                num_wo_m = int(np.sum(age_group & has_disease_m & no_sdoh))
+                den_wo_m = int(np.sum(age_group & male & no_sdoh))
+                num_wo_f = int(np.sum(age_group & has_disease_f & no_sdoh))
+                den_wo_f = int(np.sum(age_group & female & no_sdoh))
+
+                total_num_with += (num_w_m + num_w_f)
+                total_den_with += (den_w_m + den_w_f)
+
+                for sex, num, den, num_w, den_w, num_wo, den_wo in zip(
+                    ("male","female"),
+                    (num_m, num_f),
+                    (den_m, den_f),
+                    (num_w_m, num_w_f),
+                    (den_w_m, den_w_f),
+                    (num_wo_m, num_wo_f),
+                    (den_wo_m, den_wo_f),
+                ):
+                    self.results[f"{disease}_num_{sex}_{i}"][ti]              = num
+                    self.results[f"{disease}_den_{sex}_{i}"][ti]              = max(den,1)
+                    self.results[f"{disease}_prev_{sex}_{i}"][ti]             = sc.safedivide(num, den)
+                    self.results[f"{disease}_num_with_SDoH_{sex}_{i}"][ti]    = num_w
+                    self.results[f"{disease}_den_with_SDoH_{sex}_{i}"][ti]    = max(den_w,1)
+                    self.results[f"{disease}_prev_with_SDoH_{sex}_{i}"][ti]   = sc.safedivide(num_w, den_w)
+                    self.results[f"{disease}_num_without_SDoH_{sex}_{i}"][ti] = num_wo
+                    self.results[f"{disease}_den_without_SDoH_{sex}_{i}"][ti] = max(den_wo,1)
+                    self.results[f"{disease}_prev_without_SDoH_{sex}_{i}"][ti]= sc.safedivide(num_wo, den_wo)
+
+            # Summary (now using boolean-array compatible function)
+            self.results[f"{disease}_prev_no_sdoh"][ti]   = self.cond_prob_bool(has_disease, no_sdoh)
+            self.results[f"{disease}_prev_has_sdoh"][ti]  = self.cond_prob_bool(has_disease, sdoh)
+            self.results[f"{disease}_prev_no_sdoh_f"][ti] = self.cond_prob_bool(has_disease_f, nosdoh_f)
+            self.results[f"{disease}_prev_has_sdoh_f"][ti]= self.cond_prob_bool(has_disease_f, sdoh_f)
+            self.results[f"{disease}_prev_no_sdoh_m"][ti] = self.cond_prob_bool(has_disease_m, nosdoh_m)
+            self.results[f"{disease}_prev_has_sdoh_m"][ti]= self.cond_prob_bool(has_disease_m, sdoh_m)
+
+            self.results[f"{disease}_num_total"][ti] = total_num_with
+            self.results[f"{disease}_den_total"][ti] = total_den_with
+
+        # Overall adult SDoH proportion (Fig 5A)
+        adults = np.asarray(ppl.age >= 15, dtype=bool) & alive
+        self.results["sdoh_prop_adults"][ti] = sc.safedivide(np.sum(sdoh & adults), np.sum(adults))
+        

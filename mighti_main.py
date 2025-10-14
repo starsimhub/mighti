@@ -79,7 +79,7 @@ def get_prevalence_function(disease):
             prevalence_data=prevalence_data,
             age_bins=age_bins,
             sim=sim,
-            uids=uids,
+            size=uids,
         )
     return prevalence_func
 
@@ -200,29 +200,13 @@ interventions = [hiv_test, art, vmmc, prep]  # or add t2d_tx, etc.
 # Utility: helpers
 # ---------------------------------------------------------------------
 def get_deaths_module(sim):
-    """
-    Retrieve the DeathsByAgeSexAnalyzer from the simulation results, regardless of where it's stored.
-    """
-    # 1. Check if it’s in sim.analyzers (dict in Starsim v3)
     if hasattr(sim, "analyzers") and isinstance(sim.analyzers, dict):
-        for analyzer in sim.analyzers.values():
-            if isinstance(analyzer, mi.DeathsByAgeSexAnalyzer):
-                return analyzer
-
-    # 2. Fallback: check sim.results.analyzers (Starsim v3.x Results container)
-    if hasattr(sim, "results") and hasattr(sim.results, "analyzers"):
-        for analyzer in sim.results.analyzers.values():
-            if isinstance(analyzer, mi.DeathsByAgeSexAnalyzer):
-                return analyzer
-
-    # 3. Fallback for older versions (list-like)
-    if hasattr(sim, "analyzers") and not isinstance(sim.analyzers, dict):
-        for analyzer in sim.analyzers:
-            if isinstance(analyzer, mi.DeathsByAgeSexAnalyzer):
-                return analyzer
-
+        for a in sim.analyzers.values():
+            if isinstance(a, mi.DeathsByAgeSexAnalyzer):
+                return a
     raise ValueError(
-        "Deaths analyzer not found. Ensure mi.DeathsByAgeSexAnalyzer() is included when creating the simulation."
+        "Deaths analyzer not found. Available keys: "
+        f"{list(sim.results.keys()) if hasattr(sim, 'results') else 'None'}"
     )
 
 def get_pregnancy_module(sim):
