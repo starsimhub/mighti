@@ -2,11 +2,11 @@ from .version import __version__, __versiondate__, __license__
 
 from .utils import *
 from .sdoh import *
+from .people_extend import *
 from .life_expectancy import *
 from .interactions import *
 from .analyzers import *
 from .disease_definitions import *  
-from .prevalence_analyzer import *
 from .plot_functions import *
 from .diseases import *  
 from .interventions import *

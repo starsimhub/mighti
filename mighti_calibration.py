@@ -12,9 +12,7 @@ import stisim as sti
 
 
 def make_sim():
-    # fertility_rates = pd.read_csv('mighti/data/eswatini_asfr.csv')
-    # death_rates = pd.read_csv('mighti/data/eswatini_mortality_rates_2007.csv') # TODO update to use yearly mortality rate data if desired
-
+  
     hiv = sti.HIV(beta_m2f=0.05, beta_m2c=0.025, init_prev=0.15)
     fertility_rate = {'fertility_rate': pd.read_csv('mighti/data/eswatini_asfr.csv')}
     pregnancy = ss.Pregnancy(pars=fertility_rate)
@@ -24,11 +22,11 @@ def make_sim():
     sexual = sti.StructuredSexual()
     maternal = ss.MaternalNet()
 
-    prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=pd.read_csv('mighti/data/eswatini_prevalence.csv'), diseases=['HIV'])
+    prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(prevalence_data=pd.read_csv('mighti/data/eswatini_prevalence.csv'), diseases=['HIV'])
 
     sim = ss.Sim(
         dt=1,
-        unit = 'month',
+        unit = 'year',
         n_agents=10000,
         total_pop=9980999,
         start=1990,
@@ -80,26 +78,6 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
     """
     sim = make_sim()
 
-    #
-    # if calib_pars is not None:
-    #     sim = build_sim(sim, calib_pars)
-
-    # data = pd.read_csv('mighti/data/eswatini_prevalence.csv')
-
-    # calib = ss.Calibration(
-    #     sim=sim,
-    #     calib_pars=calib_pars,
-    #     build_fn=build_sim,
-    #     eval_fn=eval_fn,
-    #     eval_kw={'data': data},
-    #     total_trials=total_trials,
-    #     n_workers=1,
-    #     keep_db=keep_db,
-    #     die=True,
-    #     reseed=False,
-    #     sampler=optuna.samplers.TPESampler(seed=12345) 
-    # )
-    
     data = pd.read_csv('mighti/data/eswatini_prevalence.csv')
     eval_fn = make_eval_fn(data)
     
@@ -188,7 +166,7 @@ if __name__ == '__main__':
         hiv_beta_m2c = dict(low=0.001, high=0.1, guess=0.025), # Network females in risk group 1 concurrent partners
     )
 
-    calib = run_calib(calib_pars=calib_pars, total_trials=3, keep_db=False)
+    calib = run_calib(calib_pars=calib_pars, total_trials=100, keep_db=False)
 
     sc.toc(T)
     print('Done.')

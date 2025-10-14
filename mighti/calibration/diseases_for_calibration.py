@@ -729,6 +729,28 @@ class AlcoholUseDisorder(RemittingDisease):
             self.pars.p_acquire_multiplier = 1  
         return
 
+
+class AnxietyDisorder(RemittingDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'AnxietyDisorder'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'AnxietyDisorder')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+    
+    
+class ChronicPain(RemittingDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'ChronicPain'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'ChronicPain')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+    
     
 class StimulantUseDisorder(RemittingDisease):
     def __init__(self, csv_path, pars=None, **kwargs):

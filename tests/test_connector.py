@@ -1,64 +1,125 @@
 """
-Test impact of including the HIV-NCD connector
+HIV–AUD Connector Test using MIGHTI and StarSim 3.x MultiSim
 
-One simulation is run with HIV and alcohol use disorder, but no connector. A second simulation
-is run with the addition of the connector. Adding the connector should increase
-prevalence of alcohol use disorder. 
+Compares two simulations:
+Baseline: HIV + AlcoholUseDisorder, no connector.
+Connector: HIV + AlcoholUseDisorder + NCDHIVConnector.
+
+The connector should increase or maintain AlcoholUseDisorder prevalence.
 """
 
+import os
+import pandas as pd
+import numpy as np
 import sciris as sc
 import starsim as ss
 import stisim as sti
-import pylab as pl
-import numpy as np
 import mighti as mi
-import pandas as pd
-import os
 
-
+# ---------------------------------------------------------------------
 # Settings
-do_plot = False
-sc.options(interactive=do_plot)
-
-# File path to parameter file
+# ---------------------------------------------------------------------
+sc.options(interactive=False)
 thisdir = os.path.dirname(__file__)
-param_path = os.path.join(thisdir, 'test_data', 'eswatini_parameters.csv')
+region = "eswatini"
+inityear, endyear = 2007, 2020
+n_agents = 3000
+
+param_path = os.path.join(thisdir, "test_data", f"{region}_parameters.csv")
+prev_path  = os.path.join(thisdir, "test_data", f"{region}_prevalence.csv")
+
+# ---------------------------------------------------------------------
+# Load parameter & prevalence data
+# ---------------------------------------------------------------------
 params_df = pd.read_csv(param_path)
 params_df.columns = params_df.columns.str.strip()
 
+prev_df = pd.read_csv(prev_path)
+prevalence_data, age_bins = mi.initialize_prevalence_data(
+    diseases=["HIV", "AlcoholUseDisorder"],
+    prevalence_data=prev_df,
+    inityear=inityear,
+)
 
-def test_hiv_alcoholusedisorder():
-    hiv = sti.HIV(init_prev=0.1, beta={'structuredsexual': [0.01, 0.01]})
-    alcoholusedisorder = mi.AlcoholUseDisorder(csv_path=param_path, init_prev=ss.bernoulli(0.1))
+def get_prev_func(disease):
+    """Return StarSim 3.x-compatible prevalence callable."""
+    def func(sim, uids):
+        return mi.age_sex_dependent_prevalence(
+            disease=disease,
+            prevalence_data=prevalence_data,
+            age_bins=age_bins,
+            sim=sim,
+            size=uids,
+        )
+    return func
 
-    pars = dict(
-        start=2000,
-        stop=2030,  # more years
-        dt=1,
-        n_agents=5000,  # more agents
-        networks=sti.StructuredSexual(),
-        diseases=[hiv, alcoholusedisorder]
-    )
-    sim0 = ss.Sim(pars).run()
+# ---------------------------------------------------------------------
+# Build disease modules
+# ---------------------------------------------------------------------
+hiv = sti.HIV()
+hiv_prev = get_prev_func("HIV")
+hiv.pars.init_prev = ss.bernoulli(p=lambda sim, uids: hiv_prev(sim, uids))
+hiv.pars.beta = {"structuredsexual": [0.03, 0.03]}
+hiv.pars.include_aids_deaths = True
+hiv.pars.include_care = False
+hiv.pars.art_efficacy = 0.0
+hiv.pars.p_hiv_death = ss.bernoulli(p=0.00015)
 
-    pars['connectors'] = mi.NCDHIVConnector({'alcoholusedisorder': 2.47})
-    sim1 = ss.Sim(pars).run()
+aud = mi.AlcoholUseDisorder(csv_path=param_path, init_prev=ss.bernoulli(p=0.10))
 
-    res0 = sim0.results.alcoholusedisorder.prevalence.mean()
-    res1 = sim1.results.alcoholusedisorder.prevalence.mean()
-    assert res1 >= res0 - 0.01, f'AlcoholUseDisorder should be higher with connector: {res1=} vs {res0=}'
-    print(f'[✓] Alcohol Use Disorder prevalence increased or remained similar: {res0:.3f} → {res1:.3f}')
+# ---------------------------------------------------------------------
+# Networks, demographics, connectors
+# ---------------------------------------------------------------------
+networks = sti.StructuredSexual()
+# death = ss.Deaths({"death_rate": pd.DataFrame({"year": [2007], "death_rate": [0.01]}), "rate_units": 1})
+# pregnancy = ss.Pregnancy(pars={"fertility_rate": pd.DataFrame({"year": [2007], "fertility_rate": [0.02]})})
+ppl = ss.People(n_agents=n_agents)  # minimal, avoids external CSVs
+
+connector = mi.NCDHIVConnector({"alcoholusedisorder": 2.47})
+
+# ---------------------------------------------------------------------
+# Build two sims (baseline vs connector)
+# ---------------------------------------------------------------------
+sim_base = ss.Sim(
+    n_agents=n_agents,
+    start=inityear,
+    stop=endyear,
+    people=ppl,
+    networks=networks,
+    diseases=[hiv, aud],
+    label="Baseline (no connector)",
+)
+
+sim_conn = ss.Sim(
+    n_agents=n_agents,
+    start=inityear,
+    stop=endyear,
+    people=ppl,
+    networks=networks,
+    diseases=[hiv, aud],
+    connectors=[connector],
+    label="With HIV–AUD connector",
+)
+
+# ---------------------------------------------------------------------
+# MultiSim wrapper and run
+# ---------------------------------------------------------------------
+def test_hiv_aud_connector_msim():
+    msim = ss.MultiSim([sim_base, sim_conn])
+    msim.run()
+
+    # Extract mean AUD prevalence
+    prev_base = msim.sims[0].results.alcoholusedisorder.prevalence.mean()
+    prev_conn = msim.sims[1].results.alcoholusedisorder.prevalence.mean()
+
+    msg = f"AUD prevalence should be ≥ baseline with connector: {prev_base:.3f} → {prev_conn:.3f}"
+    assert prev_conn >= prev_base - 0.01, msg
+    print(f"[✓] {msg}")
+    return msim
 
 
-# %% Run as a script
-    if __name__ == '__main__':
-        # Run `%matplotlib inline` to see the figure.
-        pl.plot(sim0.results.alcoholusedisorder.timevec, sim0.results.alcoholusedisorder.prevalence, label='No connector')
-        pl.plot(sim1.results.alcoholusedisorder.timevec, sim1.results.alcoholusedisorder.prevalence, label='With connector')
-        pl.xlabel('Year')
-        pl.ylabel('AUD Prevalence')
-        pl.legend()
-        pl.title('HIV ↔ Alcohol Use Disorder Connector Effect')
-        pl.show()
-        
-        
+# ---------------------------------------------------------------------
+# Run directly
+# ---------------------------------------------------------------------
+if __name__ == "__main__":
+    test_hiv_aud_connector_msim()

@@ -12,7 +12,5 @@ class Flu(GenericSIS):
         self.disease_name = 'Flu'
         super().__init__(csv_path, pars, **kwargs)
         self.define_pars(label = 'Flu')
-        if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire = 1
         return
 
