@@ -4,6 +4,13 @@
 # using MIGHTI and prevalence data. Outputs best-fit parameter and comparison
 # of observed vs. simulated prevalence by age and sex.
 # """
+"""
+NOTICE; THIS DOES NOT WORK WITH STARSIM==2.3.1, starsim==2.2.0, stisim==1.0.1, numpy==2.2.6
+Calibrate disease acquisition parameter (p_acquire) for a specified condition
+using MIGHTI and prevalence data. Outputs best-fit parameter and comparison
+of observed vs. simulated prevalence by age and sex.
+"""
+
 
 
 
