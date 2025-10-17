@@ -27,9 +27,9 @@ import stisim as sti
 logger = logging.getLogger("MIGHTI")
 logger.setLevel(logging.INFO)
 
-n_agents = 1_000
+n_agents = 100_000
 inityear = 2007
-endyear = 2024
+endyear = 2045
 region = "eswatini"
 
 # ---------------------------------------------------------------------
@@ -58,7 +58,7 @@ df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
 # Keep it minimal for debugging: HIV + one HC
-healthconditions = ["Type2Diabetes"]
+healthconditions = ["CardiovascularDiseases"]
 diseases = ["HIV"] + healthconditions
 
 # ---------------------------------------------------------------------
@@ -70,18 +70,13 @@ prevalence_data, age_bins = mi.initialize_prevalence_data(
 )
 
 def get_prevalence_function(disease):
-    """
-    Return a Starsim-3.x compatible callable for init_prev: func(sim, uids) -> probs
-    """
-    def prevalence_func(sim, uids):
+    def prevalence_func(sim, uids, size=None):
         return mi.age_sex_dependent_prevalence(
-            disease=disease,
-            prevalence_data=prevalence_data,
-            age_bins=age_bins,
-            sim=sim,
-            size=uids,
+            disease=disease, prevalence_data=prevalence_data,
+            age_bins=age_bins, sim=sim, size=size,
         )
     return prevalence_func
+
 
 # ---------------------------------------------------------------------
 # Analyzers
@@ -91,9 +86,7 @@ survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
 death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
-    conditions=["hiv", "type2diabetes"],
-    condition_attr_map={"hiv": "infected", "type2diabetes": "affected"},
-)
+    conditions=healthconditions)
 
 analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer]
 
@@ -117,43 +110,46 @@ structuredsexual = sti.StructuredSexual()
 networks = [maternal, structuredsexual]
 
 # ---------------------------------------------------------------------
-# Diseases — create modules and set pars BEFORE building the Sim
+# Diseases 
 # ---------------------------------------------------------------------
 disease_objects = []
 
 # --- HIV ---
 hiv = sti.HIV()
-# Prevalence init (callable)
-hiv_prev = get_prevalence_function("HIV")
-hiv.pars.init_prev = ss.bernoulli(p=lambda sim, uids: hiv_prev(sim, uids))
 
-# Transmission
+# Assign prevalence
+prev_func = get_prevalence_function('HIV')
+hiv.pars.init_prev = ss.bernoulli(
+    p=lambda sim, uids, size=None: prev_func(sim, uids, size)
+)
+
+# Transmission parameters
 hiv.pars.beta = {
-    "structuredsexual": [0.029594299274445842, 0.029594299274445842],
-    "maternal": [0.0011249414706988527, 0.0011249414706988527],
+    'structuredsexual': [0.029594299274445842, 0.029594299274445842],
+    'maternal': [0.0011249414706988527, 0.0011249414706988527],
 }
-
-# Mortality; turn off care effects to expose AIDS mortality
+hiv = hiv  # for later reference
+# --- AIDS mortality ---
 hiv.pars.include_aids_deaths = True
 hiv.pars.p_hiv_death = ss.bernoulli(p=0.00015)
-hiv.pars.include_care = False
-hiv.pars.art_efficacy = 0.0
+hiv.pars.include_care = True
+hiv.pars.art_efficacy = 0.9
 
 disease_objects.append(hiv)
 
-# --- Non-HIV diseases ---
-def make_init_prev_dist(disease_name):
-    func = get_prevalence_function(disease_name)
-    return ss.bernoulli(p=lambda sim, uids: func(sim, uids))
 
-for disease_name in healthconditions:
-    disease_cls = getattr(mi, disease_name, None)
-    if disease_cls is None:
-        print(f"⚠️ Skipping unknown disease: {disease_name}")
-        continue
-    init_prev = make_init_prev_dist(disease_name)
-    disease_obj = disease_cls(csv_path=csv_path_params, pars={"init_prev": init_prev})
-    disease_objects.append(disease_obj)
+def make_init_prev_func(disease):
+    prev_func = get_prevalence_function(disease)
+    return lambda sim, uids, size=None: prev_func(sim, uids, size)
+
+# Other diseases
+for disease in healthconditions:
+    disease_class = getattr(mi, disease, None)
+    if disease_class:
+        init_prev = ss.bernoulli(p=make_init_prev_func(disease))
+        disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})
+        disease_objects.append(disease_obj)
+
 
 # ---------------------------------------------------------------------
 # Connectors (HIV ↔ NCD, plus other NCD interactions)
@@ -268,6 +264,6 @@ if __name__ == "__main__":
     # mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
 
     # # Optional prevalence plots
-    # prevalence_check_df = pd.read_csv(f"mighti/data/{region}_postprocess_check_prevalence.csv")
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, "Type2Diabetes", prevalence_check_df, inityear, endyear)
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, "Type2Diabetes")
+    prevalence_check_df = pd.read_csv(f"mighti/data/{region}_postprocess_check_prevalence.csv")
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, "CardiovascularDiseases", prevalence_check_df, inityear, endyear)
+    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, "CardiovascularDiseases")

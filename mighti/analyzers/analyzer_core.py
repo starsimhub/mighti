@@ -50,8 +50,7 @@ class SurvivorshipAnalyzer(ss.Analyzer):
         for age in range(self.max_age):
             for sex in ['Male', 'Female']:
                 self.survivorship_data[sex][age] += len(ppl.age[(ppl.age >= age) & (ppl.age < age+1) & (ppl.female == (sex=='Female'))])
-
-
+                
 class ConditionAtDeathAnalyzer(ss.Analyzer):
     """
     Simple analyzer that records who died, their age/sex/YLL,
