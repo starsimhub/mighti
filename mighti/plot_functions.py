@@ -11,21 +11,36 @@ import pandas as pd
 from collections import Counter
 
 
-logger = logging.getLogger(__name__)
+def _safe_get_result(analyzer, key, sim):
+    """
+    Return analyzer result as a numpy array aligned to sim.timevec length.
+    Works for both Starsim ≤2.x and ≥3.x result structures.
+    """
+    val = analyzer.results.get(key)
+    if val is None:
+        return np.zeros(len(sim.timevec))
+    if hasattr(val, "values"):  # e.g. pandas Series
+        val = val.values
+    val = np.array(val)
+    if len(val) != len(sim.timevec):
+        val = np.pad(val, (0, max(0, len(sim.timevec) - len(val))), mode="edge")[: len(sim.timevec)]
+    return val
 
+logger = logging.getLogger(__name__)
 
 def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     """
     Plot mean prevalence over time for a given disease and both sexes.
-
-    Parameters:
-    - sim: The simulation object (provides `sim.timevec`)
-    - prevalence_analyzer: The prevalence analyzer with stored results
-    - disease: Name of the disease (e.g., 'HIV', 'Type2Diabetes')
     """
+    disease = disease.lower() 
 
     def extract_results(key_pattern):
-        return [prevalence_analyzer.results.get(f'{disease}_{key_pattern}_{i}', np.zeros(len(sim.timevec))) for i in range(len(prevalence_analyzer.age_bins))]
+        matching_keys = [k for k in prevalence_analyzer.results.keys()
+                         if k.startswith(f'{disease}_{key_pattern}_')]
+        matching_keys = sorted(matching_keys, key=lambda x: int(x.split('_')[-1]))
+        if not matching_keys:
+            print(f'No keys found for pattern {disease}_{key_pattern}_')
+        return [_safe_get_result(prevalence_analyzer, k, sim) for k in matching_keys]
 
     male_num_with_HIV = np.sum(extract_results('num_with_HIV_male'), axis=0)
     female_num_with_HIV = np.sum(extract_results('num_with_HIV_female'), axis=0)
@@ -47,20 +62,15 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     mean_prevalence_female_without_HIV = np.nan_to_num(female_num_without_HIV / female_den_without_HIV) * 100
 
     fig, ax = plt.subplots(figsize=(10, 5))
-
-    ax.plot(sim.timevec, mean_prevalence_male_with_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV+)', linewidth=2, color='blue', linestyle='solid')
-    ax.plot(sim.timevec, mean_prevalence_female_with_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV+)', linewidth=2, color='red', linestyle='solid')
-    ax.plot(sim.timevec, mean_prevalence_male_without_HIV, label=f'Male {disease.capitalize()} Prevalence (HIV-)', linewidth=2, color='blue', linestyle='dashed')
-    ax.plot(sim.timevec, mean_prevalence_female_without_HIV, label=f'Female {disease.capitalize()} Prevalence (HIV-)', linewidth=2, color='red', linestyle='dashed')
-
+    ax.plot(sim.timevec, mean_prevalence_male_with_HIV, label=f'Male {disease} (HIV+)', color='blue', lw=2)
+    ax.plot(sim.timevec, mean_prevalence_female_with_HIV, label=f'Female {disease} (HIV+)', color='red', lw=2)
+    ax.plot(sim.timevec, mean_prevalence_male_without_HIV, '--', color='blue', lw=2, label=f'Male {disease} (HIV–)')
+    ax.plot(sim.timevec, mean_prevalence_female_without_HIV, '--', color='red', lw=2, label=f'Female {disease} (HIV–)')
     ax.set_xlabel('Year', fontsize=16)
-    ax.set_ylabel(f'{disease.capitalize()} Prevalence (%)', fontsize=16)
-    ax.set_title(f'Mean {disease.capitalize()} Prevalence Over Time (All Ages)', fontsize=18)
-    ax.tick_params(axis='both', which='major', labelsize=14)
-    ax.legend(loc='lower right', fontsize=14, frameon=False)   
-    ax.grid()
-
-    # plt.show()
+    ax.set_ylabel(f'{disease} Prevalence (%)', fontsize=16)
+    ax.legend()
+    ax.grid(True)
+    plt.show()
     
 
 def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year):
@@ -79,7 +89,7 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
 
     # Extract simulated values
     def extract_results(key_pattern):
-        return [prevalence_analyzer.results.get(f'{disease}_{key_pattern}_{i}', np.zeros(len(sim.timevec)))
+        return [_safe_get_result(prevalence_analyzer, f'{disease}_{key_pattern}_{i}', sim)
                 for i in range(len(prevalence_analyzer.age_bins))]
 
     male_num = np.sum(extract_results('num_male'), axis=0)
@@ -127,86 +137,6 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
     return total_male_prev, total_female_prev
 
 
-
-# def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year):
-#     """
-#     Plot mean prevalence over time for a given disease and both sexes, including observed data points.
-#     Calculate and print the mean prevalence over the specified range of years.
-
-#     Parameters:
-#     - sim: The simulation object (provides `sim.timevec`)
-#     - prevalence_analyzer: The prevalence analyzer with stored results
-#     - disease: Name of the disease (e.g., 'HIV', 'Type2Diabetes')
-#     - prevalence_data_df: The DataFrame containing observed prevalence data
-#     - init_year: The initial year of the simulation
-#     - end_year: The end year of the simulation
-#     """
-#     def extract_results(key_pattern):
-#         return [prevalence_analyzer.results.get(f'{disease}_{key_pattern}_{i}', np.zeros(len(sim.timevec))) for i in range(len(prevalence_analyzer.age_bins))]
-
-#     male_num = np.sum(extract_results('num_male'), axis=0)
-#     female_num = np.sum(extract_results('num_female'), axis=0)
-#     male_den = np.sum(extract_results('den_male'), axis=0)
-#     female_den = np.sum(extract_results('den_female'), axis=0)
-
-#     sim_length = len(sim.timevec)
-#     if len(male_num) != sim_length:
-#         male_num = np.zeros(sim_length)
-#     if len(female_num) != sim_length:
-#         female_num = np.zeros(sim_length)
-#     if len(male_den) != sim_length:
-#         male_den = np.zeros(sim_length)
-#     if len(female_den) != sim_length:
-#         female_den = np.zeros(sim_length)
-
-#     male_den[male_den == 0] = 1
-#     female_den[female_den == 0] = 1
-
-#     total_male_prevalence = np.nan_to_num(male_num /  male_den) * 100
-#     total_female_prevalence = np.nan_to_num(female_num / female_den) * 100
-
-#     mask = (sim.timevec >= init_year) & (sim.timevec <= end_year)
-
-#     plt.figure(figsize=(10, 5))
-#     plt.plot(sim.timevec[mask], total_male_prevalence[mask], label=f'Male {disease.capitalize()} Prevalence (Simulated)', linewidth=5, color='blue', linestyle='solid')
-#     plt.plot(sim.timevec[mask], total_female_prevalence[mask], label=f'Female {disease.capitalize()} Prevalence (Simulated)', linewidth=5, color='red', linestyle='solid')
-
-#     if prevalence_data_df is not None:
-#         plot_colors = {'male': 'blue',
-#                        'female': 'red'}
-
-#         for sex in ['male', 'female']:
-#             col = f'{disease}_{sex}'
-#             if col in prevalence_data_df.columns:
-#                 observed_data = prevalence_data_df[['Year', col]].dropna()
-#                 age_bins = [agetuple[0] for agetuple in sim.analyzers.prevalence_analyzer.age_bins]
-#                 weights = dict(Counter(np.digitize(sim.people.age[sim.people[sex]], age_bins) - 1))
-
-#                 observed_data = observed_data.groupby('Year', as_index=False).apply(
-#                     lambda x: np.average(
-#                         x[col],
-#                         weights=[weights.get(i, 0) for i in x.index]
-#                         if sum(weights.get(i, 0) for i in x.index) > 0 else None
-#                     ),
-#                     include_groups=False).rename(columns={None: col})
-
-#                 observed_data[col] *= 100
-#                 observed_data = observed_data[
-#                     (observed_data['Year'] >= init_year) & (observed_data['Year'] <= end_year)]
-
-#                 plt.scatter(observed_data['Year'], observed_data[col],
-#                             color=plot_colors[sex], marker='o', edgecolor='black', s=100,
-#                             label=f'Observed {sex.capitalize()} Prevalence')
-        
-#     plt.legend()
-#     plt.xlabel('Year')
-#     plt.ylabel(f'{disease.capitalize()} Prevalence (%)')
-#     plt.title(f'Mean {disease.capitalize()} Prevalence Over Time (All Ages)')
-#     plt.grid()
-    
-#     # plt.show()
-
-
 def plot_age_group_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year, age_groups=None):
     """
     Plot age group prevalence over time for a given disease and both sexes, including observed data points.
@@ -244,7 +174,7 @@ def plot_age_group_prevalence(sim, prevalence_analyzer, disease, prevalence_data
     colors = plt.cm.tab10(np.linspace(0, 1, len(age_groups)))
 
     def extract_results(key_pattern):
-        return [prevalence_analyzer.results.get(f'{disease}_{key_pattern}_{i}', np.zeros(len(sim.timevec))) for i in range(len(age_groups))]
+        return [_safe_get_result(prevalence_analyzer, f'{disease}_{key_pattern}_{i}', sim) for i in range(len(age_groups))]
 
     male_num_bins = extract_results('num_male')
     female_num_bins = extract_results('num_female')

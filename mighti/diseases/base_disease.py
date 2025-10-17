@@ -103,11 +103,25 @@ class RemittingDisease(ss.NCD):
         )
 
     def init_post(self):
-        if 'init_prev' in self.pars:
-            initial_cases = self.pars.init_prev.filter()
-            self.set_prognoses(initial_cases)
-            return initial_cases
-        return []
+        
+        super().init_post()
+
+        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+
+        if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
+            # Sample prevalence probabilities
+            probs = self.pars.init_prev.rvs(sim.people.uid)
+            affected = np.random.rand(len(sim.people)) < probs
+
+            # Assign disease state
+            if hasattr(self, "affected"):
+                self.affected[:] = affected
+
+            # Optionally set prognoses for affected agents
+            if hasattr(self, "set_prognoses"):
+                self.set_prognoses(np.where(affected)[0])
+
+        return
 
     def set_prognoses(self, uids):
         self.susceptible[uids] = False
@@ -231,11 +245,25 @@ class AcuteDisease(ss.NCD):
         )
 
     def init_post(self):
-        if 'init_prev' in self.pars:
-            initial_cases = self.pars.init_prev.filter()
-            self.set_prognoses(initial_cases)
-            return initial_cases
-        return []
+        
+        super().init_post()
+
+        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+
+        if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
+            # Sample prevalence probabilities
+            probs = self.pars.init_prev.rvs(sim.people.uid)
+            affected = np.random.rand(len(sim.people)) < probs
+
+            # Assign disease state
+            if hasattr(self, "affected"):
+                self.affected[:] = affected
+
+            # Optionally set prognoses for affected agents
+            if hasattr(self, "set_prognoses"):
+                self.set_prognoses(np.where(affected)[0])
+
+        return
 
     def set_prognoses(self, uids):
         self.susceptible[uids] = False
@@ -333,11 +361,25 @@ class ChronicDisease(ss.NCD):
         )
 
     def init_post(self):
-        if 'init_prev' in self.pars:
-            initial_cases = self.pars.init_prev.filter()
-            self.set_prognoses(initial_cases)
-            return initial_cases
-        return []
+ 
+        super().init_post()
+
+        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+
+        if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
+            # Sample prevalence probabilities
+            probs = self.pars.init_prev.rvs(sim.people.uid)
+            affected = np.random.rand(len(sim.people)) < probs
+
+            # Assign disease state
+            if hasattr(self, "affected"):
+                self.affected[:] = affected
+
+            # Optionally set prognoses for affected agents
+            if hasattr(self, "set_prognoses"):
+                self.set_prognoses(np.where(affected)[0])
+
+        return
 
     def set_prognoses(self, uids):
         self.susceptible[uids] = False
@@ -437,12 +479,29 @@ class GenericSIS(ss.SIS):
             reset=True,
         )
 
-    def init_post(self):
-        if 'init_prev' in self.pars:
-            initial_cases = self.pars.init_prev.filter()
-            self.set_prognoses(initial_cases)
-            return initial_cases
-        return []
+def init_post(self):
+    """
+    Initialize disease prevalence after people are created.
+    Compatible with Starsim >=3.0 and callable init_prev.
+    """
+    super().init_post()
+
+    sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+
+    if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
+        # Sample prevalence probabilities
+        probs = self.pars.init_prev.rvs(sim.people.uid)
+        affected = np.random.rand(len(sim.people)) < probs
+
+        # Assign disease state
+        if hasattr(self, "affected"):
+            self.affected[:] = affected
+
+        # Optionally set prognoses for affected agents
+        if hasattr(self, "set_prognoses"):
+            self.set_prognoses(np.where(affected)[0])
+
+    return
 
     def set_prognoses(self, uids):
         self.susceptible[uids] = False
