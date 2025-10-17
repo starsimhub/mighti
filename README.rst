@@ -1,91 +1,121 @@
-Model of Inter-Generational Health, Transmission, and Interventions (MIGHTI)
-=============================================================================
+# Model of Inter-Generational Health, Transmission, and Interventions (MIGHTI)
 
 **Warning!** MIGHTI is still in the early stages of development. It is being shared solely for transparency and to facilitate collaborative development. It is *not yet ready* to be used for real research or policy analysis without careful validation.
 
 MIGHTI is an agent-based modeling framework designed to simulate the dynamics of infectious diseases, non-communicable diseases (NCDs), and their interactions over time. MIGHTI builds on the Starsim architecture.
 
-**Documentation:** See the `MIGHTI Wiki <https://github.com/starsimhub/mighti/wiki>`_ for usage instructions and examples.
+**Documentation:** See the [MIGHTI Wiki](https://github.com/starsimhub/mighti/wiki) for usage instructions and examples.
 
-Requirements
-------------
+---
+
+## Requirements
 
 - Python 3.9–3.13
+- Operating System: Windows, macOS, or Linux
+- Conda or virtual environment (recommended)
 
-We recommend, but do not require, installing MIGHTI in a virtual environment such as `Anaconda <https://www.anaconda.com/>`_.
+### Required Dependencies
 
-Installation
-------------
+You can install them via `docs/requirements.txt` or manually:
+
+#### Core packages:
+- `numpy`
+- `pandas`
+- `matplotlib`
+- `scipy`
+- `scikit-learn`
+
+#### Simulation Engine:
+- [`starsim`](https://github.com/starsimhub/starsim) — agent-based simulation core
+- [`stisim`](https://github.com/starsimhub/stisim) — sexually transmitted infection modules
+- `sciris` — support library for simulation management
+
+#### Calibration (optional):
+- `optuna`
+- `tqdm`
+
+#### Development tools (optional):
+- `pytest` — for testing
+- `sphinx`, `myst-parser`, `sphinx_rtd_theme` — for documentation
+
+#### Notebook & IDE support (optional):
+- `ipykernel`
+- `spyder-kernels==2.5.*`
+
+---
+
+## Installation
 
 MIGHTI is **not yet available on PyPI**, but you can install it directly from GitHub:
 
-.. code-block:: bash
-
-    git clone https://github.com/starsimhub/mighti.git
-    cd mighti
-    pip install -e .
-
+```bash
+git clone https://github.com/starsimhub/mighti.git
+cd mighti
+pip install -e .
+```
 
 Please also make sure to install its dependencies:
 
-.. code-block:: bash
+```bash
+pip install -r docs/requirements.txt
+```
 
-    pip install starsim stisim
+To ensure you're using the correct versions of Starsim and STIsim:
 
+```bash
+pip install --upgrade --force-reinstall git+https://github.com/starsimhub/starsim.git
+pip install --upgrade --force-reinstall git+https://github.com/starsimhub/stisim.git
+```
 
-Running an Example
-------------
+---
 
+## Running an Example
+
+```bash
 python mighti_main.py
+```
 
-This will run a sample simulation that includes demography, HIV, and NCD modules. Outputs will be saved in the outputs/ folder.
+This will run a sample simulation that includes demography, HIV, and NCD modules. Outputs will be saved in the `outputs/` folder.
 
 You can also run:
-	•	mighti_demography.py — mortality and life expectancy module
-	•	mighti_calibration.py — Optuna-based parameter calibration
 
+- `mighti_demography.py` — mortality and life expectancy module
+- `mighti_calibration.py` — Optuna-based parameter calibration
 
-Usage and Documentation
-------------
+---
 
-MIGHTI is based on Starsim, please refer to `Starsim documentation <https://docs.idmod.org/projects/starsim/en/latest/>`_ for additional information.
+## Usage and Documentation
 
+MIGHTI builds on [Starsim](https://docs.idmod.org/projects/starsim/en/latest/). Please refer to the Starsim documentation for details on base classes, intervention logic, and simulation controls.
 
-References
-------------
+---
 
-MIGHTI uses data from:
-	•	Demography: UN WPP 2024
-	•	NCDs: Global Burden of Disease (GBD)
-	•	HIV: DHS, SHIMS
+## Contributing
 
+Contributions to the MIGHTI project are welcome!  
+Please read the [CONTRIBUTING.rst](https://github.com/starsimhub/mighti/blob/main/contributing.rst) for guidelines on submitting pull requests and our code of conduct.
 
-Contributing
-------------
+---
 
-Contributions to the MIGHTI project are welcome! Please read `CONTRIBUTING.mst <https://github.com/starsimhub/mighti/blob/main/contributing.rst>`_ for details on our code of conduct, and the process for submitting pull requests.
+## Data Sources
 
+MIGHTI uses public datasets for demographic and disease burden modeling:
 
-Disclaimer
-------------
+### Demography
+- [UN World Population Prospects 2024](https://population.un.org/wpp/downloads?folder=Standard%20Projections&group=Mortality)
 
-This code was developed by researchers at NYU, IDM, and collaborators. It is shared under the MIT License to foster reproducibility and future development. No guarantees are made regarding functionality or support. You are free to fork and modify the code under the terms of the license.
+### Disease Burden
+- [Global Burden of Disease Study (GBD)](https://vizhub.healthdata.org/gbd-results/)
 
+### HIV
+- [Demographic and Health Surveys (DHS)](https://dhsprogram.com/pubs/pdf/FR202/FR202.pdf)
+- [Swaziland HIV Incidence Measurement Survey (SHIMS)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5291824/)
 
-References
-------------------------
+---
 
-The MIGHTI framework incorporates data from the following public sources:
+## Disclaimer
 
-	•	Demography data:
-		World Population Prospects 2024
-		https://population.un.org/wpp/downloads?folder=Standard%20Projections&group=Mortality
-
-	•	Disease data:
-		Global Burden of Disease Study (GBD)
-		https://vizhub.healthdata.org/gbd-results/
-
-	•	HIV data:
-		•	Demographic and Health Surveys (DHS) https://dhsprogram.com/pubs/pdf/FR202/FR202.pdf
-
-		•	Swaziland HIV Incidence Measurement Survey (SHIMS) https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5291824/
+This code was developed by researchers at NYU, IDM, and collaborators.  
+It is shared under the MIT License to foster reproducibility and future development.  
+No guarantees are made regarding functionality or support.  
+You are free to fork and modify the code under the terms of the license.
