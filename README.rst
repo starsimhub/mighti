@@ -11,8 +11,8 @@ Requirements
 ------------
 
 - Python 3.9–3.13
-
-We recommend, but do not require, installing MIGHTI in a virtual environment such as `Anaconda <https://www.anaconda.com/>`_.
+- Starsim 3.0
+- STIsim 1.4.0
 
 Installation
 ------------
@@ -89,3 +89,7 @@ The MIGHTI framework incorporates data from the following public sources:
 		•	Demographic and Health Surveys (DHS) https://dhsprogram.com/pubs/pdf/FR202/FR202.pdf
 
 		•	Swaziland HIV Incidence Measurement Survey (SHIMS) https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5291824/
+
+
+
+can you add requirements and dependencies as we stated in wiki?
