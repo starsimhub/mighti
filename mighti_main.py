@@ -29,7 +29,7 @@ logger.setLevel(logging.INFO)
 
 n_agents = 100_000
 inityear = 2007
-endyear = 2045
+endyear = 2020
 region = "eswatini"
 
 # ---------------------------------------------------------------------
@@ -265,5 +265,5 @@ if __name__ == "__main__":
 
     # # Optional prevalence plots
     prevalence_check_df = pd.read_csv(f"mighti/data/{region}_postprocess_check_prevalence.csv")
-    # mi.plot_mean_prevalence(sim, prevalence_analyzer, "CardiovascularDiseases", prevalence_check_df, inityear, endyear)
-    mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, "CardiovascularDiseases")
+    mi.plot_mean_prevalence(sim, prevalence_analyzer, "CardiovascularDiseases", prevalence_check_df, inityear, endyear)
+    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, "CardiovascularDiseases")

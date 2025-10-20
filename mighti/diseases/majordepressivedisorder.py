@@ -8,32 +8,6 @@ import starsim as ss
 import numpy as np
 
 
-"""
-Module defining Major Depressive Disorder as a remitting disease model
-with housing-dependent recovery and protection effects.
-"""
-
-from mighti.diseases.base_disease import RemittingDisease
-from starsim.interventions import treat_num
-import starsim as ss
-import numpy as np
-
-
-"""
-Module defining Major Depressive Disorder as a remitting disease model
-with housing-dependent recovery and protection effects.
-"""
-
-from mighti.diseases.base_disease import RemittingDisease
-from starsim.interventions import treat_num
-import starsim as ss
-import numpy as np
-# mighti/diseases/majordepressivedisorder.py
-
-import numpy as np
-import starsim as ss
-from .base_disease import RemittingDisease
-
 
 class MajorDepressiveDisorder(RemittingDisease):
     """
@@ -151,10 +125,14 @@ class MajorDepressiveDisorder(RemittingDisease):
         return new_cases
 
 
+
+from starsim.interventions import BaseTreatment
+
+
 class DepressionCare(ss.treat_num):
     """
-    Treats individuals with depression, optionally boosting remission
-    and adherence if applicable.
+    Treats individuals with depression (MajorDepressiveDisorder),
+    boosting remission and optionally improving ART adherence.
 
     Args:
         product (ss.Product): optional treatment product
@@ -162,60 +140,73 @@ class DepressionCare(ss.treat_num):
         max_capacity (int): optional limit on treated agents per step
         eligibility (callable): custom eligibility function
         label (str): intervention label
-        remission_boost (float): multiplier applied to remission rate of treated
-        adherence_boost (float): optional improvement to ART adherence (CASM link)
+        remission_boost (float): multiplier on remission rate for treated individuals
+        adherence_boost (float): multiplier on ART adherence (CASM link)
         verbose (bool): print summary each step
     """
 
     def __init__(self, product=None, prob=1.0, max_capacity=None, eligibility=None,
                  label='DepressionCare', remission_boost=1.5, adherence_boost=1.1,
-                 verbose=False, **kwargs):
-
+                 verbose=False, **_):
+        """
+        Starsim 3.x passes kwargs to Timeline; extra fields like remission_boost must
+        not be forwarded, so we explicitly exclude them.
+        """
         super().__init__(product=product, prob=prob, max_capacity=max_capacity,
-                         eligibility=eligibility, label=label, **kwargs)
-
-        self.disease_name = 'Depression'  # consistent with MIGHTI naming
+                         eligibility=eligibility, label=label)
+        self.disease_name = 'MajorDepressiveDisorder'
         self.remission_boost = remission_boost
         self.adherence_boost = adherence_boost
         self.verbose = verbose
-        self.treated_inds = []  # track who was treated each step
+        self.treated_inds = []
+        self.treated_per_timestep = []  # optional: track number treated per step
 
-    def initialize(self, sim):
-        """Define default eligibility: all agents currently depressed."""
-        super().initialize(sim)
+    # ------------------------------------------------------------------
+    # Initialization
+    # ------------------------------------------------------------------
+    def init_pre(self, sim):
+        """Define eligibility before the simulation starts."""
+        super().init_pre(sim)
         if self.eligibility is None:
-            if self.disease_name.lower() not in sim.diseases:
+            dis_key = self.disease_name.lower()
+            if dis_key not in sim.diseases:
                 raise ValueError(f"[{self.label}] Disease '{self.disease_name}' not found in sim.diseases.")
-            self.eligibility = lambda sim: sim.diseases[self.disease_name.lower()].affected.uids
+            self.eligibility = lambda sim: sim.diseases[dis_key].affected.uids
 
+    # ------------------------------------------------------------------
+    # Step
+    # ------------------------------------------------------------------
     def step(self):
-        """Apply treatment to eligible individuals, boost remission and adherence."""
+        """Apply treatment, boost remission, and optionally ART adherence."""
         sim = self.sim
         dep = sim.diseases[self.disease_name.lower()]
 
-        # Select eligible agents
+        # Select eligible individuals
         eligible = self.eligibility(sim)
         if len(eligible) == 0:
+            self.treated_per_timestep.append(0)
             return np.array([], dtype=int)
 
         # Apply coverage probability
         to_treat = eligible[np.random.rand(len(eligible)) < self.prob]
 
-        # Apply treatment (through base class)
-        treat_inds = super().step_custom(to_treat)
+        # Starsim 3.0.3: apply treatment using BaseTreatment.step()
+        treat_inds = BaseTreatment.step(self)
         self.treated_inds = treat_inds
+        self.treated_per_timestep.append(len(treat_inds))
 
+        # Apply effects
         if len(treat_inds):
-            # Boost remission
+            # 1. Boost remission
             dep.pars.remission_rate[treat_inds] *= self.remission_boost
 
-            # Optional: modest adherence benefit if ART present
+            # 2. Optionally, modest adherence improvement if ART intervention present
             art_intv = next((i for i in sim.interventions if 'ART' in i.label.upper()), None)
             if art_intv is not None and hasattr(art_intv, 'rel_effect'):
                 art_intv.rel_effect[treat_inds] *= self.adherence_boost
 
             if self.verbose:
-                print(f"[{self.label}] Treated {len(treat_inds)} agents for depression at step {sim.t.ti}")
+                print(f"[{self.label}] Treated {len(treat_inds)} agents at step {sim.t.ti}")
 
         return treat_inds
     

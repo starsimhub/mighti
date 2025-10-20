@@ -87,20 +87,39 @@ class RemittingDisease(ss.NCD):
         self.update_pars(pars, **kwargs)
 
         self.define_states(
-            ss.State('susceptible', default=True),
-            ss.State('affected'),
-            ss.State('on_treatment'),
-            ss.State('reversed'), 
+            ss.BoolState('susceptible', default=True),
+            ss.BoolState('at_risk', default=True),   
+            ss.BoolState('affected'),
+            ss.BoolState('on_treatment'),
+            ss.BoolState('reversed'), 
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_reversed'),
+            ss.FloatArr('ti_dead'), 
             ss.FloatArr('rel_sus', default=1.0),  
             ss.FloatArr('rel_death', default=1.0),  
+            reset=True,
         )
 
     def init_post(self):
-        initial_cases = self.pars.init_prev.filter()
-        self.set_prognoses(initial_cases)
-        return initial_cases
+        
+        super().init_post()
+
+        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+
+        if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
+            # Sample prevalence probabilities
+            probs = self.pars.init_prev.rvs(sim.people.uid)
+            affected = np.random.rand(len(sim.people)) < probs
+
+            # Assign disease state
+            if hasattr(self, "affected"):
+                self.affected[:] = affected
+
+            # Optionally set prognoses for affected agents
+            if hasattr(self, "set_prognoses"):
+                self.set_prognoses(np.where(affected)[0])
+
+        return
 
     def set_prognoses(self, uids):
         self.susceptible[uids] = False
@@ -141,15 +160,14 @@ class RemittingDisease(ss.NCD):
 
         # New cases
         susceptible = (~self.affected).uids
-        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
+        # p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
+        p_acq = calculate_p_acquire_generic(self, self.sim, susceptible)
 
-        # Apply sex filtering
         if self.pars.affected_sex == "female":
             p_acq[self.sim.people.male[susceptible]] = 0
         elif self.pars.affected_sex == "male":
             p_acq[self.sim.people.female[susceptible]] = 0
 
-        # Apply rel_sus and rel_sus_hiv
         try:
             p_acq *= self.rel_sus[susceptible]
             if hasattr(self.sim.people, 'hiv'):
@@ -215,19 +233,37 @@ class AcuteDisease(ss.NCD):
         self.update_pars(pars, **kwargs)
 
         self.define_states(
-            ss.State('susceptible', default=True),
-            ss.State('affected'),
-            ss.State('on_treatment'),
+            ss.BoolState('susceptible', default=True),
+            ss.BoolState('at_risk', default=True),
+            ss.BoolState('affected'),
+            ss.BoolState('on_treatment'),
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_dead'),
-            ss.FloatArr('rel_sus', default=1.0),  
-            ss.FloatArr('rel_death', default=1.0),  
+            ss.FloatArr('rel_sus', default=1.0),
+            ss.FloatArr('rel_death', default=1.0),
+            reset=True,
         )
 
     def init_post(self):
-        initial_cases = self.pars.init_prev.filter()
-        self.set_prognoses(initial_cases)
-        return initial_cases
+        
+        super().init_post()
+
+        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+
+        if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
+            # Sample prevalence probabilities
+            probs = self.pars.init_prev.rvs(sim.people.uid)
+            affected = np.random.rand(len(sim.people)) < probs
+
+            # Assign disease state
+            if hasattr(self, "affected"):
+                self.affected[:] = affected
+
+            # Optionally set prognoses for affected agents
+            if hasattr(self, "set_prognoses"):
+                self.set_prognoses(np.where(affected)[0])
+
+        return
 
     def set_prognoses(self, uids):
         sim = self.sim
@@ -265,17 +301,15 @@ class AcuteDisease(ss.NCD):
 
     def step(self):
         ti = self.ti
+        susceptible = self.at_risk.uids
+        # p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
+        p_acq = calculate_p_acquire_generic(self, self.sim, susceptible)
 
-        # New cases
-        susceptible = (~self.affected).uids
-        
-        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
-        
         if self.pars.affected_sex == "female":
             p_acq[self.sim.people.male[susceptible]] = 0
         elif self.pars.affected_sex == "male":
             p_acq[self.sim.people.female[susceptible]] = 0
-        
+
         try:
             p_acq *= self.rel_sus[susceptible]
             if hasattr(self.sim.people, 'hiv'):
@@ -283,29 +317,20 @@ class AcuteDisease(ss.NCD):
                 p_acq[hiv_pos] *= self.pars.rel_sus_hiv
         except Exception:
             pass
-        
-        # Sample new cases using numpy
-        draws = np.random.rand(len(susceptible))
-        new_cases = susceptible[draws < p_acq]
+
+        new_cases = susceptible[np.random.rand(len(susceptible)) < p_acq]
         self.affected[new_cases] = True
+        self.at_risk[new_cases] = False
         self.ti_affected[new_cases] = ti
-                
-        # New implementation of detah
+
+        # Deaths
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
-
-        try:
-            base_p = self.pars.p_death.pars['p']
-        except Exception:
-            raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
-
-        adjusted_p_death = base_p * rel_death
-        draws = np.random.rand(len(affected_uids))
-        deaths = affected_uids[draws < adjusted_p_death]
-        self.ti_dead[deaths] = ti  
+        base_p = self.pars.p_death.pars.get('p', 0)
+        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
 
         self.sim.people.request_death(deaths)
-        self.results.new_deaths[ti] = len(deaths)
+        self.ti_dead[deaths] = ti
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
@@ -336,54 +361,54 @@ class ChronicDisease(ss.NCD):
             p_acquire=1,
             init_prev=None
         )
-        
+
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))    
         self.update_pars(pars, **kwargs)
-    
         self.define_states(
-            ss.State('susceptible', default=True),
-            ss.State('affected'),
-            ss.State('on_treatment'),
+            ss.BoolState('susceptible', default=True),
+            ss.BoolState('at_risk', default=True),
+            ss.BoolState('affected'),
+            ss.BoolState('on_treatment'),
             ss.FloatArr('ti_affected'),
             ss.FloatArr('ti_dead'),
-            ss.FloatArr('rel_sus', default=1.0),  
-            ss.FloatArr('rel_death', default=1.0),  
+            ss.FloatArr('rel_sus', default=1.0),
+            ss.FloatArr('rel_death', default=1.0),
+            reset=True,
         )
-    
+
     def init_post(self):
-        initial_cases = self.pars.init_prev.filter()
-        self.set_prognoses(initial_cases)
-        return initial_cases
+ 
+        super().init_post()
+        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+
+        if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
+            # Sample prevalence probabilities
+            probs = self.pars.init_prev.rvs(sim.people.uid)
+            affected = np.random.rand(len(sim.people)) < probs
+
+            # Assign disease state
+            if hasattr(self, "affected"):
+                self.affected[:] = affected
+
+            # Optionally set prognoses for affected agents
+            if hasattr(self, "set_prognoses"):
+                self.set_prognoses(np.where(affected)[0])
+        return
 
     def set_prognoses(self, uids):
-        sim = self.sim
-        p = self.pars
-    
         self.susceptible[uids] = False
         self.affected[uids] = True
-    
-        dur_condition = p.dur_condition.rvs(size=len(uids))
-    
-        dead_uids = p.p_death.filter(uids)    
-        rec_uids = np.setdiff1d(uids, dead_uids)
-        dead_indices = np.isin(uids, dead_uids)
-        rec_indices = ~dead_indices
-    
-        self.ti_dead[dead_uids] = self.ti + dur_condition[dead_indices] / self.t.dt
-    
-        if hasattr(self, "ti_reversed"):
-            self.ti_reversed[rec_uids] = self.ti + dur_condition[rec_indices] / self.t.dt
+        self.at_risk[uids] = False
 
     def init_results(self):
         super().init_results()
-        existing_results = set(self.results.keys())
-        
-        if 'new_cases' not in existing_results:
-            self.define_results(ss.Result('new_cases', dtype=int, label='New Cases'))
-        if 'new_deaths' not in existing_results:
-            self.define_results(ss.Result('new_deaths', dtype=int, label='Deaths'))
-        if 'prevalence' not in existing_results:
-            self.define_results(ss.Result('prevalence', dtype=float, label='Prevalence'))
+        for name, dtype, label in [
+            ('new_cases', int, 'New Cases'),
+            ('new_deaths', int, 'Deaths'),
+            ('prevalence', float, 'Prevalence')
+        ]:
+            if name not in self.results:
+                self.define_results(ss.Result(name, dtype=dtype, label=label))
 
     def update_results(self):
         super().update_results()
@@ -391,16 +416,15 @@ class ChronicDisease(ss.NCD):
 
     def step(self):
         ti = self.ti
+        susceptible = self.at_risk.uids
 
-        # New cases
-        susceptible = (~self.affected).uids
         p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
-        
+            
         if self.pars.affected_sex == "female":
             p_acq[self.sim.people.male[susceptible]] = 0
         elif self.pars.affected_sex == "male":
             p_acq[self.sim.people.female[susceptible]] = 0
-        
+
         try:
             p_acq *= self.rel_sus[susceptible]
             if hasattr(self.sim.people, 'hiv'):
@@ -408,29 +432,20 @@ class ChronicDisease(ss.NCD):
                 p_acq[hiv_pos] *= self.pars.rel_sus_hiv
         except Exception:
             pass
-        
-        # Sample new cases using numpy
-        draws = np.random.rand(len(susceptible))
-        new_cases = susceptible[draws < p_acq]
+
+        new_cases = susceptible[np.random.rand(len(susceptible)) < p_acq]
         self.affected[new_cases] = True
+        self.at_risk[new_cases] = False
         self.ti_affected[new_cases] = ti
-                
-        # New implementation of detah
+
+        # Deaths
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
-
-        try:
-            base_p = self.pars.p_death.pars['p']
-        except Exception:
-            raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
-
-        adjusted_p_death = base_p * rel_death
-        draws = np.random.rand(len(affected_uids))
-        deaths = affected_uids[draws < adjusted_p_death]
-        self.ti_dead[deaths] = ti  
+        base_p = self.pars.p_death.pars.get('p', 0)
+        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
 
         self.sim.people.request_death(deaths)
-        self.results.new_deaths[ti] = len(deaths)
+        self.ti_dead[deaths] = ti
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
@@ -469,20 +484,42 @@ class GenericSIS(ss.SIS):
         self.update_pars(pars, **kwargs)
 
         self.define_states(
-            ss.State('susceptible', default=True),
-            ss.State('infected'),
-            ss.State('on_treatment'),
+            ss.BoolState('susceptible', default=True),
+            ss.BoolState('at_risk', default=True),
+            ss.BoolState('infected'),
+            ss.BoolState('on_treatment'),
             ss.FloatArr('ti_infected'),
             ss.FloatArr('ti_reversed'),
             ss.FloatArr('ti_dead'),
-            ss.FloatArr('rel_sus', default=1.0), 
-            ss.FloatArr('rel_death', default=1.0), 
+            ss.FloatArr('rel_sus', default=1.0),
+            ss.FloatArr('rel_death', default=1.0),
+            reset=True,
         )
 
     def init_post(self):
-        initial_cases = self.pars.init_prev.filter()
-        self.set_prognoses(initial_cases)
-        return initial_cases
+        """
+        Initialize disease prevalence after people are created.
+        Compatible with Starsim >=3.0 and callable init_prev.
+        """
+        super().init_post()
+
+        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+
+        if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
+            # Sample prevalence probabilities
+            probs = self.pars.init_prev.rvs(sim.people.uid)
+            affected = np.random.rand(len(sim.people)) < probs
+
+            # Assign disease state
+            if hasattr(self, "affected"):
+                self.affected[:] = affected
+
+            # Optionally set prognoses for affected agents
+            if hasattr(self, "set_prognoses"):
+                self.set_prognoses(np.where(affected)[0])
+
+        return
+
 
     def set_prognoses(self, uids):
         sim = self.sim
@@ -520,17 +557,14 @@ class GenericSIS(ss.SIS):
 
     def step(self):
         ti = self.ti
-
-        # New cases
-        susceptible = (~self.infected).uids
-        
+        susceptible = self.at_risk.uids
         p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
-        
+
         if self.pars.affected_sex == "female":
             p_acq[self.sim.people.male[susceptible]] = 0
         elif self.pars.affected_sex == "male":
             p_acq[self.sim.people.female[susceptible]] = 0
-        
+
         try:
             p_acq *= self.rel_sus[susceptible]
             if hasattr(self.sim.people, 'hiv'):
@@ -538,53 +572,55 @@ class GenericSIS(ss.SIS):
                 p_acq[hiv_pos] *= self.pars.rel_sus_hiv
         except Exception:
             pass
-        
-        # Sample new cases using numpy
-        draws = np.random.rand(len(susceptible))
-        new_cases = susceptible[draws < p_acq]
 
+        new_cases = susceptible[np.random.rand(len(susceptible)) < p_acq]
         self.infected[new_cases] = True
+        self.at_risk[new_cases] = False
         self.ti_infected[new_cases] = ti
-                
-        # New implementation of detah
+
+        # Deaths
         affected_uids = self.infected.uids
         rel_death = self.rel_death[affected_uids]
-
-        try:
-            base_p = self.pars.p_death.pars['p']
-        except Exception:
-            raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
-
-        adjusted_p_death = base_p * rel_death
-        draws = np.random.rand(len(affected_uids))
-        deaths = affected_uids[draws < adjusted_p_death]
+        base_p = self.pars.p_death.pars.get('p', 0)
+        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
 
         self.sim.people.request_death(deaths)
+        self.ti_dead[deaths] = ti
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
         self.results.new_deaths[ti] = len(deaths)
         self.results.prevalence[self.ti] = np.count_nonzero(self.infected) / len(self.sim.people)
-
-        return new_cases   
+        return new_cases
     
 
 def calculate_p_acquire_generic(disease, sim, uids):
-    """Simplified for calibration: assume constant baseline, scaled by multiplier."""
-
-    # Optional: limit to adults
-    age = sim.people.age[uids]
-    p_base = np.zeros(len(uids))
-    adult = age >= 15
-    p_base[adult] = disease.pars.p_acquire_multiplier
-
-    # Optional: restrict by sex
+    """Calculate acquisition probability for a disease with optional sex filtering and HIV interaction."""
+    p_base = np.full(len(uids), disease.pars.p_acquire_multiplier)
+    
     if disease.pars.affected_sex == "female":
-        p_base[sim.people.male[uids]] = 0
+        try:
+            p_base[sim.people.male[uids]] = 0
+        except Exception:
+            pass
     elif disease.pars.affected_sex == "male":
-        p_base[sim.people.female[uids]] = 0
+        try:
+            p_base[sim.people.female[uids]] = 0
+        except Exception:
+            pass
 
-    return p_base
+    try:
+        if hasattr(sim.people, 'hiv'):
+            hiv_positive = sim.people.hiv[uids]
+            p_base[hiv_positive] *= disease.pars.rel_sus_hiv
+    except Exception:
+        pass
+
+    try:
+        return p_base * disease.rel_sus[uids]
+    except Exception:
+        return p_base     
+       
 
 
 

@@ -32,7 +32,7 @@ class PrevalenceAnalyzer(ss.Analyzer):
 
     def __init__(self, prevalence_data=None, diseases=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.name = "prevalence_analyzer_general"
+        self.name = "prevalence_analyzer"
         self.prevalence_data = prevalence_data
         self.diseases = diseases or []
         self.age_bins = [
