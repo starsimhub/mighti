@@ -99,11 +99,12 @@ death = ss.Deaths(death_rates)
 fertility_rate = {"fertility_rate": pd.read_csv(csv_path_fertility)}
 pregnancy = ss.Pregnancy(pars=fertility_rate)
 
-ppl = mi.make_people_with_age_sex(
-    csv_path="mighti/data/eswatini_age_distribution.csv",
-    init_year=inityear,
-    n_agents=n_agents,
-)
+# ppl = mi.make_people_with_age_sex(
+#     csv_path="mighti/data/eswatini_age_distribution.csv",
+#     init_year=inityear,
+#     n_agents=n_agents,
+# )
+ppl = ss.People(n_agents=n_agents)
 
 maternal = ss.MaternalNet()
 structuredsexual = sti.StructuredSexual()
@@ -115,7 +116,11 @@ networks = [maternal, structuredsexual]
 disease_objects = []
 
 # --- HIV ---
-hiv = sti.HIV()
+hiv = sti.HIV(
+    # beta_m2f=0.0955,
+    # beta_m2c=0.0039,
+    # init_prev=0.15,
+)
 
 # Assign prevalence
 prev_func = get_prevalence_function('HIV')
@@ -124,16 +129,29 @@ hiv.pars.init_prev = ss.bernoulli(
 )
 
 # Transmission parameters
+# Best pars: {'hiv_beta_m2f': 0.09553835265049065, 'hiv_beta_m2c': 0.003895160642773216}
+# Best pars: {'hiv_beta_m2f': 0.041126225026336546, 'hiv_beta_m2c': 0.02313161100759324}
 hiv.pars.beta = {
     'structuredsexual': [0.029594299274445842, 0.029594299274445842],
     'maternal': [0.0011249414706988527, 0.0011249414706988527],
 }
-hiv = hiv  # for later reference
-# --- AIDS mortality ---
-hiv.pars.include_aids_deaths = True
-hiv.pars.p_hiv_death = ss.bernoulli(p=0.00015)
-hiv.pars.include_care = True
-hiv.pars.art_efficacy = 0.9
+
+# hiv.pars.beta = {
+#     'structuredsexual': [0.041126225026336546, 0.041126225026336546],
+#     'maternal': [0.02313161100759324, 0.02313161100759324],
+# }
+
+# hiv.pars.beta = {
+#     'structuredsexual': [0.09553835265049065, 0.09553835265049065],
+#     'maternal': [0.003895160642773216, 0.003895160642773216],
+# }
+
+
+# # --- AIDS mortality ---
+# hiv.pars.include_aids_deaths = True
+# hiv.pars.p_hiv_death = ss.bernoulli(p=0.00015)
+# hiv.pars.include_care = True
+# hiv.pars.art_efficacy = 0.9
 
 disease_objects.append(hiv)
 
@@ -196,20 +214,17 @@ interventions = [hiv_test, art, vmmc, prep]  # or add t2d_tx, etc.
 # Utility: helpers
 # ---------------------------------------------------------------------
 def get_deaths_module(sim):
+    """
+    Return the DeathsByAgeSexAnalyzer or any analyzer with 'death' in its name.
+    Works with dict-style sim.analyzers (MIGHTI default).
+    """
     if hasattr(sim, "analyzers") and isinstance(sim.analyzers, dict):
         for a in sim.analyzers.values():
-            if isinstance(a, mi.DeathsByAgeSexAnalyzer):
+            if isinstance(a, mi.DeathsByAgeSexAnalyzer) or "death" in a.label.lower():
                 return a
     raise ValueError(
-        "Deaths analyzer not found. Available keys: "
-        f"{list(sim.results.keys()) if hasattr(sim, 'results') else 'None'}"
+        f"Deaths analyzer not found. Available analyzers: {list(sim.analyzers.keys())}"
     )
-
-def get_pregnancy_module(sim):
-    for module in sim.analyzers:
-        if isinstance(module, ss.Pregnancy):
-            return module
-    raise ValueError("Pregnancy module not found.")
 
 # ---------------------------------------------------------------------
 # Main
@@ -222,9 +237,9 @@ if __name__ == "__main__":
         people=ppl,
         networks=networks,
         demographics=[pregnancy, death],
-        diseases=disease_objects,      # pass prepared disease objects (incl. HIV)
+        diseases=disease_objects,      
         connectors=connectors,
-        interventions=interventions,
+        # interventions=interventions,
         analyzers=analyzers,
         copy_inputs=False,
         label="With Interventions",
@@ -233,37 +248,24 @@ if __name__ == "__main__":
     # Run
     sim.run()
 
-    # print("Analyzer keys:", list(sim.analyzers.keys()))
-    # print("Results analyzers keys:", list(sim.results.analyzers.keys()))
-    # # Post-run checks
-    # hiv_mod = sim.diseases.hiv
-    # if hasattr(hiv_mod, "ti_dead"):
-    #     n_hiv_deaths = np.isfinite(hiv_mod.ti_dead).sum()
-    #     print(f"HIV deaths recorded in module: {n_hiv_deaths}")
-    # else:
-    #     print("No ti_dead attribute on HIV module (unexpected).")
 
-    # total_deaths = len(sim.people.dead)
-    # print(f"Total deaths in population: {total_deaths}")
-    # print("include_aids_deaths:", hiv_mod.pars.include_aids_deaths)
-    # print("p_hiv_death:", hiv_mod.pars.p_hiv_death)
+    # Mortality & life table
+    target_year = endyear - 1
+    obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name="mx")
+    obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name="ex")
 
-    # # Mortality & life table
-    # target_year = endyear - 1
-    # obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name="mx")
-    # obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name="ex")
-
-    # deaths_module = get_deaths_module(sim)
+    deaths_module = get_deaths_module(sim)
     # pregnancy_module = get_pregnancy_module(sim)
 
-    # df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
-    # df_mx_male = df_mx[df_mx["sex"] == "Male"]
-    # df_mx_female = df_mx[df_mx["sex"] == "Female"]
+    df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
+    df_mx_male = df_mx[df_mx["sex"] == "Male"]
+    df_mx_female = df_mx[df_mx["sex"] == "Female"]
 
-    # life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
-    # mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
+    life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
+    mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
+    mi.plot_life_expectancy(life_table, obs_ex, year=target_year, max_age=100)
 
-    # # Optional prevalence plots
-    prevalence_check_df = pd.read_csv(f"mighti/data/{region}_postprocess_check_prevalence.csv")
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, "CardiovascularDiseases", prevalence_check_df, inityear, endyear)
+    # # # Optional prevalence plots
+    # prevalence_check_df = pd.read_csv(f"mighti/data/{region}_postprocess_check_prevalence.csv")
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, "HIV", prevalence_check_df, inityear, endyear)
     # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, "CardiovascularDiseases")

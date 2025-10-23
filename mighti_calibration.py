@@ -22,13 +22,12 @@ def make_sim():
     sexual = sti.StructuredSexual()
     maternal = ss.MaternalNet()
 
-    prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(prevalence_data=pd.read_csv('mighti/data/eswatini_prevalence.csv'), diseases=['HIV'])
+    prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=pd.read_csv('mighti/data/eswatini_prevalence.csv'), diseases=['HIV'])
 
     sim = ss.Sim(
         dt=1,
-        unit = 'year',
-        n_agents=10000,
-        total_pop=9980999,
+        n_agents=10_000,
+        total_pop=9_980_999,
         start=1990,
         stop= 2023,
         diseases=hiv,
@@ -79,13 +78,13 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
     sim = make_sim()
 
     data = pd.read_csv('mighti/data/eswatini_prevalence.csv')
-    eval_fn = make_eval_fn(data)
     
     calib = ss.Calibration(
         sim=sim,
         calib_pars=calib_pars,
         build_fn=build_sim,
         eval_fn=eval_fn,  
+        eval_kw={'data': data}, 
         total_trials=total_trials,
         n_workers=1,
         keep_db=keep_db,
@@ -101,33 +100,6 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
     return calib
 
 
-### Added on Jul 17 to resolve eval_kw issue
-def make_eval_fn(data):
-    def eval_fn(sim, sim_result_list=None, weights=None, df_res_list=None):
-        if isinstance(sim, ss.MultiSim):
-            sim = sim.sims[0]
-
-        fit = 0
-        prev_analyzer = sim.analyzers.prevalence_analyzer
-        prev_results = sim.results.prevalence_analyzer
-
-        for index, (age_low, age_high) in enumerate(prev_analyzer.age_bins):
-            prev_observed_data = data[data['Age'] == age_low][['Year', 'Age', 'HIV_female', 'HIV_male']]
-            prev_sim_data = pd.DataFrame({
-                'Year': prev_analyzer.timevec,
-                'Age': age_low,
-                'sim_HIV_female': prev_results[f'HIV_prev_female_{index}'],
-                'sim_HIV_male': prev_results[f'HIV_prev_male_{index}']
-            })
-            merged = pd.merge(prev_observed_data, prev_sim_data, on=['Year', 'Age'], how='inner')
-            merged['error'] = abs(merged['sim_HIV_female'] - merged['HIV_female']) + abs(merged['sim_HIV_male'] - merged['HIV_male'])
-
-            fit += merged['error'].sum()
-
-        return fit
-    return eval_fn
-
-
 def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None):
     """
     Custom evaluation function for HIV calibration
@@ -135,23 +107,35 @@ def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None
     if isinstance(sim, ss.MultiSim):
         sim = sim.sims[0]
 
+    # Normalize observed data (if in %)
+    if data['HIV_female'].max() > 1:
+        data[['HIV_female', 'HIV_male']] /= 100.0
+
     fit = 0
-    prev_analyzer = sim.analyzers.prevalence_analyzer
-    prev_results = sim.results.prevalence_analyzer
+    prev_analyzer = sim.analyzers.get('prevalence_analyzer')
+    prev_results = sim.results.get('prevalence_analyzer')
 
-    # HIV prevalence
-    for index, (age_low, age_high) in enumerate(sim.analyzers.prevalence_analyzer.age_bins):
-        prev_observed_data = data[data['Age'] == age_low][['Year', 'Age', 'HIV_female', 'HIV_male']]
-        prev_sim_data = pd.DataFrame({'Year': prev_analyzer.timevec, 
-                                      'Age': age_low, 
-                                      'sim_HIV_female': prev_results[f'HIV_prev_female_{index}'],
-                                      'sim_HIV_male': prev_results[f'HIV_prev_male_{index}']})
+    for index, (age_low, age_high) in enumerate(prev_analyzer.age_bins):
+        prev_observed_data = data[data['Age'] == age_low][['Year', 'Age', 'HIV_female', 'HIV_male']].copy()
+        prev_observed_data['Year'] = prev_observed_data['Year'].astype(int)
+
+        # Normalize analyzer time vector to int years
+        sim_years = [t.year if hasattr(t, 'year') else int(t) for t in prev_analyzer.timevec]
+
+        prev_sim_data = pd.DataFrame({
+            'Year': sim_years,
+            'Age': age_low,
+            'sim_HIV_female': prev_results[f'hiv_prev_female_{index}'],
+            'sim_HIV_male':   prev_results[f'hiv_prev_male_{index}'],
+        })
+
         merged = pd.merge(prev_observed_data, prev_sim_data, on=['Year', 'Age'], how='inner')
-        merged['error'] = abs(merged['sim_HIV_female'] - merged['HIV_female']) + abs(merged['sim_HIV_male'] - merged['HIV_male'])
-
+        merged['error'] = abs(merged['sim_HIV_female'] - merged['HIV_female']) + \
+                        abs(merged['sim_HIV_male'] - merged['HIV_male'])
         fit += merged['error'].sum()
 
-    return fit
+    n_obs = len(data['Age'].unique()) * 2
+    return fit / n_obs
 
 
 #%% Run as a script
@@ -162,8 +146,8 @@ if __name__ == '__main__':
     # Define the calibration parameters. These are parsed in build_sim() as: {hiv/nw}_{parameter_name}
     # where hiv is for STIsim HIV parameters and nw is for StructuredSexual network parameters.
     calib_pars = dict(
-        hiv_beta_m2f = dict(low=0.01, high=0.10, guess=0.05), # HIV transmission parameter
-        hiv_beta_m2c = dict(low=0.001, high=0.1, guess=0.025), # Network females in risk group 1 concurrent partners
+        hiv_beta_m2f = dict(low=0.001, high=0.10, guess=0.03), # HIV transmission parameter
+        hiv_beta_m2c = dict(low=0.0001, high=0.1, guess=0.001), # Network females in risk group 1 concurrent partners
     )
 
     calib = run_calib(calib_pars=calib_pars, total_trials=100, keep_db=False)

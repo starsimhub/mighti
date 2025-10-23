@@ -34,23 +34,73 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
             else:
                 self.results.male_deaths_by_age[age_capped] += 1
 
+    def to_df(self):
+        """Return DataFrame of recorded deaths and conditions."""
+        return pd.DataFrame(self.records)
 
 class SurvivorshipAnalyzer(ss.Analyzer):
-    """Computes survivorship by age and sex for life table construction."""
+    """
+    Computes survivorship l(x) by age and sex for life table construction.
+    Fully compliant with Starsim analyzer lifecycle.
+    """
 
     def __init__(self, max_age=100, **kwargs):
         super().__init__(**kwargs)
-        self.name = 'survivorship_analyzer'
-
+        self.name = "survivorship_analyzer"
         self.max_age = max_age
-        self.survivorship_data = {'Male': np.zeros(max_age), 'Female': np.zeros(max_age)}
+        self.survivorship_data = {sex: np.zeros(max_age + 1) for sex in ["Male", "Female"]}
+        self._yearvec = None
+
+    def init_results(self):
+        """Initialize result containers."""
+        super().init_results()  # <-- this line fixes the crash
+        self.define_results(
+            ss.Result("lx_male", label="Male survivorship l(x)", shape=self.max_age + 1, dtype=float),
+            ss.Result("lx_female", label="Female survivorship l(x)", shape=self.max_age + 1, dtype=float)
+        )
+        self._yearvec = getattr(self.sim.t, "yearvec", None)
 
     def step(self):
+        """Accumulate survivorship by age and sex at each step."""
         ppl = self.sim.people
-        for age in range(self.max_age):
-            for sex in ['Male', 'Female']:
-                self.survivorship_data[sex][age] += len(ppl.age[(ppl.age >= age) & (ppl.age < age+1) & (ppl.female == (sex=='Female'))])
-                
+        for sex in ["Male", "Female"]:
+            mask = ppl.female if sex == "Female" else ~ppl.female
+            alive = mask & ~ppl.dead
+            ages = ppl.age[alive]
+            for a in range(self.max_age):
+                self.survivorship_data[sex][a] += np.sum((ages >= a) & (ages < a + 1))
+
+    def finalize(self):
+        """Normalize to l(0)=1 and copy into self.results arrays."""
+        for sex in ["Male", "Female"]:
+            lx = self.survivorship_data[sex].copy()
+            if lx[0] > 0:
+                lx /= lx[0]
+            if sex == "Male":
+                self.results.lx_male[:] = lx
+            else:
+                self.results.lx_female[:] = lx
+
+    def finalize_results(self):
+        """Required placeholder for Starsim loop."""
+        pass
+
+    def to_df(self):
+        """Convert stored survivorship to tidy DataFrame."""
+        records = []
+        year = self.sim.t.yearvec[-1] if self._yearvec is not None else None
+        for sex, key in zip(["Male", "Female"], ["lx_male", "lx_female"]):
+            lx = getattr(self.results, key, np.zeros(self.max_age + 1))
+            for age, val in enumerate(lx):
+                records.append({
+                    "year": year,
+                    "age": age,
+                    "sex": sex,
+                    "survival": float(val)
+                })
+        return pd.DataFrame(records)
+    
+
 class ConditionAtDeathAnalyzer(ss.Analyzer):
     """
     Simple analyzer that records who died, their age/sex/YLL,
@@ -71,7 +121,13 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
         self.name = "condition_at_death_analyzer"
 
     def init_results(self):
-        self.records = []
+        """Initialize analyzer results."""
+        super().init_results()
+        self.results = dict()
+        self.results['n_deaths'] = 0
+        self.results['by_cause'] = {}
+        self.results['by_sex'] = {}
+        self.results['by_age'] = {}
 
     def _had_condition(self, disease, uid):
         """Return True if agent had this condition at death."""
