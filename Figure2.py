@@ -238,6 +238,5 @@ axes[0].legend(frameon=False, loc="upper right")
 fig.suptitle(f"Figure 2. Population-attributable life expectancy loss by condition, Eswatini {plot_year}", y=0.98)
 
 plt.tight_layout()
-os.makedirs("results", exist_ok=True)
-plt.savefig("results/Fig2_stacked_LE_loss_corrected.png", dpi=600)
+plt.savefig("Figures/Fig2_stacked_LE_loss_corrected.png", dpi=600)
 plt.show()
