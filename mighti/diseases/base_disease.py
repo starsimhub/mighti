@@ -103,21 +103,22 @@ class RemittingDisease(ss.NCD):
         )
 
     def init_post(self):
-        
+
         super().init_post()
 
-        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+        # (1) initialize baseline risk if relevant
+        initial_risk = self.pars['initial_risk'].filter()
+        self.at_risk[initial_risk] = True
+        self.ti_affected[initial_risk] = self.ti + self.pars['dur_risk'].rvs(initial_risk, round=True)
 
+        # (2) initialize prevalence
         if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
-            # Sample prevalence probabilities
-            probs = self.pars.init_prev.rvs(sim.people.uid)
-            affected = np.random.rand(len(sim.people)) < probs
+            probs = self.pars.init_prev.rvs(self.sim.people.uid)          # ← fixed
+            affected = np.random.rand(len(self.sim.people)) < probs       # ← fixed
 
-            # Assign disease state
             if hasattr(self, "affected"):
                 self.affected[:] = affected
 
-            # Optionally set prognoses for affected agents
             if hasattr(self, "set_prognoses"):
                 self.set_prognoses(np.where(affected)[0])
 
@@ -159,7 +160,6 @@ class RemittingDisease(ss.NCD):
     def step(self):
         ti = self.ti
 
-        # New cases
         susceptible = (~self.affected).uids
         p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
 
@@ -205,6 +205,28 @@ class RemittingDisease(ss.NCD):
         self.results.remission_prevalence[self.ti] = np.count_nonzero(self.reversed) / len(self.sim.people)
         return new_cases
 
+    @property
+    def duration(self):
+        """Duration of active condition in years, with NaN-safety."""
+        if not hasattr(self, 'ti_affected') or not hasattr(self, 'affected'):
+            raise AttributeError("This disease does not support duration")
+
+        n = len(self.sim.people)
+        dur = np.zeros(n)
+        ti_now = self.ti
+
+        # Defensive copy and clean any nan or invalid times
+        ti_aff = np.asarray(self.ti_affected, dtype=float)
+        ti_aff[~np.isfinite(ti_aff)] = 0.0
+
+        # active indices that exist within current population size
+        active = self.affected.uids[self.affected.uids < n]
+        if len(active):
+            dur[active] = np.maximum(0, ti_now - ti_aff[active])
+
+        # Replace any remaining NaN with 0
+        dur[~np.isfinite(dur)] = 0.0
+        return dur
 
 class AcuteDisease(ss.NCD):
     """Base class for all acute diseases."""
@@ -247,8 +269,7 @@ class AcuteDisease(ss.NCD):
     def init_post(self):
         
         super().init_post()
-
-        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+        sim = self.sim
 
         if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
             # Sample prevalence probabilities
@@ -322,6 +343,30 @@ class AcuteDisease(ss.NCD):
         self.results.prevalence[self.ti] = np.count_nonzero(self.affected) / len(self.sim.people)
         return new_cases
 
+
+    @property
+    def duration(self):
+        """
+        Duration (in years) since onset of disease, 0 if not affected.
+        This allows YLD calculations in MicrocostingAnalyzer.
+        """
+        n = len(self.sim.people)
+        dur = np.zeros(n)
+
+        # Handle different onset attributes
+        if hasattr(self, 'affected') and hasattr(self, 'ti_affected'):
+            affected_uids = self.affected.uids
+            if len(affected_uids):
+                dur[affected_uids] = self.sim.t.years - self.ti_affected[affected_uids]
+        elif hasattr(self, 'infected') and hasattr(self, 'ti_infected'):
+            infected_uids = self.infected.uids
+            if len(infected_uids):
+                dur[infected_uids] = self.sim.t.years - self.ti_infected[infected_uids]
+
+        # Clip negatives (e.g. from pre-sim infections)
+        dur = np.clip(dur, 0, None)
+        return dur
+    
 
 class ChronicDisease(ss.NCD):
     """Base class for chronic diseases."""
@@ -363,8 +408,7 @@ class ChronicDisease(ss.NCD):
     def init_post(self):
  
         super().init_post()
-
-        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+        sim = self.sim 
 
         if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
             # Sample prevalence probabilities
@@ -438,6 +482,28 @@ class ChronicDisease(ss.NCD):
         self.results.prevalence[self.ti] = np.count_nonzero(self.affected) / len(self.sim.people)
         return new_cases
 
+    @property
+    def duration(self):
+        """
+        Duration (in years) since onset of disease, 0 if not affected.
+        This allows YLD calculations in MicrocostingAnalyzer.
+        """
+        n = len(self.sim.people)
+        dur = np.zeros(n)
+
+        # Handle different onset attributes
+        if hasattr(self, 'affected') and hasattr(self, 'ti_affected'):
+            affected_uids = self.affected.uids
+            if len(affected_uids):
+                dur[affected_uids] = self.sim.t.years - self.ti_affected[affected_uids]
+        elif hasattr(self, 'infected') and hasattr(self, 'ti_infected'):
+            infected_uids = self.infected.uids
+            if len(infected_uids):
+                dur[infected_uids] = self.sim.t.years - self.ti_infected[infected_uids]
+
+        # Clip negatives (e.g. from pre-sim infections)
+        dur = np.clip(dur, 0, None)
+        return dur
 
 class GenericSIS(ss.SIS):
     """Base class for communicable diseases (SIS model)."""
@@ -479,29 +545,25 @@ class GenericSIS(ss.SIS):
             reset=True,
         )
 
-def init_post(self):
-    """
-    Initialize disease prevalence after people are created.
-    Compatible with Starsim >=3.0 and callable init_prev.
-    """
-    super().init_post()
+    def init_post(self):
+        super().init_post()
 
-    sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
 
-    if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
-        # Sample prevalence probabilities
-        probs = self.pars.init_prev.rvs(sim.people.uid)
-        affected = np.random.rand(len(sim.people)) < probs
+        if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
+            # Sample prevalence probabilities
+            probs = self.pars.init_prev.rvs(sim.people.uid)
+            affected = np.random.rand(len(sim.people)) < probs
 
-        # Assign disease state
-        if hasattr(self, "affected"):
-            self.affected[:] = affected
+            # Assign disease state
+            if hasattr(self, "affected"):
+                self.affected[:] = affected
 
-        # Optionally set prognoses for affected agents
-        if hasattr(self, "set_prognoses"):
-            self.set_prognoses(np.where(affected)[0])
+            # Optionally set prognoses for affected agents
+            if hasattr(self, "set_prognoses"):
+                self.set_prognoses(np.where(affected)[0])
 
-    return
+        return
 
     def set_prognoses(self, uids):
         self.susceptible[uids] = False
@@ -559,6 +621,29 @@ def init_post(self):
         self.results.new_deaths[ti] = len(deaths)
         self.results.prevalence[self.ti] = np.count_nonzero(self.infected) / len(self.sim.people)
         return new_cases
+    
+    @property
+    def duration(self):
+        """
+        Duration (in years) since onset of disease, 0 if not affected.
+        This allows YLD calculations in MicrocostingAnalyzer.
+        """
+        n = len(self.sim.people)
+        dur = np.zeros(n)
+
+        # Handle different onset attributes
+        if hasattr(self, 'affected') and hasattr(self, 'ti_affected'):
+            affected_uids = self.affected.uids
+            if len(affected_uids):
+                dur[affected_uids] = self.sim.t.years - self.ti_affected[affected_uids]
+        elif hasattr(self, 'infected') and hasattr(self, 'ti_infected'):
+            infected_uids = self.infected.uids
+            if len(infected_uids):
+                dur[infected_uids] = self.sim.t.years - self.ti_infected[infected_uids]
+
+        # Clip negatives (e.g. from pre-sim infections)
+        dur = np.clip(dur, 0, None)
+        return dur
     
 
 def calculate_p_acquire_generic(disease, sim, uids):

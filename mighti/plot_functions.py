@@ -264,3 +264,35 @@ def plot_life_expectancy(life_table, observed_data, year, max_age=100, figsize=(
     plt.subplots_adjust(bottom=0.1)
     plt.show()
     return fig, (ax1, ax2)
+
+
+def plot_cost_effectiveness_plane(results, wtp_thresholds=[100, 500, 1000],
+                                  figsize=(8, 6),savepath=None,show=True):
+    
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Plot each result as a scatter point
+    for res in results:
+        ax.scatter(res['delta_daly'], res['delta_cost'], label=res['label'], s=80)
+        ax.annotate(res['label'], (res['delta_daly'], res['delta_cost']), fontsize=10,
+                    xytext=(5, 5), textcoords='offset points')
+
+    # Plot WTP threshold lines
+    x_vals = np.linspace(0, max([r['delta_daly'] for r in results]) * 1.1, 100)
+    for wtp in wtp_thresholds:
+        ax.plot(x_vals, wtp * x_vals, linestyle='--', label=f'${wtp}/DALY')
+
+    # Axis labels and formatting
+    ax.set_xlabel('Incremental DALYs averted', fontsize=12)
+    ax.set_ylabel('Incremental cost ($)', fontsize=12)
+    ax.axhline(0, color='gray', linewidth=0.5)
+    ax.axvline(0, color='gray', linewidth=0.5)
+    ax.legend()
+    ax.set_title('Cost-Effectiveness Plane', fontsize=14)
+    ax.grid(True)
+
+    if savepath:
+        plt.savefig(savepath, bbox_inches='tight')
+    if show:
+        plt.show()
+    plt.close(fig)

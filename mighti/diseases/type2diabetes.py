@@ -13,7 +13,7 @@ class Type2Diabetes(RemittingDisease):
         self.disease_name = 'Type2Diabetes'
         super().__init__(csv_path, pars, **kwargs)
 
-        self.define_pars(label='Type2Diabetes')  
+        self.define_pars(label='type2diabetes')  
         return
 
    
