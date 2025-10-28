@@ -4,9 +4,17 @@ Defines interventions.
 
 
 import starsim as ss
+import stisim as sti
 import numpy as np
 
-_all_ = ['ImproveHospitalDischarge', 'GiveHousingToDepressed', 'GiveHousingSupport', 'HousingSupportForAUD']
+_all_ = ['ARTwithCASM','ImproveHospitalDischarge', 'GiveHousingToDepressed', 'GiveHousingSupport', 'HousingSupportForAUD']
+
+
+class ARTwithCASM(sti.ART):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.casm_sensitivity = "pharma"
+
 
 class ImproveHospitalDischarge(ss.Intervention):
     def __init__(self, disease_name, multiplier=2.0, start_day=0, end_day=None, label=None):

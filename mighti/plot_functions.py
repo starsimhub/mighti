@@ -296,3 +296,21 @@ def plot_cost_effectiveness_plane(results, wtp_thresholds=[100, 500, 1000],
     if show:
         plt.show()
     plt.close(fig)
+
+
+def plot_adherence_by_condition(sim, label):
+    results = sim.results[label]
+    t = np.array(results["time"])
+    with_cond = np.array(results["on_with_condition"])
+    without_cond = np.array(results["on_without_condition"])
+
+    plt.plot(t, with_cond, label="With condition")
+    plt.plot(t, without_cond, label="Without condition")
+    plt.xlabel("Year")
+    plt.ylabel("Proportion on ART")
+    plt.title(f"Adherence by {label}")
+    plt.ylim(0, 1)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+    

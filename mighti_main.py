@@ -90,6 +90,21 @@ death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
 
 analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer]
 
+casm_keys = [
+    "majordepressivedisorder.affected",
+    "alcoholuse.affected",
+    "anxiety.affected",
+    "chronicpain.affected",
+    "tobaccouse.affected",
+    "opioiduse.affected",
+    "stimulantuse.affected",
+]
+
+analyzers = []
+for c in casm_keys:
+    a = mi.AdherenceAnalyzer(condition_key=c, intervention_key="hiv.on_art")
+    analyzers.append(a)
+
 # ---------------------------------------------------------------------
 # Demographics & networks
 # ---------------------------------------------------------------------
@@ -195,7 +210,8 @@ intervention_df = pd.read_csv(csv_path_intervention)
 unified_product = ss.Tx(df=intervention_df, label="UnifiedTx")
 
 hiv_test = sti.HIVTest(test_prob_data=test_prob_data, years=test_years)
-art = sti.ART(coverage_data=art_coverage_data)
+art = mi.ARTwithCASM(coverage_data=art_coverage_data)  
+art.casm_sensitivity = "pharma"
 vmmc = sti.VMMC(pars={"future_coverage": {"year": 2015, "prop": 0.30}})
 prep = sti.Prep(pars={"coverage": [0, 0.05, 0.25], "years": [2007, 2015, 2020]})
 
@@ -210,6 +226,8 @@ t2d_tx = mi.T2D_ReduceMortalityTx(
 
 # Choose which intervention set to use in the Sim
 interventions = [hiv_test, art, vmmc, prep]  # or add t2d_tx, etc.
+
+
 
 # ---------------------------------------------------------------------
 # Utility: helpers
@@ -240,7 +258,7 @@ if __name__ == "__main__":
         demographics=[pregnancy, death],
         diseases=disease_objects,      
         connectors=connectors,
-        # interventions=interventions,
+        interventions=interventions,
         analyzers=analyzers,
         copy_inputs=False,
         label="With Interventions",
@@ -270,3 +288,5 @@ if __name__ == "__main__":
     # prevalence_check_df = pd.read_csv(f"mighti/data/{region}_postprocess_check_prevalence.csv")
     # mi.plot_mean_prevalence(sim, prevalence_analyzer, "HIV", prevalence_check_df, inityear, endyear)
     # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, "CardiovascularDiseases")
+
+    mi.plot_adherence_by_condition(sim, analyzers, casm_keys)
