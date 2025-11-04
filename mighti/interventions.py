@@ -7,7 +7,39 @@ import starsim as ss
 import stisim as sti
 import numpy as np
 
-_all_ = ['ARTwithCASM','ImproveHospitalDischarge', 'GiveHousingToDepressed', 'GiveHousingSupport', 'HousingSupportForAUD']
+_all_ = ['ART', 'ARTwithCASM','ImproveHospitalDischarge', 'GiveHousingToDepressed', 'GiveHousingSupport', 'HousingSupportForAUD']
+
+
+class ART(sti.ART):
+    """
+    ART intervention with optional integration to the BudgetConstraint module.
+    """
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        # Store reference to budget module if present
+        self._budget_module = sim.get_module("budget_constraint", optional=True)
+
+    def apply(self, sim):
+        # Execute normal ART behavior (diagnosis, initiation, adherence updates, etc.)
+        super().apply(sim)
+
+        # If budget constraint active, register cost and HRH usage
+        if self._budget_module:
+            n_treated = getattr(self, "n_treated", 0)
+
+            # Safety guard: only proceed if n_treated > 0
+            if n_treated > 0:
+                cost = n_treated * getattr(self, "cost_per_person_year", 120) / sim.n_years
+                hrh_minutes = {
+                    "doctor": 5 * n_treated,
+                    "nurse": 30 * n_treated,
+                }
+                self._budget_module.register_usage(
+                    cost=cost,
+                    hrh_minutes=hrh_minutes,
+                    source=self.name,
+                )
 
 
 class ARTwithCASM(sti.ART):

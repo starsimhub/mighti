@@ -2,6 +2,8 @@ import starsim as ss
 import numpy as np
 import pandas as pd
 
+__all__ = ['MicrocostingAnalyzer', 'HRHAnalyzer', 'summarize_microcosting_results']
+
 class MicrocostingAnalyzer(ss.Analyzer):
     def __init__(self, unit_costs=None, disability_weights=None,
                  discount_rate=None,
@@ -205,6 +207,25 @@ class MicrocostingAnalyzer(ss.Analyzer):
 
     def to_df(self):
         return self.detailed_outputs
+
+
+class HRHAnalyzer(ss.Analyzer):
+    """Summarizes human resource utilization by cadre per timestep."""
+
+    def __init__(self, label="hrh_analyzer"):
+        super().__init__(label=label)
+        self.records = []
+
+    def apply(self, sim):
+        econ = sim.get_module("budget_constraint", optional=True)
+        if econ and econ.resources:
+            used = {**econ.resources.summarize()}
+            used["t"] = sim.t
+            self.records.append(used)
+
+    def finalize(self, sim):
+        self.df = pd.DataFrame(self.records)
+        sim.results["hrh"] = self.df
 
 
 def summarize_microcosting_results(analyzer):

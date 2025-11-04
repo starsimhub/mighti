@@ -103,7 +103,7 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
                          if k.startswith(f"{disease}_{key_pattern}_")]
         matching_keys = sorted(matching_keys, key=lambda x: int(x.split('_')[-1]))
         if not matching_keys:
-            print(f"⚠️ No keys found for pattern {disease}_{key_pattern}_")
+            print(f" No keys found for pattern {disease}_{key_pattern}_")
         return [_safe_get_result(prevalence_analyzer, k, sim) for k in matching_keys]
 
     male_num = np.sum(extract_results("num_male"), axis=0)
@@ -152,8 +152,7 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
 
     # --- Ensure numeric (not datetime) x-axis ---
     ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{int(x)}"))
-    units.registry[np.ndarray] = None   # 🚫 disable automatic datetime conversion
-    dates.set_epoch('0000-12-31T00:00:00')  # safety for some Matplotlib versions
+    units.registry[np.ndarray] = None   # disable automatic datetime conversion
 
     # --- Style ---
     ax.set_title(f"{disease.capitalize()} Prevalence Over Time (All Ages)", fontsize=16)

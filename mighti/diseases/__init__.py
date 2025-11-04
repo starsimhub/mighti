@@ -1,6 +1,19 @@
+# ---------------------------------------------------------------------
 # Base disease types
-from .base_disease import RemittingDisease, AcuteDisease, ChronicDisease, GenericSIS
+# ---------------------------------------------------------------------
+from .base_disease import (
+    RemittingDisease,
+    AcuteDisease,
+    ChronicDisease,
+    GenericSIS,
+    GenericSIR,
+    AcuteSurgicalDisease,
+    StaticCondition,
+)
 
+# ---------------------------------------------------------------------
+# Existing diseases
+# ---------------------------------------------------------------------
 from .alcoholusedisorder import *
 from .alzheimersdisease import *
 from .anxietydisorder import *
@@ -13,14 +26,14 @@ from .chronicliverdisease import *
 from .chronicpain import *
 from .copd import *
 from .colorectalcancer import *
-from .majordepressivedisorder import *
-from .interpersonalviolence import *
-from .flu import *
 from .dementia import *
+from .flu import *
 from .hpv import *
 from .hyperlipidemia import *
 from .hypertension import *
+from .interpersonalviolence import *
 from .lungcancer import *
+from .majordepressivedisorder import *
 from .obesity import *
 from .opioidusedisorder import *
 from .parkinsonsdisease import *
@@ -33,3 +46,16 @@ from .tobaccouse import *
 from .type1diabetes import *
 from .type2diabetes import *
 from .viralhepatitis import *
+
+
+from .chromosomalabnormalities import *
+from .congenitalheartanomalies import *
+from .congenitalmusculoskeletal import *
+from .digestivecongenitalanomalies import *
+from .diarrhealdisease import *
+from .downsyndrome import *
+from .neonatalencephalopathy import *
+from .neonataljaundice import *
+from .neonatalsepsis import *
+from .neonatalpretermbirth import *
+from .neuraltubedefects import *

@@ -9,11 +9,12 @@ import starsim as ss
 from scipy.stats import lognorm
 
 
-__all__ = ['RemittingDisease', 'AcuteDisease', 'ChronicDisease', 'GenericSIS']
+__all__ = ['RemittingDisease', 'AcuteDisease', 'AcuteSurgicalDisease', 'ChronicDisease',
+            'GenericSIS', 'GenericSIR', 'StaticCondition']
 
 
 logger = logging.getLogger(__name__)
-
+logging.basicConfig(level=logging.WARNING)
 
 def get_disease_parameters(csv_path, disease_name):
     """
@@ -228,6 +229,7 @@ class RemittingDisease(ss.NCD):
         dur[~np.isfinite(dur)] = 0.0
         return dur
 
+
 class AcuteDisease(ss.NCD):
     """Base class for all acute diseases."""
 
@@ -368,6 +370,163 @@ class AcuteDisease(ss.NCD):
         return dur
     
 
+
+class AcuteSurgicalDisease(ss.NCD):
+    """Acute disease with a possible surgical intervention event.
+
+    Represents conditions like appendicitis, congenital heart anomalies, or digestive congenital anomalies
+    that are acute in course but can be surgically treated to improve survival.
+
+    Parameters loaded from CSV include:
+        - dur_condition: mean duration of untreated disease (yrs)
+        - p_death: baseline probability of death per timestep
+        - p_acquire: per-timestep acquisition probability
+        - p_surgery: probability of receiving surgery
+        - rel_mortality_treated: relative mortality for treated individuals
+        - rel_mortality_untreated: relative mortality for untreated individuals
+        - cost_surgery (optional): for MicrocostingAnalyzer integration
+    """
+
+    def __init__(self, csv_path=None, pars=None, **kwargs):
+        super().__init__()
+        self.csv_path = csv_path
+        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+
+        sigma = 0.5
+        mu = np.log(disease_params["dur_condition"]) - (sigma**2) / 2
+
+        self.define_pars(
+            dur_condition=lognorm(s=sigma, scale=np.exp(mu)),
+            p_death=ss.bernoulli(disease_params["p_death"]),
+            max_disease_duration=disease_params["max_disease_duration"],
+            rel_sus_hiv=disease_params.get("rel_sus_hiv", 1.0),
+            affected_sex=disease_params.get("affected_sex", "both"),
+            p_acquire_multiplier=1.0,
+            p_acquire=disease_params["p_acquire"],
+            p_surgery=disease_params.get("p_surgery", 0.3),
+            rel_mortality_treated=disease_params.get("rel_mortality_treated", 0.5),
+            rel_mortality_untreated=disease_params.get("rel_mortality_untreated", 2.0),
+            cost_surgery=disease_params.get("cost_surgery", 0.0),
+            init_prev=None,
+        )
+
+        self.p_acquire = ss.bernoulli(
+            p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids)
+        )
+        self.update_pars(pars, **kwargs)
+
+        # Define states
+        self.define_states(
+            ss.BoolState("susceptible", default=True),
+            ss.BoolState("at_risk", default=True),
+            ss.BoolState("affected"),
+            ss.BoolState("on_treatment"),   # here: has received surgery
+            ss.BoolState("surgery_done", default=False),
+            ss.FloatArr("ti_affected"),
+            ss.FloatArr("ti_dead"),
+            ss.FloatArr("ti_surgery"),
+            ss.FloatArr("rel_sus", default=1.0),
+            ss.FloatArr("rel_death", default=1.0),
+            reset=True,
+        )
+
+    def init_post(self):
+        super().init_post()
+        sim = self.sim
+
+        if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
+            probs = self.pars.init_prev.rvs(sim.people.uid)
+            affected = np.random.rand(len(sim.people)) < probs
+            if hasattr(self, "affected"):
+                self.affected[:] = affected
+            if hasattr(self, "set_prognoses"):
+                self.set_prognoses(np.where(affected)[0])
+        return
+
+    def set_prognoses(self, uids):
+        self.susceptible[uids] = False
+        self.affected[uids] = True
+        self.at_risk[uids] = False
+        self.rel_death[uids] = self.pars.rel_mortality_untreated
+
+    def init_results(self):
+        super().init_results()
+        for name, dtype, label in [
+            ("new_cases", int, "New Cases"),
+            ("new_deaths", int, "Deaths"),
+            ("new_surgeries", int, "Surgeries"),
+            ("prevalence", float, "Prevalence"),
+        ]:
+            if name not in self.results:
+                self.define_results(ss.Result(name, dtype=dtype, label=label))
+
+    def step(self):
+        ti = self.ti
+        sim = self.sim
+
+        # --- Acquisition ---
+        susceptible = self.at_risk.uids
+        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
+
+        if self.pars.affected_sex == "female":
+            p_acq[sim.people.male[susceptible]] = 0
+        elif self.pars.affected_sex == "male":
+            p_acq[sim.people.female[susceptible]] = 0
+
+        try:
+            p_acq *= self.rel_sus[susceptible]
+            if hasattr(sim.people, "hiv"):
+                hiv_pos = sim.people.hiv[susceptible]
+                p_acq[hiv_pos] *= self.pars.rel_sus_hiv
+        except Exception:
+            pass
+
+        new_cases = susceptible[np.random.rand(len(susceptible)) < p_acq]
+        self.affected[new_cases] = True
+        self.at_risk[new_cases] = False
+        self.ti_affected[new_cases] = ti
+        self.rel_death[new_cases] = self.pars.rel_mortality_untreated
+
+        # --- Surgery events ---
+        affected_uids = self.affected.uids
+        can_surgery = affected_uids[~self.surgery_done[affected_uids]]
+        surgeries = can_surgery[np.random.rand(len(can_surgery)) < self.pars.p_surgery]
+        if len(surgeries):
+            self.on_treatment[surgeries] = True
+            self.surgery_done[surgeries] = True
+            self.ti_surgery[surgeries] = ti
+            self.rel_death[surgeries] = self.pars.rel_mortality_treated
+
+        # --- Deaths ---
+        affected_uids = self.affected.uids
+        rel_death = self.rel_death[affected_uids]
+        base_p = self.pars.p_death.pars.get("p", 0)
+        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
+        if len(deaths):
+            sim.people.request_death(deaths)
+            self.ti_dead[deaths] = ti
+
+        # --- Results ---
+        self.results.new_cases[ti] = len(new_cases)
+        self.results.new_surgeries[ti] = len(surgeries)
+        self.results.new_deaths[ti] = len(deaths)
+        self.results.prevalence[ti] = np.count_nonzero(self.affected) / len(sim.people)
+
+        return new_cases
+
+    @property
+    def duration(self):
+        """Duration (in years) since onset of disease."""
+        n = len(self.sim.people)
+        dur = np.zeros(n)
+        if hasattr(self, "affected") and hasattr(self, "ti_affected"):
+            affected_uids = self.affected.uids
+            if len(affected_uids):
+                dur[affected_uids] = self.sim.t.years - self.ti_affected[affected_uids]
+        dur = np.clip(dur, 0, None)
+        return dur
+    
+
 class ChronicDisease(ss.NCD):
     """Base class for chronic diseases."""
 
@@ -504,6 +663,7 @@ class ChronicDisease(ss.NCD):
         # Clip negatives (e.g. from pre-sim infections)
         dur = np.clip(dur, 0, None)
         return dur
+    
 
 class GenericSIS(ss.SIS):
     """Base class for communicable diseases (SIS model)."""
@@ -644,11 +804,53 @@ class GenericSIS(ss.SIS):
         # Clip negatives (e.g. from pre-sim infections)
         dur = np.clip(dur, 0, None)
         return dur
-    
+
+
+class GenericSIR(ss.SIR):
+    """Base class for communicable diseases following an SIR model."""
+    def __init__(self, csv_path, pars=None, **kwargs):
+        super().__init__()
+        self.csv_path = csv_path
+        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        sigma = 0.5
+        mu = np.log(disease_params["dur_condition"]) - (sigma**2) / 2
+        self.define_pars(
+            dur_condition=lognorm(s=sigma, scale=np.exp(mu)),
+            p_death=ss.bernoulli(disease_params["p_death"]),
+            remission_rate=disease_params["remission_rate"],
+            max_disease_duration=disease_params["max_disease_duration"],
+            rel_sus_hiv=disease_params["rel_sus_hiv"],
+            affected_sex=disease_params["affected_sex"],
+            p_acquire=disease_params["p_acquire"],
+            init_prev=None,
+        )
+        self.update_pars(pars, **kwargs)
+
+
+class StaticCondition(ss.NCD):
+    """Base class for lifelong static conditions (e.g., Down Syndrome)."""
+    def __init__(self, csv_path, pars=None, **kwargs):
+        super().__init__()
+        self.csv_path = csv_path
+        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        self.define_pars(
+            p_death=ss.bernoulli(disease_params["p_death"]),
+            rel_sus_hiv=disease_params["rel_sus_hiv"],
+            affected_sex=disease_params["affected_sex"],
+            init_prev=None,
+        )
+        self.update_pars(pars, **kwargs)
+        self.define_states(
+            ss.BoolState("affected", default=True),
+            ss.FloatArr("rel_sus", default=1.0),
+            ss.FloatArr("rel_death", default=1.0),
+            reset=True,
+        )
+
 
 def calculate_p_acquire_generic(disease, sim, uids):
     """Calculate acquisition probability for a disease with optional sex filtering and HIV interaction."""
-    p_base = np.full(len(uids), disease.pars.p_acquire_multiplier)
+    p_base = np.full(len(uids), disease.pars.p_acquire_multiplier * disease.pars.p_acquire)
     
     if disease.pars.affected_sex == "female":
         try:
