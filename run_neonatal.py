@@ -49,7 +49,8 @@ df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
-healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
+# healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
+healthconditions = ['Type2Diabetes']
 diseases = ["HIV"] + healthconditions
 
 # ---------------------------------------------------------------------
@@ -248,9 +249,8 @@ if __name__ == "__main__":
 
     print(sim_with.analyzers.survivorship_analyzer.results['lx_male'][:5])
 
-    # df_mx = mi.calculate_mortality_rates(sim_with, deaths_analyzer)
-    # plt.plot(df_mx[df_mx.sex=="Male"].age, df_mx[df_mx.sex=="Male"].mx)
-    # sim_with.run()
+    df_mx = mi.calculate_mortality_rates(sim_with, deaths_analyzer)
+    plt.plot(df_mx[df_mx.sex=="Male"].age, df_mx[df_mx.sex=="Male"].mx)
 
     for d in sim_with.diseases():
         name = getattr(d, "disease_name", d.__class__.__name__)
