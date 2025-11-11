@@ -2,10 +2,10 @@
 Module defining neonatal jaundice as an acute disease model.
 """
 
-from mighti.diseases.base_disease import AcuteDisease
+from mighti.diseases.base_disease import NonAcquiredDisease
 
 
-class NeonatalJaundice(AcuteDisease):
+class NeonatalJaundice(NonAcquiredDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
         self.disease_name = 'NeonatalJaundice'
         super().__init__(csv_path, pars, **kwargs)

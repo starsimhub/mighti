@@ -8,7 +8,8 @@ from .base_disease import (
     GenericSIS,
     GenericSIR,
     AcuteSurgicalDisease,
-    StaticCondition,
+    NonAcquiredDisease,
+    StaticCondition
 )
 
 # ---------------------------------------------------------------------
@@ -59,3 +60,6 @@ from .neonataljaundice import *
 from .neonatalsepsis import *
 from .neonatalpretermbirth import *
 from .neuraltubedefects import *
+
+from .esophagealcancer import *
+from .proteinenergymalnutrition import *

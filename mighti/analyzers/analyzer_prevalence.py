@@ -202,7 +202,7 @@ class PrevalenceAnalyzer_HIV(ss.Analyzer):
 
         for disease in self.diseases:
             dis = getattr(sim.diseases, disease)
-            status_attr = "infected" if disease in ["hiv", "hpv", "flu", "viralhepatitis", "tb"] else "affected"
+            status_attr = "infected" if disease in ["hiv", "hpv", "flu", "viralhepatitis", "tb", "diarrhealdisease"] else "affected"
             has_disease = getattr(dis, status_attr)
 
             # Track stratified prevalences

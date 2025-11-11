@@ -277,13 +277,13 @@ if __name__ == "__main__":
 
     # # # Optional prevalence plots
     prevalence_check_df = pd.read_csv(f"mighti/data/{region}_postprocess_check_prevalence.csv")
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, "HIV", prevalence_check_df, inityear, endyear)
+    mi.plot_mean_prevalence(sim, prevalence_analyzer, "DownSyndrome", prevalence_check_df, inityear, endyear)
     # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, "CardiovascularDiseases")
 
     # mi.plot_adherence_by_condition(sim, analyzers, casm_keys)
 
     male_prev, female_prev = mi.plot_mean_prevalence(
-        sim, prevalence_analyzer, "HIV", prevalence_data_df, init_year=2000, end_year=2020
+        sim, prevalence_analyzer, "DownSyndrome", prevalence_data_df, init_year=2000, end_year=2020
     )
 
     for t, pm, pf in zip(sim.timevec, male_prev, female_prev):
