@@ -331,8 +331,28 @@ class OnARTByConditionAnalyzer(ss.Analyzer):
         ppl = self.sim.people
         cond = np.asarray(ppl.states.get(self.condition_key), dtype=bool)
         hiv  = np.asarray(ppl.states.get("hiv.infected"), dtype=bool)
+        # Use diagnosed HIV+ as denominator (people who tested positive)
+        hiv_diagnosed = np.asarray(ppl.states.get("hiv.diagnosed", hiv), dtype=bool)
         art  = np.asarray(ppl.states.get("hiv.on_art"), dtype=bool)
         ti = self.ti
-        self.results["onart_with_condition"][ti]    = self.cond_prob(art, hiv & cond)
-        self.results["onart_without_condition"][ti] = self.cond_prob(art, hiv & ~cond)
+        
+        # Calculate denominators
+        cond_diag = hiv_diagnosed & cond
+        no_cond_diag = hiv_diagnosed & ~cond
+        
+        # Debug: print denominator sizes for first few and last few timesteps
+        # Just print for first 3 timesteps and skip the "last few" check to avoid attribute errors
+        if ti < 3:
+            cond_count = cond_diag.sum()
+            no_cond_count = no_cond_diag.sum()
+            cond_art = (art & cond_diag).sum()
+            no_cond_art = (art & no_cond_diag).sum()
+            print(f"[OnARTByConditionAnalyzer] Year {self.sim.t.year}, ti={ti}: "
+                  f"Cond diagnosed={cond_count}, Cond on ART={cond_art}, Coverage={self.cond_prob(art, cond_diag):.3f} | "
+                  f"NoCond diagnosed={no_cond_count}, NoCond on ART={no_cond_art}, Coverage={self.cond_prob(art, no_cond_diag):.3f}")
+        
+        # Calculate ART coverage among diagnosed HIV+ (tested positive)
+        # This is what the user requested: "proportion on ART among people who are HIV+ and tested positive"
+        self.results["onart_with_condition"][ti]    = self.cond_prob(art, cond_diag)
+        self.results["onart_without_condition"][ti] = self.cond_prob(art, no_cond_diag)
         

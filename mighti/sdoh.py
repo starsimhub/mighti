@@ -137,11 +137,17 @@ class BaseSDoH(ss.Module):
         p_loss = getattr(self, "p_loss", 0.01)   # yearly probability of losing stability
         p_gain = getattr(self, "p_gain", 0.10)   # yearly probability of regaining stability
 
-        unhoused = ~self.state
-        housed = self.state
+        # Convert StarSim BoolArr → NumPy boolean array
+        state_np = np.asarray(self.state, dtype=bool)
 
-        lose_mask = housed & (np.random.rand(len(ppl)) < p_loss)
-        gain_mask = unhoused & (np.random.rand(len(ppl)) < p_gain)
+        unhoused = ~state_np
+        housed   = state_np
+
+        rand_loss = np.random.rand(len(ppl)) < p_loss
+        rand_gain = np.random.rand(len(ppl)) < p_gain
+
+        lose_mask = housed & rand_loss
+        gain_mask = unhoused & rand_gain
 
         self.state[lose_mask] = False
         self.state[gain_mask] = True

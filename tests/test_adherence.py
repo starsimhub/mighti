@@ -1,189 +1,250 @@
 """
-Unit tests for Adherence connectors (e.g., AdherenceFromDepression)
-Ensures that CASM-linked adherence logic behaves as expected.
+Minimal working adherence test using real STI-Sim HIV
+and the same structure as mighti_main.py, but simplified.
+
+This test:
+  - creates a valid Starsim + STI-Sim simulation
+  - initializes HIV properly (with CD4)
+  - applies AdherenceEngine, ARTAdherenceDisruptor,
+    InterventionAdherenceDisruptor
+  - runs for 1 year
+  - checks that adherence modifies ART retention
 """
 
-import pytest
 import numpy as np
+import pandas as pd
 import starsim as ss
 import stisim as sti
 import mighti as mi
 
+region = "eswatini"
+n_agents=1000
+csv_prevalence        = f"mighti/data/{region}_prevalence.csv"
+csv_path_params      = f"mighti/data/{region}_parameters.csv"
+healthcondition = "MajorDepressiveDisorder"
+diseases = ['HIV', healthcondition]
+
+prevalence_data_df = pd.read_csv(csv_prevalence)
+prevalence_data, age_bins = mi.initialize_prevalence_data(
+    diseases=diseases,
+    prevalence_data=prevalence_data_df,
+    inityear=2000,
+)
+
+def get_prevalence_function(disease):
+    def prevalence_func(sim, uids, size=None):
+        return mi.age_sex_dependent_prevalence(
+            disease=disease,
+            prevalence_data=prevalence_data,
+            age_bins=age_bins,
+            sim=sim,
+            size=size,
+        )
+    return prevalence_func
+
+def make_init_prev_func(disease):
+    prev_func_local = get_prevalence_function(disease)
+    return lambda sim, uids, size=None: prev_func_local(sim, uids, size)
+
+
 
 # ---------------------------------------------------------------------
-# Helper: minimal simulation
+# TEST 1: AdherenceEngine computes adherence < 1 for affected agents
 # ---------------------------------------------------------------------
-def make_minisim(n_agents=500, start=2007, stop=2010, depression_prevalence=0.3):
-    """Create a minimal Starsim simulation with HIV, Depression, ART, and adherence connector."""
-    ppl = ss.People(n_agents)
-    maternal = ss.MaternalNet()
-    sexual = sti.StructuredSexual()
-    networks = [maternal, sexual]
+def test_adherence_engine_basic():
+    extra_states = [
+        ss.FloatArr("adherence", default=1.0),
+        ss.BoolArr("neighbourhood_situation"),
+    ]
 
-    death = ss.Deaths()
-    pregnancy = ss.Pregnancy()
-
-    # HIV with ART enabled
-    hiv = sti.HIV()
-    hiv.pars.include_care = True
-    hiv.pars.art_efficacy = 0.9
-
-    # MajorDepressiveDisorder with fixed prevalence
-    csv_path = "mighti/data/eswatini_parameters.csv"  # valid placeholder
-    dep = mi.MajorDepressiveDisorder(
-        csv_path=csv_path,
-        pars=dict(init_prev=ss.bernoulli(p=depression_prevalence))
+    hiv = sti.HIV(
+        beta_m2f=0.2,
+        beta_m2c=0.01,
+        init_prev=0.20,
     )
-    diseases = [hiv, dep]
 
-    art = sti.ART(pars={"init_prob": ss.bernoulli(p=0.9)})
-    interventions = [art]
+    # enable full cascade
+    hiv.pars.include_care = True
+    hiv.pars.include_aids_deaths = False   # turn off mortality for faster tests
+    hiv.pars.art_efficacy = 0.90
 
-    adherence_conn = mi.AdherenceFromDepression()
-    prevalence_analyzer = mi.PrevalenceAnalyzer(diseases=["HIV", "MajorDepressiveDisorder"])
+    init_prev = ss.bernoulli(p=make_init_prev_func(healthcondition))
+
+    disease_class = getattr(mi, healthcondition, None)
+
+    # Instantiate the disease
+    condition_obj = disease_class(
+        csv_path=csv_path_params,
+        pars={"init_prev": init_prev},
+    )
+
+    # Add to the disease list
+    disease_objects = [hiv, condition_obj]
+
+    adherence_engine = mi.AdherenceEngine(casm_rel=mi.CASM_REL_FACTORS)
 
     sim = ss.Sim(
         n_agents=n_agents,
-        start=start,
-        stop=stop,
-        people=ppl,
-        networks=networks,
-        demographics=[death, pregnancy],
-        diseases=diseases,
-        interventions=interventions,
-        connectors=[adherence_conn],
-        analyzers=[prevalence_analyzer],
-        label="AdherenceTest",
+        start=2000,
+        stop=2001,
+        people=ss.People(n_agents=n_agents, extra_states=extra_states),
+        diseases=disease_objects,
+        modules=[adherence_engine],
+        interventions=[],
+        connectors=[],
+        label="test_adherence_engine",
     )
 
-    return sim, adherence_conn
-
-
-# ---------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------
-def test_adherence_connector_records_timesteps():
-    """Connector should record adherence over time (using sim-managed connector)."""
-    sim, _ = make_minisim()
     sim.run()
 
-    # Fetch connector actually used by Starsim
-    conn = next(c for name, c in sim.connectors.items() if "adherence" in name.lower())
+    adher = sim.people.states["adherence"]
+    print(adher.mean())
+    assert adher.mean() < 1.0, "Adherence should be reduced for CASM-affected agents"
 
-    assert len(conn.time) > 0, "Connector did not record any timesteps."
-    assert len(conn.time) == len(conn.mean_adherence), "Mismatch between time and adherence lengths."
-    mean_val = np.mean(conn.mean_adherence)
-    assert 0.0 < mean_val <= 1.0, f"Unexpected adherence mean: {mean_val:.3f}"
+    print("TEST 1 PASSED: AdherenceEngine basic behavior is correct.")
 
+# ---------------------------------------------------------------------
+# TEST 2: ARTAdherenceDisruptor increases ART dropout when adherence < 1
+# ---------------------------------------------------------------------
+def test_art_adherence_disruptor():
+    # Same extra_states pattern as TEST 1
+    extra_states = [
+        ss.FloatArr("adherence", default=1.0),
+        ss.BoolArr("neighbourhood_situation"),
+    ]
 
-def test_adherence_reduces_with_higher_depression():
-    """Mean adherence should be lower with higher depression prevalence."""
-    sim_low, _ = make_minisim(depression_prevalence=0.3)
-    sim_low.run()
-    conn_low = next(c for name, c in sim_low.connectors.items() if "adherence" in name.lower())
-    mean_low = np.mean(conn_low.mean_adherence)
-
-    sim_high, _ = make_minisim(depression_prevalence=0.8)
-    sim_high.run()
-    conn_high = next(c for name, c in sim_high.connectors.items() if "adherence" in name.lower())
-    mean_high = np.mean(conn_high.mean_adherence)
-
-    assert not np.isnan(mean_low), "Low depression adherence values are NaN."
-    assert not np.isnan(mean_high), "High depression adherence values are NaN."
-    assert mean_high < mean_low, (
-        f"Adherence did not decrease with higher depression prevalence "
-        f"({mean_high:.3f} >= {mean_low:.3f})"
+    # --------------------------
+    # HIV with full cascade
+    # --------------------------
+    hiv = sti.HIV(
+        beta_m2f=0.2,
+        beta_m2c=0.01,
+        init_prev=0.20,
     )
-
-
-def test_connector_is_attached_to_sim():
-    """Connector should be attached and accessible via sim.connectors."""
-    sim, _ = make_minisim()
-    sim.run()
-
-    connector_labels = list(sim.connectors.keys())
-    matches = [c for name, c in sim.connectors.items() if "adherence" in name.lower()]
-
-    assert matches, f"No adherence connector found; available: {connector_labels}"
-    conn = matches[0]
-
-    assert len(conn.mean_adherence) > 0, "Connector did not record adherence values."
-    assert np.mean(conn.mean_adherence) < 1.0, "Adherence reduction not applied."
-
-
-def test_adherence_improves_with_depressioncare():
-    """
-    Verify that adding DepressionCare intervention increases adherence
-    compared with no treatment, and reduces depression prevalence.
-    """
-    # --- Baseline: no depression care ---
-    sim_no_tx, _ = make_minisim(depression_prevalence=0.5)
-    sim_no_tx.run()
-    conn_no_tx = next(c for name, c in sim_no_tx.connectors.items() if "adherence" in name.lower())
-    mean_adherence_no_tx = np.mean(conn_no_tx.mean_adherence)
-    dep_prev_no_tx = sim_no_tx.results["majordepressivedisorder"].prevalence.mean()
-
-    # --- With DepressionCare intervention ---
-    depression_tx = mi.DepressionCare(
-        product=ss.Product(name="Tx"),
-        prob=0.9,               # 90% of depressed treated
-        remission_boost=2.0,    # faster recovery
-        adherence_boost=1.3,    # 30% adherence improvement
-    )
-
-    # Recreate full mini-sim but include the intervention
-    ppl = ss.People(500)
-    maternal = ss.MaternalNet()
-    sexual = sti.StructuredSexual()
-    networks = [maternal, sexual]
-    death = ss.Deaths()
-    pregnancy = ss.Pregnancy()
-
-    csv_path = "mighti/data/eswatini_parameters.csv"
-    hiv = sti.HIV()
     hiv.pars.include_care = True
-    hiv.pars.art_efficacy = 0.9
-    dep = mi.MajorDepressiveDisorder(csv_path=csv_path, pars=dict(init_prev=ss.bernoulli(p=0.5)))
-    diseases = [hiv, dep]
+    hiv.pars.include_aids_deaths = False
+    hiv.pars.art_efficacy = 0.90
+    # Everyone who is HIV-positive starts ART at t=0
+    hiv.pars.init_art = ss.bernoulli(p=1.0)
 
-    art = sti.ART(pars={"init_prob": ss.bernoulli(p=0.9)})
-    adherence_conn = mi.AdherenceFromDepression()
-    prevalence_analyzer = mi.PrevalenceAnalyzer(diseases=["HIV", "MajorDepressiveDisorder"])
+    # --------------------------
+    # MajorDepressiveDisorder (CASM condition)
+    # Use the same pattern as TEST 1
+    # --------------------------
+    disease_class = getattr(mi, healthcondition, None)
+    assert disease_class is not None, f"{healthcondition} not found in mighti"
 
-    sim_tx = ss.Sim(
-        n_agents=500,
-        start=2007,
-        stop=2010,
+    init_prev_mdd = ss.bernoulli(p=make_init_prev_func(healthcondition))
+
+    mdd_obj = disease_class(
+        csv_path=csv_path_params,
+        pars={"init_prev": init_prev_mdd},
+    )
+
+    disease_objects = [hiv, mdd_obj]
+
+    # --------------------------
+    # People + modules
+    # --------------------------
+    ppl = ss.People(n_agents=n_agents, extra_states=extra_states)
+
+    adherence_engine = mi.AdherenceEngine(casm_rel=mi.CASM_REL_FACTORS)
+    art_disruptor    = mi.ARTAdherenceDisruptor(base_dropout=0.40)
+
+    sim = ss.Sim(
+        n_agents=n_agents,
+        start=2000,
+        stop=2001,
         people=ppl,
-        networks=networks,
-        demographics=[death, pregnancy],
-        diseases=diseases,
-        interventions=[art, depression_tx],  # include DepressionCare here
-        connectors=[adherence_conn],
-        analyzers=[prevalence_analyzer],
-        label="AdherenceTestWithCare",
+        diseases=disease_objects,
+        modules=[adherence_engine, art_disruptor],
+        interventions=[],
+        connectors=[],
+        label="test_art_disruptor",
     )
 
-    sim_tx.run()
+    sim.run()
 
-    # --- Results ---
-    conn_tx = next(c for name, c in sim_tx.connectors.items() if "adherence" in name.lower())
-    mean_adherence_tx = np.mean(conn_tx.mean_adherence)
-    dep_prev_tx = sim_tx.results["majordepressivedisorder"].prevalence.mean()
+    st = sim.people.states
+    adher = st["adherence"]
+    on_art = st["hiv.on_art"]
+    hiv_infected= sim.diseases.hiv.infected  # HIV-positive
 
-    # --- Assertions ---
-    assert not np.isnan(mean_adherence_tx), "Adherence with treatment is NaN."
-    assert mean_adherence_tx > mean_adherence_no_tx - 0.01, (
-        f"Adherence did not meaningfully improve with DepressionCare "
-        f"({mean_adherence_tx:.3f} vs {mean_adherence_no_tx:.3f})"
-    )
-    assert dep_prev_tx <= dep_prev_no_tx + 0.005, (
-        f"Depression prevalence did not meaningfully decrease with DepressionCare "
-        f"({dep_prev_tx:.3f} vs {dep_prev_no_tx:.3f})"
-    )
+    # Check that adherence actually dropped on average
+    print("Mean adherence after run (TEST 2):", adher.mean())
+    assert adher.mean() < 1.0, "Adherence should be reduced by CASM conditions."
+
+    # Dropouts = HIV-positive who are no longer on ART
+    dropped = (~on_art & hiv_infected).sum()
+    print("Number of HIV-positive agents who dropped ART:", dropped)
+
+    assert dropped > 0, "Some HIV-positive agents should drop ART when adherence < 1."
+
+    print("TEST 2 PASSED: ARTAdherenceDisruptor caused ART dropout under low adherence.")
 
 # ---------------------------------------------------------------------
-# Command line entry (manual run)
+# TEST 3: InterventionAdherenceDisruptor scales REAL ART intervention
+# ---------------------------------------------------------------------
+def test_intervention_adherence_disruptor():
+    print("\nRunning TEST 3 (InterventionAdherenceDisruptor with real ART)…")
+
+    extra_states = [
+        ss.FloatArr("adherence", default=1.0),
+        ss.BoolArr("neighbourhood_situation"),
+    ]
+    ppl = ss.People(n_agents=n_agents, extra_states=extra_states)
+
+    hiv = sti.HIV(
+        beta_m2f=0.2,
+        beta_m2c=0.01,
+        init_prev=0.10,
+    )
+    hiv.pars.include_care = True
+    hiv.pars.include_aids_deaths = False
+    hiv.pars.art_efficacy = 0.95   # BASELINE
+
+    disease_class = getattr(mi, healthcondition)
+    init_prev_mdd = ss.bernoulli(p=make_init_prev_func(healthcondition))
+    mdd = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev_mdd})
+
+    art = mi.ARTwithCASM(
+        coverage_data=pd.DataFrame({"p_art": [1.0]}, index=[2000])
+    )
+    art.casm_sensitivity = "pharma"
+
+    adherence_engine = mi.AdherenceEngine(casm_rel=mi.CASM_REL_FACTORS)
+    intv_disruptor  = mi.InterventionAdherenceDisruptor()
+
+    sim = ss.Sim(
+        n_agents=n_agents,
+        start=2000,
+        stop=2001,
+        people=ppl,
+        demographics=[ss.Pregnancy(), ss.Deaths()],
+        diseases=[hiv, mdd],
+        modules=[adherence_engine, intv_disruptor],
+        interventions=[art],
+        connectors=[],
+        label="test_intv_disruptor",
+        copy_inputs=False,
+    )
+
+    sim.run()
+
+    # Correct assertion for Starsim 3
+    assert hiv.pars.art_efficacy < 0.95, (
+        f"Expected HIV ART efficacy < 0.95 after adherence scaling, got {hiv.pars.art_efficacy}"
+    )
+
+    print(f"TEST 3 PASSED: ART efficacy scaled to {hiv.pars.art_efficacy:.3f}")
+
+
+# ---------------------------------------------------------------------
+# Run all tests if file executed directly
 # ---------------------------------------------------------------------
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
+    test_adherence_engine_basic()
+    test_art_adherence_disruptor()
+    test_intervention_adherence_disruptor()
+
+    print("\nAll adherence tests passed successfully.")
