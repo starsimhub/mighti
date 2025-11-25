@@ -17,7 +17,7 @@ import starsim as ss
 import numpy as np
 import sciris as sc
 
-__all__ = ["PrevalenceAnalyzer", "PrevalenceAnalyzer_HIV", "PrevalenceAnalyzer_SDoH", "OnARTByConditionAnalyzer"]
+__all__ = ["PrevalenceAnalyzer", "PrevalenceAnalyzer_HIV", "PrevalenceAnalyzer_SDoH", "OnARTByConditionAnalyzer", "OnARTByConditionAndSexAnalyzer"]
 
 
 
@@ -355,4 +355,57 @@ class OnARTByConditionAnalyzer(ss.Analyzer):
         # This is what the user requested: "proportion on ART among people who are HIV+ and tested positive"
         self.results["onart_with_condition"][ti]    = self.cond_prob(art, cond_diag)
         self.results["onart_without_condition"][ti] = self.cond_prob(art, no_cond_diag)
+
+
+class OnARTByConditionAndSexAnalyzer(ss.Analyzer):
+    """Tracks ART coverage among HIV+ individuals, stratified by condition AND sex."""
+    
+    @staticmethod
+    def cond_prob(num, den):
+        return sc.safedivide(np.sum(num & den), np.sum(den))
+    
+    def __init__(self, condition_key="alcoholusedisorder.affected", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.name = f"onart_{condition_key.replace('.', '_')}_by_sex"
+        self.condition_key = condition_key
+        self.results_defined = False
+    
+    def init_results(self):
+        super().init_results()
+        if self.results_defined:
+            return
+        results = [
+            ss.Result("onart_cond_male", dtype=float),
+            ss.Result("onart_nocond_male", dtype=float),
+            ss.Result("onart_cond_female", dtype=float),
+            ss.Result("onart_nocond_female", dtype=float),
+        ]
+        self.define_results(*results)
+        self.results_defined = True
+    
+    def step(self):
+        ppl = self.sim.people
+        st = ppl.states
+        cond = np.asarray(st.get(self.condition_key), dtype=bool)
+        hiv_diagnosed = np.asarray(st.get("hiv.diagnosed", []), dtype=bool)
+        art = np.asarray(st.get("hiv.on_art"), dtype=bool)
+        male = np.asarray(ppl.male, bool)
+        female = np.asarray(ppl.female, bool)
+        ti = self.ti
+        
+        # Calculate by condition and sex
+        cond_diag = hiv_diagnosed & cond
+        no_cond_diag = hiv_diagnosed & ~cond
+        
+        # Male
+        cond_diag_male = cond_diag & male
+        no_cond_diag_male = no_cond_diag & male
+        self.results["onart_cond_male"][ti] = self.cond_prob(art, cond_diag_male)
+        self.results["onart_nocond_male"][ti] = self.cond_prob(art, no_cond_diag_male)
+        
+        # Female
+        cond_diag_female = cond_diag & female
+        no_cond_diag_female = no_cond_diag & female
+        self.results["onart_cond_female"][ti] = self.cond_prob(art, cond_diag_female)
+        self.results["onart_nocond_female"][ti] = self.cond_prob(art, no_cond_diag_female)
         
