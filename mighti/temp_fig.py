@@ -31,7 +31,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 n_agents = 100_000
 inityear = 2007
-endyear = 2020
+endyear = 2050
 region = "eswatini"
 
 # File paths
@@ -190,8 +190,8 @@ art_analyzer_by_sex = mi.OnARTByConditionAndSexAnalyzer(
 # ART and Testing Interventions
 # ---------------------------------------------------------------------
 art_coverage_data = pd.DataFrame(
-    {"p_art": [0.10, 0.34, 0.50, 0.65, 0.74, 0.85, 0.95]},
-    index=[2003, 2010, 2013, 2014, 2016, 2022, 2050],
+    {"p_art": [0.10, 0.34, 0.50, 0.65, 0.74, 0.85]},
+    index=[2003, 2010, 2013, 2014, 2016, 2022],
 )
 
 print("[DEBUG] ART coverage data:")
@@ -199,8 +199,8 @@ print(art_coverage_data)
 print(f"[DEBUG] Simulation years: {inityear} to {endyear}")
 
 hiv_test = sti.HIVTest(
-    test_prob_data=[0.10, 0.25, 0.60, 0.70, 0.80, 0.95, 0.95],
-    years=[2003, 2005, 2007, 2010, 2014, 2016, 2050],
+    test_prob_data=[0.10, 0.25, 0.60, 0.70, 0.80, 0.95],
+    years=[2003, 2005, 2007, 2010, 2014, 2016],
 )
 
 # Create ART interventions for each scenario
@@ -211,23 +211,23 @@ art4 = mi.ARTNoAutoAdjust(coverage_data=art_coverage_data, label="art4")
 
 # Create HIV test interventions for each scenario
 hiv_test1 = sti.HIVTest(
-    test_prob_data=[0.10, 0.25, 0.60, 0.70, 0.80, 0.95, 0.95],
-    years=[2003, 2005, 2007, 2010, 2014, 2016, 2050],
+    test_prob_data=[0.10, 0.25, 0.60, 0.70, 0.80, 0.95],
+    years=[2003, 2005, 2007, 2010, 2014, 2016],
     label="hiv_test1"
 )
 hiv_test2 = sti.HIVTest(
-    test_prob_data=[0.10, 0.25, 0.60, 0.70, 0.80, 0.95, 0.95],
-    years=[2003, 2005, 2007, 2010, 2014, 2016, 2050],
+    test_prob_data=[0.10, 0.25, 0.60, 0.70, 0.80, 0.95],
+    years=[2003, 2005, 2007, 2010, 2014, 2016],
     label="hiv_test2"
 )
 hiv_test3 = sti.HIVTest(
-    test_prob_data=[0.10, 0.25, 0.60, 0.70, 0.80, 0.95, 0.95],
-    years=[2003, 2005, 2007, 2010, 2014, 2016, 2050],
+    test_prob_data=[0.10, 0.25, 0.60, 0.70, 0.80, 0.95],
+    years=[2003, 2005, 2007, 2010, 2014, 2016],
     label="hiv_test3"
 )
 hiv_test4 = sti.HIVTest(
-    test_prob_data=[0.10, 0.25, 0.60, 0.70, 0.80, 0.95, 0.95],
-    years=[2003, 2005, 2007, 2010, 2014, 2016, 2050],
+    test_prob_data=[0.10, 0.25, 0.60, 0.70, 0.80, 0.95],
+    years=[2003, 2005, 2007, 2010, 2014, 2016],
     label="hiv_test4"
 )
 
