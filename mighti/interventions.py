@@ -72,8 +72,8 @@ class ARTNoAutoAdjust(sti.ART):
         """
         Override to disable auto-adjustment and ensure coverage is calculated correctly.
         
-        The parent class's art_coverage_correction uses target_coverage parameter directly,
-        so we need to recalculate it based on diagnosed population and then call the parent.
+        CRITICAL: This method also excludes people who have dropped out (_ever_dropped)
+        from being re-added to ART, which is essential for making dropout effects visible.
         """
         # Get the raw coverage proportion from coverage_data by interpolating
         if hasattr(self, 'coverage_data') and self.coverage_data is not None:
@@ -82,9 +82,44 @@ class ARTNoAutoAdjust(sti.ART):
             years = self.coverage_data.index.values
             props = self.coverage_data['p_art'].values
             coverage_prop = np.interp(year, years, props)
+            # Cap at the maximum value in the data to prevent extrapolation beyond observed data
+            max_coverage = props.max()
+            coverage_prop = min(coverage_prop, max_coverage)
         else:
             # Fallback: if no coverage_data, use target_coverage as-is
             coverage_prop = None
+        
+        # Get _ever_dropped set to exclude from re-initiation
+        ever_dropped = set()
+        art_dropout_connector = None
+        if hasattr(sim, 'connectors'):
+            if isinstance(sim.connectors, dict):
+                # Try multiple possible keys
+                art_dropout_connector = sim.connectors.get("artadherencedisruptor", None)
+                if art_dropout_connector is None:
+                    art_dropout_connector = sim.connectors.get("adherence_art_dropout", None)
+            else:
+                # It's a list, search by label
+                for conn in sim.connectors:
+                    if hasattr(conn, 'label'):
+                        label_lower = conn.label.lower()
+                        if ('adherence' in label_lower and 'art' in label_lower) or 'artadherencedisruptor' in label_lower:
+                            art_dropout_connector = conn
+                            break
+            
+            if art_dropout_connector is not None and hasattr(art_dropout_connector, "_ever_dropped"):
+                ever_dropped = art_dropout_connector._ever_dropped
+                # Debug: verify we found it
+                if sim.ti % 12 == 0 and len(ever_dropped) > 0:  # Print once per year if there are dropped people
+                    print(f"[ARTNoAutoAdjust.art_coverage_correction] Found connector '{art_dropout_connector.label}', _ever_dropped={len(ever_dropped)}")
+            elif sim.ti % 12 == 0:  # Debug: print if connector not found
+                connector_labels = []
+                if hasattr(sim, 'connectors'):
+                    if isinstance(sim.connectors, dict):
+                        connector_labels = list(sim.connectors.keys())
+                    else:
+                        connector_labels = [getattr(conn, 'label', 'no_label') for conn in sim.connectors]
+                print(f"[ARTNoAutoAdjust.art_coverage_correction] WARNING: Could not find ART dropout connector! Available connectors: {connector_labels}")
         
         # If target_coverage is provided and is an absolute number (likely > 1.0),
         # recalculate based on the actual eligible population (diagnosed HIV+)
@@ -98,19 +133,115 @@ class ARTNoAutoAdjust(sti.ART):
                 # This ensures we're applying coverage to the right population
                 corrected_target = int(coverage_prop * n_diagnosed)
                 
+                # CRITICAL: Reduce target by the number of _ever_dropped people who are diagnosed but not on ART
+                # This prevents the parent method from trying to add them back
+                # We need to be aggressive here - permanently exclude _ever_dropped people from coverage calculations
+                if len(ever_dropped) > 0:
+                    on_art = np.asarray(sim.people.states.get("hiv.on_art", []), bool) if "hiv.on_art" in sim.people.states else np.zeros(len(sim.people), dtype=bool)
+                    # Count how many _ever_dropped people are diagnosed
+                    # CRITICAL: Count ALL _ever_dropped people who are diagnosed, regardless of whether they're on ART or not.
+                    # If they're in _ever_dropped, they will drop out (or have dropped out), so they should be excluded
+                    # from the eligible pool for coverage calculations.
+                    ever_dropped_diagnosed = 0
+                    for uid in ever_dropped:
+                        if uid < len(diagnosed):
+                            if diagnosed[uid]:
+                                ever_dropped_diagnosed += 1
+                    
+                    # AGGRESSIVE: Exclude ALL _ever_dropped diagnosed people from eligible pool
+                    # This ensures that _ever_dropped people are permanently excluded from coverage calculations
+                    # The target should be based on eligible people (diagnosed - _ever_dropped), not all diagnosed
+                    current_on_art = on_art.sum()
+                    target_before_reduction = corrected_target
+                    
+                    # Calculate eligible diagnosed (diagnosed minus ALL _ever_dropped who are diagnosed)
+                    # This is the true pool of people who can be on ART
+                    eligible_diagnosed = n_diagnosed - ever_dropped_diagnosed
+                    
+                    # Recalculate target based on eligible diagnosed pool
+                    # CRITICAL: The target should be based on coverage_prop * eligible_diagnosed.
+                    # We should NOT use max(current_on_art, ...) because that prevents the target from decreasing
+                    # when people drop out. If people drop out, current_on_art decreases, and the target should
+                    # reflect that by being based on the smaller eligible pool.
+                    # We only add people if current_on_art < corrected_target, never force removal.
+                    if eligible_diagnosed > 0:
+                        corrected_target = int(coverage_prop * eligible_diagnosed)
+                        # Only add people if current is below target, never force removal
+                        # So if corrected_target < current_on_art, that's fine - we just won't add anyone
+                        # But we should still use corrected_target as the target (not max it)
+                    else:
+                        corrected_target = current_on_art
+                    
+                    if sim.ti % 12 == 0 and ever_dropped_diagnosed > 0:
+                        print(f"[ARTNoAutoAdjust.art_coverage_correction] Year {sim.t.year}: Excluding {ever_dropped_diagnosed} _ever_dropped diagnosed people from coverage calculation "
+                              f"(diagnosed={n_diagnosed}, eligible={eligible_diagnosed}, target before={target_before_reduction}, after={corrected_target}, "
+                              f"current_on_art={current_on_art}, _ever_dropped={len(ever_dropped)})")
+                
                 # Debug output
                 if hasattr(sim, 't') and len(self._debug_coverage_calls) < 10:
                     self._debug_coverage_calls.append((sim.t.year, target_coverage, coverage_prop, n_diagnosed, corrected_target))
                     if len(self._debug_coverage_calls) <= 3 or sim.t.year in [2010, 2013, 2016, 2020]:
-                        print(f"[ARTNoAutoAdjust.art_coverage_correction] Year {sim.t.year}: coverage_prop={coverage_prop:.3f}, diagnosed={n_diagnosed}, target_count={corrected_target} (original={target_coverage:.0f})")
+                        print(f"[ARTNoAutoAdjust.art_coverage_correction] Year {sim.t.year}: coverage_prop={coverage_prop:.3f}, diagnosed={n_diagnosed}, target_count={corrected_target} (original={target_coverage:.0f}), excluding {len(ever_dropped)} dropped people")
                 
                 # Track that correction was called and what value was used
                 self._correction_called = True
                 self._last_correction_value = corrected_target
                 
-                # Call parent method with corrected target
-                # The parent method doesn't use return value, it uses the parameter
-                super().art_coverage_correction(sim, target_coverage=corrected_target)
+                # Track how many people are on ART before correction
+                hiv = getattr(sim.diseases, "hiv", None)
+                n_on_art_before = hiv.on_art.sum() if hiv is not None else 0
+                
+                # CRITICAL: Instead of calling parent method, implement our own logic that explicitly excludes _ever_dropped
+                # The parent method might bypass our prioritize_art override, so we need to do it ourselves
+                if hiv is not None and corrected_target > n_on_art_before:
+                    # Find all diagnosed people who are not on ART
+                    diagnosed = np.asarray(sim.people.states.get("hiv.diagnosed", []), bool) if "hiv.diagnosed" in sim.people.states else np.zeros(len(sim.people), dtype=bool)
+                    on_art = np.asarray(sim.people.states.get("hiv.on_art", []), bool) if "hiv.on_art" in sim.people.states else np.zeros(len(sim.people), dtype=bool)
+                    
+                    # Eligible: diagnosed, not on ART, and NOT in _ever_dropped
+                    eligible_mask = diagnosed & ~on_art
+                    eligible_uids = np.where(eligible_mask)[0]
+                    
+                    # Filter out _ever_dropped people
+                    if len(ever_dropped) > 0:
+                        eligible_uids = [uid for uid in eligible_uids if uid not in ever_dropped]
+                    
+                    # How many do we need to add?
+                    n_needed = corrected_target - n_on_art_before
+                    n_to_add = min(n_needed, len(eligible_uids))
+                    
+                    if n_to_add > 0:
+                        # Use prioritize_art to add people (it will handle prioritization)
+                        eligible_uids_ss = ss.uids(eligible_uids)
+                        self.prioritize_art(sim, n=n_to_add, awaiting_art_uids=eligible_uids_ss)
+                    
+                    if sim.ti % 12 == 0 and len(ever_dropped) > 0:
+                        n_excluded_from_eligible = len([uid for uid in np.where(eligible_mask)[0] if uid in ever_dropped])
+                        print(f"[ARTNoAutoAdjust.art_coverage_correction] Year {sim.t.year}: Implemented own correction logic: "
+                              f"eligible={len(eligible_uids)} (excluded {n_excluded_from_eligible} _ever_dropped), "
+                              f"target={corrected_target}, current={n_on_art_before}, needed={n_needed}, adding={n_to_add}")
+                else:
+                    # No correction needed or can't do it - call parent as fallback
+                    super().art_coverage_correction(sim, target_coverage=corrected_target)
+                
+                # Track how many people were added by correction
+                n_on_art_after = hiv.on_art.sum() if hiv is not None else 0
+                n_added_by_correction = n_on_art_after - n_on_art_before
+                
+                # Debug: show what correction did
+                if n_added_by_correction > 0 and sim.ti % 12 == 0:  # Print once per year
+                    aud_affected = np.asarray(sim.people.states.get("alcoholusedisorder.affected", []), dtype=bool) if "alcoholusedisorder.affected" in sim.people.states else np.zeros(len(sim.people), dtype=bool)
+                    on_art_after = np.asarray(sim.people.states.get("hiv.on_art", []), bool) if "hiv.on_art" in sim.people.states else np.zeros(len(sim.people), dtype=bool)
+                    # Find who was just added (approximate - compare before/after)
+                    # This is approximate but gives us an idea
+                    if hiv is not None and len(aud_affected) == len(sim.people):
+                        # Count AUD vs No-AUD among those on ART
+                        aud_on_art = (on_art_after & aud_affected).sum()
+                        noaud_on_art = (on_art_after & ~aud_affected).sum()
+                        print(f"[ARTNoAutoAdjust.art_coverage_correction] Year {sim.t.year}: Added {n_added_by_correction} people via correction "
+                              f"(target={corrected_target}, on_art before={n_on_art_before}, after={n_on_art_after}, "
+                              f"total on ART: AUD={aud_on_art}, No-AUD={noaud_on_art}, _ever_dropped={len(ever_dropped)})")
+                
                 return
             elif target_coverage is not None:
                 # Use the target_coverage as-is if we can't recalculate
@@ -150,10 +281,36 @@ class ARTNoAutoAdjust(sti.ART):
         if hiv.on_art.any():
             stopping = hiv.on_art & (hiv.ti_stop_art <= self.ti)
             if stopping.any():
+                stopping_uids = stopping.uids
                 try:
-                    hiv.stop_art(stopping.uids)
+                    hiv.stop_art(stopping_uids)
+                    
+                    # CRITICAL: Immediately add stopping UIDs to _ever_dropped to prevent re-initiation
+                    # This must happen BEFORE art_coverage_correction() runs, otherwise people
+                    # who just dropped out will be immediately re-added to reach target coverage
+                    art_dropout_connector = None
+                    if hasattr(sim, 'connectors'):
+                        if isinstance(sim.connectors, dict):
+                            art_dropout_connector = sim.connectors.get("artadherencedisruptor", None)
+                            if art_dropout_connector is None:
+                                art_dropout_connector = sim.connectors.get("adherence_art_dropout", None)
+                        else:
+                            for conn in sim.connectors:
+                                if hasattr(conn, 'label'):
+                                    label_lower = conn.label.lower()
+                                    if ('adherence' in label_lower and 'art' in label_lower) or 'artadherencedisruptor' in label_lower:
+                                        art_dropout_connector = conn
+                                        break
+                    
+                    if art_dropout_connector is not None and hasattr(art_dropout_connector, "_ever_dropped"):
+                        # Convert stopping_uids to a set and add to _ever_dropped
+                        stopping_uids_set = set(stopping_uids) if hasattr(stopping_uids, '__iter__') else {stopping_uids}
+                        art_dropout_connector._ever_dropped.update(stopping_uids_set)
+                        if sim.ti % 12 == 0:  # Print once per year
+                            print(f"[ARTNoAutoAdjust.step] Year {sim.t.year}: Stopped ART for {len(stopping_uids_set)} people, "
+                                  f"added to _ever_dropped (total _ever_dropped={len(art_dropout_connector._ever_dropped)})")
                 except:
-                    errormsg = f'Error stopping ART for {stopping.uids}'
+                    errormsg = f'Error stopping ART for {stopping_uids}'
                     raise ValueError(errormsg)
 
         # Next, see how many people we need to treat vs how many are already being treated
@@ -261,43 +418,148 @@ class ARTNoAutoAdjust(sti.ART):
             # Figure out if there are treatment spots available and if so, prioritize newly diagnosed agents
             n_available_spots = n_to_treat - len(on_art.uids)
             if n_available_spots > 0:
-                # Check if ARTAdherenceDisruptor dropped anyone this step - exclude them from re-initiation
+                # Check if ARTAdherenceDisruptor dropped anyone this step or ever - exclude them from re-initiation
                 dropped_this_step = set()
+                ever_dropped = set()
                 # Try to get the connector from sim.connectors (dict or list)
+                art_dropout_connector = None
                 if hasattr(sim, 'connectors'):
                     if isinstance(sim.connectors, dict):
+                        # Try multiple possible keys
                         art_dropout_connector = sim.connectors.get("artadherencedisruptor", None)
+                        if art_dropout_connector is None:
+                            art_dropout_connector = sim.connectors.get("adherence_art_dropout", None)
                     else:
                         # List or other iterable
-                        art_dropout_connector = None
                         for conn in sim.connectors:
-                            if hasattr(conn, 'label') and 'adherence' in conn.label.lower() and 'art' in conn.label.lower():
-                                art_dropout_connector = conn
-                                break
+                            if hasattr(conn, 'label'):
+                                label_lower = conn.label.lower()
+                                if ('adherence' in label_lower and 'art' in label_lower) or 'artadherencedisruptor' in label_lower:
+                                    art_dropout_connector = conn
+                                    break
                     
-                    if art_dropout_connector is not None and hasattr(art_dropout_connector, "_dropped_this_step"):
-                        dropped_this_step = art_dropout_connector._dropped_this_step
-                        if len(dropped_this_step) > 0 and sim.ti % 2 == 0:
-                            print(f"[ARTNoAutoAdjust] Year {sim.t.year}: Excluding {len(dropped_this_step)} recently dropped agents from re-initiation")
+                    if art_dropout_connector is not None:
+                        if hasattr(art_dropout_connector, "_dropped_this_step"):
+                            dropped_this_step = art_dropout_connector._dropped_this_step
+                        if hasattr(art_dropout_connector, "_ever_dropped"):
+                            ever_dropped = art_dropout_connector._ever_dropped
+                        
+                        total_excluded = len(dropped_this_step | ever_dropped)
+                        if total_excluded > 0 and sim.ti % 12 == 0:  # Print once per year
+                            # Get more detailed info about who's excluded
+                            aud_affected = np.asarray(sim.people.states.get("alcoholusedisorder.affected", []), dtype=bool) if "alcoholusedisorder.affected" in sim.people.states else np.zeros(len(sim.people), dtype=bool)
+                            excluded_aud = len([uid for uid in (dropped_this_step | ever_dropped) if uid < len(aud_affected) and aud_affected[uid]])
+                            excluded_noaud = total_excluded - excluded_aud
+                            print(f"[ARTNoAutoAdjust] Year {sim.t.year}: Excluding {total_excluded} dropped agents from re-initiation "
+                                  f"(this_step={len(dropped_this_step)}, ever={len(ever_dropped)}, "
+                                  f"AUD={excluded_aud}, No-AUD={excluded_noaud})")
                 
                 # Remove dropped agents from dx_to_treat to prevent immediate re-initiation
-                if dropped_this_step:
-                    dx_to_treat = ss.uids([uid for uid in dx_to_treat if uid not in dropped_this_step])
+                # CRITICAL: This prevents people who dropped out from being immediately re-added,
+                # which is key to making the dropout effect visible in coverage differences
+                if dropped_this_step or ever_dropped:
+                    dx_to_treat = ss.uids([uid for uid in dx_to_treat if uid not in dropped_this_step and uid not in ever_dropped])
                 
                 self.prioritize_art(sim, n=n_available_spots, awaiting_art_uids=dx_to_treat)
 
         # Apply correction to match ART coverage data:
         # The correction method will recalculate based on diagnosed, but we've already
         # calculated n_to_treat correctly above, so we can pass it through
+        # CRITICAL: art_coverage_correction will exclude _ever_dropped people
         self.art_coverage_correction(sim, target_coverage=n_to_treat)
-
-        # Adjust rel_sus for protected unborn agents
-        if hiv.on_art[sim.people.pregnancy.pregnant].any():
-            mother_uids = (hiv.on_art & sim.people.pregnancy.pregnant).uids
-            infants = sim.networks.maternalnet.find_contacts(mother_uids)
-            hiv.rel_sus[ss.uids(infants)] = 0
-
-        return
+    
+    def prioritize_art(self, sim, n, awaiting_art_uids):
+        """
+        Override to exclude _ever_dropped people from being re-added to ART.
+        This ensures that people who dropped out due to low adherence (e.g., from AUD)
+        are not immediately re-added, making the dropout effect visible.
+        """
+        # Get _ever_dropped set to exclude
+        ever_dropped = set()
+        art_dropout_connector = None
+        if hasattr(sim, 'connectors'):
+            if isinstance(sim.connectors, dict):
+                # Try multiple possible keys
+                art_dropout_connector = sim.connectors.get("artadherencedisruptor", None)
+                if art_dropout_connector is None:
+                    art_dropout_connector = sim.connectors.get("adherence_art_dropout", None)
+            else:
+                # It's a list, search by label
+                for conn in sim.connectors:
+                    if hasattr(conn, 'label'):
+                        label_lower = conn.label.lower()
+                        if ('adherence' in label_lower and 'art' in label_lower) or 'artadherencedisruptor' in label_lower:
+                            art_dropout_connector = conn
+                            break
+            
+            if art_dropout_connector is not None and hasattr(art_dropout_connector, "_ever_dropped"):
+                ever_dropped = art_dropout_connector._ever_dropped
+                # Debug: verify we found it (only print if there are dropped people to avoid spam)
+                if sim.ti % 12 == 0 and len(ever_dropped) > 0:  # Print once per year if there are dropped people
+                    print(f"[ARTNoAutoAdjust.prioritize_art] Found connector '{art_dropout_connector.label}', _ever_dropped={len(ever_dropped)}")
+            elif sim.ti % 12 == 0 and len(awaiting_art_uids) > 0:  # Debug: print if connector not found and there are people awaiting
+                connector_labels = []
+                if hasattr(sim, 'connectors'):
+                    if isinstance(sim.connectors, dict):
+                        connector_labels = list(sim.connectors.keys())
+                    else:
+                        connector_labels = [getattr(conn, 'label', 'no_label') for conn in sim.connectors]
+                print(f"[ARTNoAutoAdjust.prioritize_art] WARNING: Could not find ART dropout connector! Available connectors: {connector_labels}")
+        
+        # Exclude _ever_dropped people from awaiting_art_uids
+        n_before = len(awaiting_art_uids)
+        n_after = n_before  # Initialize in case ever_dropped is empty
+        n_excluded = 0  # Initialize
+        excluded_aud = 0  # Initialize
+        excluded_noaud = 0  # Initialize
+        
+        # Debug: Always print when prioritize_art is called with _ever_dropped people (yearly)
+        if sim.ti % 12 == 0 and len(ever_dropped) > 0:
+            print(f"[ARTNoAutoAdjust.prioritize_art] Year {sim.t.year}: prioritize_art called with n={n}, awaiting={n_before}, _ever_dropped={len(ever_dropped)}")
+        
+        if ever_dropped:
+            # Get detailed info about who's being excluded
+            aud_affected = np.asarray(sim.people.states.get("alcoholusedisorder.affected", []), dtype=bool) if "alcoholusedisorder.affected" in sim.people.states else np.zeros(len(sim.people), dtype=bool)
+            awaiting_list = list(awaiting_art_uids)
+            excluded_list = [uid for uid in awaiting_list if uid in ever_dropped]
+            excluded_aud = len([uid for uid in excluded_list if uid < len(aud_affected) and aud_affected[uid]])
+            excluded_noaud = len(excluded_list) - excluded_aud
+            
+            awaiting_art_uids = ss.uids([uid for uid in awaiting_list if uid not in ever_dropped])
+            n_after = len(awaiting_art_uids)
+            n_excluded = n_before - n_after
+            
+            # Always print when exclusion happens (yearly)
+            if sim.ti % 12 == 0:
+                if n_excluded > 0:
+                    print(f"[ARTNoAutoAdjust.prioritize_art] Year {sim.t.year}: Excluded {n_excluded} dropped people from prioritize_art "
+                          f"(before={n_before}, after={n_after}, _ever_dropped={len(ever_dropped)}, "
+                          f"AUD={excluded_aud}, No-AUD={excluded_noaud})")
+                elif len(excluded_list) == 0 and n_before > 0:
+                    # Debug: No overlap between awaiting and _ever_dropped
+                    print(f"[ARTNoAutoAdjust.prioritize_art] Year {sim.t.year}: No overlap between awaiting_art_uids ({n_before}) and _ever_dropped ({len(ever_dropped)})")
+        
+        # Call parent method with filtered UIDs
+        # Track how many people are actually added by parent method
+        hiv = getattr(sim.diseases, "hiv", None)
+        n_on_art_before = hiv.on_art.sum() if hiv is not None else 0
+        
+        super().prioritize_art(sim, n=n, awaiting_art_uids=awaiting_art_uids)
+        
+        # Track how many were actually added
+        n_on_art_after = hiv.on_art.sum() if hiv is not None else 0
+        n_added = n_on_art_after - n_on_art_before
+        
+        if n_added > 0 and sim.ti % 12 == 0:  # Print once per year
+            # Check how many of those added are AUD
+            aud_affected = np.asarray(sim.people.states.get("alcoholusedisorder.affected", []), dtype=bool) if "alcoholusedisorder.affected" in sim.people.states else np.zeros(len(sim.people), dtype=bool)
+            # Find who was just added (wasn't on ART before, is on ART now)
+            if hiv is not None and len(aud_affected) == len(sim.people):
+                on_art_after = np.asarray(sim.people.states.get("hiv.on_art", []), bool)
+                # This is approximate - we can't perfectly track who was just added
+                # But we can see if any AUD people are in the newly added group
+                print(f"[ARTNoAutoAdjust.prioritize_art] Year {sim.t.year}: Added {n_added} people to ART via prioritize_art "
+                      f"(n={n}, awaiting={n_before}, filtered to {n_after}, _ever_dropped excluded={n_excluded})")
     
     def apply(self, sim):
         """Override to add debug output."""

@@ -2,10 +2,10 @@
 Figure 7 — Adherence and CASM Demonstration (HIV–AUD Interaction)
 
 This script compares 4 scenarios:
-1. No interaction (HIV+AUD, no CASM effects)
-2. With interaction (HIV+AUD, CASM reduces adherence)
-3. No interaction + AUD care
-4. With interaction + AUD care
+1. No Adherence module (HIV+AUD, no CASM effects)
+2. With Adherence module (HIV+AUD, CASM reduces adherence)
+3. No Adherence module + AUD care
+4. With Adherence module + AUD care
 
 Plots ART coverage over time stratified by AUD status.
 """
@@ -41,6 +41,7 @@ csv_path_fertility  = f"mighti/data/{region}_asfr.csv"
 csv_path_death      = f"mighti/data/{region}_mortality_rates.csv"
 csv_path_age        = f"mighti/data/{region}_age_distribution_{inityear}.csv"
 csv_path_intervention = f"mighti/data/{region}_intervention.csv"
+csv_path_interactions = "mighti/data/rel_sus.csv"  # For disease interaction connectors
 
 # Prepare demographic data (safe even if cached)
 prepare_data_for_year.prepare_data_for_year(region, inityear)
@@ -172,6 +173,154 @@ class AUDCare(ss.treat_num):
 
 
 # ---------------------------------------------------------------------
+# Analyzer for tracking dropout and adherence over time
+# ---------------------------------------------------------------------
+class DropoutAdherenceAnalyzer(ss.Analyzer):
+    """Tracks ART dropout counts and mean adherence over time, stratified by AUD status."""
+    
+    def __init__(self, condition_key="alcoholusedisorder.affected", **kwargs):
+        super().__init__(**kwargs)
+        self.condition_key = condition_key
+        self.name = "dropout_adherence_analyzer"
+    
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result("year", label="Year", dtype=float),
+            ss.Result("aud_dropout_count", label="AUD current dropout count (ever started - currently on)", dtype=int),
+            ss.Result("noaud_dropout_count", label="No-AUD current dropout count (ever started - currently on)", dtype=int),
+            ss.Result("aud_cumulative_dropout", label="AUD cumulative dropout count (from _ever_dropped)", dtype=int),
+            ss.Result("noaud_cumulative_dropout", label="No-AUD cumulative dropout count (from _ever_dropped)", dtype=int),
+            ss.Result("aud_new_dropouts", label="AUD new dropouts this timestep", dtype=int),
+            ss.Result("noaud_new_dropouts", label="No-AUD new dropouts this timestep", dtype=int),
+            ss.Result("aud_mean_adherence", label="AUD mean adherence", dtype=float),
+            ss.Result("noaud_mean_adherence", label="No-AUD mean adherence", dtype=float),
+            ss.Result("aud_on_art_count", label="AUD on ART count", dtype=int),
+            ss.Result("noaud_on_art_count", label="No-AUD on ART count", dtype=int),
+            ss.Result("aud_ever_started_count", label="AUD ever started ART count", dtype=int),
+            ss.Result("noaud_ever_started_count", label="No-AUD ever started ART count", dtype=int),
+        )
+        # Track previous _ever_dropped size to calculate new dropouts
+        self._prev_ever_dropped_size_aud = 0
+        self._prev_ever_dropped_size_noaud = 0
+    
+    def step(self):
+        sim = self.sim
+        ppl = sim.people
+        st = ppl.states
+        ti = int(self.ti)  # Get current timestep index (use self.ti, not sim.ti, and ensure it's an integer)
+        
+        # Get states
+        aud_affected = np.asarray(st.get(self.condition_key, []), dtype=bool) if self.condition_key in st else np.zeros(len(ppl), dtype=bool)
+        hiv_diagnosed = np.asarray(st.get("hiv.diagnosed", []), dtype=bool) if "hiv.diagnosed" in st else np.zeros(len(ppl), dtype=bool)
+        on_art = np.asarray(st.get("hiv.on_art", []), dtype=bool) if "hiv.on_art" in st else np.zeros(len(ppl), dtype=bool)
+        alive = np.asarray(ppl.alive, dtype=bool) if hasattr(ppl, 'alive') else np.ones(len(ppl), dtype=bool)
+        adherence = np.asarray(st.get("adherence", []), dtype=float) if "adherence" in st else np.ones(len(ppl), dtype=float)
+        
+        # Get ti_art to determine who ever started ART
+        ti_art = None
+        if "hiv.ti_art" in st:
+            ti_art_raw = st.get("hiv.ti_art", [])
+            if hasattr(ti_art_raw, 'values'):
+                ti_art = np.asarray(ti_art_raw.values, dtype=float)
+            else:
+                ti_art = np.asarray(ti_art_raw, dtype=float)
+        
+        # Stratify by AUD status among diagnosed HIV+ individuals
+        aud_diag = hiv_diagnosed & aud_affected
+        noaud_diag = hiv_diagnosed & ~aud_affected
+        
+        # Count people currently on ART
+        aud_on_art = (on_art & aud_diag & alive).sum()
+        noaud_on_art = (on_art & noaud_diag & alive).sum()
+        
+        # Count people who ever started ART (alive only)
+        aud_ever_started = 0
+        noaud_ever_started = 0
+        if ti_art is not None:
+            aud_ever_started = ((ti_art[aud_diag] >= 0) & np.isfinite(ti_art[aud_diag]) & alive[aud_diag]).sum() if aud_diag.any() else 0
+            noaud_ever_started = ((ti_art[noaud_diag] >= 0) & np.isfinite(ti_art[noaud_diag]) & alive[noaud_diag]).sum() if noaud_diag.any() else 0
+        else:
+            # Fallback: use current on_art count
+            aud_ever_started = aud_on_art
+            noaud_ever_started = noaud_on_art
+        
+        # Calculate current dropout count (ever started - currently on, alive only)
+        # This can decrease when people die or are re-added to ART
+        aud_dropout = max(0, aud_ever_started - aud_on_art)
+        noaud_dropout = max(0, noaud_ever_started - noaud_on_art)
+        
+        # Get cumulative dropout count from ARTAdherenceDisruptor connector
+        # This tracks who has EVER dropped out (regardless of current status)
+        art_dropout_connector = None
+        if hasattr(sim, 'connectors'):
+            if isinstance(sim.connectors, dict):
+                art_dropout_connector = sim.connectors.get("artadherencedisruptor", None)
+                if art_dropout_connector is None:
+                    art_dropout_connector = sim.connectors.get("adherence_art_dropout", None)
+            else:
+                for conn in sim.connectors:
+                    if hasattr(conn, 'label'):
+                        label_lower = conn.label.lower()
+                        if ('adherence' in label_lower and 'art' in label_lower) or 'artadherencedisruptor' in label_lower:
+                            art_dropout_connector = conn
+                            break
+        
+        # Count cumulative dropouts from _ever_dropped set (alive only)
+        aud_cumulative_dropout = 0
+        noaud_cumulative_dropout = 0
+        aud_new_dropouts = 0
+        noaud_new_dropouts = 0
+        
+        if art_dropout_connector is not None and hasattr(art_dropout_connector, "_ever_dropped"):
+            ever_dropped = art_dropout_connector._ever_dropped
+            # Count alive people in _ever_dropped, stratified by AUD status
+            for uid in ever_dropped:
+                if uid < len(alive) and alive[uid]:
+                    if uid < len(aud_affected):
+                        if aud_affected[uid]:
+                            aud_cumulative_dropout += 1
+                        else:
+                            noaud_cumulative_dropout += 1
+            
+            # Calculate new dropouts this timestep (increase in _ever_dropped size)
+            # This is approximate - we compare current size to previous size
+            current_aud_dropped = aud_cumulative_dropout
+            current_noaud_dropped = noaud_cumulative_dropout
+            aud_new_dropouts = max(0, current_aud_dropped - self._prev_ever_dropped_size_aud)
+            noaud_new_dropouts = max(0, current_noaud_dropped - self._prev_ever_dropped_size_noaud)
+            self._prev_ever_dropped_size_aud = current_aud_dropped
+            self._prev_ever_dropped_size_noaud = current_noaud_dropped
+        
+        # Calculate mean adherence (for people on ART)
+        aud_adherence_mean = adherence[on_art & aud_diag & alive].mean() if (on_art & aud_diag & alive).any() else 1.0
+        noaud_adherence_mean = adherence[on_art & noaud_diag & alive].mean() if (on_art & noaud_diag & alive).any() else 1.0
+        
+        # Store results using timestep indexing (Starsim API)
+        year = sim.t.year if hasattr(sim.t, 'year') else float(ti) / 12.0 + sim.start
+        # Use dictionary-style access like other analyzers
+        self.results["year"][ti] = year
+        self.results["aud_dropout_count"][ti] = aud_dropout  # Current dropouts (can decrease)
+        self.results["noaud_dropout_count"][ti] = noaud_dropout  # Current dropouts (can decrease)
+        self.results["aud_cumulative_dropout"][ti] = aud_cumulative_dropout  # Cumulative (from _ever_dropped)
+        self.results["noaud_cumulative_dropout"][ti] = noaud_cumulative_dropout  # Cumulative (from _ever_dropped)
+        self.results["aud_new_dropouts"][ti] = aud_new_dropouts  # New dropouts this timestep
+        self.results["noaud_new_dropouts"][ti] = noaud_new_dropouts  # New dropouts this timestep
+        self.results["aud_mean_adherence"][ti] = aud_adherence_mean
+        self.results["noaud_mean_adherence"][ti] = noaud_adherence_mean
+        self.results["aud_on_art_count"][ti] = aud_on_art
+        self.results["noaud_on_art_count"][ti] = noaud_on_art
+        self.results["aud_ever_started_count"][ti] = aud_ever_started
+        self.results["noaud_ever_started_count"][ti] = noaud_ever_started
+        
+        # Debug output every 12 timesteps (yearly)
+        if ti % 12 == 0:
+            print(f"[DropoutAdherenceAnalyzer] Year {year:.1f}, ti={ti}: "
+                  f"AUD cumulative={aud_cumulative_dropout}, No-AUD cumulative={noaud_cumulative_dropout}, "
+                  f"AUD adherence={aud_adherence_mean:.3f}, No-AUD adherence={noaud_adherence_mean:.3f}")
+
+
+# ---------------------------------------------------------------------
 # Analyzers
 # ---------------------------------------------------------------------
 prevalence_analyzer = mi.PrevalenceAnalyzer(
@@ -182,6 +331,11 @@ art_analyzer = mi.OnARTByConditionAnalyzer(
     condition_key="alcoholusedisorder.affected"
 )
 art_analyzer_by_sex = mi.OnARTByConditionAndSexAnalyzer(
+    condition_key="alcoholusedisorder.affected"
+)
+
+# Analyzer for tracking dropout and adherence over time
+dropout_adherence_analyzer = DropoutAdherenceAnalyzer(
     condition_key="alcoholusedisorder.affected"
 )
 
@@ -247,8 +401,25 @@ intervention_disruptor = mi.InterventionAdherenceDisruptor(scale_art_efficacy=Fa
 # Requires people to be on ART for 2+ timesteps (2 months) before allowing dropout
 # This minimal delay avoids the HIV module bug but allows people with low adherence
 # (e.g., due to AUD) to drop out relatively quickly
-art_dropout1 = mi.ARTAdherenceDisruptor(base_dropout=0.50, label="artadherencedisruptor")
-art_dropout2 = mi.ARTAdherenceDisruptor(base_dropout=0.50, label="artadherencedisruptor")
+# 
+# allow_reinitiation_after_remission:
+#   - False: People who drop out due to AUD remain permanently excluded (even after remission)
+#     This is appropriate for scenarios WITHOUT AUD care where people with AUD who drop out
+#     should not restart ART even if they go into remission.
+#   - True: People who drop out can be re-added after going into remission
+#     This is appropriate for scenarios WITH AUD care where remission is supported.
+art_dropout1 = mi.ARTAdherenceDisruptor(
+    base_dropout=0.50,  # For AUD-affected people: higher dropout based on adherence
+    base_dropout_noaud=0.001,  # For No-AUD people: very low baseline dropout (~1% per year, Eswatini 95-95-95)
+    allow_reinitiation_after_remission=False,  # No AUD care - permanent exclusion
+    label="artadherencedisruptor"
+)
+art_dropout2 = mi.ARTAdherenceDisruptor(
+    base_dropout=0.50,  # For AUD-affected people: higher dropout based on adherence
+    base_dropout_noaud=0.001,  # For No-AUD people: very low baseline dropout (~1% per year, Eswatini 95-95-95)
+    allow_reinitiation_after_remission=True,  # With AUD care - allow re-initiation after remission
+    label="artadherencedisruptor"
+)
 
 # ---------------------------------------------------------------------
 # AUD Care interventions
@@ -272,10 +443,49 @@ aud_care2 = AUDCare(
 
 
 # ---------------------------------------------------------------------
+# Disease interaction connectors (HIV ↔ NCD, plus other NCD interactions)
+# ---------------------------------------------------------------------
+# Read relative susceptibility data for HIV-NCD interactions
+disease_connectors = []
+try:
+    # Try to read rel_sus.csv for NCD-HIV interactions
+    # First, try reading from parameters CSV (same format as mighti_main.py)
+    df_params = pd.read_csv(csv_path_params)
+    if "condition" in df_params.columns and "rel_sus" in df_params.columns:
+        # Filter to only include conditions that are not HIV
+        ncd_df = df_params[df_params["condition"] != "HIV"]
+        ncd_hiv_rel_sus = ncd_df.set_index("condition")["rel_sus"].to_dict()
+        if ncd_hiv_rel_sus:
+            ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
+            disease_connectors.append(ncd_hiv_connector)
+            print(f"[INFO] Loaded NCD-HIV connector with {len(ncd_hiv_rel_sus)} conditions")
+    
+    # Try to read NCD-NCD interactions from rel_sus.csv (matrix format)
+    try:
+        ncd_interactions = mi.read_interactions(csv_path_interactions)
+        if ncd_interactions:
+            ncd_connectors = mi.create_connectors(ncd_interactions)
+            disease_connectors.extend(ncd_connectors)
+            print(f"[INFO] Loaded {len(ncd_connectors)} NCD-NCD interaction connector(s)")
+    except Exception as e2:
+        # rel_sus.csv might not exist or have wrong format - that's okay
+        print(f"[INFO] Could not load NCD-NCD interactions from {csv_path_interactions}: {e2}")
+        print(f"       Continuing without NCD-NCD interaction connectors")
+    
+    if len(disease_connectors) == 0:
+        print(f"[INFO] No disease interaction connectors loaded - continuing without them")
+except Exception as e:
+    print(f"[WARNING] Could not load disease interaction connectors: {e}")
+    print(f"         Continuing without disease interaction connectors")
+    disease_connectors = []
+
+# ---------------------------------------------------------------------
 # Create 4 scenarios
 # ---------------------------------------------------------------------
-print(f"Initializing sim \"No interaction (HIV+AUD, no CASM effects)\" with {n_agents} agents")
+print(f"Initializing sim \"No Adherence module (HIV+AUD, no CASM effects)\" with {n_agents} agents")
 ppl1 = make_people()
+# Combine ART dropout connector with disease interaction connectors
+connectors1 = [art_dropout1] + disease_connectors
 sim_noInteraction = ss.Sim(
     n_agents=n_agents,
     start=inityear,
@@ -285,17 +495,20 @@ sim_noInteraction = ss.Sim(
     demographics=[death, pregnancy],
     diseases=[hiv, aud],
     interventions=[hiv_test1, art1],
+    connectors=connectors1,  # ART dropout + disease interaction connectors
     rand_seed=42,
-    analyzers=[prevalence_analyzer, art_analyzer, art_analyzer_by_sex],
-    label="No interaction (HIV+AUD, no CASM effects)"
+    analyzers=[prevalence_analyzer, art_analyzer, art_analyzer_by_sex, dropout_adherence_analyzer],
+    label="No Adherence module (HIV+AUD, no CASM effects)"
 )
 
-print(f"Initializing sim \"With interaction (HIV+AUD, CASM reduces adherence)\" with {n_agents} agents")
+print(f"Initializing sim \"With Adherence module (HIV+AUD, CASM reduces adherence)\" with {n_agents} agents")
 ppl2 = make_people()
 adherence_engine2 = mi.AdherenceEngine(
     casm_rel={"AlcoholUseDisorder": 0.709},
     sdoh_rel={}
 )
+# Combine ART dropout connector with disease interaction connectors
+connectors2 = [art_dropout1] + disease_connectors
 sim_withInteraction = ss.Sim(
     n_agents=n_agents,
     start=inityear,
@@ -306,14 +519,16 @@ sim_withInteraction = ss.Sim(
     diseases=[hiv, aud],
     interventions=[hiv_test2, art2],
     modules=[adherence_engine2, intervention_disruptor],
-    connectors=[art_dropout1],
+    connectors=connectors2,  # ART dropout + disease interaction connectors
     rand_seed=43,
-    analyzers=[prevalence_analyzer, art_analyzer, art_analyzer_by_sex],
-    label="With interaction (HIV+AUD, CASM reduces adherence)"
+    analyzers=[prevalence_analyzer, art_analyzer, art_analyzer_by_sex, dropout_adherence_analyzer],
+    label="With Adherence module (HIV+AUD, CASM reduces adherence)"
 )
 
-print(f"Initializing sim \"No interaction + AUD care\" with {n_agents} agents")
+print(f"Initializing sim \"No Adherence module + AUD care\" with {n_agents} agents")
 ppl3 = make_people()
+# Combine ART dropout connector with disease interaction connectors
+connectors3 = [art_dropout2] + disease_connectors
 sim_noInteraction_withAUDCare = ss.Sim(
     n_agents=n_agents,
     start=inityear,
@@ -323,17 +538,20 @@ sim_noInteraction_withAUDCare = ss.Sim(
     demographics=[death, pregnancy],
     diseases=[hiv, aud],
     interventions=[hiv_test3, art3, aud_care1],
+    connectors=connectors3,  # ART dropout + disease interaction connectors
     rand_seed=44,
-    analyzers=[prevalence_analyzer, art_analyzer, art_analyzer_by_sex],
-    label="No interaction + AUD care"
+    analyzers=[prevalence_analyzer, art_analyzer, art_analyzer_by_sex, dropout_adherence_analyzer],
+    label="No Adherence module + AUD care"
 )
 
-print(f"Initializing sim \"With interaction + AUD care\" with {n_agents} agents")
+print(f"Initializing sim \"With Adherence module + AUD care\" with {n_agents} agents")
 ppl4 = make_people()
 adherence_engine4 = mi.AdherenceEngine(
     casm_rel={"AlcoholUseDisorder": 0.709},
     sdoh_rel={}
 )
+# Combine ART dropout connector with disease interaction connectors
+connectors4 = [art_dropout2] + disease_connectors
 sim_withInteraction_withAUDCare = ss.Sim(
     n_agents=n_agents,
     start=inityear,
@@ -344,10 +562,10 @@ sim_withInteraction_withAUDCare = ss.Sim(
     diseases=[hiv, aud],
     interventions=[hiv_test4, art4, aud_care2],
     modules=[adherence_engine4, intervention_disruptor],
-    connectors=[art_dropout2],
+    connectors=connectors4,  # ART dropout + disease interaction connectors
     rand_seed=45,
-    analyzers=[prevalence_analyzer, art_analyzer, art_analyzer_by_sex],
-    label="With interaction + AUD care"
+    analyzers=[prevalence_analyzer, art_analyzer, art_analyzer_by_sex, dropout_adherence_analyzer],
+    label="With Adherence module + AUD care"
 )
 
 # ---------------------------------------------------------------------
@@ -693,9 +911,12 @@ def analyze_downstream_effects(msim):
                 # Check if STIsim's ti_stop_art is being used (scheduled stops)
                 if ti_stop_art is not None:
                     # Count people who have ti_stop_art set (scheduled to stop or already stopped)
-                    aud_has_stop = (ti_stop_art[aud_diag] >= 0) & np.isfinite(ti_stop_art[aud_diag]) if aud_diag.any() else np.array([], dtype=bool)
-                    noaud_has_stop = (ti_stop_art[noaud_diag] >= 0) & np.isfinite(ti_stop_art[noaud_diag]) if noaud_diag.any() else np.array([], dtype=bool)
-                    print(f"  Scheduled to stop ART (ti_stop_art set): AUD={aud_has_stop.sum()}, No-AUD={noaud_has_stop.sum()}")
+                    # Only count if ti_stop_art is actually set (not just initialized to 0 or NaN)
+                    # Check if ti_stop_art <= current timestep (they were scheduled to stop)
+                    current_ti = float(sim.ti)
+                    aud_has_stop = (ti_stop_art[aud_diag] >= 0) & np.isfinite(ti_stop_art[aud_diag]) & (ti_stop_art[aud_diag] <= current_ti) if aud_diag.any() else np.array([], dtype=bool)
+                    noaud_has_stop = (ti_stop_art[noaud_diag] >= 0) & np.isfinite(ti_stop_art[noaud_diag]) & (ti_stop_art[noaud_diag] <= current_ti) if noaud_diag.any() else np.array([], dtype=bool)
+                    print(f"  Scheduled to stop ART (ti_stop_art set and <= current timestep): AUD={aud_has_stop.sum()}, No-AUD={noaud_has_stop.sum()}")
                     
                     # Check if people who are NOT on ART have ti_stop_art set (they were stopped)
                     aud_stopped = aud_has_stop & ~aud_on_art if len(aud_has_stop) == len(aud_on_art) else np.array([], dtype=bool)
@@ -703,10 +924,55 @@ def analyze_downstream_effects(msim):
                     print(f"  Stopped ART (ti_stop_art set AND not on ART): AUD={aud_stopped.sum()}, No-AUD={noaud_stopped.sum()}")
                 
                 # Additional check: Are people being dropped and re-initiated?
-                if aud_dropout_count > 0:
-                    print(f"  [INFO] AUD: {aud_dropout_count} ALIVE people started ART but are NOT currently on (dropped out)")
-                if noaud_dropout_count > 0:
-                    print(f"  [INFO] No-AUD: {noaud_dropout_count} ALIVE people started ART but are NOT currently on (dropped out)")
+                # Check if they have ti_stop_art set (scheduled by ARTAdherenceDisruptor or other mechanism)
+                if aud_dropout_count > 0 or noaud_dropout_count > 0:
+                    # Get UIDs of people who dropped out
+                    aud_dropout_uids = []
+                    noaud_dropout_uids = []
+                    if aud_diag.any() and aud_dropout_count > 0:
+                        # Get indices of diagnosed AUD people
+                        aud_diag_indices = np.where(aud_diag)[0]
+                        # aud_ever_art is already a boolean array for diagnosed AUD people only (size = aud_diag.sum())
+                        # aud_on_art is for the full population, so extract diagnosed AUD subset
+                        aud_on_art_diag = aud_on_art[aud_diag]  # Extract diagnosed AUD subset from full population array
+                        aud_alive_diag = alive[aud_diag]  # Extract diagnosed AUD subset
+                        # Find dropped out: ever started, alive, but not currently on ART
+                        # aud_ever_art is already indexed for diagnosed AUD people, so use it directly
+                        aud_dropped_mask = aud_ever_art & aud_alive_diag & ~aud_on_art_diag
+                        aud_dropped_indices = aud_diag_indices[aud_dropped_mask]
+                        aud_dropout_uids = aud_dropped_indices.tolist()
+                    if noaud_diag.any() and noaud_dropout_count > 0:
+                        # Get indices of diagnosed No-AUD people
+                        noaud_diag_indices = np.where(noaud_diag)[0]
+                        # noaud_ever_art is already a boolean array for diagnosed No-AUD people only (size = noaud_diag.sum())
+                        # noaud_on_art is for the full population, so extract diagnosed No-AUD subset
+                        noaud_on_art_diag = noaud_on_art[noaud_diag]  # Extract diagnosed No-AUD subset from full population array
+                        noaud_alive_diag = alive[noaud_diag]  # Extract diagnosed No-AUD subset
+                        # Find dropped out: ever started, alive, but not currently on ART
+                        # noaud_ever_art is already indexed for diagnosed No-AUD people, so use it directly
+                        noaud_dropped_mask = noaud_ever_art & noaud_alive_diag & ~noaud_on_art_diag
+                        noaud_dropped_indices = noaud_diag_indices[noaud_dropped_mask]
+                        noaud_dropout_uids = noaud_dropped_indices.tolist()
+                    
+                    # Check if these people have ti_stop_art set (from ARTAdherenceDisruptor or other)
+                    if ti_stop_art is not None and (len(aud_dropout_uids) > 0 or len(noaud_dropout_uids) > 0):
+                        current_ti = float(sim.ti)
+                        aud_with_ti_stop = sum(1 for uid in aud_dropout_uids if uid < len(ti_stop_art) and np.isfinite(ti_stop_art[uid]) and ti_stop_art[uid] >= 0 and ti_stop_art[uid] <= current_ti)
+                        noaud_with_ti_stop = sum(1 for uid in noaud_dropout_uids if uid < len(ti_stop_art) and np.isfinite(ti_stop_art[uid]) and ti_stop_art[uid] >= 0 and ti_stop_art[uid] <= current_ti)
+                        print(f"  [INFO] AUD: {aud_dropout_count} ALIVE people started ART but are NOT currently on (dropped out)")
+                        print(f"         → {aud_with_ti_stop}/{aud_dropout_count} have ti_stop_art set (scheduled by ARTAdherenceDisruptor)")
+                        print(f"  [INFO] No-AUD: {noaud_dropout_count} ALIVE people started ART but are NOT currently on (dropped out)")
+                        print(f"         → {noaud_with_ti_stop}/{noaud_dropout_count} have ti_stop_art set (scheduled by ARTAdherenceDisruptor)")
+                        if noaud_dropout_count > 0 and noaud_with_ti_stop == 0:
+                            print(f"         ⚠️  WARNING: No-AUD dropout is NOT from ARTAdherenceDisruptor! This suggests:")
+                            print(f"            - Base STIsim ART module has its own dropout mechanism, OR")
+                            print(f"            - People are being removed from ART through another mechanism (e.g., coverage correction), OR")
+                            print(f"            - There's a bug in dropout tracking")
+                    else:
+                        if aud_dropout_count > 0:
+                            print(f"  [INFO] AUD: {aud_dropout_count} ALIVE people started ART but are NOT currently on (dropped out)")
+                        if noaud_dropout_count > 0:
+                            print(f"  [INFO] No-AUD: {noaud_dropout_count} ALIVE people started ART but are NOT currently on (dropped out)")
             except Exception as e:
                 print(f"  [WARNING] Could not calculate dropout rate: {e}")
                 import traceback
@@ -814,10 +1080,10 @@ def plot_art_coverage_over_time(msim, prefix="Fig7A_ART_coverage", burn_in_years
             )
     
     scenario_labels = [
-        "No interaction\n(no CASM effects)",
-        "With interaction\n(CASM reduces adherence)",
-        "No interaction\n+ AUD care",
-        "With interaction\n+ AUD care"
+        "No Adherence module\n(no CASM effects)",
+        "With Adherence module\n(CASM reduces adherence)",
+        "No Adherence module\n+ AUD care",
+        "With Adherence module\n+ AUD care"
     ]
     
     for i, sim in enumerate(msim.sims):
@@ -902,6 +1168,281 @@ def plot_art_coverage_over_time(msim, prefix="Fig7A_ART_coverage", burn_in_years
 
 
 # ---------------------------------------------------------------------
+# Plotting functions for dropout and adherence
+# ---------------------------------------------------------------------
+def plot_dropout_and_adherence(msim, prefix="Fig7B_Dropout_Adherence", burn_in_years=3):
+    """
+    Plot ART dropout counts and mean adherence over time, stratified by AUD status.
+    Creates two subplots: dropout counts and mean adherence.
+    """
+    sns.set_context("talk", font_scale=1.4)
+    
+    plt.rcParams.update({
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial"],
+        "axes.titlesize": 20,
+        "axes.labelsize": 18,
+        "axes.labelweight": "bold",
+        "xtick.labelsize": 16,
+        "ytick.labelsize": 16,
+        "legend.fontsize": 14,
+        "lines.linewidth": 2.5,
+        "axes.linewidth": 1.3,
+        "xtick.major.width": 1.2,
+        "ytick.major.width": 1.2,
+        "xtick.direction": "in",
+        "ytick.direction": "in",
+        "figure.dpi": 300,
+        "savefig.dpi": 600,
+        "savefig.bbox": "tight",
+    })
+    
+    # Create figure with 2 rows (dropout, adherence) x 4 columns (scenarios)
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    
+    scenario_labels = [
+        "No Adherence module\n(no CASM effects)",
+        "With Adherence module\n(CASM reduces adherence)",
+        "No Adherence module\n+ AUD care",
+        "With Adherence module\n+ AUD care"
+    ]
+    
+    # Helper function to extract arrays from Starsim Result objects
+    def extract_result_array(result_obj, dtype=float):
+        """Extract array from Starsim Result object, trying multiple methods."""
+        if result_obj is None:
+            return np.array([], dtype=dtype)
+        # Method 1: Try direct conversion first (most common case - Result objects are often numpy arrays)
+        try:
+            arr = np.array(result_obj, dtype=dtype)
+            if arr.size > 0:
+                return arr
+        except (TypeError, ValueError, AttributeError):
+            pass
+        # Method 2: Check if it has .values (pandas-like)
+        if hasattr(result_obj, 'values'):
+            try:
+                return np.asarray(result_obj.values, dtype=dtype)
+            except (TypeError, ValueError, AttributeError):
+                pass
+        # Method 3: Check if it's directly indexable (Result might support indexing)
+        try:
+            if hasattr(result_obj, '__len__') and len(result_obj) > 0:
+                # Try to get all values by indexing
+                arr = np.array([result_obj[j] for j in range(len(result_obj))], dtype=dtype)
+                if arr.size > 0:
+                    return arr
+        except (TypeError, IndexError, AttributeError):
+            pass
+        # Method 4: Check if it has an internal array attribute
+        for attr in ['array', 'data', '_array', '_data', 'values']:
+            if hasattr(result_obj, attr):
+                try:
+                    val = getattr(result_obj, attr)
+                    if val is not None:
+                        arr = np.asarray(val, dtype=dtype)
+                        if arr.size > 0:
+                            return arr
+                except (TypeError, ValueError, AttributeError):
+                    continue
+        # Fallback: return empty array
+        return np.array([], dtype=dtype)
+    
+    for i, sim in enumerate(msim.sims):
+        # Extract data from analyzer
+        analyzer_key = "dropout_adherence_analyzer"
+        # Debug: print available result keys
+        if i == 0:  # Only print once
+            print(f"[DEBUG] Available result keys in sim.results: {list(sim.results.keys())}")
+        if analyzer_key in sim.results:
+            print(f"[DEBUG] Found analyzer '{analyzer_key}' for scenario {i}")
+            res = sim.results[analyzer_key]
+            
+            year_vals = res.get("year")
+            years = extract_result_array(year_vals, dtype=float)
+            
+            aud_dropout_vals = res.get("aud_dropout_count")
+            aud_dropout = extract_result_array(aud_dropout_vals, dtype=int)
+            
+            noaud_dropout_vals = res.get("noaud_dropout_count")
+            noaud_dropout = extract_result_array(noaud_dropout_vals, dtype=int)
+            
+            aud_adherence_vals = res.get("aud_mean_adherence")
+            aud_adherence = extract_result_array(aud_adherence_vals, dtype=float)
+            
+            noaud_adherence_vals = res.get("noaud_mean_adherence")
+            noaud_adherence = extract_result_array(noaud_adherence_vals, dtype=float)
+            
+            # Debug: print data sizes and sample values (after all variables are defined)
+            if i == 0:  # Only print once
+                print(f"[DEBUG] Extracted data sizes: years={len(years)}, "
+                      f"year_vals type={type(year_vals)}, years sample={years[:5] if len(years) > 5 else years}")
+                print(f"[DEBUG] aud_dropout size={len(aud_dropout)}, sample={aud_dropout[:5] if len(aud_dropout) > 5 else aud_dropout}")
+                print(f"[DEBUG] aud_adherence size={len(aud_adherence)}, sample={aud_adherence[:5] if len(aud_adherence) > 5 else aud_adherence}")
+        else:
+            # Fallback: calculate from final state only
+            st = sim.people.states
+            ppl = sim.people
+            aud_affected = np.asarray(st.get("alcoholusedisorder.affected", []), dtype=bool) if "alcoholusedisorder.affected" in st else np.zeros(len(ppl), dtype=bool)
+            hiv_diagnosed = np.asarray(st.get("hiv.diagnosed", []), dtype=bool) if "hiv.diagnosed" in st else np.zeros(len(ppl), dtype=bool)
+            on_art = np.asarray(st.get("hiv.on_art", []), dtype=bool) if "hiv.on_art" in st else np.zeros(len(ppl), dtype=bool)
+            alive = np.asarray(ppl.alive, dtype=bool) if hasattr(ppl, 'alive') else np.ones(len(ppl), dtype=bool)
+            adherence = np.asarray(st.get("adherence", []), dtype=float) if "adherence" in st else np.ones(len(ppl), dtype=float)
+            
+            aud_diag = hiv_diagnosed & aud_affected
+            noaud_diag = hiv_diagnosed & ~aud_affected
+            
+            # Calculate dropout
+            ti_art = None
+            if "hiv.ti_art" in st:
+                ti_art_raw = st.get("hiv.ti_art", [])
+                if hasattr(ti_art_raw, 'values'):
+                    ti_art = np.asarray(ti_art_raw.values, dtype=float)
+                else:
+                    ti_art = np.asarray(ti_art_raw, dtype=float)
+            
+            aud_ever_started = ((ti_art[aud_diag] >= 0) & np.isfinite(ti_art[aud_diag]) & alive[aud_diag]).sum() if ti_art is not None and aud_diag.any() else (on_art & aud_diag & alive).sum()
+            noaud_ever_started = ((ti_art[noaud_diag] >= 0) & np.isfinite(ti_art[noaud_diag]) & alive[noaud_diag]).sum() if ti_art is not None and noaud_diag.any() else (on_art & noaud_diag & alive).sum()
+            aud_on_art = (on_art & aud_diag & alive).sum()
+            noaud_on_art = (on_art & noaud_diag & alive).sum()
+            
+            aud_dropout_val = max(0, aud_ever_started - aud_on_art)
+            noaud_dropout_val = max(0, noaud_ever_started - noaud_on_art)
+            
+            aud_adherence_val = adherence[on_art & aud_diag & alive].mean() if (on_art & aud_diag & alive).any() else 1.0
+            noaud_adherence_val = adherence[on_art & noaud_diag & alive].mean() if (on_art & noaud_diag & alive).any() else 1.0
+            
+            years = np.array([sim.t.year])
+            aud_dropout = np.array([aud_dropout_val])
+            noaud_dropout = np.array([noaud_dropout_val])
+            aud_adherence = np.array([aud_adherence_val])
+            noaud_adherence = np.array([noaud_adherence_val])
+        
+        # Apply burn-in period
+        burn_in_year = inityear + burn_in_years
+        mask = years >= burn_in_year
+        years_filtered = years[mask]
+        aud_dropout_filtered = aud_dropout[mask]
+        noaud_dropout_filtered = noaud_dropout[mask]
+        aud_adherence_filtered = aud_adherence[mask]
+        noaud_adherence_filtered = noaud_adherence[mask]
+        
+        # Average by year if we have sub-yearly data
+        if len(years_filtered) > (endyear - burn_in_year + 1) * 1.5:
+            df = pd.DataFrame({
+                "year": np.floor(years_filtered).astype(int),
+                "aud_dropout": aud_dropout_filtered,
+                "noaud_dropout": noaud_dropout_filtered,
+                "aud_adherence": aud_adherence_filtered,
+                "noaud_adherence": noaud_adherence_filtered
+            })
+            df_avg = df.groupby("year", as_index=False).mean()
+            years_plot = df_avg["year"].values
+            aud_dropout_plot = df_avg["aud_dropout"].values
+            noaud_dropout_plot = df_avg["noaud_dropout"].values
+            aud_adherence_plot = df_avg["aud_adherence"].values
+            noaud_adherence_plot = df_avg["noaud_adherence"].values
+        else:
+            years_plot = years_filtered
+            aud_dropout_plot = aud_dropout_filtered
+            noaud_dropout_plot = noaud_dropout_filtered
+            aud_adherence_plot = aud_adherence_filtered
+            noaud_adherence_plot = noaud_adherence_filtered
+        
+        # Plot dropout counts (row 0) - use cumulative dropout from _ever_dropped
+        ax_dropout = axes[0, i]
+        # Try to get cumulative dropout data, fallback to current dropout
+        if analyzer_key in sim.results:
+            res_for_cum = sim.results[analyzer_key]
+            aud_cumulative_vals = res_for_cum.get("aud_cumulative_dropout")
+            noaud_cumulative_vals = res_for_cum.get("noaud_cumulative_dropout")
+            
+            # Use the same extraction function
+            aud_cumulative = extract_result_array(aud_cumulative_vals, dtype=int)
+            noaud_cumulative = extract_result_array(noaud_cumulative_vals, dtype=int)
+        else:
+            aud_cumulative = None
+            noaud_cumulative = None
+        
+        if aud_cumulative is not None and noaud_cumulative is not None and len(aud_cumulative) > 0 and len(noaud_cumulative) > 0:
+            # Use cumulative dropout (from _ever_dropped)
+            
+            # Apply same filtering and averaging as dropout_plot
+            aud_cumulative_filtered = aud_cumulative[mask] if len(aud_cumulative) == len(years) else aud_cumulative
+            noaud_cumulative_filtered = noaud_cumulative[mask] if len(noaud_cumulative) == len(years) else noaud_cumulative
+            
+            if len(aud_cumulative_filtered) > (endyear - burn_in_year + 1) * 1.5:
+                df_cum = pd.DataFrame({
+                    "year": np.floor(years_filtered).astype(int),
+                    "aud_cumulative": aud_cumulative_filtered,
+                    "noaud_cumulative": noaud_cumulative_filtered
+                })
+                df_cum_avg = df_cum.groupby("year", as_index=False).mean()
+                aud_cumulative_plot = df_cum_avg["aud_cumulative"].values
+                noaud_cumulative_plot = df_cum_avg["noaud_cumulative"].values
+                years_cum_plot = df_cum_avg["year"].values
+            else:
+                aud_cumulative_plot = aud_cumulative_filtered
+                noaud_cumulative_plot = noaud_cumulative_filtered
+                years_cum_plot = years_filtered
+            
+            ax_dropout.plot(years_cum_plot, aud_cumulative_plot, "-", color="#d62728", label="AUD (cumulative)", linewidth=2.5)
+            ax_dropout.plot(years_cum_plot, noaud_cumulative_plot, "--", color="#9467bd", label="No AUD (cumulative)", linewidth=2.5)
+            ylabel = "Cumulative Dropout Count\n(from _ever_dropped)"
+        else:
+            # Fallback to current dropout (with note that it can decrease)
+            ax_dropout.plot(years_plot, aud_dropout_plot, "-", color="#d62728", label="AUD (current)", linewidth=2.5)
+            ax_dropout.plot(years_plot, noaud_dropout_plot, "--", color="#9467bd", label="No AUD (current)", linewidth=2.5)
+            ylabel = "Current Dropout Count\n(can decrease due to deaths/re-initiation)"
+        
+        ax_dropout.set_xlim(burn_in_year - 0.5, endyear + 0.5)
+        if i == 0:
+            ax_dropout.set_ylabel(ylabel, fontweight="bold")
+        else:
+            ax_dropout.set_ylabel("")
+        ax_dropout.set_xlabel("Year", fontweight="bold")
+        ax_dropout.set_title(scenario_labels[i], fontweight="bold", fontsize=16)
+        if i == 0:
+            ax_dropout.legend(frameon=False, loc='best')
+        ax_dropout.grid(True, alpha=0.3)
+        
+        # Plot mean adherence (row 1)
+        ax_adherence = axes[1, i]
+        ax_adherence.plot(years_plot, aud_adherence_plot, "-", color="#3182bd", label="AUD", linewidth=2.5)
+        ax_adherence.plot(years_plot, noaud_adherence_plot, "--", color="#bdbdbd", label="No AUD", linewidth=2.5)
+        ax_adherence.set_ylim(0, 1.05)
+        ax_adherence.set_xlim(burn_in_year - 0.5, endyear + 0.5)
+        if i == 0:
+            ax_adherence.set_ylabel("Mean Adherence", fontweight="bold")
+        else:
+            ax_adherence.set_ylabel("")
+        ax_adherence.set_xlabel("Year", fontweight="bold")
+        if i == 0:
+            ax_adherence.legend(frameon=False, loc='best')
+        ax_adherence.grid(True, alpha=0.3)
+    
+    plt.suptitle("ART Dropout and Adherence Over Time by AUD Status", fontweight="bold", fontsize=22, y=0.995)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.97])
+    plt.savefig(f"{prefix}.png", dpi=400)
+    plt.show()
+
+
+# ---------------------------------------------------------------------
 # Generate plots
 # ---------------------------------------------------------------------
 plot_art_coverage_over_time(msim, burn_in_years=3)
+
+# Add dropout/adherence analyzer to simulations and re-run, or plot from existing data
+# For now, we'll create the analyzer and add it, but note that it won't have historical data
+# unless we re-run the simulations. Let's add it and create a version that works with current data.
+print("\n" + "="*80)
+print("DROPOUT/ADHERENCE PLOTS")
+print("="*80)
+print("\n[INFO] The DropoutAdherenceAnalyzer was added to the simulations, but since the")
+print("       simulations have already run, it doesn't have historical time-series data.")
+print("       The plots below will only show final state data (one data point per scenario).")
+print("\n       To get time-series plots showing dropout and adherence over time, you need to:")
+print("       1. Re-run the simulation (the analyzer will collect data during the run)")
+print("       2. Then the plots will show full time series instead of just final state")
+print("="*80 + "\n")
+plot_dropout_and_adherence(msim, burn_in_years=3)

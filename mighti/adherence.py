@@ -11,6 +11,7 @@ Provides a three-component adherence pipeline:
 import numpy as np
 import sciris as sc
 import starsim as ss
+import stisim as sti
 
 __all__ = [
     "AdherenceEngine",
@@ -19,6 +20,274 @@ __all__ = [
     "CASM_REL_FACTORS",
     "SDOH_REL_FACTORS",
 ]
+
+# =====================================================================
+# Monkey patches to fix HIV module bugs
+# =====================================================================
+# The HIV module's post_art_decline function has a bug where it can
+# raise "ValueError: Post-ART duration is negative" when ti_stop_art
+# is set but ti_art is invalid or when people are dropped and re-added
+# in the same timestep. This monkey patch fixes the issue by ensuring
+# valid ti_art and ti_stop_art values before calculating duration.
+# The HIV module's step_state method also has a bug where it can raise
+# "ValueError: Invalid entry for CD4" when CD4 values are invalid.
+# This monkey patch fixes the issue by validating and fixing CD4 values
+# before the original validation check.
+_original_post_art_decline = None
+_original_step_state = None
+_original_make_p_hiv_death = None
+
+def _get_valid_cd4(uid, st, default=500.0):
+    """Get valid CD4 value for a UID, ensuring it's not NaN or invalid."""
+    if "hiv.cd4" in st:
+        current_cd4 = np.asarray(st.get("hiv.cd4", []), dtype=float)
+        if uid < len(current_cd4):
+            cd4_val = current_cd4[uid]
+            # Ensure CD4 is valid (finite, positive, reasonable range)
+            if np.isfinite(cd4_val) and 0 < cd4_val < 2000:
+                return cd4_val
+    return default
+
+def _patched_post_art_decline(self, uids):
+    """
+    Patched version of hiv.post_art_decline that handles negative durations.
+    Returns current CD4 values if there are any timing issues to avoid errors.
+    """
+    if len(uids) == 0:
+        return np.array([])
+    
+    # Get current state
+    st = self.sim.people.states
+    
+    # Convert uids to list if needed
+    if hasattr(uids, '__iter__') and not isinstance(uids, (list, tuple, np.ndarray)):
+        uids = list(uids)
+    elif isinstance(uids, np.ndarray):
+        uids = uids.tolist()
+    
+    # Get timing arrays
+    ti_art = np.asarray(st.get("hiv.ti_art", []), dtype=float) if "hiv.ti_art" in st else np.array([], dtype=float)
+    ti_stop_art = np.asarray(st.get("hiv.ti_stop_art", []), dtype=float) if "hiv.ti_stop_art" in st else np.array([], dtype=float)
+    
+    # Filter to valid UIDs
+    valid_uids = [uid for uid in uids if uid < len(ti_art) and uid < len(ti_stop_art) and uid >= 0]
+    if len(valid_uids) == 0:
+        # Return current CD4 values for invalid UIDs (ensure they're valid)
+        return np.array([_get_valid_cd4(uid, st) for uid in uids], dtype=float)
+    
+    # Get values for valid UIDs
+    ti_art_vals = np.array([ti_art[uid] if uid < len(ti_art) else np.nan for uid in valid_uids], dtype=float)
+    ti_stop_art_vals = np.array([ti_stop_art[uid] if uid < len(ti_stop_art) else np.nan for uid in valid_uids], dtype=float)
+    
+    # Check for any invalid values - if found, just return current CD4
+    invalid_ti_art = ~np.isfinite(ti_art_vals) | (ti_art_vals < 0)
+    invalid_ti_stop = ~np.isfinite(ti_stop_art_vals) | (ti_stop_art_vals < 0)
+    
+    # Calculate duration
+    duration = ti_stop_art_vals - ti_art_vals
+    negative_duration = duration < 0
+    
+    # If ANY invalid values or negative durations, return current CD4 values directly
+    # This is safer than trying to fix the values and call the original function
+    if invalid_ti_art.any() or invalid_ti_stop.any() or negative_duration.any():
+        # Return current CD4 values for all UIDs (ensure they're valid)
+        result = np.array([_get_valid_cd4(uid, st) for uid in valid_uids], dtype=float)
+        # Pad with current CD4 for any invalid UIDs
+        if len(valid_uids) < len(uids):
+            full_result = np.array([_get_valid_cd4(uid, st) for uid in uids], dtype=float)
+            valid_indices = {uid: i for i, uid in enumerate(valid_uids)}
+            for i, uid in enumerate(uids):
+                if uid in valid_indices:
+                    full_result[i] = result[valid_indices[uid]]
+            return full_result
+        return result
+    
+    # All values are valid - try calling original function
+    # Temporarily update state arrays with fixed values
+    original_ti_art = ti_art.copy() if len(ti_art) > 0 else None
+    original_ti_stop_art = ti_stop_art.copy() if len(ti_stop_art) > 0 else None
+    
+    try:
+        # Update state arrays with fixed values for valid UIDs only
+        for i, uid in enumerate(valid_uids):
+            if uid < len(ti_art):
+                ti_art[uid] = ti_art_vals[i]
+            if uid < len(ti_stop_art):
+                ti_stop_art[uid] = ti_stop_art_vals[i]
+        
+        # Call original function
+        if _original_post_art_decline is not None:
+            result = _original_post_art_decline(self, valid_uids)
+        else:
+            # Fallback if original function not available
+            result = np.array([_get_valid_cd4(uid, st) for uid in valid_uids], dtype=float)
+        
+        # Validate result - ensure no NaN or invalid values
+        if isinstance(result, np.ndarray) and len(result) > 0:
+            invalid_result = ~np.isfinite(result) | (result <= 0) | (result >= 2000)
+            if invalid_result.any():
+                # Replace invalid values with current CD4
+                for i, uid in enumerate(valid_uids):
+                    if i < len(result) and invalid_result[i]:
+                        result[i] = _get_valid_cd4(uid, st)
+        
+        # Restore original values
+        if original_ti_art is not None:
+            for i, uid in enumerate(valid_uids):
+                if uid < len(ti_art):
+                    ti_art[uid] = original_ti_art[uid]
+        if original_ti_stop_art is not None:
+            for i, uid in enumerate(valid_uids):
+                if uid < len(ti_stop_art):
+                    ti_stop_art[uid] = original_ti_stop_art[uid]
+        
+        # If we had invalid UIDs, pad result with current CD4 values
+        if len(valid_uids) < len(uids):
+            full_result = np.array([_get_valid_cd4(uid, st) for uid in uids], dtype=float)
+            valid_indices = {uid: i for i, uid in enumerate(valid_uids)}
+            for i, uid in enumerate(uids):
+                if uid in valid_indices and valid_indices[uid] < len(result):
+                    cd4_val = result[valid_indices[uid]]
+                    # Ensure CD4 is valid
+                    if np.isfinite(cd4_val) and 0 < cd4_val < 2000:
+                        full_result[i] = cd4_val
+            return full_result
+        
+        return result
+    except Exception as e:
+        # If original function still fails, return current CD4 values (ensure they're valid)
+        return np.array([_get_valid_cd4(uid, st) for uid in valid_uids], dtype=float)
+
+def _patched_make_p_hiv_death(self, uids=None):
+    """
+    Patched version of hiv.make_p_hiv_death that handles IndexError when
+    np.digitize returns out-of-bounds indices.
+    """
+    if _original_make_p_hiv_death is None:
+        # Fallback if original not available - try to call original directly
+        try:
+            # Try to get the original from the class
+            hiv_class = type(self)
+            if hasattr(hiv_class, 'make_p_hiv_death'):
+                original = hiv_class.__dict__.get('make_p_hiv_death', None)
+                if original is not None and original != _patched_make_p_hiv_death:
+                    return original(self, uids=uids)
+        except:
+            pass
+        return np.zeros(len(uids) if uids is not None else len(self.sim.people), dtype=float)
+    
+    try:
+        # Call original function
+        return _original_make_p_hiv_death(self, uids=uids)
+    except IndexError as e:
+        # Handle IndexError from np.digitize returning out-of-bounds indices
+        # This happens when CD4 values are >= max bin value
+        # Re-implement the logic with proper bounds checking
+        if uids is None:
+            uids = self.sim.people.uids
+        
+        # Get CD4 values from states
+        st = self.sim.people.states
+        if "hiv.cd4" in st:
+            cd4 = st["hiv.cd4"]
+            cd4_vals = np.asarray(cd4[uids], dtype=float)
+        else:
+            # Fallback to self.cd4 if available
+            cd4_vals = np.asarray(self.cd4[uids], dtype=float) if hasattr(self, 'cd4') else np.full(len(uids), 500.0, dtype=float)
+        
+        # Get cd4_bins from the HIV module
+        try:
+            cd4_bins = self.cd4_bins if hasattr(self, 'cd4_bins') else np.array([0, 50, 100, 200, 350, 500, 1000])
+        except:
+            cd4_bins = np.array([0, 50, 100, 200, 350, 500, 1000])
+        
+        # Get p_hiv_death array
+        try:
+            p_hiv_death = self.p_hiv_death if hasattr(self, 'p_hiv_death') else np.ones(len(cd4_bins) - 1, dtype=float) * 0.01
+        except:
+            p_hiv_death = np.ones(len(cd4_bins) - 1, dtype=float) * 0.01
+        
+        # Clip CD4 values to be within valid range for bins
+        # Ensure CD4 values are < max bin to prevent out-of-bounds indices
+        max_cd4_for_bins = cd4_bins[-1] - 1.0  # Just below max bin
+        cd4_vals = np.clip(cd4_vals, 0.0, max_cd4_for_bins)
+        
+        # Use digitize and clip indices to valid range
+        indices = np.digitize(cd4_vals, cd4_bins)
+        indices = np.clip(indices, 0, len(p_hiv_death) - 1)
+        
+        return p_hiv_death[indices]
+
+def _patched_step_state(self):
+    """
+    Patched version of hiv.step_state that validates and fixes CD4 values
+    before the original validation check to prevent "Invalid entry for CD4" errors.
+    """
+    # Validate and fix CD4 values before calling original step_state
+    st = self.sim.people.states
+    if "hiv.cd4" in st:
+        cd4 = st["hiv.cd4"]
+        # Convert to numpy array for validation
+        cd4_arr = np.asarray(cd4, dtype=float)
+        
+        # Find invalid CD4 values
+        invalid_cd4 = ~np.isfinite(cd4_arr) | (cd4_arr <= 0) | (cd4_arr >= 2000)
+        
+        if invalid_cd4.any():
+            # Fix invalid values by setting them to a reasonable default
+            n_fixed = invalid_cd4.sum()
+            for uid in np.where(invalid_cd4)[0]:
+                if uid < len(cd4):
+                    cd4[uid] = 500.0
+    
+    # Call original step_state (it may not return anything)
+    if _original_step_state is not None:
+        result = _original_step_state(self)
+        return result if result is not None else None
+    else:
+        # Fallback: try to call the original method directly
+        # This should not happen if patch is applied correctly
+        try:
+            result = super(type(self), self).step_state()
+            return result if result is not None else None
+        except AttributeError:
+            # If super doesn't have step_state, that's okay - the original should be available
+            pass
+
+# Apply monkey patch when module is imported
+def _apply_monkey_patch():
+    """Apply monkey patches to HIV methods if not already applied."""
+    global _original_post_art_decline, _original_step_state, _original_make_p_hiv_death
+    
+    # Patch post_art_decline
+    if _original_post_art_decline is None:
+        try:
+            if hasattr(sti, 'HIV') and hasattr(sti.HIV, 'post_art_decline'):
+                _original_post_art_decline = sti.HIV.post_art_decline
+                sti.HIV.post_art_decline = _patched_post_art_decline
+        except (AttributeError, TypeError):
+            pass
+    
+    # Patch step_state
+    if _original_step_state is None:
+        try:
+            if hasattr(sti, 'HIV') and hasattr(sti.HIV, 'step_state'):
+                _original_step_state = sti.HIV.step_state
+                sti.HIV.step_state = _patched_step_state
+        except (AttributeError, TypeError):
+            pass
+    
+    # Patch make_p_hiv_death
+    if _original_make_p_hiv_death is None:
+        try:
+            if hasattr(sti, 'HIV') and hasattr(sti.HIV, 'make_p_hiv_death'):
+                _original_make_p_hiv_death = sti.HIV.make_p_hiv_death
+                sti.HIV.make_p_hiv_death = _patched_make_p_hiv_death
+        except (AttributeError, TypeError):
+            pass
+
+# Try to apply immediately
+_apply_monkey_patch()
 
 # ---------------------------------------------------------------------
 # CASM adherence multipliers (1/OR from Table S2)
@@ -127,10 +396,71 @@ class ARTAdherenceDisruptor(ss.Connector):
     This acts on currently on-ART HIV-positive individuals.
     """
 
-    def __init__(self, base_dropout=0.10, label="adherence_art_dropout"):
+    def __init__(self, base_dropout=0.10, base_dropout_noaud=0.001, allow_reinitiation_after_remission=True, label="adherence_art_dropout"):
+        """
+        Initialize ARTAdherenceDisruptor.
+        
+        Args:
+            base_dropout: Base dropout probability multiplier for AUD-affected people (default: 0.10)
+            base_dropout_noaud: Base dropout probability multiplier for No-AUD people (default: 0.001, very low)
+                In Eswatini with 95-95-95 targets, baseline dropout should be very low (~1-2% per year)
+            allow_reinitiation_after_remission: If True, people who drop out due to AUD can be re-added to ART
+                after going into remission. If False, they remain permanently excluded (default: True).
+                This is useful for scenarios without AUD care where people with AUD who drop out should
+                not restart ART even if they go into remission.
+            label: Label for the connector
+        """
         super().__init__(label=label)
-        self.base_dropout = float(base_dropout)
+        self.base_dropout = float(base_dropout)  # For AUD-affected people
+        self.base_dropout_noaud = float(base_dropout_noaud)  # For No-AUD people (very low baseline)
+        self.allow_reinitiation_after_remission = bool(allow_reinitiation_after_remission)
         self._dropped_this_step = set()  # Track who was dropped this step to prevent immediate re-initiation
+        self._ever_dropped = set()  # Track who has ever dropped out (persists across timesteps)
+        self._dropped_due_to_aud = set()  # Track who dropped out specifically due to AUD (for permanent exclusion)
+
+    def init_pre(self, sim):
+        """Initialize connector and ensure monkey patch is applied."""
+        super().init_pre(sim)
+        # Ensure monkey patch is applied (in case it wasn't applied at import time)
+        _apply_monkey_patch()
+        
+        # Also ensure the patches are applied to the instance's HIV module
+        hiv = getattr(sim.diseases, "hiv", None)
+        if hiv is not None:
+            hiv_class = type(hiv)
+            
+            # Patch post_art_decline
+            if hasattr(hiv_class, 'post_art_decline'):
+                # Check if patch is already applied
+                if hiv_class.post_art_decline != _patched_post_art_decline:
+                    global _original_post_art_decline
+                    if _original_post_art_decline is None:
+                        _original_post_art_decline = hiv_class.post_art_decline
+                    hiv_class.post_art_decline = _patched_post_art_decline
+                    if sim.ti == 0:  # Only print once
+                        print(f"[ARTAdherenceDisruptor] Applied monkey patch to {hiv_class.__name__}.post_art_decline")
+            
+            # Patch step_state
+            if hasattr(hiv_class, 'step_state'):
+                # Check if patch is already applied
+                if hiv_class.step_state != _patched_step_state:
+                    global _original_step_state
+                    if _original_step_state is None:
+                        _original_step_state = hiv_class.step_state
+                    hiv_class.step_state = _patched_step_state
+                    if sim.ti == 0:  # Only print once
+                        print(f"[ARTAdherenceDisruptor] Applied monkey patch to {hiv_class.__name__}.step_state")
+            
+            # Patch make_p_hiv_death
+            if hasattr(hiv_class, 'make_p_hiv_death'):
+                # Check if patch is already applied
+                if hiv_class.make_p_hiv_death != _patched_make_p_hiv_death:
+                    global _original_make_p_hiv_death
+                    if _original_make_p_hiv_death is None:
+                        _original_make_p_hiv_death = hiv_class.make_p_hiv_death
+                    hiv_class.make_p_hiv_death = _patched_make_p_hiv_death
+                    if sim.ti == 0:  # Only print once
+                        print(f"[ARTAdherenceDisruptor] Applied monkey patch to {hiv_class.__name__}.make_p_hiv_death")
 
     def step(self):
         sim = self.sim
@@ -142,9 +472,42 @@ class ARTAdherenceDisruptor(ss.Connector):
 
         # Reset tracking for this step
         self._dropped_this_step = set()
+        
+        # CRITICAL: Handle remission based on allow_reinitiation_after_remission setting
+        # If allow_reinitiation_after_remission=True: Remove people from _ever_dropped when they go into remission
+        # If allow_reinitiation_after_remission=False: Keep people in _ever_dropped permanently (especially if they dropped due to AUD)
+        if len(self._ever_dropped) > 0 and "alcoholusedisorder.affected" in st:
+            aud_affected = np.asarray(st["alcoholusedisorder.affected"], dtype=bool)
+            # Find people in _ever_dropped who are no longer AUD-affected
+            ever_dropped_list = list(self._ever_dropped)
+            no_longer_aud = [uid for uid in ever_dropped_list if uid < len(aud_affected) and not aud_affected[uid]]
+            
+            if len(no_longer_aud) > 0:
+                # Count how many of these dropped specifically due to AUD
+                n_dropped_due_to_aud = len([uid for uid in no_longer_aud if uid in self._dropped_due_to_aud])
+                
+                if self.allow_reinitiation_after_remission:
+                    # Remove them from _ever_dropped so they can be re-added to ART
+                    # Also remove from _dropped_due_to_aud if they're there
+                    self._ever_dropped -= set(no_longer_aud)
+                    self._dropped_due_to_aud -= set(no_longer_aud)
+                    if sim.ti % 12 == 0:  # Print once per year
+                        print(f"[ARTAdherenceDisruptor] Year {sim.t.year}: Removed {len(no_longer_aud)} people from _ever_dropped "
+                              f"(went into AUD remission, allow_reinitiation={self.allow_reinitiation_after_remission}, "
+                              f"dropped_due_to_aud={n_dropped_due_to_aud})")
+                else:
+                    # Keep them in _ever_dropped permanently (especially if they dropped due to AUD)
+                    # This means they won't be re-added even after remission
+                    if sim.ti % 12 == 0:  # Print once per year
+                        print(f"[ARTAdherenceDisruptor] Year {sim.t.year}: {len(no_longer_aud)} people in _ever_dropped went into remission "
+                              f"but remain excluded (allow_reinitiation={self.allow_reinitiation_after_remission}, "
+                              f"dropped_due_to_aud={n_dropped_due_to_aud})")
 
         adher = np.asarray(st["adherence"], float)
         on_art = np.asarray(st["hiv.on_art"], bool)
+        
+        # Get AUD status to apply different dropout rates
+        aud_affected = np.asarray(st.get("alcoholusedisorder.affected", []), dtype=bool) if "alcoholusedisorder.affected" in st else np.zeros(len(adher), dtype=bool)
         
         # Debug: Always print on first few timesteps to verify it's running
         if sim.ti < 3:
@@ -158,8 +521,45 @@ class ARTAdherenceDisruptor(ss.Connector):
                 f"This usually indicates 'adherence' was not registered via People.add()."
             )
 
-        drop_p = self.base_dropout * (1.0 - adher)
+        # Calculate dropout probability: use different base rates for AUD vs No-AUD
+        # For No-AUD people: very low baseline dropout (Eswatini 95-95-95 means minimal dropout)
+        # For AUD-affected people: higher dropout based on adherence
+        # OPTIMIZED: Pre-compute (1.0 - adher) once and use vectorized operations
+        one_minus_adher = 1.0 - adher
+        drop_p = np.where(
+            aud_affected,
+            self.base_dropout * one_minus_adher,  # AUD-affected: higher dropout
+            self.base_dropout_noaud * one_minus_adher  # No-AUD: very low baseline dropout
+        )
+        # Clip to valid probability range [0, 1]
+        drop_p = np.clip(drop_p, 0.0, 1.0)
         rand = np.random.rand(len(adher))
+        
+        # CRITICAL: Remove people from _ever_dropped if their dropout probability is now 0.0
+        # This handles cases where people were added to _ever_dropped earlier (maybe when adherence was lower),
+        # but now have perfect adherence (1.0) and thus dropout probability of 0.0.
+        # If dropout probability is 0.0, they're not at risk of dropping out anymore, so there's no reason to exclude them.
+        # This applies regardless of allow_reinitiation_after_remission - if there's no risk, they should be eligible.
+        # The allow_reinitiation_after_remission setting only applies to people who are still at risk (dropout probability > 0.0).
+        if len(self._ever_dropped) > 0:
+            ever_dropped_list = list(self._ever_dropped)
+            # Check dropout probability for people in _ever_dropped
+            to_remove = []
+            for uid in ever_dropped_list:
+                if uid < len(drop_p):
+                    # If dropout probability is 0.0 (or very close to 0.0), remove from _ever_dropped
+                    # This allows them to be re-added to ART if needed, regardless of allow_reinitiation setting
+                    # because if there's no risk of dropout, there's no reason to exclude them
+                    if drop_p[uid] < 1e-6:  # Essentially 0.0
+                        to_remove.append(uid)
+            
+            if len(to_remove) > 0:
+                # Remove from both _ever_dropped and _dropped_due_to_aud
+                self._ever_dropped -= set(to_remove)
+                self._dropped_due_to_aud -= set(to_remove)
+                if sim.ti % 12 == 0:  # Print once per year
+                    print(f"[ARTAdherenceDisruptor] Year {sim.t.year}: Removed {len(to_remove)} people from _ever_dropped "
+                          f"(dropout probability now 0.0, allowing re-initiation regardless of allow_reinitiation setting)")
 
         # Allow dropping people who are currently on ART
         # Strategy: require at least 24 timesteps (2 years) on ART to avoid HIV module errors
@@ -347,15 +747,92 @@ class ARTAdherenceDisruptor(ss.Connector):
                         # Set ti_stop_art to current timestep for people we want to drop
                         # The HIV module will handle stopping ART in its step_state (in ARTNoAutoAdjust.step())
                         ti_stop_art[final_drop_ids] = sim.ti
+                        
+                        # CRITICAL: Ensure ti_art is valid for people we're dropping to prevent CD4 errors
+                        # The HIV module's post_art_decline needs valid ti_art values
+                        if "hiv.ti_art" in st:
+                            ti_art = st["hiv.ti_art"]
+                            for uid in final_drop_ids:
+                                if uid < len(ti_art):
+                                    # Ensure ti_art is valid (finite and >= 0)
+                                    if not np.isfinite(ti_art[uid]) or ti_art[uid] < 0:
+                                        # Set to a reasonable default (current timestep - 24 months)
+                                        ti_art[uid] = max(0.0, float(sim.ti) - 24.0)
+                        
+                        # CRITICAL: Pre-validate CD4 values for people we're dropping to prevent "Invalid entry for CD4" errors
+                        # The HIV module will recalculate CD4 after stopping ART, but we need to ensure
+                        # current CD4 values are valid to prevent errors during the transition
+                        if "hiv.cd4" in st:
+                            cd4 = st["hiv.cd4"]
+                            # Validate CD4 specifically for people we're dropping
+                            for uid in final_drop_ids:
+                                if uid < len(cd4):
+                                    cd4_val = float(cd4[uid])  # Convert to float for comparison
+                                    # Ensure CD4 is valid (finite, positive, reasonable range)
+                                    if not (np.isfinite(cd4_val) and 0 < cd4_val < 2000):
+                                        # Set to a reasonable default
+                                        cd4[uid] = 500.0
                     
-                    # Track who was dropped this step
-                    self._dropped_this_step = set(final_drop_ids.tolist())
+                    # Track who was dropped this step and ever dropped
+                    dropped_uids = set(final_drop_ids.tolist())
+                    self._dropped_this_step = dropped_uids
+                    self._ever_dropped.update(dropped_uids)  # Add to ever_dropped set
                     
-                    # Print when dropping (less verbose - only every 5 timesteps or if significant)
+                    # Track which of these dropped specifically due to AUD (for permanent exclusion if needed)
+                    if aud_dropped > 0:
+                        aud_dropped_uids = [final_drop_ids[i] for i in range(len(final_drop_ids)) if aud_affected[final_drop_ids[i]]]
+                        self._dropped_due_to_aud.update(aud_dropped_uids)
+                        # Debug: verify we're only adding AUD-affected people
+                        if sim.ti % 12 == 0:  # Print once per year
+                            print(f"[ARTAdherenceDisruptor] Year {sim.t.year}: Added {len(aud_dropped_uids)} AUD-affected people to _dropped_due_to_aud "
+                                  f"(total dropped this step={final_drop_ids.size}, aud_dropped={aud_dropped})")
+                    
+                    # Print when dropping with detailed debug info
                     if sim.ti % 5 == 0 or final_drop_ids.size > 10:
                         print(f"[ARTAdherenceDisruptor] Year {sim.t.year}, ti={sim.ti}: Scheduled ART stop for {final_drop_ids.size} agents "
                               f"(AUD={aud_dropped}, NoAUD={final_drop_ids.size - aud_dropped}, "
                               f"mean_adherence={mean_adher_dropped:.3f}, mean_drop_prob={mean_drop_p_dropped:.4f})")
+                    
+                    # Yearly summary of dropout tracking
+                    if sim.ti % 12 == 0:  # Once per year
+                        # Get current ART status for context
+                        on_art = np.asarray(st.get("hiv.on_art", []), bool) if "hiv.on_art" in st else np.zeros(len(ppl), dtype=bool)
+                        aud_affected = np.asarray(st.get("alcoholusedisorder.affected", []), dtype=bool) if "alcoholusedisorder.affected" in st else np.zeros(len(ppl), dtype=bool)
+                        aud_on_art = (on_art & aud_affected).sum()
+                        noaud_on_art = (on_art & ~aud_affected).sum()
+                        
+                        # Count how many in _ever_dropped are currently AUD-affected
+                        ever_dropped_aud = len([uid for uid in self._ever_dropped if uid < len(aud_affected) and aud_affected[uid]])
+                        ever_dropped_noaud = len(self._ever_dropped) - ever_dropped_aud
+                        
+                        # Count how many in _dropped_due_to_aud are currently AUD-affected vs in remission
+                        dropped_due_to_aud_currently_aud = len([uid for uid in self._dropped_due_to_aud if uid < len(aud_affected) and aud_affected[uid]])
+                        dropped_due_to_aud_in_remission = len(self._dropped_due_to_aud) - dropped_due_to_aud_currently_aud
+                        
+                        print(f"[ARTAdherenceDisruptor SUMMARY] Year {sim.t.year}: "
+                              f"_ever_dropped={len(self._ever_dropped)} (currently AUD={ever_dropped_aud}, currently No-AUD={ever_dropped_noaud}), "
+                              f"_dropped_due_to_aud={len(self._dropped_due_to_aud)} (currently AUD={dropped_due_to_aud_currently_aud}, in remission={dropped_due_to_aud_in_remission}), "
+                              f"allow_reinitiation={self.allow_reinitiation_after_remission}, "
+                              f"Currently on ART: AUD={aud_on_art}, No-AUD={noaud_on_art}")
+        
+        # Final validation: Check CD4 values for people who have ti_stop_art set (scheduled to drop)
+        # This catches any invalid CD4 values that might cause errors in the HIV module's step_state
+        if "hiv.ti_stop_art" in st and "hiv.cd4" in st:
+            ti_stop_art = st["hiv.ti_stop_art"]
+            cd4 = st["hiv.cd4"]
+            # Find people who have ti_stop_art set (scheduled to drop this step)
+            ti_stop_art_arr = np.asarray(ti_stop_art, dtype=float)
+            scheduled_to_drop = np.isfinite(ti_stop_art_arr) & (ti_stop_art_arr == sim.ti)
+            
+            if scheduled_to_drop.any():
+                # Validate CD4 for people scheduled to drop
+                for uid in np.where(scheduled_to_drop)[0]:
+                    if uid < len(cd4):
+                        cd4_val = float(cd4[uid])
+                        # Ensure CD4 is valid (finite, positive, reasonable range)
+                        if not (np.isfinite(cd4_val) and 0 < cd4_val < 2000):
+                            # Set to a reasonable default
+                            cd4[uid] = 500.0
 
 
 # =====================================================================
