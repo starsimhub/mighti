@@ -189,8 +189,8 @@ class DropoutAdherenceAnalyzer(ss.Analyzer):
             ss.Result("year", label="Year", dtype=float),
             ss.Result("aud_dropout_count", label="AUD current dropout count (ever started - currently on)", dtype=int),
             ss.Result("noaud_dropout_count", label="No-AUD current dropout count (ever started - currently on)", dtype=int),
-            ss.Result("aud_cumulative_dropout", label="AUD cumulative dropout count (from _ever_dropped)", dtype=int),
-            ss.Result("noaud_cumulative_dropout", label="No-AUD cumulative dropout count (from _ever_dropped)", dtype=int),
+            ss.Result("aud_cumulative_dropout", label="AUD cumulative dropout count (ever started - currently on, includes all sources)", dtype=int),
+            ss.Result("noaud_cumulative_dropout", label="No-AUD cumulative dropout count (ever started - currently on, includes all sources)", dtype=int),
             ss.Result("aud_new_dropouts", label="AUD new dropouts this timestep", dtype=int),
             ss.Result("noaud_new_dropouts", label="No-AUD new dropouts this timestep", dtype=int),
             ss.Result("aud_mean_adherence", label="AUD mean adherence", dtype=float),
@@ -251,7 +251,7 @@ class DropoutAdherenceAnalyzer(ss.Analyzer):
         noaud_dropout = max(0, noaud_ever_started - noaud_on_art)
         
         # Get cumulative dropout count from ARTAdherenceDisruptor connector
-        # This tracks who has EVER dropped out (regardless of current status)
+        # This tracks who has EVER dropped out via ARTAdherenceDisruptor (regardless of current status)
         art_dropout_connector = None
         if hasattr(sim, 'connectors'):
             if isinstance(sim.connectors, dict):
@@ -267,10 +267,9 @@ class DropoutAdherenceAnalyzer(ss.Analyzer):
                             break
         
         # Count cumulative dropouts from _ever_dropped set (alive only)
-        aud_cumulative_dropout = 0
-        noaud_cumulative_dropout = 0
-        aud_new_dropouts = 0
-        noaud_new_dropouts = 0
+        # This tracks dropouts specifically from ARTAdherenceDisruptor
+        aud_cumulative_dropout_from_disruptor = 0
+        noaud_cumulative_dropout_from_disruptor = 0
         
         if art_dropout_connector is not None and hasattr(art_dropout_connector, "_ever_dropped"):
             ever_dropped = art_dropout_connector._ever_dropped
@@ -279,18 +278,24 @@ class DropoutAdherenceAnalyzer(ss.Analyzer):
                 if uid < len(alive) and alive[uid]:
                     if uid < len(aud_affected):
                         if aud_affected[uid]:
-                            aud_cumulative_dropout += 1
+                            aud_cumulative_dropout_from_disruptor += 1
                         else:
-                            noaud_cumulative_dropout += 1
-            
-            # Calculate new dropouts this timestep (increase in _ever_dropped size)
-            # This is approximate - we compare current size to previous size
-            current_aud_dropped = aud_cumulative_dropout
-            current_noaud_dropped = noaud_cumulative_dropout
-            aud_new_dropouts = max(0, current_aud_dropped - self._prev_ever_dropped_size_aud)
-            noaud_new_dropouts = max(0, current_noaud_dropped - self._prev_ever_dropped_size_noaud)
-            self._prev_ever_dropped_size_aud = current_aud_dropped
-            self._prev_ever_dropped_size_noaud = current_noaud_dropped
+                            noaud_cumulative_dropout_from_disruptor += 1
+        
+        # Calculate new dropouts this timestep (increase in _ever_dropped size)
+        # This is approximate - we compare current size to previous size
+        aud_new_dropouts = max(0, aud_cumulative_dropout_from_disruptor - self._prev_ever_dropped_size_aud)
+        noaud_new_dropouts = max(0, noaud_cumulative_dropout_from_disruptor - self._prev_ever_dropped_size_noaud)
+        self._prev_ever_dropped_size_aud = aud_cumulative_dropout_from_disruptor
+        self._prev_ever_dropped_size_noaud = noaud_cumulative_dropout_from_disruptor
+        
+        # IMPORTANT: Use "current dropout" (ever started - currently on) as the cumulative dropout metric
+        # This includes ALL dropouts (from ARTAdherenceDisruptor, base STIsim ART module, or any other source)
+        # The "current dropout" represents the true cumulative number of people who have dropped out
+        # (it can decrease if people are re-added or die, but for alive people it's the best estimate)
+        # For plotting purposes, we use this as the cumulative dropout count
+        aud_cumulative_dropout = aud_dropout  # Use current dropout as cumulative (includes all sources)
+        noaud_cumulative_dropout = noaud_dropout  # Use current dropout as cumulative (includes all sources)
         
         # Calculate mean adherence (for people on ART)
         aud_adherence_mean = adherence[on_art & aud_diag & alive].mean() if (on_art & aud_diag & alive).any() else 1.0
@@ -1349,9 +1354,11 @@ def plot_dropout_and_adherence(msim, prefix="Fig7B_Dropout_Adherence", burn_in_y
             aud_adherence_plot = aud_adherence_filtered
             noaud_adherence_plot = noaud_adherence_filtered
         
-        # Plot dropout counts (row 0) - use cumulative dropout from _ever_dropped
+        # Plot dropout counts (row 0) - use cumulative dropout from analyzer
+        # The analyzer now uses "current dropout" (ever started - currently on) as cumulative,
+        # which includes ALL dropouts (from ARTAdherenceDisruptor, base STIsim ART, or any other source)
         ax_dropout = axes[0, i]
-        # Try to get cumulative dropout data, fallback to current dropout
+        # Get cumulative dropout data from analyzer (which now includes all dropouts)
         if analyzer_key in sim.results:
             res_for_cum = sim.results[analyzer_key]
             aud_cumulative_vals = res_for_cum.get("aud_cumulative_dropout")
@@ -1364,8 +1371,10 @@ def plot_dropout_and_adherence(msim, prefix="Fig7B_Dropout_Adherence", burn_in_y
             aud_cumulative = None
             noaud_cumulative = None
         
+        # Always use cumulative dropout from analyzer (which includes all dropouts)
+        # If analyzer data is not available, fall back to current dropout
         if aud_cumulative is not None and noaud_cumulative is not None and len(aud_cumulative) > 0 and len(noaud_cumulative) > 0:
-            # Use cumulative dropout (from _ever_dropped)
+            # Use cumulative dropout from analyzer (includes all sources)
             
             # Apply same filtering and averaging as dropout_plot
             aud_cumulative_filtered = aud_cumulative[mask] if len(aud_cumulative) == len(years) else aud_cumulative
@@ -1386,14 +1395,14 @@ def plot_dropout_and_adherence(msim, prefix="Fig7B_Dropout_Adherence", burn_in_y
                 noaud_cumulative_plot = noaud_cumulative_filtered
                 years_cum_plot = years_filtered
             
-            ax_dropout.plot(years_cum_plot, aud_cumulative_plot, "-", color="#d62728", label="AUD (cumulative)", linewidth=2.5)
-            ax_dropout.plot(years_cum_plot, noaud_cumulative_plot, "--", color="#9467bd", label="No AUD (cumulative)", linewidth=2.5)
-            ylabel = "Cumulative Dropout Count\n(from _ever_dropped)"
+            ax_dropout.plot(years_cum_plot, aud_cumulative_plot, "-", color="#d62728", label="AUD", linewidth=2.5)
+            ax_dropout.plot(years_cum_plot, noaud_cumulative_plot, "--", color="#9467bd", label="No AUD", linewidth=2.5)
+            ylabel = "Dropout Count\n(ever started - currently on ART, alive only)"
         else:
             # Fallback to current dropout (with note that it can decrease)
-            ax_dropout.plot(years_plot, aud_dropout_plot, "-", color="#d62728", label="AUD (current)", linewidth=2.5)
-            ax_dropout.plot(years_plot, noaud_dropout_plot, "--", color="#9467bd", label="No AUD (current)", linewidth=2.5)
-            ylabel = "Current Dropout Count\n(can decrease due to deaths/re-initiation)"
+            ax_dropout.plot(years_plot, aud_dropout_plot, "-", color="#d62728", label="AUD", linewidth=2.5)
+            ax_dropout.plot(years_plot, noaud_dropout_plot, "--", color="#9467bd", label="No AUD", linewidth=2.5)
+            ylabel = "Dropout Count\n(ever started - currently on ART, alive only)"
         
         ax_dropout.set_xlim(burn_in_year - 0.5, endyear + 0.5)
         if i == 0:
