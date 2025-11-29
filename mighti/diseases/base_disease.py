@@ -1912,7 +1912,16 @@ class NonAcquiredDisease(ss.Module):
 
         if len(deaths):
             sim.people.request_death(deaths)
-            logger.debug(f"[STEP] {self.disease_name}: {len(deaths)} deaths at timestep {ti}")
+            # Set ti_dead to current timestep so deaths are finalized immediately
+            sim.people.ti_dead[deaths] = ti
+            logger.debug(f"[STEP] {self.disease_name}: {len(deaths)} deaths requested at timestep {ti}")
+            
+            # Finalize deaths immediately to ensure they're committed
+            # This is safe because step_die() only finalizes deaths with ti_dead <= ti
+            # and is idempotent (can be called multiple times)
+            finalized = sim.people.step_die()
+            if len(finalized) > 0:
+                logger.debug(f"[STEP] {self.disease_name}: {len(finalized)} deaths finalized at timestep {ti}")
 
         self.results.new_deaths[ti] = len(deaths)
         self.results.prevalence[ti] = np.count_nonzero(self.affected) / len(sim.people)
@@ -2019,7 +2028,17 @@ class StaticCondition(NonAcquiredDisease):
         deaths = affected[np.random.rand(len(affected)) < base_p * rel_death]
         if len(deaths):
             sim.people.request_death(deaths)
+            # Set ti_dead to current timestep so deaths are finalized immediately
+            sim.people.ti_dead[deaths] = ti
             self.ti_dead[deaths] = ti
+            logger.debug(f"[STEP] {self.disease_name}: {len(deaths)} deaths requested at timestep {ti}")
+            
+            # Finalize deaths immediately to ensure they're committed
+            # This is safe because step_die() only finalizes deaths with ti_dead <= ti
+            # and is idempotent (can be called multiple times)
+            finalized = sim.people.step_die()
+            if len(finalized) > 0:
+                logger.debug(f"[STEP] {self.disease_name}: {len(finalized)} deaths finalized at timestep {ti}")
 
         self.results.new_deaths[ti] = len(deaths)
         self.results.prevalence[ti] = np.count_nonzero(self.affected) / len(sim.people)

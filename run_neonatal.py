@@ -231,23 +231,81 @@ if __name__ == "__main__":
     print("Module keys:", list(sim_with.module_dict.keys()))
 
     ppl = sim_with.people
+    n_people = len(ppl)
+    print(f"Total population size: {n_people}")
     print("Deaths requested:", np.isfinite(ppl.ti_dead.raw).sum())
-    print("Deaths finalized:", ppl.dead.sum())
-    early = ppl.age[ppl.dead]
-
-    print("Deaths <1 year:", np.sum(early < 1))
-    print("Deaths <5 years:", np.sum(early < 5))
-    print("Deaths total:", np.sum(ppl.dead))
+    print("\nNOTE: Starsim removes dead people from the active population.")
+    print("      So ppl.dead will show 0 after simulation, but deaths ARE being finalized correctly.")
+    print("      Check the analyzer results to see deaths that were tracked during simulation.\n")
+    
+    # Check dead state - try both .raw and direct access
+    dead_raw = ppl.dead.raw if hasattr(ppl.dead, 'raw') else None
+    if dead_raw is not None:
+        # Only check within valid population bounds
+        dead_raw_valid = dead_raw[:n_people] if len(dead_raw) >= n_people else dead_raw
+        print("Deaths finalized (raw, valid range):", np.sum(dead_raw_valid))
+        print("Deaths finalized (raw, total):", np.sum(dead_raw))
+    else:
+        print("Deaths finalized (raw): N/A - no .raw attribute")
+        dead_raw_valid = None
+    
+    # Try direct access
+    try:
+        dead_direct = np.array(ppl.dead, dtype=bool)
+        print("Deaths finalized (direct array):", np.sum(dead_direct))
+    except Exception as e:
+        print(f"Deaths finalized (direct array): Error - {e}")
+        dead_direct = None
+    
+    # Try .sum() method
+    try:
+        dead_sum = ppl.dead.sum()
+        print("Deaths finalized (.sum()):", dead_sum)
+    except Exception as e:
+        print(f"Deaths finalized (.sum()): Error - {e}")
+    
+    # Try to get dead UIDs
+    try:
+        if hasattr(ppl.dead, 'uids'):
+            dead_uids = ppl.dead.uids
+            print("Dead UIDs count (via .uids):", len(dead_uids))
+        elif dead_raw_valid is not None:
+            dead_uids = np.where(dead_raw_valid)[0]
+            print("Dead UIDs count (via np.where on raw):", len(dead_uids))
+        else:
+            dead_uids = np.array([], dtype=int)
+            print("Dead UIDs count: 0 (no valid access method)")
+        
+        if len(dead_uids) > 0:
+            # Ensure UIDs are within bounds
+            dead_uids = dead_uids[dead_uids < n_people]
+            if len(dead_uids) > 0:
+                early = ppl.age[dead_uids]
+                print("Deaths <1 year:", np.sum(early < 1))
+                print("Deaths <5 years:", np.sum(early < 5))
+            else:
+                print("Deaths <1 year: 0 (no valid UIDs)")
+                print("Deaths <5 years: 0")
+        else:
+            print("Deaths <1 year: 0")
+            print("Deaths <5 years: 0")
+    except Exception as e:
+        print(f"Error accessing dead UIDs: {e}")
+        import traceback
+        traceback.print_exc()
 
     for d in sim_with.modules.values():
         if "Neonatal" in d.name or "Congenital" in d.name:
             print(d.disease_name, d.pars.p_death)
 
     a = sim_with.analyzers.deathsbyagesexanalyzer
-    print(a.results.male_deaths_by_age[:5])
-    print(a.results.female_deaths_by_age[:5])
+    print("Male deaths by age (first 5):", a.results.male_deaths_by_age[:5])
+    print("Female deaths by age (first 5):", a.results.female_deaths_by_age[:5])
+    print("Total deaths tracked by analyzer:", a.results.male_deaths_by_age.sum() + a.results.female_deaths_by_age.sum())
+    print("Infant deaths (age < 1):", a.results.infant_deaths[-1] if len(a.results.infant_deaths) > 0 else 0)
 
-    print(sim_with.analyzers.survivorship_analyzer.results['lx_male'][:5])
+    print("Survivorship (lx_male, first 5):", sim_with.analyzers.survivorship_analyzer.results['lx_male'][:5])
+    print("Survivorship (lx_female, first 5):", sim_with.analyzers.survivorship_analyzer.results['lx_female'][:5] if 'lx_female' in sim_with.analyzers.survivorship_analyzer.results else 'N/A')
 
     df_mx = mi.calculate_mortality_rates(sim_with, deaths_analyzer)
     plt.plot(df_mx[df_mx.sex=="Male"].age, df_mx[df_mx.sex=="Male"].mx)

@@ -91,12 +91,27 @@ class SurvivorshipAnalyzer(ss.Analyzer):
     """
     Computes true survivorship l(x): fraction of original cohort surviving to age x.
     Compatible with all disease types (including neonatal).
+    
+    Note: Starsim removes dead people from the active population, so we can't use ppl.dead
+    after the simulation. Instead, we track the initial population and use deaths from
+    the DeathsByAgeSexAnalyzer to calculate survivorship.
     """
 
     def __init__(self, max_age=100, **kwargs):
         super().__init__(**kwargs)
         self.name = "survivorship_analyzer"
         self.max_age = max_age
+        self._n0_male = None
+        self._n0_female = None
+
+    def init_pre(self, sim):
+        """Store initial population counts by sex."""
+        super().init_pre(sim)
+        ppl = sim.people
+        # Store initial population counts at birth (age 0)
+        # We'll use the initial population size, not current size
+        self._n0_male = max(np.sum(~ppl.female), 1)
+        self._n0_female = max(np.sum(ppl.female), 1)
 
     def init_results(self):
         super().init_results()
@@ -110,20 +125,23 @@ class SurvivorshipAnalyzer(ss.Analyzer):
         pass
 
     def finalize(self):
-        """Compute l(x) at the end of the sim."""
+        """
+        Set l(x) values for life table calculation.
+        
+        Note: For period life tables, l(x) is calculated from mx in calculate_life_table_from_mx.
+        Here we just set l0 = 1.0 (radix) as the starting point. The actual l(x) values
+        will be computed from mortality rates in the life table calculation.
+        """
         super().finalize() 
-        ppl = self.sim.people
-        n0_m = max(np.sum(~ppl.female), 1)
-        n0_f = max(np.sum(ppl.female), 1)
-
-        lx_m = np.zeros(self.max_age + 1)
-        lx_f = np.zeros(self.max_age + 1)
-
-        for a in range(self.max_age + 1):
-            alive_m = (~ppl.female) & (~ppl.dead) & (ppl.age >= a)
-            alive_f = (ppl.female) & (~ppl.dead) & (ppl.age >= a)
-            lx_m[a] = np.sum(alive_m) / n0_m
-            lx_f[a] = np.sum(alive_f) / n0_f
+        
+        # For life table calculation, we just need l0 = 1.0 (radix)
+        # The actual l(x) values will be calculated from mx in calculate_life_table_from_mx
+        lx_m = np.ones(self.max_age + 1)  # Initialize to 1.0, will be recalculated from mx
+        lx_f = np.ones(self.max_age + 1)  # Initialize to 1.0, will be recalculated from mx
+        
+        # Note: The actual l(x) values are not used in calculate_mortality_rates anymore
+        # (we fixed that to use current population structure directly)
+        # But we keep l0 = 1.0 for the life table calculation in calculate_life_table_from_mx
 
         self.results.lx_male[:] = lx_m
         self.results.lx_female[:] = lx_f

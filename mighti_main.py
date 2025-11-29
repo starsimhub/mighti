@@ -59,7 +59,16 @@ df.columns = df.columns.str.strip()
 
 # healthconditions = ['Type2Diabetes']
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
-healthconditions = [condition for condition in df.condition if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]]
+# Temporarily exclude neonatal and congenital diseases to test mortality calculations
+neonatal_congenital = [
+    "NeonatalSepsis", "NeonatalEncephalopathy", "NeonatalJaundice", "NeonatalPretermBirth",
+    "DownSyndrome", "CongenitalHeartAnomalies", "CongenitalMusculoskeletal", 
+    "DigestiveCongenitalAnomalies", "ChromosomalAbnormalities", "NeuralTubeDefects"
+]
+healthconditions = [
+    condition for condition in df.condition 
+    if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"] + neonatal_congenital
+]
 diseases = ["HIV"] + healthconditions
 
 # ---------------------------------------------------------------------
@@ -83,13 +92,13 @@ def get_prevalence_function(disease):
 # Analyzers
 # ---------------------------------------------------------------------
 prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=diseases)
-# survivorship_analyzer = mi.SurvivorshipAnalyzer()
-# deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
+survivorship_analyzer = mi.SurvivorshipAnalyzer()
+deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
 
 # death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
 #     conditions=healthconditions)
 
-# analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer]
+analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer]
 
 # casm_keys = [
 #     "majordepressivedisorder.affected",
@@ -250,7 +259,7 @@ if __name__ == "__main__":
         diseases=disease_objects,      
         # connectors=connectors,
         # interventions=interventions,
-        analyzers=prevalence_analyzer,
+        analyzers=analyzers,
         copy_inputs=False,
         label="With Interventions",
     )
@@ -259,21 +268,21 @@ if __name__ == "__main__":
     sim.run()
 
 
-    # # Mortality & life table
-    # target_year = endyear - 1
-    # obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name="mx")
-    # obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name="ex")
+    # Mortality & life table
+    target_year = endyear - 1
+    obs_mx = prepare_data_for_year.extract_indicator_for_plot(mx_path, target_year, value_column_name="mx")
+    obs_ex = prepare_data_for_year.extract_indicator_for_plot(ex_path, target_year, value_column_name="ex")
 
-    # deaths_module = get_deaths_module(sim)
-    # pregnancy_module = get_pregnancy_module(sim)
+    deaths_module = get_deaths_module(sim)
+    #pregnancy_module = get_pregnancy_module(sim)
 
-    # df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
-    # df_mx_male = df_mx[df_mx["sex"] == "Male"]
-    # df_mx_female = df_mx[df_mx["sex"] == "Female"]
+    df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=target_year, max_age=100, radix=n_agents)
+    df_mx_male = df_mx[df_mx["sex"] == "Male"]
+    df_mx_female = df_mx[df_mx["sex"] == "Female"]
 
-    # life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
-    # mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
-    # mi.plot_life_expectancy(life_table, obs_ex, year=target_year, max_age=100)
+    life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
+    mi.plot_mx_comparison(df_mx, obs_mx, year=target_year, age_interval=5)
+    mi.plot_life_expectancy(life_table, obs_ex, year=target_year, max_age=100)
 
     # # # Optional prevalence plots
     # prevalence_check_df = pd.read_csv(f"mighti/data/{region}_postprocess_check_prevalence.csv")
@@ -282,9 +291,9 @@ if __name__ == "__main__":
 
     # mi.plot_adherence_by_condition(sim, analyzers, casm_keys)
 
-    male_prev, female_prev = mi.plot_mean_prevalence(
-        sim, prevalence_analyzer, "Type2Diabetes", prevalence_data_df, init_year=2000, end_year=2020
-    )
+    # male_prev, female_prev = mi.plot_mean_prevalence(
+    #     sim, prevalence_analyzer, "Type2Diabetes", prevalence_data_df, init_year=2000, end_year=2020
+    # )
 
     # for t, pm, pf in zip(sim.timevec, male_prev, female_prev):
     #     year = t.year if hasattr(t, "year") else int(t)

@@ -13,25 +13,25 @@ import pandas as pd
 
 def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=100000):
     """
-    Compute age-specific mortality rates (m(x)) using simulated death tracking and survivorship.
+    Compute age-specific mortality rates (m(x)) using simulated death tracking and current population structure.
+    
+    For a period life table, we calculate person-years from the current population structure,
+    not from survivorship l(x), which avoids circular dependencies.
 
     Args:
         sim (ss.Sim): The simulation object.
         deaths_module: Module tracking male/female deaths by age (e.g., mi.DeathsByAgeSexAnalyzer).
         year (int, optional): Simulation year for labeling output. If None, uses current sim year.
         max_age (int): Maximum age to include in calculations.
-        radix (int): Reference population size used for initial survivorship (typically 100000).
+        radix (int): Reference population size (not used directly, but kept for compatibility).
 
     Returns:
         pd.DataFrame: A table with columns ['year', 'age', 'sex', 'mx'].
     """
-    surv_an = sim.analyzers.survivorship_analyzer
-    lx_male = surv_an.results.lx_male
-    lx_female = surv_an.results.lx_female
-
+    ppl = sim.people
+    
+    # Get deaths by age
     deaths_by_age = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
-    person_years = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
-
     for age in range(max_age + 1):
         deaths_by_age['Male'][age] = (
             deaths_module.results.male_deaths_by_age[age]
@@ -42,15 +42,28 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
             if age < len(deaths_module.results.female_deaths_by_age) else 0
         )
 
+    # Calculate current population at each age (dead people already removed by Starsim)
+    pop_by_age = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
+    for age in range(max_age + 1):
+        # Count people at exact age (using floor to match age bins)
+        age_mask = (np.floor(ppl.age) == age)
+        pop_by_age['Male'][age] = np.sum((~ppl.female) & age_mask)
+        pop_by_age['Female'][age] = np.sum(ppl.female & age_mask)
+
     mortality_rates = []
     current_year = year if year is not None else int(sim.t.yearvec[sim.t.ti])
 
+    # Calculate mortality rates: mx = deaths / person-years
+    # Person-years Lx = average of population at age x and x+1
     for age in range(max_age):
-        for sex, lx in [('Male', lx_male), ('Female', lx_female)]:
+        for sex in ['Male', 'Female']:
             deaths = deaths_by_age[sex][age]
-            # person-years lived between x and x+1
-            Lx = 0.5 * (lx[age] + lx[age + 1])
-            person_years[sex][age] = Lx
+            # Person-years lived between x and x+1 = average population in age interval
+            pop_x = pop_by_age[sex][age]
+            pop_x1 = pop_by_age[sex][age + 1] if age + 1 <= max_age else pop_by_age[sex][age]
+            Lx = 0.5 * (pop_x + pop_x1)
+            
+            # mx = deaths / person-years
             mx = deaths / Lx if Lx > 0 else 0
 
             mortality_rates.append({
@@ -61,9 +74,10 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
             })
 
     # Handle open interval (max_age)
-    for sex, lx in [('Male', lx_male), ('Female', lx_female)]:
+    for sex in ['Male', 'Female']:
         deaths = deaths_by_age[sex][max_age]
-        Lx = lx[max_age - 1]  # approximate with previous age group
+        # Use population at max_age for person-years in open interval
+        Lx = pop_by_age[sex][max_age]
         mx = deaths / Lx if Lx > 0 else 0
         mortality_rates.append({'year': current_year, 'age': max_age, 'sex': sex, 'mx': mx})
 

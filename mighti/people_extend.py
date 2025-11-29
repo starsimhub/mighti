@@ -32,16 +32,57 @@ def fixed_step_die(self):
 
     if len(death_uids) == 0:
         return np.array([], dtype=int)
+    
+    # Ensure all UIDs are within valid population bounds
+    n_people = len(self)
+    valid_mask = death_uids < n_people
+    death_uids = death_uids[valid_mask]
+    
+    if len(death_uids) == 0:
+        return np.array([], dtype=int)
 
     # --- 1. Update state arrays (mirrors Starsim finalize_deaths) ---
-    self.alive.raw[death_uids] = False
-    self.dead.raw[death_uids] = True
-    self.ti_dead.raw[death_uids] = np.minimum(
-        np.where(np.isfinite(ti_dead_raw[death_uids]), ti_dead_raw[death_uids], ti),
+    # Filter out already-dead individuals to avoid re-processing
+    # Check both .raw and direct access to handle BoolState filtering
+    try:
+        already_dead_raw = self.dead.raw[death_uids] if hasattr(self.dead, 'raw') else None
+        # Also check if they're already marked as dead in the main array
+        # (BoolState might filter, so we need to check .raw)
+        if already_dead_raw is not None:
+            already_dead = already_dead_raw
+        else:
+            # Fallback: try direct access
+            already_dead = np.array(self.dead[death_uids], dtype=bool) if hasattr(self.dead, '__getitem__') else np.zeros(len(death_uids), dtype=bool)
+    except (IndexError, KeyError):
+        # If indexing fails, assume none are dead yet
+        already_dead = np.zeros(len(death_uids), dtype=bool)
+    
+    new_deaths = death_uids[~already_dead]
+    
+    if len(new_deaths) == 0:
+        # All these deaths were already processed
+        return np.array([], dtype=int)
+    
+    # Update state arrays for newly dead individuals
+    # Use both .raw and direct assignment to ensure state is properly set
+    self.alive.raw[new_deaths] = False
+    self.dead.raw[new_deaths] = True
+    # Also set via direct assignment if BoolState supports it
+    try:
+        self.dead[new_deaths] = True
+    except (IndexError, KeyError, TypeError):
+        # BoolState might not support direct indexing, that's okay
+        pass
+    
+    self.ti_dead.raw[new_deaths] = np.minimum(
+        np.where(np.isfinite(ti_dead_raw[new_deaths]), ti_dead_raw[new_deaths], ti),
         ti
     )
     # maintain parity between ti_dead and ti_removed
-    self.ti_removed.raw[death_uids] = self.ti_dead.raw[death_uids]
+    self.ti_removed.raw[new_deaths] = self.ti_dead.raw[new_deaths]
+    
+    # Update death_uids to only include new deaths for notification
+    death_uids = new_deaths
 
     # --- 2. Notify all diseases and mortality-linked modules ---
     for module in self.sim.module_list:
