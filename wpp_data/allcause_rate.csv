@@ -1,0 +1,112 @@
+measure,location,sex,age,cause,metric,year,val,upper,lower
+Deaths,Eswatini,Both,All ages,Prostate cancer,Rate,2007,3.605595211,5.210154883,2.4127149
+Deaths,Eswatini,Both,All ages,Colon and rectum cancer,Rate,2007,2.865699754,3.770627855,2.146518974
+Deaths,Eswatini,Both,All ages,Cardiovascular diseases,Rate,2007,116.7857163,147.4814276,93.59939508
+Deaths,Eswatini,Both,All ages,Neural tube defects,Rate,2007,1.131638561,1.930132561,0.552129169
+Deaths,Eswatini,Both,All ages,Congenital heart anomalies,Rate,2007,4.203315041,6.33015424,2.571458129
+Deaths,Eswatini,Both,All ages,Down syndrome,Rate,2007,0.921155018,1.531948561,0.456539267
+Deaths,Eswatini,Both,All ages,Other chromosomal abnormalities,Rate,2007,0.486454021,0.823886638,0.255079308
+Deaths,Eswatini,Both,All ages,Congenital musculoskeletal and limb anomalies,Rate,2007,0.336415752,0.60441383,0.159418993
+Deaths,Eswatini,Both,All ages,Digestive congenital anomalies,Rate,2007,1.356864934,2.523575657,0.691045444
+Deaths,Eswatini,Both,All ages,Road injuries,Rate,2007,66.42389583,93.43209112,43.6757491
+Deaths,Eswatini,Both,All ages,Diabetes mellitus type 1,Rate,2007,0.650082856,1.011435997,0.437291631
+Deaths,Eswatini,Both,All ages,Diabetes mellitus type 2,Rate,2007,29.66603651,41.50248611,19.95288213
+Deaths,Eswatini,Both,All ages,Acute hepatitis,Rate,2007,1.322365172,2.152702588,0.770466803
+Deaths,Eswatini,Both,All ages,Esophageal cancer,Rate,2007,4.391707002,6.100431905,2.910934169
+Deaths,Eswatini,Both,All ages,"Tracheal, bronchus, and lung cancer",Rate,2007,1.928297978,2.610695664,1.387880794
+Deaths,Eswatini,Both,All ages,Breast cancer,Rate,2007,6.507028052,9.867680954,4.169868609
+Deaths,Eswatini,Both,All ages,Cervical cancer,Rate,2007,28.2823481,42.84104068,16.77227412
+Deaths,Eswatini,Both,All ages,Other drug use disorders,Rate,2007,0.070038754,0.13236612,0.032741984
+Deaths,Eswatini,Both,All ages,Musculoskeletal disorders,Rate,2007,1.154878199,1.690869739,0.721605698
+Deaths,Eswatini,Both,All ages,Neonatal preterm birth,Rate,2007,29.42607259,39.34730929,21.73999454
+Deaths,Eswatini,Both,All ages,Neonatal encephalopathy due to birth asphyxia and trauma,Rate,2007,19.31687531,29.47153458,11.60343084
+Deaths,Eswatini,Both,All ages,Neonatal sepsis and other neonatal infections,Rate,2007,6.069840928,11.12368175,3.431532647
+Deaths,Eswatini,Both,All ages,Hemolytic disease and other neonatal jaundice,Rate,2007,1.27926705,2.15020836,0.516524191
+Deaths,Eswatini,Both,All ages,Protein-energy malnutrition,Rate,2007,10.34233202,13.99286516,7.879147536
+Deaths,Eswatini,Both,All ages,Alzheimer's disease and other dementias,Rate,2007,7.272500037,18.98518912,1.753216
+Deaths,Eswatini,Both,All ages,Parkinson's disease,Rate,2007,0.879091676,1.105543341,0.674333522
+Deaths,Eswatini,Both,All ages,Alcohol use disorders,Rate,2007,1.104916254,1.632069411,0.694107646
+Deaths,Eswatini,Both,All ages,Opioid use disorders,Rate,2007,0.433105911,0.688174401,0.25604569
+Deaths,Eswatini,Both,All ages,Cocaine use disorders,Rate,2007,0.04160979,0.089792778,0.015761091
+Deaths,Eswatini,Both,All ages,Amphetamine use disorders,Rate,2007,0.011325945,0.030288162,0.003703117
+Deaths,Eswatini,Both,All ages,Interpersonal violence,Rate,2007,64.44655074,84.54768867,46.27068864
+Deaths,Eswatini,Both,All ages,Diarrheal diseases,Rate,2007,35.32019113,62.79249464,15.89616261
+Deaths,Eswatini,Both,All ages,Lower respiratory infections,Rate,2007,106.4717028,130.085975,79.12323266
+Deaths,Eswatini,Both,All ages,Asthma,Rate,2007,11.16845193,17.33969222,7.067697951
+Deaths,Eswatini,Both,All ages,Cirrhosis and other chronic liver diseases,Rate,2007,17.02439593,24.37316495,11.21271912
+Prevalence,Eswatini,Both,All ages,Diarrheal diseases,Rate,2007,1839.541491,2104.587248,1637.797072
+Prevalence,Eswatini,Both,All ages,Alzheimer's disease and other dementias,Rate,2007,200.6681852,228.4039503,172.0541967
+Prevalence,Eswatini,Both,All ages,Alcohol use disorders,Rate,2007,1468.884661,1833.438449,1162.022498
+Prevalence,Eswatini,Both,All ages,Opioid use disorders,Rate,2007,117.6830982,143.1326222,91.44583722
+Prevalence,Eswatini,Both,All ages,Cannabis use disorders,Rate,2007,246.0463999,362.1931616,162.5763239
+Prevalence,Eswatini,Both,All ages,Neonatal preterm birth,Rate,2007,910.3920194,1239.801779,712.1491688
+Prevalence,Eswatini,Both,All ages,Neonatal sepsis and other neonatal infections,Rate,2007,170.2857606,256.2418273,110.5297386
+Prevalence,Eswatini,Both,All ages,Neural tube defects,Rate,2007,18.87209552,23.39257564,15.30560193
+Prevalence,Eswatini,Both,All ages,Congenital musculoskeletal and limb anomalies,Rate,2007,264.6114845,335.6439363,203.4415723
+Prevalence,Eswatini,Both,All ages,Breast cancer,Rate,2007,127.8148393,252.8539089,66.72678855
+Prevalence,Eswatini,Both,All ages,Prostate cancer,Rate,2007,24.16077081,40.09997631,14.29104999
+Prevalence,Eswatini,Both,All ages,Cardiovascular diseases,Rate,2007,4501.174078,4920.151483,4091.090986
+Prevalence,Eswatini,Both,All ages,Lower respiratory infections,Rate,2007,142.2168456,153.6368099,133.1953734
+Prevalence,Eswatini,Both,All ages,Interpersonal violence,Rate,2007,3903.162698,4351.754582,3500.443702
+Prevalence,Eswatini,Both,All ages,Parkinson's disease,Rate,2007,19.80967262,23.14328668,16.68586189
+Prevalence,Eswatini,Both,All ages,Neonatal encephalopathy due to birth asphyxia and trauma,Rate,2007,66.1376219,101.3370677,39.86266313
+Prevalence,Eswatini,Both,All ages,Amphetamine use disorders,Rate,2007,60.76416645,85.19543161,39.61233956
+Prevalence,Eswatini,Both,All ages,Cocaine use disorders,Rate,2007,35.78831529,50.40027155,25.21200711
+Prevalence,Eswatini,Both,All ages,Major depressive disorder,Rate,2007,1920.820652,2446.312607,1403.056759
+Prevalence,Eswatini,Both,All ages,Other drug use disorders,Rate,2007,8.208015862,10.82341714,6.035711925
+Prevalence,Eswatini,Both,All ages,Anxiety disorders,Rate,2007,3505.929735,4422.709003,2568.058511
+Prevalence,Eswatini,Both,All ages,Acute hepatitis,Rate,2007,478.4978285,526.7581638,436.5191074
+Prevalence,Eswatini,Both,All ages,Hemolytic disease and other neonatal jaundice,Rate,2007,91.87936698,101.6457492,82.21808027
+Prevalence,Eswatini,Both,All ages,Protein-energy malnutrition,Rate,2007,491.7510044,533.7220685,453.4229375
+Prevalence,Eswatini,Both,All ages,Esophageal cancer,Rate,2007,9.91721164,16.62268755,5.30996382
+Prevalence,Eswatini,Both,All ages,Cervical cancer,Rate,2007,566.0189272,1282.573249,189.4867119
+Prevalence,Eswatini,Both,All ages,Colon and rectum cancer,Rate,2007,17.64652625,30.71482811,9.788876479
+Prevalence,Eswatini,Both,All ages,"Tracheal, bronchus, and lung cancer",Rate,2007,3.491465098,6.074988019,1.909878332
+Prevalence,Eswatini,Both,All ages,Musculoskeletal disorders,Rate,2007,10079.65842,10731.45122,9427.200262
+Prevalence,Eswatini,Both,All ages,Congenital heart anomalies,Rate,2007,289.4173251,321.5641235,257.0844154
+Prevalence,Eswatini,Both,All ages,Other chromosomal abnormalities,Rate,2007,78.90146462,92.33314186,67.11608745
+Prevalence,Eswatini,Both,All ages,Down syndrome,Rate,2007,33.84382867,42.02791862,26.88994215
+Prevalence,Eswatini,Both,All ages,Diabetes mellitus type 1,Rate,2007,13.20156782,16.28209611,10.33495218
+Prevalence,Eswatini,Both,All ages,Diabetes mellitus type 2,Rate,2007,3200.245898,3436.369273,2954.416792
+Prevalence,Eswatini,Both,All ages,Digestive congenital anomalies,Rate,2007,71.94575143,87.78914702,55.70729942
+Prevalence,Eswatini,Both,All ages,Asthma,Rate,2007,4464.418171,5432.931383,3624.657875
+Prevalence,Eswatini,Both,All ages,Cirrhosis and other chronic liver diseases,Rate,2007,18656.32944,20121.24293,17319.68078
+Prevalence,Eswatini,Both,All ages,Road injuries,Rate,2007,1730.037129,1889.221942,1590.028866
+Incidence,Eswatini,Both,All ages,Congenital heart anomalies,Rate,2007,64.82762596,85.90882555,49.93021213
+Incidence,Eswatini,Both,All ages,Breast cancer,Rate,2007,11.38498476,17.00358357,6.904140624
+Incidence,Eswatini,Both,All ages,Prostate cancer,Rate,2007,4.46668758,6.788557429,3.042318354
+Incidence,Eswatini,Both,All ages,Road injuries,Rate,2007,1017.922155,1088.811532,945.1294088
+Incidence,Eswatini,Both,All ages,Neonatal encephalopathy due to birth asphyxia and trauma,Rate,2007,29.45424521,30.96224577,28.16341554
+Incidence,Eswatini,Both,All ages,Alzheimer's disease and other dementias,Rate,2007,35.57330039,40.18678479,30.8995674
+Incidence,Eswatini,Both,All ages,Protein-energy malnutrition,Rate,2007,396.8287886,477.4257684,330.7170059
+Incidence,Eswatini,Both,All ages,Opioid use disorders,Rate,2007,23.49265177,29.4350787,18.86136716
+Incidence,Eswatini,Both,All ages,Diabetes mellitus type 2,Rate,2007,198.5439013,212.6147227,184.8114745
+Incidence,Eswatini,Both,All ages,Acute hepatitis,Rate,2007,5584.987884,6230.038587,5129.99881
+Incidence,Eswatini,Both,All ages,Musculoskeletal disorders,Rate,2007,2437.095794,2646.383244,2221.694538
+Incidence,Eswatini,Both,All ages,Esophageal cancer,Rate,2007,4.613447863,6.453844152,3.049276098
+Incidence,Eswatini,Both,All ages,Digestive congenital anomalies,Rate,2007,10.06416109,12.76738899,7.490511666
+Incidence,Eswatini,Both,All ages,Down syndrome,Rate,2007,2.19745505,2.719202458,1.750361986
+Incidence,Eswatini,Both,All ages,Other chromosomal abnormalities,Rate,2007,14.79436974,17.68642405,12.39194065
+Incidence,Eswatini,Both,All ages,Neural tube defects,Rate,2007,2.216277109,2.621554655,1.849549207
+Incidence,Eswatini,Both,All ages,Congenital musculoskeletal and limb anomalies,Rate,2007,57.12229893,82.20232137,39.66897037
+Incidence,Eswatini,Both,All ages,Cervical cancer,Rate,2007,68.30079304,113.739018,34.32734609
+Incidence,Eswatini,Both,All ages,"Tracheal, bronchus, and lung cancer",Rate,2007,2.071630401,2.808943838,1.476177656
+Incidence,Eswatini,Both,All ages,Colon and rectum cancer,Rate,2007,3.559132515,4.72672044,2.594684448
+Incidence,Eswatini,Both,All ages,Interpersonal violence,Rate,2007,1155.343822,1290.846499,1043.672506
+Incidence,Eswatini,Both,All ages,Cardiovascular diseases,Rate,2007,394.0055531,428.0813229,360.6761459
+Incidence,Eswatini,Both,All ages,Cirrhosis and other chronic liver diseases,Rate,2007,847.9200979,925.3084511,770.202212
+Incidence,Eswatini,Both,All ages,Asthma,Rate,2007,1300.842809,1632.513798,1007.532214
+Incidence,Eswatini,Both,All ages,Parkinson's disease,Rate,2007,3.582581131,3.938499343,3.23686836
+Incidence,Eswatini,Both,All ages,Diarrheal diseases,Rate,2007,115356.2834,134254.5687,99201.71477
+Incidence,Eswatini,Both,All ages,Alcohol use disorders,Rate,2007,731.7130428,901.138048,571.0893373
+Incidence,Eswatini,Both,All ages,Amphetamine use disorders,Rate,2007,8.583018978,12.43606191,5.321899699
+Incidence,Eswatini,Both,All ages,Other drug use disorders,Rate,2007,57.99754072,76.50888404,43.71799408
+Incidence,Eswatini,Both,All ages,Cocaine use disorders,Rate,2007,3.549276345,5.112573395,2.259353099
+Incidence,Eswatini,Both,All ages,Cannabis use disorders,Rate,2007,44.39682509,66.241736,29.09355061
+Incidence,Eswatini,Both,All ages,Lower respiratory infections,Rate,2007,6795.799615,7440.529263,6278.607366
+Incidence,Eswatini,Both,All ages,Anxiety disorders,Rate,2007,555.4715816,702.8506382,402.1581638
+Incidence,Eswatini,Both,All ages,Major depressive disorder,Rate,2007,3054.437974,3517.400234,2608.673629
+Incidence,Eswatini,Both,All ages,Diabetes mellitus type 1,Rate,2007,0.746495365,1.005282759,0.582645849
+Incidence,Eswatini,Both,All ages,Neonatal sepsis and other neonatal infections,Rate,2007,220.1238815,242.8429544,198.5130011
+Incidence,Eswatini,Both,All ages,Neonatal preterm birth,Rate,2007,359.833871,392.8100036,327.6591062
+Incidence,Eswatini,Both,All ages,Hemolytic disease and other neonatal jaundice,Rate,2007,14.224558,20.72951892,8.374415118

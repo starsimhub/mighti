@@ -2,6 +2,16 @@ import starsim as ss
 import numpy as np
 import pandas as pd
 
+# Import severity function - handle import error gracefully
+try:
+    from mighti.diseases.base_disease import get_disability_weight_by_severity
+    HAS_SEVERITY_SUPPORT = True
+except ImportError:
+    HAS_SEVERITY_SUPPORT = False
+    def get_disability_weight_by_severity(disease, uids=None):
+        """Fallback if severity module not available."""
+        return np.array([])
+
 __all__ = ['MicrocostingAnalyzer', 'HRHAnalyzer', 'summarize_microcosting_results']
 
 class MicrocostingAnalyzer(ss.Analyzer):
@@ -78,7 +88,7 @@ class MicrocostingAnalyzer(ss.Analyzer):
         # ---------------------------------------------------------------------
         print("\n YLDs by condition:")
 
-        for cond, weight in self.disability_weights.items():
+        for cond, fallback_weight in self.disability_weights.items():
 
             # Special logic for HIV (ti_infected-based)
             if cond == 'hiv' and hasattr(ppl, 'hiv') and hasattr(ppl.hiv, 'ti_infected'):
@@ -93,19 +103,85 @@ class MicrocostingAnalyzer(ss.Analyzer):
                 end_year = self.sim.t.yearvec[-1]
                 dur_years = end_year - start_years
 
+                # Check if HIV has severity system
+                hiv_disease = getattr(self.sim.diseases, 'hiv', None)
+                if HAS_SEVERITY_SUPPORT and hiv_disease and hasattr(hiv_disease, 'severity_weights'):
+                    # Use severity-specific weights
+                    infected_uids = np.where(infected_mask)[0]
+                    severity_weights = get_disability_weight_by_severity(hiv_disease, infected_uids)
+                    if len(severity_weights) > 0:
+                        print(f"    Using severity-specific weights (mean: {severity_weights.mean():.4f}, range: [{severity_weights.min():.4f}, {severity_weights.max():.4f}])")
+                    else:
+                        severity_weights = np.full(len(infected_uids), fallback_weight)
+                        print(f"    Using fixed weight: {fallback_weight} (severity weights not available)")
+                else:
+                    # Fallback to fixed weight
+                    infected_uids = np.where(infected_mask)[0]
+                    severity_weights = np.full(len(infected_uids), fallback_weight)
+                    print(f"    Using fixed weight: {fallback_weight}")
+
                 yld = np.zeros(n_total)
-                yld[infected_mask] = dur_years * weight / ((1 + self.discount_rate_outcomes) ** (n_years - 1))
+                yld[infected_mask] = dur_years * severity_weights / ((1 + self.discount_rate_outcomes) ** (n_years - 1))
                 yld_details[f'{cond}_yld'] = yld
                 total_yld += yld
                 print(f"  {cond}: {yld.sum():.2f}")
                 continue
 
-            # New: dynamic condition duration lookup
+            # New: dynamic condition duration lookup with severity support
             elif hasattr(self.sim.diseases, cond) and hasattr(self.sim.diseases[cond], 'duration'):
-                print(f"  Calculating {cond} YLDs from disease.duration")
                 disease = self.sim.diseases[cond]
                 durations = disease.duration
-                yld = durations * weight / ((1 + self.discount_rate_outcomes) ** (n_years - 1))
+                
+                # Check if disease has severity system
+                if HAS_SEVERITY_SUPPORT and hasattr(disease, 'severity_weights'):
+                    # Use severity-specific weights
+                    # Get affected/infected individuals
+                    if hasattr(disease, 'affected'):
+                        affected_uids = disease.affected.uids
+                    elif hasattr(disease, 'infected'):
+                        affected_uids = disease.infected.uids
+                    else:
+                        affected_uids = np.arange(len(durations))
+                    
+                    # Get severity-specific weights for affected individuals
+                    severity_weights = get_disability_weight_by_severity(disease, affected_uids)
+                    
+                    # Map weights to full array
+                    weights_array = np.full(n_total, fallback_weight)
+                    if len(affected_uids) > 0 and len(severity_weights) > 0:
+                        valid_uids = affected_uids[affected_uids < n_total]
+                        valid_weights = severity_weights[:len(valid_uids)]
+                        weights_array[valid_uids] = valid_weights
+                    
+                    print(f"  Calculating {cond} YLDs from disease.duration with severity-specific weights")
+                    if len(severity_weights) > 0:
+                        print(f"    Mean severity weight: {severity_weights.mean():.4f}, range: [{severity_weights.min():.4f}, {severity_weights.max():.4f}]")
+                    print(f"    Affected individuals: {len(affected_uids)}")
+                else:
+                    # Fallback to fixed weight
+                    weights_array = np.full(n_total, fallback_weight)
+                    print(f"  Calculating {cond} YLDs from disease.duration (using fixed weight: {fallback_weight})")
+                
+                # Calculate YLD: duration * weight (per individual)
+                yld = np.zeros(n_total)
+                if len(durations) > 0:
+                    # For affected individuals, use their duration and severity-specific weight
+                    if hasattr(disease, 'affected'):
+                        affected_uids = disease.affected.uids
+                    elif hasattr(disease, 'infected'):
+                        affected_uids = disease.infected.uids
+                    else:
+                        affected_uids = np.arange(min(len(durations), n_total))
+                    
+                    # Ensure arrays are aligned
+                    n_affected = min(len(affected_uids), len(durations))
+                    affected_uids = affected_uids[:n_affected]
+                    durations_subset = durations[:n_affected]
+                    weights_subset = weights_array[affected_uids]
+                    
+                    # Calculate YLD for affected individuals
+                    yld[affected_uids] = durations_subset * weights_subset / ((1 + self.discount_rate_outcomes) ** (n_years - 1))
+                
                 if len(yld) < n_total:
                     yld = np.pad(yld, (0, n_total - len(yld)))
                 total_yld += yld
@@ -144,16 +220,56 @@ class MicrocostingAnalyzer(ss.Analyzer):
             raise ValueError("MicrocostingAnalyzer requires 'intervention_analyzer' in sim.analyzers.")
         if 'art' in self.unit_costs:
             art_df = intervention_analyzer.to_df()
-            art_counts = (
-                art_df[art_df['received_art']]
-                .groupby('uid').size()
-                .reindex(uids_all, fill_value=0)
-                .to_numpy()
-            )
-            art_cost = art_counts * self.unit_costs['art'] / ((1 + self.discount_rate_costs) ** (n_years - 1))
-            total_cost += art_cost
-            cost_details['art_cost'] = art_cost
-            print(f"  • ART total cost: {art_cost.sum():,.2f} for {art_counts.sum():,} doses")
+            
+            # Debug: Check dataframe structure
+            print(f"  Debug: InterventionAnalyzer dataframe shape: {art_df.shape}")
+            print(f"  Debug: Columns: {art_df.columns.tolist()}")
+            if 'received_art' in art_df.columns:
+                print(f"  Debug: received_art column exists, True count: {art_df['received_art'].sum()}")
+                print(f"  Debug: received_art unique values: {art_df['received_art'].unique()}")
+            else:
+                print(f"  Debug: WARNING - 'received_art' column not found!")
+                print(f"  Debug: Available columns: {art_df.columns.tolist()}")
+            
+            # Check if anyone is on ART in the simulation
+            if hasattr(self.sim.diseases, 'hiv'):
+                hiv = self.sim.diseases.hiv
+                if hasattr(hiv, 'on_art'):
+                    n_on_art = hiv.on_art.sum()
+                    print(f"  Debug: Current number on ART in sim: {n_on_art}")
+                if hasattr(hiv, 'infected'):
+                    n_infected = hiv.infected.sum()
+                    print(f"  Debug: Current number HIV infected: {n_infected}")
+                if hasattr(hiv, 'diagnosed'):
+                    n_diagnosed = hiv.diagnosed.sum()
+                    print(f"  Debug: Current number HIV diagnosed: {n_diagnosed}")
+                # Check ART intervention
+                art_intervention = None
+                for intv in getattr(self.sim, 'interventions', []):
+                    if hasattr(intv, '__class__') and 'ART' in intv.__class__.__name__:
+                        art_intervention = intv
+                        break
+                if art_intervention:
+                    print(f"  Debug: ART intervention found: {art_intervention.__class__.__name__}")
+                else:
+                    print(f"  Debug: WARNING - No ART intervention found in sim.interventions!")
+                    print(f"  Debug: Available interventions: {[i.__class__.__name__ for i in getattr(self.sim, 'interventions', [])]}")
+            
+            if 'received_art' in art_df.columns and len(art_df) > 0:
+                art_counts = (
+                    art_df[art_df['received_art']]
+                    .groupby('uid').size()
+                    .reindex(uids_all, fill_value=0)
+                    .to_numpy()
+                )
+                art_cost = art_counts * self.unit_costs['art'] / ((1 + self.discount_rate_costs) ** (n_years - 1))
+                total_cost += art_cost
+                cost_details['art_cost'] = art_cost
+                print(f"  • ART total cost: {art_cost.sum():,.2f} for {art_counts.sum():,} doses")
+            else:
+                print(f"  • WARNING: No ART data found in InterventionAnalyzer. ART cost set to 0.")
+                art_cost = np.zeros(n_total)
+                cost_details['art_cost'] = art_cost
 
         # ---------------------------------------------------------------------
         # Final DataFrame

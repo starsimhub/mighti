@@ -122,14 +122,14 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
 
     # --- Plot simulated curves ---
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(time_years, total_male_prev[mask], label="Male Simulated", color="blue", lw=3)
-    ax.plot(time_years, total_female_prev[mask], label="Female Simulated", color="red", lw=3)
+    ax.plot(time_years, total_male_prev[mask], label="Male Simulated", color="blue", lw=3, marker='o', markersize=3, alpha=0.7)
+    ax.plot(time_years, total_female_prev[mask], label="Female Simulated", color="red", lw=3, marker='o', markersize=3, alpha=0.7)
 
     # --- Clean observed data ---
     df = prevalence_data_df.copy()
     df.columns = [c.strip().lower() for c in df.columns]
     if "year" not in df.columns:
-        raise ValueError("prevalence_data_df must include a 'year' column")
+        raise ValueError(f"prevalence_data_df must include a 'year' column. Available columns: {df.columns.tolist()}")
 
     df["year"] = pd.to_numeric(df["year"], errors="coerce")
     df = df.dropna(subset=["year"])
@@ -138,17 +138,186 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
     most_recent = df["year"].max()
     df = df[(df["year"] >= init_year) & (df["year"] <= min(end_year, most_recent))]
 
-    disease_col = disease.lower()
-
-    if disease_col in df.columns and "sex" in df.columns:
-        for sex, color in [("male", "blue"), ("female", "red")]:
-            obs = df[df["sex"].str.lower() == sex]
-            if not obs.empty:
-                ax.scatter(
-                    obs["year"].astype(float), obs[disease_col] * 100,
-                    label=f"{sex.capitalize()} Observed",
-                    color=color, edgecolor="black", s=80, zorder=5
-                )
+    # Try to find disease column with multiple possible names
+    disease_col = None
+    disease_col_male = None
+    disease_col_female = None
+    possible_names = [
+        disease.lower(),
+        disease.lower().replace("type", "type_").replace("diabetes", "diabetes"),
+        disease.lower().replace("2", "_2").replace("1", "_1"),
+        disease.lower().replace("type2", "type_2").replace("type1", "type_1"),
+    ]
+    
+    # First, try to find the base disease column
+    for name in possible_names:
+        if name in df.columns:
+            disease_col = name
+            break
+    
+    # If base column not found, look for sex-specific columns
+    if disease_col is None:
+        for name in possible_names:
+            male_name = f"{name}_male"
+            female_name = f"{name}_female"
+            if male_name in df.columns:
+                disease_col_male = male_name
+            if female_name in df.columns:
+                disease_col_female = female_name
+            if disease_col_male or disease_col_female:
+                break
+        
+        # If still not found, try to find any column that contains the disease name
+        if disease_col_male is None and disease_col_female is None:
+            for col in df.columns:
+                if disease.lower() in col.lower() or col.lower() in disease.lower():
+                    # Check if it's sex-specific
+                    if "_male" in col.lower():
+                        disease_col_male = col
+                    elif "_female" in col.lower():
+                        disease_col_female = col
+                    else:
+                        disease_col = col
+                        print(f"  Warning: Using column '{col}' for disease '{disease}'")
+                    break
+    
+    # Find sex column (try multiple possible names)
+    sex_col = None
+    for possible_sex_col in ["sex", "gender", "male", "female"]:
+        if possible_sex_col in df.columns:
+            sex_col = possible_sex_col
+            break
+    
+    # Plot observed data
+    # Handle sex-specific columns first (if found)
+    if disease_col_male or disease_col_female:
+        # We have sex-specific columns, plot them separately
+        for col, sex, color in [(disease_col_male, "male", "blue"), (disease_col_female, "female", "red")]:
+            if col is not None and col in df.columns:
+                # Check if data is already in percentage format
+                sample_values = df[col].dropna()
+                if len(sample_values) > 0:
+                    max_val = sample_values.max()
+                    is_percentage = max_val > 1.0
+                    
+                    # Extract values and years - ensure we're using the filtered dataframe
+                    obs_values = df[col].astype(float)
+                    
+                    # Make sure year column exists and is numeric
+                    if "year" not in df.columns:
+                        print(f"  Error: 'year' column not found in observed data. Available columns: {df.columns.tolist()}")
+                        continue
+                    
+                    obs_years = pd.to_numeric(df["year"], errors="coerce")
+                    
+                    # Remove rows where disease value is NaN OR year is NaN, keeping years aligned
+                    valid_mask = ~obs_values.isna() & ~obs_years.isna()
+                    obs_df_valid = df[valid_mask].copy()
+                    
+                    if len(obs_df_valid) > 0:
+                        # Aggregate by year (mean) if there are multiple rows per year
+                        # This handles cases where data has multiple age groups or other dimensions per year
+                        obs_df_valid["year"] = obs_years[valid_mask]
+                        obs_df_valid["value"] = obs_values[valid_mask]
+                        
+                        # Group by year and take mean (or could use median, sum, etc.)
+                        aggregated = obs_df_valid.groupby("year")["value"].mean().reset_index()
+                        obs_years_agg = aggregated["year"].values
+                        obs_values_agg = aggregated["value"].values
+                        
+                        # Debug: print year range and sample data
+                        if len(obs_years_agg) > 0:
+                            print(f"  {sex.capitalize()} observed: {len(obs_df_valid)} raw points -> {len(obs_years_agg)} aggregated points")
+                            print(f"    Years range: {obs_years_agg.min():.0f} to {obs_years_agg.max():.0f}, unique years: {len(np.unique(obs_years_agg))}")
+                            print(f"    Sample years: {obs_years_agg[:10] if len(obs_years_agg) > 10 else obs_years_agg}")
+                            print(f"    Sample values: {obs_values_agg[:5] if len(obs_values_agg) > 5 else obs_values_agg}")
+                        
+                        if len(obs_values_agg) > 0:
+                            # Convert to percentage if needed
+                            if not is_percentage:
+                                obs_values_agg = obs_values_agg * 100
+                            
+                            ax.scatter(
+                                obs_years_agg, obs_values_agg,
+                                label=f"{sex.capitalize()} Observed",
+                                color=color, edgecolor="black", s=100, zorder=5, alpha=0.8, marker='s'
+                            )
+    elif disease_col is not None and disease_col in df.columns:
+        # Standard disease column - check if data is already in percentage format
+        sample_values = df[disease_col].dropna()
+        if len(sample_values) > 0:
+            max_val = sample_values.max()
+            is_percentage = max_val > 1.0
+            
+            # Handle standard format with sex column
+            if sex_col and sex_col in df.columns:
+                # Standard sex column - filter by sex
+                for sex, color in [("male", "blue"), ("female", "red")]:
+                    if sex_col == "sex" or sex_col == "gender":
+                        obs = df[df[sex_col].str.lower().str.strip() == sex].copy()
+                    else:
+                        # If sex_col is "male" or "female", filter differently
+                        obs = df[df[sex_col] == 1].copy() if sex_col == sex else df[df[sex_col] == 0].copy()
+                    
+                    if not obs.empty and disease_col in obs.columns:
+                        # Extract values and years, keeping them aligned
+                        obs_values = obs[disease_col].astype(float)
+                        obs_years = pd.to_numeric(obs["year"], errors="coerce")
+                        
+                        # Remove rows where disease value is NaN or year is NaN
+                        valid_mask = ~obs_values.isna() & ~obs_years.isna()
+                        obs_valid = obs[valid_mask].copy()
+                        
+                        if len(obs_valid) > 0:
+                            # Aggregate by year (mean) if there are multiple rows per year
+                            obs_valid["year"] = obs_years[valid_mask].values
+                            obs_valid["value"] = obs_values[valid_mask].values
+                            
+                            aggregated = obs_valid.groupby("year")["value"].mean().reset_index()
+                            obs_years_agg = aggregated["year"].values
+                            obs_values_agg = aggregated["value"].values
+                            
+                            if len(obs_values_agg) > 0:
+                                # Convert to percentage if needed
+                                if not is_percentage:
+                                    obs_values_agg = obs_values_agg * 100
+                                
+                                ax.scatter(
+                                    obs_years_agg, obs_values_agg,
+                                    label=f"{sex.capitalize()} Observed",
+                                    color=color, edgecolor="black", s=100, zorder=5, alpha=0.8, marker='s'
+                                )
+            else:
+                # No sex column - plot all data
+                obs_values = df[disease_col].astype(float)
+                obs_years = pd.to_numeric(df["year"], errors="coerce")
+                
+                # Remove rows where disease value is NaN or year is NaN
+                valid_mask = ~obs_values.isna() & ~obs_years.isna()
+                obs_valid = df[valid_mask].copy()
+                
+                if len(obs_valid) > 0:
+                    # Aggregate by year (mean) if there are multiple rows per year
+                    obs_valid["year"] = obs_years[valid_mask].values
+                    obs_valid["value"] = obs_values[valid_mask].values
+                    
+                    aggregated = obs_valid.groupby("year")["value"].mean().reset_index()
+                    obs_years_agg = aggregated["year"].values
+                    obs_values_agg = aggregated["value"].values
+                    
+                    if len(obs_values_agg) > 0:
+                        if not is_percentage:
+                            obs_values_agg = obs_values_agg * 100
+                        
+                        ax.scatter(
+                            obs_years_agg, obs_values_agg,
+                            label="Observed",
+                            color="black", edgecolor="white", s=100, zorder=5, alpha=0.8, marker='s'
+                        )
+    else:
+        print(f"  Warning: Could not find disease column for '{disease}' in observed data.")
+        print(f"  Available columns: {df.columns.tolist()}")
+        print(f"  Tried names: {possible_names}")
 
     # --- Ensure numeric (not datetime) x-axis ---
     ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{int(x)}"))
@@ -160,12 +329,12 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
     ax.set_ylabel("Prevalence (%)", fontsize=14)
     ax.set_xlim(init_year - 1, end_year + 1)
     ax.set_ylim(bottom=0)
-    ax.legend(frameon=False, fontsize=12)
+    ax.legend(frameon=True, fontsize=11, loc='best')
     ax.grid(True, alpha=0.4)
     plt.tight_layout()
     plt.show()
 
-    print(f" Observed data restricted to {init_year}–{min(end_year, most_recent)} ({len(df)} rows used).")
+    print(f"  Observed data restricted to {init_year}–{min(end_year, most_recent)} ({len(df)} rows used).")
     return total_male_prev, total_female_prev   
     
     
@@ -312,4 +481,120 @@ def plot_adherence_by_condition(sim, label):
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+
+def plot_severity_distribution(sim, disease_name, show_weights=True, figsize=(12, 5)):
+    """
+    Plot severity distribution for a disease showing:
+    1. Current proportion of affected individuals in each severity level
+    2. Severity weights (disability weights) for each level
+    
+    Parameters:
+        sim: Simulation object
+        disease_name (str): Name of the disease (e.g., "Type2Diabetes")
+        show_weights (bool): Whether to show disability weights plot
+        figsize: Figure size tuple
+    """
+    disease_key = disease_name.lower()
+    disease = sim.diseases.get(disease_key, None)
+    
+    if disease is None:
+        logger.warning(f"Disease '{disease_name}' not found in simulation. Available diseases: {list(sim.diseases.keys())}")
+        return
+    
+    # Check if disease has severity system
+    if not hasattr(disease, 'severity_level'):
+        logger.warning(f"Disease '{disease_name}' does not have severity_level state. Severity system may not be initialized.")
+        return
+    
+    # Get affected individuals
+    if hasattr(disease, 'affected'):
+        affected_uids = disease.affected.uids
+        affected_mask = disease.affected
+    elif hasattr(disease, 'infected'):
+        affected_uids = disease.infected.uids
+        affected_mask = disease.infected
+    else:
+        logger.warning(f"Disease '{disease_name}' does not have 'affected' or 'infected' state.")
+        return
+    
+    if len(affected_uids) == 0:
+        logger.warning(f"No affected individuals found for '{disease_name}' at end of simulation.")
+        return
+    
+    # Get severity levels for affected individuals
+    severity_levels = disease.severity_level[affected_uids]
+    
+    # Count by severity level
+    n_levels = disease.n_severity_levels if hasattr(disease, 'n_severity_levels') else 3
+    severity_counts = np.bincount(severity_levels, minlength=n_levels)
+    severity_proportions = severity_counts / len(affected_uids) if len(affected_uids) > 0 else np.zeros(n_levels)
+    
+    # Get severity weights if available
+    severity_weights = None
+    if hasattr(disease, 'severity_weights'):
+        severity_weights = disease.severity_weights
+    
+    # Create figure with subplots
+    if show_weights and severity_weights is not None:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+    else:
+        fig, ax1 = plt.subplots(1, 1, figsize=(figsize[0]//2, figsize[1]))
+        ax2 = None
+    
+    # Plot 1: Severity distribution (bar chart)
+    severity_labels = [f"Level {i}" for i in range(n_levels)]
+    if n_levels == 3:
+        severity_labels = ["Mild", "Moderate", "Severe"]
+    elif n_levels == 2:
+        severity_labels = ["Mild", "Severe"]
+    
+    colors = plt.cm.RdYlGn_r(np.linspace(0.3, 0.9, n_levels))  # Green (mild) to Red (severe)
+    
+    bars = ax1.bar(severity_labels, severity_proportions * 100, color=colors, alpha=0.7, edgecolor='black', linewidth=1.5)
+    ax1.set_ylabel('Proportion of Affected Individuals (%)', fontsize=12)
+    ax1.set_xlabel('Severity Level', fontsize=12)
+    ax1.set_title(f'{disease_name} Severity Distribution\n(n={len(affected_uids):,} affected)', fontsize=14, fontweight='bold')
+    ax1.set_ylim(0, max(severity_proportions) * 100 * 1.2 if max(severity_proportions) > 0 else 100)
+    ax1.grid(True, alpha=0.3, axis='y')
+    
+    # Add value labels on bars
+    for i, (bar, prop) in enumerate(zip(bars, severity_proportions)):
+        height = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width()/2., height,
+                f'{prop*100:.1f}%\n(n={severity_counts[i]:,})',
+                ha='center', va='bottom', fontsize=10, fontweight='bold')
+    
+    # Plot 2: Severity weights (disability weights)
+    if ax2 is not None and severity_weights is not None:
+        bars2 = ax2.bar(severity_labels, severity_weights, color=colors, alpha=0.7, edgecolor='black', linewidth=1.5)
+        ax2.set_ylabel('Disability Weight', fontsize=12)
+        ax2.set_xlabel('Severity Level', fontsize=12)
+        ax2.set_title(f'{disease_name} Disability Weights', fontsize=14, fontweight='bold')
+        ax2.set_ylim(0, max(severity_weights) * 1.2 if max(severity_weights) > 0 else 1.0)
+        ax2.grid(True, alpha=0.3, axis='y')
+        
+        # Add value labels on bars
+        for bar, weight in zip(bars2, severity_weights):
+            height = bar.get_height()
+            ax2.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{weight:.3f}',
+                    ha='center', va='bottom', fontsize=10, fontweight='bold')
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # Print summary statistics
+    print(f"\n{disease_name} Severity Summary:")
+    print(f"  Total affected: {len(affected_uids):,}")
+    for i, (label, count, prop) in enumerate(zip(severity_labels, severity_counts, severity_proportions)):
+        weight_str = f" (DW={severity_weights[i]:.3f})" if severity_weights is not None else ""
+        print(f"  {label}: {count:,} ({prop*100:.1f}%){weight_str}")
+    
+    if severity_weights is not None:
+        # Calculate weighted average disability weight
+        weighted_avg = np.sum(severity_proportions * severity_weights)
+        print(f"  Weighted average disability weight: {weighted_avg:.3f}")
+    
+    return fig
     

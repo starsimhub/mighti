@@ -69,6 +69,7 @@ cause_map = {
     "Diarrheal disease": "DiarrhealDisease",
     "Esophageal cancer": "EsophagealCancer",
     "Protein-energy malnutrition": "ProteinEnergyMalnutrition",
+    "Lower respiratory infections": "LowerRespiratoryInfections",
 }
 
 def process_population_data(male_csv, female_csv, output_csv, country):
@@ -382,6 +383,144 @@ def extract_prevalence_timeseries_by_sex(long_csv_path, output_csv):
     print(f" Prevalence time series saved to {output_csv}")
     return wide
 
+
+def calculate_p_death_and_duration(percent_csv_path, rate_csv_path, output_csv, parameters_csv_path=None, year=2007):
+    """
+    Calculate p_death and dur_condition from GBD data files.
+    
+    Parameters:
+        percent_csv_path: Path to CSV with prevalence in Percent (allcause_percent.csv)
+        rate_csv_path: Path to CSV with Deaths, Prevalence, and Incidence in Rate (allcause_rate.csv)
+        output_csv: Path to output CSV file (eswatini_parameters_calculated.csv)
+        parameters_csv_path: Path to eswatini_parameters.csv to get condition order (optional)
+        year: Year to use for calculations (default: 2007)
+    
+    Formulas:
+        p_death = deaths_per_100k / 100_000 / prevalence_percent
+        (Note: prevalence_percent is already in decimal form, so no * 100 needed)
+        dur_condition = prevalence_rate / incidence_rate
+    """
+    import pandas as pd
+    import os
+    
+    # Load data
+    df_percent = pd.read_csv(percent_csv_path)
+    df_rate = pd.read_csv(rate_csv_path)
+    
+    # Load parameters CSV to get condition order if provided
+    condition_order = None
+    if parameters_csv_path and os.path.exists(parameters_csv_path):
+        df_params = pd.read_csv(parameters_csv_path)
+        condition_order = df_params["condition"].tolist()
+    
+    # Filter for the specified year and "Both" sex, "All ages"
+    df_percent = df_percent[
+        (df_percent["year"] == year) & 
+        (df_percent["sex"] == "Both") & 
+        (df_percent["age"] == "All ages") &
+        (df_percent["measure"] == "Prevalence") &
+        (df_percent["metric"] == "Percent")
+    ].copy()
+    
+    df_rate = df_rate[
+        (df_rate["year"] == year) & 
+        (df_rate["sex"] == "Both") & 
+        (df_rate["age"] == "All ages")
+    ].copy()
+    
+    # Extract measures from rate file
+    deaths_df = df_rate[df_rate["measure"] == "Deaths"].copy()
+    prevalence_rate_df = df_rate[df_rate["measure"] == "Prevalence"].copy()
+    incidence_df = df_rate[df_rate["measure"] == "Incidence"].copy()
+    
+    # Map GBD cause names to MIGHTI names
+    df_percent["condition"] = df_percent["cause"].map(cause_map)
+    deaths_df["condition"] = deaths_df["cause"].map(cause_map)
+    prevalence_rate_df["condition"] = prevalence_rate_df["cause"].map(cause_map)
+    incidence_df["condition"] = incidence_df["cause"].map(cause_map)
+    
+    # Build result dataframe - use condition_order if provided, otherwise use all mapped conditions
+    if condition_order:
+        all_conditions = condition_order
+    else:
+        # Create a combined dataframe with all conditions that have mappings
+        all_conditions = set()
+        all_conditions.update(df_percent["condition"].dropna())
+        all_conditions.update(deaths_df["condition"].dropna())
+        all_conditions.update(prevalence_rate_df["condition"].dropna())
+        all_conditions.update(incidence_df["condition"].dropna())
+        all_conditions = sorted([c for c in all_conditions if pd.notna(c)])
+    
+    results = []
+    
+    for condition in all_conditions:
+        result_row = {"condition": condition}
+        
+        # Get prevalence_percent (from percent file)
+        prev_percent_row = df_percent[df_percent["condition"] == condition]
+        if len(prev_percent_row) > 0:
+            prevalence_percent = prev_percent_row["val"].iloc[0]
+        else:
+            prevalence_percent = None
+        
+        # Get deaths_per_100k (from rate file, Deaths measure)
+        deaths_row = deaths_df[deaths_df["condition"] == condition]
+        if len(deaths_row) > 0:
+            deaths_per_100k = deaths_row["val"].iloc[0]
+        else:
+            deaths_per_100k = None
+        
+        # Get prevalence_rate (from rate file, Prevalence measure)
+        prev_rate_row = prevalence_rate_df[prevalence_rate_df["condition"] == condition]
+        if len(prev_rate_row) > 0:
+            prevalence_rate = prev_rate_row["val"].iloc[0]
+        else:
+            prevalence_rate = None
+        
+        # Get incidence_rate (from rate file, Incidence measure)
+        inc_row = incidence_df[incidence_df["condition"] == condition]
+        if len(inc_row) > 0:
+            incidence_rate = inc_row["val"].iloc[0]
+        else:
+            incidence_rate = None
+        
+        # Calculate p_death (prevalence_percent is already in decimal form, so no * 100)
+        if deaths_per_100k is not None and prevalence_percent is not None and prevalence_percent > 0:
+            p_death = deaths_per_100k / 100_000 / prevalence_percent
+            result_row["p_death"] = p_death
+        else:
+            result_row["p_death"] = None
+        
+        # Calculate dur_condition
+        if prevalence_rate is not None and incidence_rate is not None and incidence_rate > 0:
+            dur_condition = prevalence_rate / incidence_rate
+            result_row["dur_condition"] = dur_condition
+        else:
+            result_row["dur_condition"] = None
+        
+        results.append(result_row)
+    
+    # Create DataFrame with only condition, p_death, and dur_condition
+    df_result = pd.DataFrame(results)
+    
+    # Keep only the columns we want in the output
+    df_result = df_result[["condition", "p_death", "dur_condition"]]
+    
+    # Round numeric columns
+    df_result["p_death"] = pd.to_numeric(df_result["p_death"], errors="coerce")
+    df_result["dur_condition"] = pd.to_numeric(df_result["dur_condition"], errors="coerce")
+    df_result["p_death"] = df_result["p_death"].round(6)
+    df_result["dur_condition"] = df_result["dur_condition"].round(2)
+    
+    # Save to CSV
+    os.makedirs(os.path.dirname(output_csv), exist_ok=True)
+    df_result.to_csv(output_csv, index=False)
+    logging.info(f"Calculated parameters saved to {output_csv}")
+    logging.info(f"Calculated p_death for {df_result['p_death'].notna().sum()} conditions")
+    logging.info(f"Calculated dur_condition for {df_result['dur_condition'].notna().sum()} conditions")
+    
+    return df_result
+
 if __name__ == "__main__":
     region = "eswatini"
     Region = "Eswatini"
@@ -433,9 +572,9 @@ if __name__ == "__main__":
     # -------------------------------------------------------------
     # 4. Prevalence (GBD long-format to MIGHTI template)
     # -------------------------------------------------------------
-    prevalence_raw_csv = wpp_path("eswatini_all_disease.csv")
-    prevalence_output_csv = data_path(f"{region}_prevalence.csv")
-    create_and_fill_prevalence_template_from_long_format(prevalence_raw_csv, prevalence_output_csv)
+    #prevalence_raw_csv = wpp_path("eswatini_all_disease.csv")
+    #prevalence_output_csv = data_path(f"{region}_prevalence.csv")
+    #create_and_fill_prevalence_template_from_long_format(prevalence_raw_csv, prevalence_output_csv)
 
     # -------------------------------------------------------------
     # 5. Parameter table (derived from GBD long format)
@@ -449,4 +588,13 @@ if __name__ == "__main__":
     # -------------------------------------------------------------
     # output_prevalence_check_csv = data_path(f"{region}_postprocess_check_prevalence.csv")
     # extract_prevalence_timeseries_by_sex(prevalence_raw_csv, output_prevalence_check_csv)
+
+    # -------------------------------------------------------------
+    # 7. Calculate p_death and dur_condition automatically
+    # -------------------------------------------------------------
+    percent_csv = wpp_path("allcause_percent.csv")
+    rate_csv = wpp_path("allcause_rate.csv")
+    parameters_csv = data_path("eswatini_parameters.csv")  # Get condition order from this file
+    output_calculated = wpp_path("eswatini_parameters_calculated.csv")
+    calculate_p_death_and_duration(percent_csv, rate_csv, output_calculated, parameters_csv_path=parameters_csv, year=2007)
     

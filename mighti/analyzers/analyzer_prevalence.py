@@ -89,8 +89,14 @@ class PrevalenceAnalyzer(ss.Analyzer):
             if dis is None:
                 continue
 
-            # Use appropriate attribute (infected vs affected)
-            status_attr = "infected" if disease in ["hiv","hpv","flu","viralhepatitis","tb"] else "affected"
+            # Dynamically detect which attribute to use (infected vs affected)
+            if hasattr(dis, "infected"):
+                status_attr = "infected"
+            elif hasattr(dis, "affected"):
+                status_attr = "affected"
+            else:
+                # Fallback: try common names
+                status_attr = "infected" if disease in ["hiv","hpv","flu","viralhepatitis","tb","lowerrespiratoryinfections"] else "affected"
             has_disease = getattr(dis, status_attr)
 
             # Total prevalence
@@ -202,7 +208,14 @@ class PrevalenceAnalyzer_HIV(ss.Analyzer):
 
         for disease in self.diseases:
             dis = getattr(sim.diseases, disease)
-            status_attr = "infected" if disease in ["hiv", "hpv", "flu", "viralhepatitis", "tb", "diarrhealdisease"] else "affected"
+            # Dynamically detect which attribute to use (infected vs affected)
+            if hasattr(dis, "infected"):
+                status_attr = "infected"
+            elif hasattr(dis, "affected"):
+                status_attr = "affected"
+            else:
+                # Fallback: try common names
+                status_attr = "infected" if disease in ["hiv", "hpv", "flu", "viralhepatitis", "tb", "diarrhealdisease", "lowerrespiratoryinfections"] else "affected"
             has_disease = getattr(dis, status_attr)
 
             # Track stratified prevalences

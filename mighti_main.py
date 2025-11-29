@@ -276,16 +276,30 @@ if __name__ == "__main__":
     # mi.plot_life_expectancy(life_table, obs_ex, year=target_year, max_age=100)
 
     # # # Optional prevalence plots
-    prevalence_check_df = pd.read_csv(f"mighti/data/{region}_postprocess_check_prevalence.csv")
-    mi.plot_mean_prevalence(sim, prevalence_analyzer, "DownSyndrome", prevalence_check_df, inityear, endyear)
+    # prevalence_check_df = pd.read_csv(f"mighti/data/{region}_postprocess_check_prevalence.csv")
+    # mi.plot_mean_prevalence(sim, prevalence_analyzer, "DownSyndrome", prevalence_check_df, inityear, endyear)
     # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, "CardiovascularDiseases")
 
     # mi.plot_adherence_by_condition(sim, analyzers, casm_keys)
 
     male_prev, female_prev = mi.plot_mean_prevalence(
-        sim, prevalence_analyzer, "DownSyndrome", prevalence_data_df, init_year=2000, end_year=2020
+        sim, prevalence_analyzer, "Type2Diabetes", prevalence_data_df, init_year=2000, end_year=2020
     )
 
-    for t, pm, pf in zip(sim.timevec, male_prev, female_prev):
-        year = t.year if hasattr(t, "year") else int(t)
-        print(f"Year {year} | Male: {pm:.2f}% | Female: {pf:.2f}%")
+    # for t, pm, pf in zip(sim.timevec, male_prev, female_prev):
+    #     year = t.year if hasattr(t, "year") else int(t)
+    #     print(f"Year {year} | Male: {pm:.2f}% | Female: {pf:.2f}%")
+
+    # # Plot severity distribution for diseases with severity system
+    # print("\n" + "="*60)
+    # print("Severity Distribution Analysis")
+    # print("="*60)
+    
+    # # Check a few diseases that might have severity data
+    # diseases_to_check = ["Type2Diabetes", "Type1Diabetes", "Asthma", "DiarrhealDisease"]
+    # for disease_name in diseases_to_check:
+    #     if disease_name.lower() in [d.lower() for d in healthconditions]:
+    #         try:
+    #             mi.plot_severity_distribution(sim, disease_name, show_weights=True)
+    #         except Exception as e:
+    #             logger.warning(f"Could not plot severity for {disease_name}: {e}")

@@ -26,6 +26,7 @@ import prepare_data_for_year
 import starsim as ss
 import stisim as sti
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Set up logging and random seeds for reproducibility
 logger = logging.getLogger('MIGHTI')
@@ -70,8 +71,8 @@ prepare_data_for_year.prepare_data(region)
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
-# Keep it minimal for debugging: HIV + one HC
-healthconditions = ["Type2Diabetes"]
+# Keep it minimal for debugging: HIV + Lower Respiratory Infection to test severity framework
+healthconditions = ["LowerRespiratoryInfections"]
 diseases = ["HIV"] + healthconditions
 
 #---------------------------------------------------------------------
@@ -105,16 +106,18 @@ analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_
 
 
 # Analyzers
+# Note: disability_weights are used as fallback if severity system is not available.
+# If diseases have severity initialized, severity-specific weights will be used automatically.
 microcosting_analyzer_base = mi.MicrocostingAnalyzer(
     unit_costs={'art': 50}, 
-    disability_weights={'hiv': 0.2, 'type2diabetes': 0.1},
+    disability_weights={'hiv': 0.2, 'lowerrespiratoryinfections': 0.1},  # Fallback weights if severity not available
     discount_rate_costs=0.03,
     discount_rate_outcomes=0.03,
     name='microcostinganalyzer'
 )
 microcosting_analyzer_intv = mi.MicrocostingAnalyzer(
     unit_costs={'art': 50}, 
-    disability_weights={'hiv': 0.2, 'type2diabetes': 0.1},
+    disability_weights={'hiv': 0.2, 'lowerrespiratoryinfections': 0.1},  # Fallback weights if severity not available
     discount_rate=0.03,
     discount_rate_costs=0.03,
     discount_rate_outcomes=0.03,
@@ -153,11 +156,56 @@ disease_objects = []
 # --- HIV ---
 hiv = sti.HIV()
 
+# Debug: Check if HIV columns exist in CSV
+print(f"[DEBUG] Checking HIV prevalence data...")
+print(f"[DEBUG] CSV columns: {list(prevalence_data_df.columns)[:10]}...")  # Show first 10 columns
+hiv_male_col = 'HIV_male' in prevalence_data_df.columns
+hiv_female_col = 'HIV_female' in prevalence_data_df.columns
+print(f"[DEBUG] HIV_male column exists: {hiv_male_col}")
+print(f"[DEBUG] HIV_female column exists: {hiv_female_col}")
+
 # Assign prevalence
 prev_func = get_prevalence_function('HIV')
-hiv.pars.init_prev = ss.bernoulli(
-    p=lambda sim, uids, size=None: prev_func(sim, uids, size)
-)
+
+# Debug: Check if HIV is in prevalence_data
+if 'HIV' in prevalence_data:
+    print(f"[DEBUG] HIV found in prevalence_data. Sample values:")
+    for sex in ['male', 'female']:
+        if sex in prevalence_data['HIV']:
+            sample_ages = list(prevalence_data['HIV'][sex].keys())[:5]
+            sample_vals = [prevalence_data['HIV'][sex][age] for age in sample_ages]
+            print(f"  {sex}: ages {sample_ages} -> {sample_vals}")
+            print(f"  {sex}: total age keys: {len(prevalence_data['HIV'][sex])}")
+else:
+    print(f"[DEBUG] WARNING: HIV NOT found in prevalence_data!")
+    print(f"[DEBUG] Available diseases in prevalence_data: {list(prevalence_data.keys())}")
+
+# Test the prevalence function with a dummy sim to see what it returns
+class DummySim:
+    def __init__(self):
+        self.people = type('obj', (object,), {
+            'age': np.array([25, 30, 35, 40, 45]),
+            'female': np.array([False, True, False, True, False])
+        })()
+
+try:
+    dummy_sim = DummySim()
+    test_prev = prev_func(dummy_sim, None, size=np.arange(5))
+    print(f"[DEBUG] Test prevalence function returned: {test_prev}")
+    print(f"[DEBUG] Mean prevalence: {test_prev.mean():.4f}, Max: {test_prev.max():.4f}, Min: {test_prev.min():.4f}")
+    
+    # If all zeros, use constant prevalence as fallback
+    if test_prev.mean() == 0.0:
+        print(f"[DEBUG] WARNING: HIV prevalence is all zeros! Using constant 15% prevalence as fallback.")
+        hiv.pars.init_prev = ss.bernoulli(p=0.15)
+    else:
+        hiv.pars.init_prev = ss.bernoulli(
+            p=lambda sim, uids, size=None: prev_func(sim, uids, size)
+        )
+except Exception as e:
+    print(f"[DEBUG] Error testing prevalence function: {e}")
+    print(f"[DEBUG] Using constant 15% prevalence as fallback.")
+    hiv.pars.init_prev = ss.bernoulli(p=0.15)
 
 # Transmission parameters
 # Best pars: {'hiv_beta_m2f': 0.09553835265049065, 'hiv_beta_m2c': 0.003895160642773216}
@@ -243,6 +291,335 @@ def get_pregnancy_module(sim):
         if isinstance(module, ss.Pregnancy):
             return module
     raise ValueError("Pregnancy module not found in the simulation.")
+
+
+# ---------------------------------------------------------------------
+# Visualization Function
+# ---------------------------------------------------------------------
+def plot_cea_results(sim_base, sim_intv, analyzer_base, analyzer_intv, cost_increment, daly_averted, icer):
+    """
+    Create comprehensive visualization of CEA results.
+    """
+    fig = plt.figure(figsize=(16, 10))
+    gs = fig.add_gridspec(3, 3, hspace=0.3, wspace=0.3)
+    
+    # 1. Cost-Effectiveness Plane (top left, spans 2 columns)
+    ax1 = fig.add_subplot(gs[0, :2])
+    results = [{
+        'label': 'ART vs Baseline',
+        'delta_daly': daly_averted,
+        'delta_cost': cost_increment
+    }]
+    
+    # Plot WTP threshold lines
+    x_max = max(abs(daly_averted) * 1.2, 1000)
+    x_vals = np.linspace(0, x_max, 100)
+    wtp_thresholds = [100, 500, 1000]
+    colors_wtp = ['green', 'orange', 'red']
+    for wtp, color in zip(wtp_thresholds, colors_wtp):
+        ax1.plot(x_vals, wtp * x_vals, linestyle='--', color=color, alpha=0.6, 
+                label=f'${wtp}/DALY WTP threshold', linewidth=1.5)
+    
+    # Plot intervention point
+    ax1.scatter(daly_averted, cost_increment, s=300, color='blue', 
+               marker='o', edgecolor='black', linewidth=2, zorder=5, label='ART Intervention')
+    ax1.annotate(f'ICER = ${icer:.2f}/DALY', 
+                xy=(daly_averted, cost_increment),
+                xytext=(10, 10), textcoords='offset points',
+                fontsize=12, fontweight='bold',
+                bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.7))
+    
+    ax1.set_xlabel('DALYs Averted', fontsize=12, fontweight='bold')
+    ax1.set_ylabel('Incremental Cost ($)', fontsize=12, fontweight='bold')
+    ax1.set_title('Cost-Effectiveness Plane', fontsize=14, fontweight='bold')
+    ax1.axhline(0, color='gray', linewidth=0.8, linestyle='-')
+    ax1.axvline(0, color='gray', linewidth=0.8, linestyle='-')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(loc='upper left', fontsize=10)
+    
+    # 2. Summary Bar Chart (top right)
+    ax2 = fig.add_subplot(gs[0, 2])
+    categories = ['Total Cost', 'Total DALY', 'YLD', 'YLL']
+    base_vals = [
+        analyzer_base.results.total_cost / 1e6,  # Convert to millions
+        analyzer_base.results.total_daly / 1e3,   # Convert to thousands
+        analyzer_base.results.total_yld / 1e3,
+        analyzer_base.results.total_yll / 1e3
+    ]
+    intv_vals = [
+        analyzer_intv.results.total_cost / 1e6,
+        analyzer_intv.results.total_daly / 1e3,
+        analyzer_intv.results.total_yld / 1e3,
+        analyzer_intv.results.total_yll / 1e3
+    ]
+    
+    x = np.arange(len(categories))
+    width = 0.35
+    ax2.bar(x - width/2, base_vals, width, label='Baseline', color='lightcoral', alpha=0.8)
+    ax2.bar(x + width/2, intv_vals, width, label='With ART', color='lightblue', alpha=0.8)
+    ax2.set_ylabel('Value (Millions $ or Thousands)', fontsize=10)
+    ax2.set_title('Summary Comparison', fontsize=12, fontweight='bold')
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(categories, rotation=45, ha='right')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3, axis='y')
+    
+    # 3. HIV Prevalence Over Time (middle left)
+    ax3 = fig.add_subplot(gs[1, 0])
+    try:
+        # Try to get HIV prevalence from disease directly
+        if hasattr(sim_base.diseases, 'hiv') and hasattr(sim_base.diseases.hiv, 'infected'):
+            # Calculate prevalence over time from current state (simplified)
+            n_base = len(sim_base.people)
+            n_intv = len(sim_intv.people)
+            hiv_prev_base_current = sim_base.diseases.hiv.infected.sum() / n_base * 100 if n_base > 0 else 0
+            hiv_prev_intv_current = sim_intv.diseases.hiv.infected.sum() / n_intv * 100 if n_intv > 0 else 0
+            
+            # For now, show current prevalence as a bar chart
+            ax3.bar(['Baseline', 'With ART'], [hiv_prev_base_current, hiv_prev_intv_current],
+                   color=['red', 'blue'], alpha=0.7, edgecolor='black', linewidth=1.5)
+            ax3.set_ylabel('HIV Prevalence (%)', fontsize=10)
+            ax3.set_title('HIV Prevalence (Final Year)', fontsize=12, fontweight='bold')
+            ax3.grid(True, alpha=0.3, axis='y')
+            # Add value labels
+            for i, (label, val) in enumerate(zip(['Baseline', 'With ART'], [hiv_prev_base_current, hiv_prev_intv_current])):
+                ax3.text(i, val, f'{val:.2f}%', ha='center', va='bottom', fontweight='bold')
+        else:
+            ax3.text(0.5, 0.5, 'HIV data\nnot available', 
+                    ha='center', va='center', transform=ax3.transAxes, fontsize=12)
+            ax3.set_title('HIV Prevalence', fontsize=12, fontweight='bold')
+    except Exception as e:
+        ax3.text(0.5, 0.5, f'Error: {str(e)[:30]}', 
+                ha='center', va='center', transform=ax3.transAxes, fontsize=10)
+        ax3.set_title('HIV Prevalence', fontsize=12, fontweight='bold')
+    
+    # 4. ART Coverage Over Time (middle center)
+    ax4 = fig.add_subplot(gs[1, 1])
+    if hasattr(sim_intv.diseases, 'hiv') and hasattr(sim_intv.diseases.hiv, 'on_art'):
+        # Calculate ART coverage over time from intervention analyzer
+        df_art = sim_intv.analyzers.intervention_analyzer.to_df()
+        if len(df_art) > 0:
+            # Group by year and calculate coverage
+            art_by_year = df_art.groupby('year').agg({
+                'received_art': 'sum',
+                'uid': 'nunique'
+            }).reset_index()
+            art_by_year['coverage'] = art_by_year['received_art'] / art_by_year['uid'] * 100
+            
+            ax4.plot(art_by_year['year'], art_by_year['coverage'], 
+                    color='green', linewidth=2, marker='o', markersize=4)
+            ax4.set_xlabel('Year', fontsize=10)
+            ax4.set_ylabel('ART Coverage (%)', fontsize=10)
+            ax4.set_title('ART Coverage Over Time', fontsize=12, fontweight='bold')
+            ax4.set_ylim(0, 105)
+            ax4.grid(True, alpha=0.3)
+        else:
+            ax4.text(0.5, 0.5, 'ART data\nnot available', 
+                    ha='center', va='center', transform=ax4.transAxes, fontsize=12)
+            ax4.set_title('ART Coverage Over Time', fontsize=12, fontweight='bold')
+    else:
+        ax4.text(0.5, 0.5, 'ART data\nnot available', 
+                ha='center', va='center', transform=ax4.transAxes, fontsize=12)
+        ax4.set_title('ART Coverage Over Time', fontsize=12, fontweight='bold')
+    
+    # 5. Cost Breakdown (middle right)
+    ax5 = fig.add_subplot(gs[1, 2])
+    try:
+        art_cost_val = 0
+        if hasattr(analyzer_intv, 'detailed_outputs') and analyzer_intv.detailed_outputs is not None:
+            art_cost_val = analyzer_intv.detailed_outputs.get('art_cost', pd.Series([0])).sum()
+        elif hasattr(analyzer_intv.results, 'get'):
+            art_cost_val = analyzer_intv.results.get('art_cost', 0)
+        elif hasattr(analyzer_intv.results, 'art_cost'):
+            art_cost_val = analyzer_intv.results.art_cost
+        
+        total_cost_val = analyzer_intv.results.total_cost
+        other_cost = total_cost_val - art_cost_val
+        
+        if total_cost_val > 0:
+            colors_pie = ['#ff9999', '#66b3ff']
+            sizes = [art_cost_val, max(other_cost, 0)]
+            labels = ['ART Cost', 'Other Costs']
+            if other_cost <= 0:
+                sizes = [art_cost_val]
+                labels = ['ART Cost']
+            ax5.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90, colors=colors_pie[:len(sizes)])
+            ax5.set_title(f'Cost Breakdown\n(Total: ${total_cost_val/1e6:.2f}M)', fontsize=12, fontweight='bold')
+        else:
+            ax5.text(0.5, 0.5, 'No cost data', 
+                    ha='center', va='center', transform=ax5.transAxes, fontsize=12)
+            ax5.set_title('Cost Breakdown', fontsize=12, fontweight='bold')
+    except Exception as e:
+        ax5.text(0.5, 0.5, f'Error: {str(e)[:30]}', 
+                ha='center', va='center', transform=ax5.transAxes, fontsize=10)
+        ax5.set_title('Cost Breakdown', fontsize=12, fontweight='bold')
+    
+    # 6. HIV+ with Lower Respiratory Infections (bottom left)
+    ax6 = fig.add_subplot(gs[2, 0])
+    
+    # Try to get HIV+ vs HIV- with LRI data
+    lri_name_variants = ['lowerrespiratoryinfections', 'LowerRespiratoryInfections', 'lowerrespiratoryinfection']
+    lri_disease = None
+    lri_name = None
+    
+    for variant in lri_name_variants:
+        if hasattr(sim_intv.diseases, variant):
+            lri_disease = getattr(sim_intv.diseases, variant)
+            lri_name = variant
+            break
+        elif variant in sim_intv.diseases:
+            lri_disease = sim_intv.diseases[variant]
+            lri_name = variant
+            break
+    
+    if lri_disease is not None and hasattr(lri_disease, 'infected') and hasattr(sim_intv.diseases, 'hiv'):
+        hiv = sim_intv.diseases.hiv
+        lri_infected = lri_disease.infected
+        hiv_infected = hiv.infected
+        hiv_susceptible = hiv.susceptible
+        
+        # Find HIV+ and HIV- individuals with LRI
+        lri_uids = lri_infected.uids
+        hiv_pos_with_lri = lri_uids[lri_infected[lri_uids] & hiv_infected[lri_uids]]
+        hiv_neg_with_lri = lri_uids[lri_infected[lri_uids] & hiv_susceptible[lri_uids]]
+        
+        # Get severity distribution
+        if hasattr(lri_disease, 'severity_level') and len(hiv_pos_with_lri) > 0:
+            hiv_pos_severity = lri_disease.severity_level[hiv_pos_with_lri]
+            unique_hiv_pos, counts_hiv_pos = np.unique(hiv_pos_severity, return_counts=True)
+            
+            # Create stacked bar chart
+            severity_levels = sorted(set(unique_hiv_pos))
+            hiv_pos_counts = [counts_hiv_pos[unique_hiv_pos == sev][0] if sev in unique_hiv_pos else 0 for sev in severity_levels]
+            
+            if len(hiv_neg_with_lri) > 0:
+                hiv_neg_severity = lri_disease.severity_level[hiv_neg_with_lri]
+                unique_hiv_neg, counts_hiv_neg = np.unique(hiv_neg_severity, return_counts=True)
+                hiv_neg_counts = [counts_hiv_neg[unique_hiv_neg == sev][0] if sev in unique_hiv_neg else 0 for sev in severity_levels]
+            else:
+                hiv_neg_counts = [0] * len(severity_levels)
+            
+            x = np.arange(len(severity_levels))
+            width = 0.35
+            
+            # Plot stacked bars
+            bottom_hiv_pos = np.zeros(len(severity_levels))
+            bottom_hiv_neg = np.zeros(len(severity_levels))
+            
+            colors = ['#90EE90', '#FFD700', '#FF6347', '#8B0000']  # Light green, gold, tomato, dark red
+            
+            for i, sev in enumerate(severity_levels):
+                if hiv_pos_counts[i] > 0:
+                    ax6.bar(x[i] - width/2, hiv_pos_counts[i], width, 
+                           label='HIV+' if i == 0 else '', color=colors[min(sev, len(colors)-1)], 
+                           alpha=0.8, bottom=bottom_hiv_pos[i])
+                if hiv_neg_counts[i] > 0:
+                    ax6.bar(x[i] + width/2, hiv_neg_counts[i], width,
+                           label='HIV-' if i == 0 else '', color=colors[min(sev, len(colors)-1)],
+                           alpha=0.5, bottom=bottom_hiv_neg[i])
+            
+            ax6.set_xlabel('Severity Level', fontsize=10)
+            ax6.set_ylabel('Number of Individuals', fontsize=10)
+            ax6.set_title('Lower Respiratory Infections:\nHIV+ vs HIV- by Severity', fontsize=12, fontweight='bold')
+            ax6.set_xticks(x)
+            ax6.set_xticklabels([f'Level {sev}' for sev in severity_levels])
+            ax6.legend()
+            ax6.grid(True, alpha=0.3, axis='y')
+            
+            # Add value labels
+            for i, sev in enumerate(severity_levels):
+                if hiv_pos_counts[i] > 0:
+                    ax6.text(x[i] - width/2, hiv_pos_counts[i], f'{hiv_pos_counts[i]:,}',
+                            ha='center', va='bottom', fontsize=8)
+                if hiv_neg_counts[i] > 0:
+                    ax6.text(x[i] + width/2, hiv_neg_counts[i], f'{hiv_neg_counts[i]:,}',
+                            ha='center', va='bottom', fontsize=8)
+        else:
+            # Fallback: just show counts
+            categories = ['HIV+ with LRI', 'HIV- with LRI']
+            counts = [len(hiv_pos_with_lri), len(hiv_neg_with_lri)]
+            ax6.bar(categories, counts, color=['#FF6347', '#90EE90'], alpha=0.8)
+            ax6.set_ylabel('Number of Individuals', fontsize=10)
+            ax6.set_title('Lower Respiratory Infections:\nHIV+ vs HIV-', fontsize=12, fontweight='bold')
+            ax6.grid(True, alpha=0.3, axis='y')
+            for i, count in enumerate(counts):
+                ax6.text(i, count, f'{count:,}', ha='center', va='bottom', fontweight='bold')
+    else:
+        # Fallback if LRI data not available
+        ax6.text(0.5, 0.5, 'LRI data\nnot available', 
+                ha='center', va='center', transform=ax6.transAxes, fontsize=12)
+        ax6.set_title('HIV+ with Lower Respiratory Infections', fontsize=12, fontweight='bold')
+    
+    # 7. Key Metrics Summary (bottom center + right)
+    ax7 = fig.add_subplot(gs[2, 1:])
+    ax7.axis('off')
+    
+    # Get ART cost for summary
+    art_cost_summary = 0
+    try:
+        if hasattr(analyzer_intv, 'detailed_outputs') and analyzer_intv.detailed_outputs is not None:
+            art_cost_summary = analyzer_intv.detailed_outputs.get('art_cost', pd.Series([0])).sum()
+        elif hasattr(analyzer_intv.results, 'get'):
+            art_cost_summary = analyzer_intv.results.get('art_cost', 0)
+        elif hasattr(analyzer_intv.results, 'art_cost'):
+            art_cost_summary = analyzer_intv.results.art_cost
+    except:
+        art_cost_summary = 0
+    
+    # Create summary text
+    summary_text = f"""
+    COST-EFFECTIVENESS ANALYSIS SUMMARY
+    
+    Baseline Scenario:
+      • Total Cost: ${analyzer_base.results.total_cost:,.2f}
+      • Total DALY: {analyzer_base.results.total_daly:,.2f}
+      • YLD: {analyzer_base.results.total_yld:,.2f}
+      • YLL: {analyzer_base.results.total_yll:,.2f}
+    
+    With ART Scenario:
+      • Total Cost: ${analyzer_intv.results.total_cost:,.2f}
+      • Total DALY: {analyzer_intv.results.total_daly:,.2f}
+      • YLD: {analyzer_intv.results.total_yld:,.2f}
+      • YLL: {analyzer_intv.results.total_yll:,.2f}
+      • ART Cost: ${art_cost_summary:,.2f}
+    
+    Incremental Results:
+      • DALYs Averted: {daly_averted:,.2f}
+      • Incremental Cost: ${cost_increment:,.2f}
+      • ICER: ${icer:,.2f} per DALY averted
+    """
+    
+    # Determine cost-effectiveness
+    if icer < 100:
+        ce_status = "HIGHLY COST-EFFECTIVE"
+        ce_color = 'green'
+    elif icer < 500:
+        ce_status = "COST-EFFECTIVE"
+        ce_color = 'blue'
+    elif icer < 1000:
+        ce_status = "MODERATELY COST-EFFECTIVE"
+        ce_color = 'orange'
+    else:
+        ce_status = "NOT COST-EFFECTIVE"
+        ce_color = 'red'
+    
+    summary_text += f"\n    Cost-Effectiveness Status: {ce_status}"
+    
+    ax7.text(0.05, 0.95, summary_text, transform=ax7.transAxes,
+            fontsize=11, verticalalignment='top', family='monospace',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    
+    # Add status indicator
+    ax7.text(0.95, 0.95, ce_status, transform=ax7.transAxes,
+            fontsize=14, fontweight='bold', color=ce_color,
+            verticalalignment='top', horizontalalignment='right',
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='white', edgecolor=ce_color, linewidth=3))
+    
+    plt.suptitle('Cost-Effectiveness Analysis: ART Intervention', 
+                fontsize=16, fontweight='bold', y=0.98)
+    plt.show()
+    
+    return fig
     
     
 # ---------------------------------------------------------------------
@@ -308,31 +685,35 @@ if __name__ == '__main__':
     print(f"  Incremental Cost: ${cost_increment:,.2f}")
     print(f"  ICER: ${icer:,.2f} per DALY averted")
 
-    d = sim_intv.diseases.type2diabetes
-    dur = d.duration
-    print("NaNs:", np.isnan(dur).sum(), "mean duration:", np.mean(dur))
+    # Debug: Check duration for the first non-HIV disease in the simulation
     import inspect
-
-    diab = sim_intv.diseases.get('type2diabetes', None)
-    diab2 = sim_base.diseases.get('type2diabetes', None)
-
-    print('--- DIABETES DEBUG ---')
-    print('Class:', diab.__class__)
-    print('MRO:', inspect.getmro(diab.__class__))
-    print('Has duration attr:', hasattr(diab, 'duration'))
-
-    if hasattr(diab, 'duration'):
-        print('duration type:', type(diab.duration))
-        print('first few values:', diab.duration[:10])
-
-    print('--- DIABETES DEBUG (Base) ---')
-    print('Class:', diab2.__class__)
-    print('MRO:', inspect.getmro(diab2.__class__))
-    print('Has duration attr:', hasattr(diab2, 'duration'))
-
-    if hasattr(diab2, 'duration'):
-        print('duration type:', type(diab2.duration))
-        print('first few values:', diab2.duration[:10])
+    non_hiv_diseases = [d for d in sim_intv.diseases.keys() if d != 'hiv']
+    if non_hiv_diseases:
+        disease_name = non_hiv_diseases[0]
+        d = sim_intv.diseases.get(disease_name, None)
+        if d is not None:
+            dur = d.duration
+            print(f"\n--- {disease_name.upper()} DEBUG ---")
+            print("NaNs:", np.isnan(dur).sum(), "mean duration:", np.mean(dur))
+            print('Class:', d.__class__)
+            print('MRO:', inspect.getmro(d.__class__))
+            print('Has duration attr:', hasattr(d, 'duration'))
+            if hasattr(d, 'duration'):
+                print('duration type:', type(d.duration))
+                print('first few values:', d.duration[:10])
+            
+            # Also check baseline
+            d_base = sim_base.diseases.get(disease_name, None)
+            if d_base is not None:
+                print(f'--- {disease_name.upper()} DEBUG (Base) ---')
+                print('Class:', d_base.__class__)
+                print('MRO:', inspect.getmro(d_base.__class__))
+                print('Has duration attr:', hasattr(d_base, 'duration'))
+                if hasattr(d_base, 'duration'):
+                    print('duration type:', type(d_base.duration))
+                    print('first few values:', d_base.duration[:10])
+    else:
+        print("\nNo non-HIV diseases found in simulation for duration debugging")
 
     summary_base = mi.summarize_microcosting_results(analyzer_base)
     summary_intv = mi.summarize_microcosting_results(analyzer_intv)
@@ -345,11 +726,235 @@ if __name__ == '__main__':
     for k, v in summary_intv.items():
         print(f"{k}: {v:,.2f}")
 
+    # Debug: Print all available diseases and YLD keys
+    print("\n" + "="*60)
+    print("DEBUG: Available Diseases and YLD Data")
+    print("="*60)
+    print(f"Available diseases in simulation: {list(sim_intv.diseases.keys())}")
+    
+    if hasattr(analyzer_base, 'detailed_outputs') and analyzer_base.detailed_outputs is not None:
+        print(f"\nAvailable YLD keys in analyzer_base.detailed_outputs:")
+        for key in analyzer_base.detailed_outputs.keys():
+            if 'yld' in key.lower():
+                val = analyzer_base.detailed_outputs[key]
+                if hasattr(val, 'sum'):
+                    print(f"  {key}: {val.sum():,.2f}")
+                else:
+                    print(f"  {key}: {val}")
+    else:
+        print("\nanalyzer_base.detailed_outputs is None or not available")
+    
+    # Print Lower Respiratory Infections statistics
+    print("\n" + "="*60)
+    print("LOWER RESPIRATORY INFECTIONS STATISTICS")
+    print("="*60)
+    
+    # Check if disease exists in simulation
+    lri_name_variants = ['lowerrespiratoryinfections', 'LowerRespiratoryInfections', 'lowerrespiratoryinfection']
+    lri_disease = None
+    lri_name = None
+    
+    for variant in lri_name_variants:
+        if hasattr(sim_intv.diseases, variant):
+            lri_disease = getattr(sim_intv.diseases, variant)
+            lri_name = variant
+            break
+        elif variant in sim_intv.diseases:
+            lri_disease = sim_intv.diseases[variant]
+            lri_name = variant
+            break
+    
+    # Also try to find by iterating through all diseases
+    if lri_disease is None:
+        for name, disease_obj in sim_intv.diseases.items():
+            if hasattr(disease_obj, 'disease_name'):
+                if 'lower' in disease_obj.disease_name.lower() and 'respiratory' in disease_obj.disease_name.lower():
+                    lri_disease = disease_obj
+                    lri_name = name
+                    print(f"Found LRI disease with name '{name}' (disease_name: {disease_obj.disease_name})")
+                    break
+    
+    if lri_disease is not None:
+        # Get prevalence
+        if hasattr(lri_disease, 'infected'):
+            n_infected_base = sim_base.diseases[lri_name].infected.sum() if lri_name in sim_base.diseases else 0
+            n_infected_intv = lri_disease.infected.sum()
+            n_total_base = len(sim_base.people)
+            n_total_intv = len(sim_intv.people)
+            prev_base = n_infected_base / n_total_base * 100 if n_total_base > 0 else 0
+            prev_intv = n_infected_intv / n_total_intv * 100 if n_total_intv > 0 else 0
+            
+            print(f"\nPrevalence:")
+            print(f"  Baseline: {n_infected_base:,} / {n_total_base:,} ({prev_base:.2f}%)")
+            print(f"  With ART: {n_infected_intv:,} / {n_total_intv:,} ({prev_intv:.2f}%)")
+        
+        # Get YLD from analyzer
+        if hasattr(analyzer_base, 'detailed_outputs') and analyzer_base.detailed_outputs is not None:
+            lri_yld_base = analyzer_base.detailed_outputs.get('lowerrespiratoryinfections_yld', pd.Series([0])).sum()
+        else:
+            lri_yld_base = 0
+        
+        if hasattr(analyzer_intv, 'detailed_outputs') and analyzer_intv.detailed_outputs is not None:
+            lri_yld_intv = analyzer_intv.detailed_outputs.get('lowerrespiratoryinfections_yld', pd.Series([0])).sum()
+        else:
+            lri_yld_intv = 0
+        
+        print(f"\nYLD (Years Lived with Disability):")
+        print(f"  Baseline: {lri_yld_base:,.2f}")
+        print(f"  With ART: {lri_yld_intv:,.2f}")
+        print(f"  Difference: {lri_yld_base - lri_yld_intv:,.2f}")
+        
+        # Get severity distribution if available
+        if hasattr(lri_disease, 'severity_level'):
+            severity_base = sim_base.diseases[lri_name].severity_level if lri_name in sim_base.diseases else None
+            severity_intv = lri_disease.severity_level
+            
+            if severity_base is not None:
+                unique_base, counts_base = np.unique(severity_base[lri_disease.infected.uids] if hasattr(lri_disease, 'infected') else severity_base, return_counts=True)
+                print(f"\nSeverity Distribution (Baseline):")
+                for sev, count in zip(unique_base, counts_base):
+                    print(f"  Level {sev}: {count:,} ({count/len(severity_base)*100:.1f}%)")
+            
+            if hasattr(lri_disease, 'infected'):
+                infected_uids = lri_disease.infected.uids
+                if len(infected_uids) > 0:
+                    unique_intv, counts_intv = np.unique(severity_intv[infected_uids], return_counts=True)
+                    print(f"\nSeverity Distribution (With ART):")
+                    for sev, count in zip(unique_intv, counts_intv):
+                        print(f"  Level {sev}: {count:,} ({count/len(infected_uids)*100:.1f}%)")
+        
+        # =====================================================================
+        # HIV+ INDIVIDUALS WITH LOWER RESPIRATORY INFECTIONS ANALYSIS
+        # =====================================================================
+        print("\n" + "="*60)
+        print("HIV+ INDIVIDUALS WITH LOWER RESPIRATORY INFECTIONS")
+        print("="*60)
+        
+        # Check HIV status
+        if hasattr(sim_intv.diseases, 'hiv') and hasattr(sim_intv.diseases.hiv, 'infected'):
+            hiv_infected = sim_intv.diseases.hiv.infected
+            hiv_susceptible = sim_intv.diseases.hiv.susceptible
+            
+            if hasattr(lri_disease, 'infected'):
+                lri_infected = lri_disease.infected
+                
+                # Find HIV+ individuals with LRI
+                hiv_pos_with_lri = lri_infected.uids[lri_infected[lri_infected.uids] & hiv_infected[lri_infected.uids]]
+                hiv_neg_with_lri = lri_infected.uids[lri_infected[lri_infected.uids] & hiv_susceptible[lri_infected.uids]]
+                
+                print(f"\nCo-infection Status (With ART, Final Year):")
+                print(f"  HIV+ with LRI: {len(hiv_pos_with_lri):,}")
+                print(f"  HIV- with LRI: {len(hiv_neg_with_lri):,}")
+                print(f"  Total with LRI: {len(lri_infected.uids):,}")
+                
+                if len(hiv_pos_with_lri) > 0:
+                    # Severity distribution for HIV+ individuals
+                    if hasattr(lri_disease, 'severity_level'):
+                        hiv_pos_severity = lri_disease.severity_level[hiv_pos_with_lri]
+                        unique_hiv_pos, counts_hiv_pos = np.unique(hiv_pos_severity, return_counts=True)
+                        print(f"\nSeverity Distribution - HIV+ with LRI:")
+                        for sev, count in zip(unique_hiv_pos, counts_hiv_pos):
+                            pct = count / len(hiv_pos_with_lri) * 100
+                            print(f"  Level {sev}: {count:,} ({pct:.1f}%)")
+                    
+                    # Compare with HIV- individuals
+                    if len(hiv_neg_with_lri) > 0 and hasattr(lri_disease, 'severity_level'):
+                        hiv_neg_severity = lri_disease.severity_level[hiv_neg_with_lri]
+                        unique_hiv_neg, counts_hiv_neg = np.unique(hiv_neg_severity, return_counts=True)
+                        print(f"\nSeverity Distribution - HIV- with LRI:")
+                        for sev, count in zip(unique_hiv_neg, counts_hiv_neg):
+                            pct = count / len(hiv_neg_with_lri) * 100
+                            print(f"  Level {sev}: {count:,} ({pct:.1f}%)")
+                    
+                    # Calculate mean severity
+                    if hasattr(lri_disease, 'severity_level'):
+                        mean_sev_hiv_pos = lri_disease.severity_level[hiv_pos_with_lri].mean()
+                        if len(hiv_neg_with_lri) > 0:
+                            mean_sev_hiv_neg = lri_disease.severity_level[hiv_neg_with_lri].mean()
+                            print(f"\nMean Severity:")
+                            print(f"  HIV+ with LRI: {mean_sev_hiv_pos:.2f}")
+                            print(f"  HIV- with LRI: {mean_sev_hiv_neg:.2f}")
+                            print(f"  Difference: {mean_sev_hiv_pos - mean_sev_hiv_neg:.2f}")
+                
+                # Calculate YLD for HIV+ vs HIV- individuals with LRI
+                if hasattr(analyzer_intv, 'detailed_outputs') and analyzer_intv.detailed_outputs is not None:
+                    # Get per-individual YLD if available
+                    lri_yld_array = None
+                    for name_var in ['lowerrespiratoryinfections_yld', 'LowerRespiratoryInfections_yld', 'lowerrespiratoryinfection_yld']:
+                        if name_var in analyzer_intv.detailed_outputs:
+                            lri_yld_array = analyzer_intv.detailed_outputs[name_var]
+                            break
+                    
+                    if lri_yld_array is not None and hasattr(lri_yld_array, '__getitem__'):
+                        # Calculate YLD for HIV+ vs HIV- with LRI
+                        hiv_pos_yld = lri_yld_array[hiv_pos_with_lri].sum() if len(hiv_pos_with_lri) > 0 else 0
+                        hiv_neg_yld = lri_yld_array[hiv_neg_with_lri].sum() if len(hiv_neg_with_lri) > 0 else 0
+                        
+                        print(f"\nYLD Contribution:")
+                        print(f"  HIV+ with LRI: {hiv_pos_yld:,.2f} YLD")
+                        print(f"  HIV- with LRI: {hiv_neg_yld:,.2f} YLD")
+                        if len(hiv_pos_with_lri) > 0:
+                            print(f"  Mean YLD per HIV+ person with LRI: {hiv_pos_yld / len(hiv_pos_with_lri):,.2f}")
+                        if len(hiv_neg_with_lri) > 0:
+                            print(f"  Mean YLD per HIV- person with LRI: {hiv_neg_yld / len(hiv_neg_with_lri):,.2f}")
+                
+                # Check deaths from LRI in HIV+ individuals
+                if hasattr(sim_intv.analyzers, 'condition_at_death_analyzer'):
+                    death_analyzer = sim_intv.analyzers.condition_at_death_analyzer
+                    if hasattr(death_analyzer, 'to_df'):
+                        df_deaths = death_analyzer.to_df()
+                        if len(df_deaths) > 0:
+                            # Count deaths from LRI
+                            died_from_lri = df_deaths[df_deaths.get('cause_lowerrespiratoryinfections', False) == True]
+                            hiv_pos_died_from_lri = died_from_lri[died_from_lri.get('hiv_positive', False) == True]
+                            
+                            print(f"\nDeaths from Lower Respiratory Infections:")
+                            print(f"  Total deaths from LRI: {len(died_from_lri):,}")
+                            print(f"  HIV+ deaths from LRI: {len(hiv_pos_died_from_lri):,}")
+                            if len(died_from_lri) > 0:
+                                print(f"  Proportion HIV+: {len(hiv_pos_died_from_lri) / len(died_from_lri) * 100:.1f}%")
+                            
+                            # Calculate YLL for HIV+ deaths from LRI
+                            if 'yll' in df_deaths.columns:
+                                total_yll_lri = died_from_lri['yll'].sum()
+                                hiv_pos_yll_lri = hiv_pos_died_from_lri['yll'].sum() if len(hiv_pos_died_from_lri) > 0 else 0
+                                
+                                print(f"\nYLL Contribution (Years of Life Lost):")
+                                print(f"  Total YLL from LRI deaths: {total_yll_lri:,.2f}")
+                                print(f"  HIV+ YLL from LRI deaths: {hiv_pos_yll_lri:,.2f}")
+                                if total_yll_lri > 0:
+                                    print(f"  Proportion from HIV+: {hiv_pos_yll_lri / total_yll_lri * 100:.1f}%")
+                
+                # Baseline comparison
+                print(f"\n--- Baseline Scenario Comparison ---")
+                if lri_name in sim_base.diseases:
+                    lri_base = sim_base.diseases[lri_name]
+                    if hasattr(lri_base, 'infected') and hasattr(sim_base.diseases, 'hiv'):
+                        hiv_base = sim_base.diseases.hiv
+                        lri_infected_base = lri_base.infected
+                        hiv_infected_base = hiv_base.infected
+                        hiv_susceptible_base = hiv_base.susceptible
+                        
+                        hiv_pos_with_lri_base = lri_infected_base.uids[
+                            lri_infected_base[lri_infected_base.uids] & hiv_infected_base[lri_infected_base.uids]
+                        ]
+                        
+                        print(f"  HIV+ with LRI (Baseline): {len(hiv_pos_with_lri_base):,}")
+                        print(f"  HIV+ with LRI (With ART): {len(hiv_pos_with_lri):,}")
+                        if len(hiv_pos_with_lri_base) > 0:
+                            change = len(hiv_pos_with_lri) - len(hiv_pos_with_lri_base)
+                            pct_change = change / len(hiv_pos_with_lri_base) * 100
+                            print(f"  Change: {change:+,} ({pct_change:+.1f}%)")
+        else:
+            print("\nWARNING: HIV disease not found in simulation!")
+        
+    else:
+        print("\nWARNING: Lower Respiratory Infections disease not found in simulation!")
+        print(f"Available diseases: {list(sim_intv.diseases.keys())}")
+    
+    print("="*60)
 
-    # Example usage for current run
-    results = [{
-        'label': 'ART vs Baseline',
-        'delta_daly': 1012498.05 - 632424.29,
-        'delta_cost': 7558117.26 - 0
-    }]
-    mi.plot_cost_effectiveness_plane(results)
+    # ---------------------------------------------------------------------
+    # Create comprehensive visualization
+    # ---------------------------------------------------------------------
+    plot_cea_results(sim_base, sim_intv, analyzer_base, analyzer_intv, cost_increment, daly_averted, icer)

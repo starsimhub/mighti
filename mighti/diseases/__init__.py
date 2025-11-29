@@ -63,3 +63,4 @@ from .neuraltubedefects import *
 
 from .esophagealcancer import *
 from .proteinenergymalnutrition import *
+from .lowerrespiratoryinfection import *
