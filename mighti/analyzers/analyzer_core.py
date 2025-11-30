@@ -7,7 +7,7 @@ import pandas as pd
 import starsim as ss
 
 
-__all__ = ["DeathsByAgeSexAnalyzer", "SurvivorshipAnalyzer", "ConditionAtDeathAnalyzer"]
+__all__ = ["DeathsByAgeSexAnalyzer", "SurvivorshipAnalyzer", "ConditionAtDeathAnalyzer", "InfantDeathsAnalyzer"]
 
 class DeathsByAgeSexAnalyzer(ss.Analyzer):
     """Tracks infant deaths and deaths by age/sex, Starsim-3.0.3 compatible."""
@@ -86,80 +86,67 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
             }),
         ], ignore_index=True)
 
-
 class SurvivorshipAnalyzer(ss.Analyzer):
     """
-    Computes true survivorship l(x): fraction of original cohort surviving to age x.
-    Compatible with all disease types (including neonatal).
-    
-    Note: Starsim removes dead people from the active population, so we can't use ppl.dead
-    after the simulation. Instead, we track the initial population and use deaths from
-    the DeathsByAgeSexAnalyzer to calculate survivorship.
+    Computes survivorship l(x) by age and sex for life table construction.
+    Fully compliant with Starsim analyzer lifecycle.
     """
 
     def __init__(self, max_age=100, **kwargs):
         super().__init__(**kwargs)
         self.name = "survivorship_analyzer"
         self.max_age = max_age
-        self._n0_male = None
-        self._n0_female = None
-
-    def init_pre(self, sim):
-        """Store initial population counts by sex."""
-        super().init_pre(sim)
-        ppl = sim.people
-        # Store initial population counts at birth (age 0)
-        # We'll use the initial population size, not current size
-        self._n0_male = max(np.sum(~ppl.female), 1)
-        self._n0_female = max(np.sum(ppl.female), 1)
+        self.survivorship_data = {sex: np.zeros(max_age + 1) for sex in ["Male", "Female"]}
+        self._yearvec = None
 
     def init_results(self):
-        super().init_results()
+        """Initialize result containers."""
+        super().init_results()  # <-- this line fixes the crash
         self.define_results(
-            ss.Result("lx_male",   shape=self.max_age + 1, dtype=float, label="Male survivorship l(x)"),
-            ss.Result("lx_female", shape=self.max_age + 1, dtype=float, label="Female survivorship l(x)"),
+            ss.Result("lx_male", label="Male survivorship l(x)", shape=self.max_age + 1, dtype=float),
+            ss.Result("lx_female", label="Female survivorship l(x)", shape=self.max_age + 1, dtype=float)
         )
+        self._yearvec = getattr(self.sim.t, "yearvec", None)
 
     def step(self):
-        """No per-step logic (needed only to silence lifecycle warning)."""
-        pass
+        """Accumulate survivorship by age and sex at each step."""
+        ppl = self.sim.people
+        for sex in ["Male", "Female"]:
+            mask = ppl.female if sex == "Female" else ~ppl.female
+            alive = mask & ~ppl.dead
+            ages = ppl.age[alive]
+            for a in range(self.max_age):
+                self.survivorship_data[sex][a] += np.sum((ages >= a) & (ages < a + 1))
 
     def finalize(self):
-        """
-        Set l(x) values for life table calculation.
-        
-        Note: For period life tables, l(x) is calculated from mx in calculate_life_table_from_mx.
-        Here we just set l0 = 1.0 (radix) as the starting point. The actual l(x) values
-        will be computed from mortality rates in the life table calculation.
-        """
-        super().finalize() 
-        
-        # For life table calculation, we just need l0 = 1.0 (radix)
-        # The actual l(x) values will be calculated from mx in calculate_life_table_from_mx
-        lx_m = np.ones(self.max_age + 1)  # Initialize to 1.0, will be recalculated from mx
-        lx_f = np.ones(self.max_age + 1)  # Initialize to 1.0, will be recalculated from mx
-        
-        # Note: The actual l(x) values are not used in calculate_mortality_rates anymore
-        # (we fixed that to use current population structure directly)
-        # But we keep l0 = 1.0 for the life table calculation in calculate_life_table_from_mx
-
-        self.results.lx_male[:] = lx_m
-        self.results.lx_female[:] = lx_f
+        """Normalize to l(0)=1 and copy into self.results arrays."""
+        for sex in ["Male", "Female"]:
+            lx = self.survivorship_data[sex].copy()
+            if lx[0] > 0:
+                lx /= lx[0]
+            if sex == "Male":
+                self.results.lx_male[:] = lx
+            else:
+                self.results.lx_female[:] = lx
 
     def finalize_results(self):
-        super().finalize_results()
+        """Required placeholder for Starsim loop."""
+        pass
 
     def to_df(self):
+        """Convert stored survivorship to tidy DataFrame."""
         records = []
-        year = int(self.sim.t.yearvec[-1])
-        for sex, key in (("Male", "lx_male"), ("Female", "lx_female")):
-            lx = getattr(self.results, key)
+        year = self.sim.t.yearvec[-1] if self._yearvec is not None else None
+        for sex, key in zip(["Male", "Female"], ["lx_male", "lx_female"]):
+            lx = getattr(self.results, key, np.zeros(self.max_age + 1))
             for age, val in enumerate(lx):
                 records.append({
-                    "year": year, "age": age, "sex": sex, "survival": float(val)
+                    "year": year,
+                    "age": age,
+                    "sex": sex,
+                    "survival": float(val)
                 })
         return pd.DataFrame(records)
-    
 
 class ConditionAtDeathAnalyzer(ss.Analyzer):
     """
@@ -266,4 +253,224 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
     def to_df(self):
         """Return DataFrame of recorded deaths and conditions."""
         return pd.DataFrame(self.records)
+
+
+class InfantDeathsAnalyzer(ss.Analyzer):
+    """
+    Analyzer specifically for tracking neonatal and infant deaths.
+    
+    Tracks:
+    - Neonatal deaths (age < 28 days)
+    - Infant deaths (age < 1 year)
+    - Deaths by cause (which neonatal/congenital disease)
+    - Person-years at risk for infants
+    
+    This analyzer is separate from SurvivorshipAnalyzer to avoid interfering
+    with the main survivorship calculation while still tracking early deaths.
+    """
+    
+    def __init__(self, max_age=100, **kwargs):
+        super().__init__(**kwargs)
+        self.name = "infant_deaths_analyzer"
+        self.max_age = max_age
+        self._dead_prev = None
+        self._neonatal_diseases = []  # Will be populated in init_pre
+        
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        self._dead_prev = np.zeros(len(sim.people), dtype=bool)
+        
+        # Identify neonatal/congenital diseases
+        self._neonatal_diseases = []
+        if hasattr(sim, 'diseases'):
+            from mighti.diseases.base_disease import NonAcquiredDisease, StaticCondition
+            for name, disease in sim.diseases.items():
+                # Check if it's a NonAcquiredDisease or StaticCondition
+                # StaticCondition is a subclass of NonAcquiredDisease, but we check both explicitly
+                is_non_acquired = isinstance(disease, NonAcquiredDisease)
+                is_static = isinstance(disease, StaticCondition)
+                
+                if is_non_acquired or is_static:
+                    if name not in self._neonatal_diseases:
+                        self._neonatal_diseases.append(name)
+                # Also check is_neonatal flag for explicit marking
+                elif hasattr(disease, 'is_neonatal') and disease.is_neonatal:
+                    if name not in self._neonatal_diseases:
+                        self._neonatal_diseases.append(name)
+    
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result("neonatal_deaths_male", dtype=int, label="Neonatal deaths (age < 28 days), male"),
+            ss.Result("neonatal_deaths_female", dtype=int, label="Neonatal deaths (age < 28 days), female"),
+            ss.Result("infant_deaths_male", dtype=int, label="Infant deaths (age < 1 year), male"),
+            ss.Result("infant_deaths_female", dtype=int, label="Infant deaths (age < 1 year), female"),
+            ss.Result("infant_person_years_male", dtype=float, label="Person-years at age < 1, male"),
+            ss.Result("infant_person_years_female", dtype=float, label="Person-years at age < 1, female"),
+        )
+        # Initialize deaths by cause dictionary (not a Result, just a regular attribute)
+        self._neonatal_deaths_by_cause = {}
+    
+    def _ensure_size(self):
+        """Resize internal arrays if population size changes."""
+        n_now = len(self.sim.people)
+        if self._dead_prev is None:
+            self._dead_prev = np.zeros(n_now, dtype=bool)
+        elif self._dead_prev.size != n_now:
+            new = np.zeros(n_now, dtype=bool)
+            n_copy = min(self._dead_prev.size, n_now)
+            new[:n_copy] = self._dead_prev[:n_copy]
+            self._dead_prev = new
+    
+    def step(self):
+        """Track neonatal and infant deaths at each step."""
+        ppl = self.sim.people
+        ti = self.sim.ti
+        self._ensure_size()
+        
+        # New deaths this step
+        new_deaths_mask = ppl.dead & ~self._dead_prev
+        new_deaths = new_deaths_mask.uids
+        
+        if len(new_deaths) == 0:
+            self._dead_prev = np.array(ppl.dead, dtype=bool)
+            return
+        
+        # Get ages and sex for new deaths
+        ages = ppl.age[new_deaths]
+        female = ppl.female[new_deaths]
+        
+        # Neonatal deaths (age < 28 days = 28/365 years)
+        neonatal_threshold = 28 / 365.0
+        neonatal_mask = ages < neonatal_threshold
+        
+        if np.any(neonatal_mask):
+            neonatal_deaths = new_deaths[neonatal_mask]
+            neonatal_female = female[neonatal_mask]
+            
+            # Count by sex
+            self.results.neonatal_deaths_male[ti] = int(np.sum(~neonatal_female))
+            self.results.neonatal_deaths_female[ti] = int(np.sum(neonatal_female))
+            
+            # Track by cause (which neonatal disease caused the death)
+            for disease_name in self._neonatal_diseases:
+                disease = getattr(self.sim.diseases, disease_name, None)
+                if disease is None:
+                    continue
+                
+                # Check if death was caused by this disease
+                # StaticCondition and NonAcquiredDisease both have ti_dead attribute
+                if hasattr(disease, 'ti_dead'):
+                    ti_dead = getattr(disease, 'ti_dead', None)
+                    if ti_dead is not None:
+                        # Check if any of the neonatal deaths have ti_dead matching this disease
+                        try:
+                            # Try to access .raw first (for FloatArr states)
+                            if hasattr(ti_dead, 'raw'):
+                                died_from_disease = np.array([
+                                    np.isfinite(ti_dead.raw[uid]) and ti_dead.raw[uid] == ti 
+                                    for uid in neonatal_deaths
+                                ], dtype=bool)
+                            else:
+                                # Fallback: direct access
+                                died_from_disease = np.array([
+                                    np.isfinite(ti_dead[uid]) and ti_dead[uid] == ti 
+                                    for uid in neonatal_deaths
+                                ], dtype=bool)
+                            
+                            if np.any(died_from_disease):
+                                if disease_name not in self._neonatal_deaths_by_cause:
+                                    self._neonatal_deaths_by_cause[disease_name] = 0
+                                self._neonatal_deaths_by_cause[disease_name] += int(np.sum(died_from_disease))
+                        except Exception as e:
+                            # Debug: print error if needed
+                            pass
+        
+        # Infant deaths (age < 1 year)
+        infant_mask = ages < 1.0
+        if np.any(infant_mask):
+            infant_deaths = new_deaths[infant_mask]
+            infant_female = female[infant_mask]
+            
+            self.results.infant_deaths_male[ti] = int(np.sum(~infant_female))
+            self.results.infant_deaths_female[ti] = int(np.sum(infant_female))
+        
+        # Accumulate person-years for infants (alive people at age < 1)
+        alive = ~ppl.dead
+        infant_alive = ppl.age[alive] < 1.0
+        if np.any(infant_alive):
+            infant_alive_uids = np.where(alive)[0][infant_alive]
+            infant_female_alive = ppl.female[infant_alive_uids]
+            
+            # Person-years = count of people (assuming 1 timestep = some fraction of a year)
+            # We'll accumulate this over all timesteps
+            dt = self.sim.t.dt if hasattr(self.sim.t, 'dt') else 1.0 / 365.0  # Default to daily
+            self.results.infant_person_years_male[ti] = float(np.sum(~infant_female_alive) * dt)
+            self.results.infant_person_years_female[ti] = float(np.sum(infant_female_alive) * dt)
+        
+        # Update snapshot
+        self._dead_prev = np.array(ppl.dead, dtype=bool)
+    
+    def finalize(self):
+        """Compute cumulative totals."""
+        super().finalize()
+        # Results are already cumulative from step(), but we can add summary here if needed
+        pass
+    
+    def finalize_results(self):
+        super().finalize_results()
+    
+    def to_df(self):
+        """Convert results to DataFrame."""
+        records = []
+        
+        # Get cumulative totals
+        total_neonatal_m = int(np.sum(self.results.neonatal_deaths_male[:]))
+        total_neonatal_f = int(np.sum(self.results.neonatal_deaths_female[:]))
+        total_infant_m = int(np.sum(self.results.infant_deaths_male[:]))
+        total_infant_f = int(np.sum(self.results.infant_deaths_female[:]))
+        total_py_m = float(np.sum(self.results.infant_person_years_male[:]))
+        total_py_f = float(np.sum(self.results.infant_person_years_female[:]))
+        
+        records.append({
+            'category': 'neonatal',
+            'sex': 'Male',
+            'deaths': total_neonatal_m,
+            'person_years': total_py_m if total_py_m > 0 else 0.0,
+            'mortality_rate': total_neonatal_m / total_py_m if total_py_m > 0 else 0.0
+        })
+        records.append({
+            'category': 'neonatal',
+            'sex': 'Female',
+            'deaths': total_neonatal_f,
+            'person_years': total_py_f if total_py_f > 0 else 0.0,
+            'mortality_rate': total_neonatal_f / total_py_f if total_py_f > 0 else 0.0
+        })
+        records.append({
+            'category': 'infant',
+            'sex': 'Male',
+            'deaths': total_infant_m,
+            'person_years': total_py_m if total_py_m > 0 else 0.0,
+            'mortality_rate': total_infant_m / total_py_m if total_py_m > 0 else 0.0
+        })
+        records.append({
+            'category': 'infant',
+            'sex': 'Female',
+            'deaths': total_infant_f,
+            'person_years': total_py_f if total_py_f > 0 else 0.0,
+            'mortality_rate': total_infant_f / total_py_f if total_py_f > 0 else 0.0
+        })
+        
+        # Add deaths by cause
+        for disease_name, count in self._neonatal_deaths_by_cause.items():
+            records.append({
+                'category': 'neonatal_by_cause',
+                'sex': 'Both',
+                'disease': disease_name,
+                'deaths': count,
+                'person_years': 0.0,
+                'mortality_rate': 0.0
+            })
+        
+        return pd.DataFrame(records)
     

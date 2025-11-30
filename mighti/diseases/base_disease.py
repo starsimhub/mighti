@@ -1999,6 +1999,9 @@ class StaticCondition(NonAcquiredDisease):
     """
 
     def __init__(self, csv_path, pars=None, **kwargs):
+        # Remove is_neonatal from kwargs if present, since StaticCondition is not neonatal-restricted
+        # (it can cause deaths at any age, not just < 28 days)
+        kwargs.pop('is_neonatal', None)
         super().__init__(csv_path, pars, is_neonatal=False, **kwargs)
         self.define_pars(dur_condition=np.inf, max_disease_duration=np.inf)
 

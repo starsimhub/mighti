@@ -29,7 +29,7 @@ logger.setLevel(logging.INFO)
 
 n_agents = 10_000
 inityear = 2007
-endyear = 2020
+endyear = 2021
 region = "eswatini"
 
 # ---------------------------------------------------------------------
@@ -57,19 +57,17 @@ prepare_data_for_year.prepare_data(region)
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
-# healthconditions = ['Type2Diabetes']
-# healthconditions = [condition for condition in df.condition if condition != "HIV"]
-# Temporarily exclude neonatal and congenital diseases to test mortality calculations
-neonatal_congenital = [
-    "NeonatalSepsis", "NeonatalEncephalopathy", "NeonatalJaundice", "NeonatalPretermBirth",
-    "DownSyndrome", "CongenitalHeartAnomalies", "CongenitalMusculoskeletal", 
-    "DigestiveCongenitalAnomalies", "ChromosomalAbnormalities", "NeuralTubeDefects"
-]
-healthconditions = [
-    condition for condition in df.condition 
-    if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"] + neonatal_congenital
-]
-diseases = ["HIV"] + healthconditions
+# Test with one neonatal disease
+healthconditions = ['Type2Diabetes']
+neonatal_disease = ['NeonatalSepsis', "NeonatalEncephalopathy", "NeonatalJaundice", "NeonatalPretermBirth",
+"CongenitalHeartAnomalies", "CongenitalMusculoskeletal","DigestiveCongenitalAnomalies", "ChromosomalAbnormalities"] 
+
+# neonatal_congenital = [
+#     "NeonatalSepsis", "NeonatalEncephalopathy", "NeonatalJaundice", "NeonatalPretermBirth",
+#     "DownSyndrome", "CongenitalHeartAnomalies", "CongenitalMusculoskeletal", 
+#     "DigestiveCongenitalAnomalies", "ChromosomalAbnormalities", "NeuralTubeDefects"
+# ]
+diseases = ["HIV"] + healthconditions + neonatal_disease
 
 # ---------------------------------------------------------------------
 # Read prevalence table and build callable prevalence data
@@ -94,11 +92,12 @@ def get_prevalence_function(disease):
 prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=diseases)
 survivorship_analyzer = mi.SurvivorshipAnalyzer()
 deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
+infant_deaths_analyzer = mi.InfantDeathsAnalyzer()
 
 # death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
 #     conditions=healthconditions)
 
-analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer]
+analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, infant_deaths_analyzer]
 
 # casm_keys = [
 #     "majordepressivedisorder.affected",
@@ -183,6 +182,14 @@ for disease in healthconditions:
         disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})
         disease_objects.append(disease_obj)
 
+# Neonatal diseases (with is_neonatal=True)
+for disease in neonatal_disease:
+    disease_class = getattr(mi, disease, None)
+    if disease_class:
+        init_prev = ss.bernoulli(p=make_init_prev_func(disease))
+        disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev}, is_neonatal=True)
+        disease_objects.append(disease_obj)
+
 
 
 # ---------------------------------------------------------------------
@@ -210,8 +217,9 @@ intervention_df = pd.read_csv(csv_path_intervention)
 unified_product = ss.Tx(df=intervention_df, label="UnifiedTx")
 
 hiv_test = sti.HIVTest(test_prob_data=test_prob_data, years=test_years)
-art = mi.ARTwithCASM(coverage_data=art_coverage_data)  
-art.casm_sensitivity = "pharma"
+art = sti.ART(coverage_data=art_coverage_data)
+# art = mi.ARTwithCASM(coverage_data=art_coverage_data)  
+# art.casm_sensitivity = "pharma"
 vmmc = sti.VMMC(pars={"future_coverage": {"year": 2015, "prop": 0.30}})
 prep = sti.Prep(pars={"coverage": [0, 0.05, 0.25], "years": [2007, 2015, 2020]})
 
@@ -257,8 +265,8 @@ if __name__ == "__main__":
         networks=networks,
         demographics=[pregnancy, death],
         diseases=disease_objects,      
-        # connectors=connectors,
-        # interventions=interventions,
+        connectors=connectors,
+        interventions=interventions,
         analyzers=analyzers,
         copy_inputs=False,
         label="With Interventions",
