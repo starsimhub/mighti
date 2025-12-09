@@ -302,6 +302,7 @@ def plot_cea_results(sim_base, sim_intv, analyzer_base, analyzer_intv, cost_incr
     """
     fig = plt.figure(figsize=(16, 10))
     gs = fig.add_gridspec(3, 3, hspace=0.3, wspace=0.3)
+    # Note: ax3 (HIV Prevalence) and ax4 (ART Coverage) removed
     
     # 1. Cost-Effectiveness Plane (top left, spans 2 columns)
     ax1 = fig.add_subplot(gs[0, :2])
@@ -364,66 +365,8 @@ def plot_cea_results(sim_base, sim_intv, analyzer_base, analyzer_intv, cost_incr
     ax2.legend()
     ax2.grid(True, alpha=0.3, axis='y')
     
-    # 3. HIV Prevalence Over Time (middle left)
-    ax3 = fig.add_subplot(gs[1, 0])
-    try:
-        # Try to get HIV prevalence from disease directly
-        if hasattr(sim_base.diseases, 'hiv') and hasattr(sim_base.diseases.hiv, 'infected'):
-            # Calculate prevalence over time from current state (simplified)
-            n_base = len(sim_base.people)
-            n_intv = len(sim_intv.people)
-            hiv_prev_base_current = sim_base.diseases.hiv.infected.sum() / n_base * 100 if n_base > 0 else 0
-            hiv_prev_intv_current = sim_intv.diseases.hiv.infected.sum() / n_intv * 100 if n_intv > 0 else 0
-            
-            # For now, show current prevalence as a bar chart
-            ax3.bar(['Baseline', 'With ART'], [hiv_prev_base_current, hiv_prev_intv_current],
-                   color=['red', 'blue'], alpha=0.7, edgecolor='black', linewidth=1.5)
-            ax3.set_ylabel('HIV Prevalence (%)', fontsize=10)
-            ax3.set_title('HIV Prevalence (Final Year)', fontsize=12, fontweight='bold')
-            ax3.grid(True, alpha=0.3, axis='y')
-            # Add value labels
-            for i, (label, val) in enumerate(zip(['Baseline', 'With ART'], [hiv_prev_base_current, hiv_prev_intv_current])):
-                ax3.text(i, val, f'{val:.2f}%', ha='center', va='bottom', fontweight='bold')
-        else:
-            ax3.text(0.5, 0.5, 'HIV data\nnot available', 
-                    ha='center', va='center', transform=ax3.transAxes, fontsize=12)
-            ax3.set_title('HIV Prevalence', fontsize=12, fontweight='bold')
-    except Exception as e:
-        ax3.text(0.5, 0.5, f'Error: {str(e)[:30]}', 
-                ha='center', va='center', transform=ax3.transAxes, fontsize=10)
-        ax3.set_title('HIV Prevalence', fontsize=12, fontweight='bold')
-    
-    # 4. ART Coverage Over Time (middle center)
-    ax4 = fig.add_subplot(gs[1, 1])
-    if hasattr(sim_intv.diseases, 'hiv') and hasattr(sim_intv.diseases.hiv, 'on_art'):
-        # Calculate ART coverage over time from intervention analyzer
-        df_art = sim_intv.analyzers.intervention_analyzer.to_df()
-        if len(df_art) > 0:
-            # Group by year and calculate coverage
-            art_by_year = df_art.groupby('year').agg({
-                'received_art': 'sum',
-                'uid': 'nunique'
-            }).reset_index()
-            art_by_year['coverage'] = art_by_year['received_art'] / art_by_year['uid'] * 100
-            
-            ax4.plot(art_by_year['year'], art_by_year['coverage'], 
-                    color='green', linewidth=2, marker='o', markersize=4)
-            ax4.set_xlabel('Year', fontsize=10)
-            ax4.set_ylabel('ART Coverage (%)', fontsize=10)
-            ax4.set_title('ART Coverage Over Time', fontsize=12, fontweight='bold')
-            ax4.set_ylim(0, 105)
-            ax4.grid(True, alpha=0.3)
-        else:
-            ax4.text(0.5, 0.5, 'ART data\nnot available', 
-                    ha='center', va='center', transform=ax4.transAxes, fontsize=12)
-            ax4.set_title('ART Coverage Over Time', fontsize=12, fontweight='bold')
-    else:
-        ax4.text(0.5, 0.5, 'ART data\nnot available', 
-                ha='center', va='center', transform=ax4.transAxes, fontsize=12)
-        ax4.set_title('ART Coverage Over Time', fontsize=12, fontweight='bold')
-    
-    # 5. Cost Breakdown (middle right)
-    ax5 = fig.add_subplot(gs[1, 2])
+    # 3. Cost Breakdown (middle left, spans 2 columns)
+    ax5 = fig.add_subplot(gs[1, :2])
     try:
         art_cost_val = 0
         if hasattr(analyzer_intv, 'detailed_outputs') and analyzer_intv.detailed_outputs is not None:
@@ -483,67 +426,86 @@ def plot_cea_results(sim_base, sim_intv, analyzer_base, analyzer_intv, cost_incr
         hiv_pos_with_lri = lri_uids[lri_infected[lri_uids] & hiv_infected[lri_uids]]
         hiv_neg_with_lri = lri_uids[lri_infected[lri_uids] & hiv_susceptible[lri_uids]]
         
-        # Get severity distribution
-        if hasattr(lri_disease, 'severity_level') and len(hiv_pos_with_lri) > 0:
-            hiv_pos_severity = lri_disease.severity_level[hiv_pos_with_lri]
-            unique_hiv_pos, counts_hiv_pos = np.unique(hiv_pos_severity, return_counts=True)
+        # Calculate total with LRI
+        total_with_lri = len(hiv_pos_with_lri) + len(hiv_neg_with_lri)
+        
+        if total_with_lri > 0:
+            # Calculate proportions
+            hiv_pos_prop = len(hiv_pos_with_lri) / total_with_lri * 100
+            hiv_neg_prop = len(hiv_neg_with_lri) / total_with_lri * 100
             
-            # Create stacked bar chart
-            severity_levels = sorted(set(unique_hiv_pos))
-            hiv_pos_counts = [counts_hiv_pos[unique_hiv_pos == sev][0] if sev in unique_hiv_pos else 0 for sev in severity_levels]
-            
-            if len(hiv_neg_with_lri) > 0:
-                hiv_neg_severity = lri_disease.severity_level[hiv_neg_with_lri]
-                unique_hiv_neg, counts_hiv_neg = np.unique(hiv_neg_severity, return_counts=True)
-                hiv_neg_counts = [counts_hiv_neg[unique_hiv_neg == sev][0] if sev in unique_hiv_neg else 0 for sev in severity_levels]
+            # Get severity distribution
+            if hasattr(lri_disease, 'severity_level') and len(hiv_pos_with_lri) > 0:
+                hiv_pos_severity = lri_disease.severity_level[hiv_pos_with_lri]
+                unique_hiv_pos, counts_hiv_pos = np.unique(hiv_pos_severity, return_counts=True)
+                
+                # Create stacked bar chart with proportions
+                severity_levels = sorted(set(unique_hiv_pos))
+                hiv_pos_counts = [counts_hiv_pos[unique_hiv_pos == sev][0] if sev in unique_hiv_pos else 0 for sev in severity_levels]
+                
+                if len(hiv_neg_with_lri) > 0:
+                    hiv_neg_severity = lri_disease.severity_level[hiv_neg_with_lri]
+                    unique_hiv_neg, counts_hiv_neg = np.unique(hiv_neg_severity, return_counts=True)
+                    hiv_neg_counts = [counts_hiv_neg[unique_hiv_neg == sev][0] if sev in unique_hiv_neg else 0 for sev in severity_levels]
+                else:
+                    hiv_neg_counts = [0] * len(severity_levels)
+                
+                # Calculate proportions for each severity level
+                total_by_severity = [hiv_pos_counts[i] + hiv_neg_counts[i] for i in range(len(severity_levels))]
+                hiv_pos_props = [hiv_pos_counts[i] / total_by_severity[i] * 100 if total_by_severity[i] > 0 else 0 
+                                for i in range(len(severity_levels))]
+                hiv_neg_props = [hiv_neg_counts[i] / total_by_severity[i] * 100 if total_by_severity[i] > 0 else 0 
+                                for i in range(len(severity_levels))]
+                
+                x = np.arange(len(severity_levels))
+                width = 0.35
+                
+                colors = ['#90EE90', '#FFD700', '#FF6347', '#8B0000']  # Light green, gold, tomato, dark red
+                
+                # Plot proportions as stacked bars
+                for i, sev in enumerate(severity_levels):
+                    if hiv_pos_props[i] > 0:
+                        ax6.bar(x[i] - width/2, hiv_pos_props[i], width, 
+                               label='HIV+' if i == 0 else '', color=colors[min(sev, len(colors)-1)], 
+                               alpha=0.8)
+                    if hiv_neg_props[i] > 0:
+                        ax6.bar(x[i] + width/2, hiv_neg_props[i], width,
+                               label='HIV-' if i == 0 else '', color=colors[min(sev, len(colors)-1)],
+                               alpha=0.5)
+                
+                ax6.set_xlabel('Severity Level', fontsize=10)
+                ax6.set_ylabel('Proportion (%)', fontsize=10)
+                ax6.set_title('Lower Respiratory Infections:\nProportion of HIV+ vs HIV- by Severity', fontsize=12, fontweight='bold')
+                ax6.set_xticks(x)
+                ax6.set_xticklabels([f'Level {sev}' for sev in severity_levels])
+                ax6.set_ylim(0, 105)
+                ax6.legend()
+                ax6.grid(True, alpha=0.3, axis='y')
+                
+                # Add value labels
+                for i, sev in enumerate(severity_levels):
+                    if hiv_pos_props[i] > 0:
+                        ax6.text(x[i] - width/2, hiv_pos_props[i], f'{hiv_pos_props[i]:.1f}%',
+                                ha='center', va='bottom', fontsize=8)
+                    if hiv_neg_props[i] > 0:
+                        ax6.text(x[i] + width/2, hiv_neg_props[i], f'{hiv_neg_props[i]:.1f}%',
+                                ha='center', va='bottom', fontsize=8)
             else:
-                hiv_neg_counts = [0] * len(severity_levels)
-            
-            x = np.arange(len(severity_levels))
-            width = 0.35
-            
-            # Plot stacked bars
-            bottom_hiv_pos = np.zeros(len(severity_levels))
-            bottom_hiv_neg = np.zeros(len(severity_levels))
-            
-            colors = ['#90EE90', '#FFD700', '#FF6347', '#8B0000']  # Light green, gold, tomato, dark red
-            
-            for i, sev in enumerate(severity_levels):
-                if hiv_pos_counts[i] > 0:
-                    ax6.bar(x[i] - width/2, hiv_pos_counts[i], width, 
-                           label='HIV+' if i == 0 else '', color=colors[min(sev, len(colors)-1)], 
-                           alpha=0.8, bottom=bottom_hiv_pos[i])
-                if hiv_neg_counts[i] > 0:
-                    ax6.bar(x[i] + width/2, hiv_neg_counts[i], width,
-                           label='HIV-' if i == 0 else '', color=colors[min(sev, len(colors)-1)],
-                           alpha=0.5, bottom=bottom_hiv_neg[i])
-            
-            ax6.set_xlabel('Severity Level', fontsize=10)
-            ax6.set_ylabel('Number of Individuals', fontsize=10)
-            ax6.set_title('Lower Respiratory Infections:\nHIV+ vs HIV- by Severity', fontsize=12, fontweight='bold')
-            ax6.set_xticks(x)
-            ax6.set_xticklabels([f'Level {sev}' for sev in severity_levels])
-            ax6.legend()
-            ax6.grid(True, alpha=0.3, axis='y')
-            
-            # Add value labels
-            for i, sev in enumerate(severity_levels):
-                if hiv_pos_counts[i] > 0:
-                    ax6.text(x[i] - width/2, hiv_pos_counts[i], f'{hiv_pos_counts[i]:,}',
-                            ha='center', va='bottom', fontsize=8)
-                if hiv_neg_counts[i] > 0:
-                    ax6.text(x[i] + width/2, hiv_neg_counts[i], f'{hiv_neg_counts[i]:,}',
-                            ha='center', va='bottom', fontsize=8)
+                # Fallback: just show overall proportions
+                categories = ['HIV+ with LRI', 'HIV- with LRI']
+                proportions = [hiv_pos_prop, hiv_neg_prop]
+                ax6.bar(categories, proportions, color=['#FF6347', '#90EE90'], alpha=0.8)
+                ax6.set_ylabel('Proportion (%)', fontsize=10)
+                ax6.set_title('Lower Respiratory Infections:\nProportion of HIV+ vs HIV-', fontsize=12, fontweight='bold')
+                ax6.set_ylim(0, 105)
+                ax6.grid(True, alpha=0.3, axis='y')
+                for i, prop in enumerate(proportions):
+                    ax6.text(i, prop, f'{prop:.1f}%', ha='center', va='bottom', fontweight='bold')
         else:
-            # Fallback: just show counts
-            categories = ['HIV+ with LRI', 'HIV- with LRI']
-            counts = [len(hiv_pos_with_lri), len(hiv_neg_with_lri)]
-            ax6.bar(categories, counts, color=['#FF6347', '#90EE90'], alpha=0.8)
-            ax6.set_ylabel('Number of Individuals', fontsize=10)
-            ax6.set_title('Lower Respiratory Infections:\nHIV+ vs HIV-', fontsize=12, fontweight='bold')
-            ax6.grid(True, alpha=0.3, axis='y')
-            for i, count in enumerate(counts):
-                ax6.text(i, count, f'{count:,}', ha='center', va='bottom', fontweight='bold')
+            # No LRI cases
+            ax6.text(0.5, 0.5, 'No LRI cases\navailable', 
+                    ha='center', va='center', transform=ax6.transAxes, fontsize=12)
+            ax6.set_title('Lower Respiratory Infections:\nProportion of HIV+ vs HIV-', fontsize=12, fontweight='bold')
     else:
         # Fallback if LRI data not available
         ax6.text(0.5, 0.5, 'LRI data\nnot available', 
@@ -609,15 +571,20 @@ def plot_cea_results(sim_base, sim_intv, analyzer_base, analyzer_intv, cost_incr
             fontsize=11, verticalalignment='top', family='monospace',
             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
     
-    # Add status indicator
-    ax7.text(0.95, 0.95, ce_status, transform=ax7.transAxes,
-            fontsize=14, fontweight='bold', color=ce_color,
-            verticalalignment='top', horizontalalignment='right',
-            bbox=dict(boxstyle='round,pad=0.5', facecolor='white', edgecolor=ce_color, linewidth=3))
+    # Add status indicator (removed "HIGHLY COST-EFFECTIVE" text as requested)
+    # Only show if not "HIGHLY COST-EFFECTIVE"
+    if ce_status != "HIGHLY COST-EFFECTIVE":
+        ax7.text(0.95, 0.95, ce_status, transform=ax7.transAxes,
+                fontsize=14, fontweight='bold', color=ce_color,
+                verticalalignment='top', horizontalalignment='right',
+                bbox=dict(boxstyle='round,pad=0.5', facecolor='white', edgecolor=ce_color, linewidth=3))
     
     plt.suptitle('Cost-Effectiveness Analysis: ART Intervention', 
                 fontsize=16, fontweight='bold', y=0.98)
-    plt.show()
+    
+    # Save as PNG instead of showing
+    plt.savefig('cea_results.png', dpi=300, bbox_inches='tight', facecolor='white')
+    print("CEA results saved to: cea_results.png")
     
     return fig
     

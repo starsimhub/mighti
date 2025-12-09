@@ -140,3 +140,7 @@ dmypy.json
 
 # Node.js and NPM
 node_modules
+
+# Documentation files (not for push)
+*.md
+!README.md
