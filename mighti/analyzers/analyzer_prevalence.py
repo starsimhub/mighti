@@ -17,7 +17,7 @@ import starsim as ss
 import numpy as np
 import sciris as sc
 
-__all__ = ["PrevalenceAnalyzer", "PrevalenceAnalyzer_HIV", "PrevalenceAnalyzer_SDoH", "OnARTByConditionAnalyzer"]
+__all__ = ["PrevalenceAnalyzer", "PrevalenceAnalyzer_HIV", "PrevalenceAnalyzer_SDoH", "OnARTByConditionAnalyzer", "OnARTByConditionAndSexAnalyzer"]
 
 
 
@@ -348,4 +348,48 @@ class OnARTByConditionAnalyzer(ss.Analyzer):
         ti = self.ti
         self.results["onart_with_condition"][ti]    = self.cond_prob(art, hiv & cond)
         self.results["onart_without_condition"][ti] = self.cond_prob(art, hiv & ~cond)
+
+
+class OnARTByConditionAndSexAnalyzer(ss.Analyzer):
+    """Tracks ART coverage among HIV+ individuals, stratified by condition and sex."""
+
+    @staticmethod
+    def cond_prob(num, den):
+        return sc.safedivide(np.sum(num & den), np.sum(den))
+
+    def __init__(self, condition_key="majordepressivedisorder.affected", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.name = f"onart_by_sex_{condition_key.replace('.', '_')}"
+        self.condition_key = condition_key
+        self.results_defined = False
+
+    def init_results(self):
+        super().init_results()
+        if self.results_defined:
+            return
+        results = [
+            ss.Result("onart_with_condition_male", dtype=float),
+            ss.Result("onart_without_condition_male", dtype=float),
+            ss.Result("onart_with_condition_female", dtype=float),
+            ss.Result("onart_without_condition_female", dtype=float),
+        ]
+        self.define_results(*results)
+        self.results_defined = True
+
+    def step(self):
+        ppl = self.sim.people
+        cond = np.asarray(ppl.states.get(self.condition_key), dtype=bool)
+        hiv  = np.asarray(ppl.states.get("hiv.infected"), dtype=bool)
+        art  = np.asarray(ppl.states.get("hiv.on_art"), dtype=bool)
+        male = np.asarray(ppl.male, dtype=bool)
+        female = np.asarray(ppl.female, dtype=bool)
+        ti = self.ti
+        
+        # Male
+        self.results["onart_with_condition_male"][ti]    = self.cond_prob(art, hiv & cond & male)
+        self.results["onart_without_condition_male"][ti] = self.cond_prob(art, hiv & ~cond & male)
+        
+        # Female
+        self.results["onart_with_condition_female"][ti]    = self.cond_prob(art, hiv & cond & female)
+        self.results["onart_without_condition_female"][ti] = self.cond_prob(art, hiv & ~cond & female)
         

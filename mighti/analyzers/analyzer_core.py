@@ -49,8 +49,8 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
         new_deaths_mask = ppl.dead & ~self._dead_prev
         new_deaths = new_deaths_mask.uids
 
-        # Cumulative infant deaths
-        self.results.infant_deaths[ti] = int(np.count_nonzero(ppl.dead[ppl.age < 1]))
+        # Cumulative infant deaths (age in days, so < 365 days = < 1 year)
+        self.results.infant_deaths[ti] = int(np.count_nonzero(ppl.dead[ppl.age < 365]))
 
         # Tally new deaths by age/sex
         if len(new_deaths):
@@ -337,12 +337,12 @@ class InfantDeathsAnalyzer(ss.Analyzer):
             return
         
         # Get ages and sex for new deaths
-        ages = ppl.age[new_deaths]
+        # Note: ppl.age is in DAYS, not years
+        ages_days = ppl.age[new_deaths]
         female = ppl.female[new_deaths]
         
-        # Neonatal deaths (age < 28 days = 28/365 years)
-        neonatal_threshold = 28 / 365.0
-        neonatal_mask = ages < neonatal_threshold
+        # Neonatal deaths (age < 28 days)
+        neonatal_mask = ages_days < 28
         
         if np.any(neonatal_mask):
             neonatal_deaths = new_deaths[neonatal_mask]
@@ -386,8 +386,8 @@ class InfantDeathsAnalyzer(ss.Analyzer):
                             # Debug: print error if needed
                             pass
         
-        # Infant deaths (age < 1 year)
-        infant_mask = ages < 1.0
+        # Infant deaths (28 days to 1 year = 365 days)
+        infant_mask = (ages_days >= 28) & (ages_days < 365)
         if np.any(infant_mask):
             infant_deaths = new_deaths[infant_mask]
             infant_female = female[infant_mask]
@@ -395,9 +395,9 @@ class InfantDeathsAnalyzer(ss.Analyzer):
             self.results.infant_deaths_male[ti] = int(np.sum(~infant_female))
             self.results.infant_deaths_female[ti] = int(np.sum(infant_female))
         
-        # Accumulate person-years for infants (alive people at age < 1)
+        # Accumulate person-years for infants (alive people at age < 365 days = 1 year)
         alive = ~ppl.dead
-        infant_alive = ppl.age[alive] < 1.0
+        infant_alive = ppl.age[alive] < 365  # Age is in days
         if np.any(infant_alive):
             infant_alive_uids = np.where(alive)[0][infant_alive]
             infant_female_alive = ppl.female[infant_alive_uids]

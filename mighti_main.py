@@ -182,12 +182,12 @@ for disease in healthconditions:
         disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})
         disease_objects.append(disease_obj)
 
-# Neonatal diseases (with is_neonatal=True)
+# Neonatal/congenital diseases (acquired at birth, age-dependent mortality)
 for disease in neonatal_disease:
     disease_class = getattr(mi, disease, None)
     if disease_class:
         init_prev = ss.bernoulli(p=make_init_prev_func(disease))
-        disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev}, is_neonatal=True)
+        disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})
         disease_objects.append(disease_obj)
 
 

@@ -28,13 +28,26 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
     person_years = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
 
     for age in range(max_age + 1):
+        # Access results - handle both dict-style and attribute-style access
+        if hasattr(deaths_module.results, 'male_deaths_by_age'):
+            male_deaths = deaths_module.results.male_deaths_by_age
+        elif 'male_deaths_by_age' in deaths_module.results:
+            male_deaths = deaths_module.results['male_deaths_by_age']
+        else:
+            raise ValueError(f"Could not find male_deaths_by_age in analyzer results. Available keys: {list(deaths_module.results.keys()) if hasattr(deaths_module.results, 'keys') else 'N/A'}")
+        
+        if hasattr(deaths_module.results, 'female_deaths_by_age'):
+            female_deaths = deaths_module.results.female_deaths_by_age
+        elif 'female_deaths_by_age' in deaths_module.results:
+            female_deaths = deaths_module.results['female_deaths_by_age']
+        else:
+            raise ValueError(f"Could not find female_deaths_by_age in analyzer results. Available keys: {list(deaths_module.results.keys()) if hasattr(deaths_module.results, 'keys') else 'N/A'}")
+        
         deaths_by_age['Male'][age] = (
-            deaths_module.results.male_deaths_by_age[age]
-            if age < len(deaths_module.results.male_deaths_by_age) else 0
+            male_deaths[age] if age < len(male_deaths) else 0
         )
         deaths_by_age['Female'][age] = (
-            deaths_module.results.female_deaths_by_age[age]
-            if age < len(deaths_module.results.female_deaths_by_age) else 0
+            female_deaths[age] if age < len(female_deaths) else 0
         )
     
     mortality_rates = []
@@ -85,14 +98,46 @@ def calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100):
             l_next = l_x[-1] * np.exp(-m_x[age])
             l_x.append(l_next)
         l_x = np.array(l_x)
+        
+        # Normalize l_x to l(0) = 1.0 (radix) for standard life table
+        # This ensures e(x) is in years and comparable across populations
+        if l_x[0] > 0:
+            l_x = l_x / l_x[0]
 
         d_x = l_x[:-1] - l_x[1:]
         d_x = np.append(d_x, l_x[-1])  # all die at terminal age
 
         q_x = 1 - np.exp(-m_x)
 
-        L_x = 0.5 * (l_x[:-1] + l_x[1:])
-        L_x = np.append(L_x, l_x[-1] / m_x[-1] if m_x[-1] > 0 else 0)
+        # Calculate L(x) - person-years lived in age interval [x, x+1)
+        # For age 0 (infants), use a(0) factor to account for early infant deaths
+        # Standard: L(0) = a(0) * l(0) + (1 - a(0)) * l(1)
+        # where a(0) ≈ 0.1-0.3 for high infant mortality, 0.5 for uniform
+        # For other ages, use uniform distribution: L(x) = 0.5 * (l(x) + l(x+1))
+        L_x = np.zeros(max_age + 1)
+        
+        # Age 0: use a(0) factor based on infant mortality level
+        # If q(0) > 0.1 (high infant mortality), use a(0) = 0.2
+        # Otherwise use a(0) = 0.3 (moderate) or 0.5 (low)
+        if max_age > 0:
+            q0 = q_x[0] if len(q_x) > 0 else 0
+            if q0 > 0.1:
+                a0 = 0.2  # High infant mortality: most deaths early in first year
+            elif q0 > 0.05:
+                a0 = 0.3  # Moderate infant mortality
+            else:
+                a0 = 0.5  # Low infant mortality: uniform distribution
+            L_x[0] = a0 * l_x[0] + (1 - a0) * l_x[1]
+        else:
+            L_x[0] = l_x[0]
+        
+        # Ages 1 to max_age-1: uniform distribution assumption
+        for age in range(1, max_age):
+            L_x[age] = 0.5 * (l_x[age] + l_x[age + 1])
+        
+        # Last age group (open interval): L(max_age) = l(max_age) / m(max_age)
+        if max_age > 0:
+            L_x[max_age] = l_x[max_age] / m_x[max_age] if m_x[max_age] > 0 else 0
 
         T_x = np.zeros_like(L_x)
         T_accum = 0

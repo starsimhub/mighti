@@ -211,10 +211,25 @@ def initialize_severity_system(disease, disease_params, pars=None):
         disease: Disease instance
         disease_params (dict): Parameters from get_disease_parameters()
         pars (dict, optional): Additional parameters that may override defaults
+            - enable_severity (bool): If False, severity system is not initialized (default: True if severity data exists, else False)
     
     Returns:
-        dict: Severity configuration including proportions and weights
+        dict or None: Severity configuration including proportions and weights, or None if severity is disabled
     """
+    # Check if severity is explicitly enabled/disabled
+    # Default: only enable if severity data exists (severity_weights or GBD data)
+    has_severity_data = "severity_weights" in disease_params or disease_params.get("disability_weight_gbd") is not None
+    
+    if pars and "enable_severity" in pars:
+        enable_severity = bool(pars["enable_severity"])
+    else:
+        # Default: enable only if severity data exists
+        enable_severity = has_severity_data
+    
+    # If disabled, return None
+    if not enable_severity:
+        logger.debug(f"Severity system disabled for {disease.disease_name}")
+        return None
     # Check if severity weights are provided directly (from severity CSV)
     if "severity_weights" in disease_params:
         # Direct weights from severity CSV
@@ -314,7 +329,12 @@ def initialize_severity_system(disease, disease_params, pars=None):
             # For >3 levels, use linear interpolation
             severity_weights = np.linspace(0.3 * d_gbd, min(1.0, 1.7 * d_gbd), n_levels)
     else:
-        # No GBD weight provided, use default weights
+        # No GBD weight provided - disable severity unless explicitly enabled
+        if not enable_severity:
+            logger.debug(f"Severity disabled for {disease.disease_name} (no severity data and not explicitly enabled)")
+            return None
+        
+        # Use default weights only if explicitly enabled
         logger.warning(f"No GBD disability weight for {disease.disease_name}, using default severity weights")
         if n_levels == 1:
             severity_weights = np.array([0.1])
@@ -434,7 +454,7 @@ def get_severity_parameters_from_csv(csv_path, disease_name):
         return None
 
 
-def get_disease_parameters(csv_path, disease_name, severity_csv_path=None):
+def get_disease_parameters(csv_path, disease_name, severity_csv_path=None, enable_severity=None):
     """
     Load disease-specific parameters from a CSV file, returning a dictionary
     with required fields and defaults when missing.
@@ -446,6 +466,7 @@ def get_disease_parameters(csv_path, disease_name, severity_csv_path=None):
             If None, will automatically try to find a severity CSV file based on csv_path.
             For example, if csv_path is "mighti/data/eswatini_parameters.csv",
             it will look for "mighti/data/eswatini_severity.csv".
+        enable_severity (bool, optional): If False, suppress warnings for severity-related fields.
 
     Returns:
         dict: Dictionary of parameters for the specified disease.
@@ -462,13 +483,24 @@ def get_disease_parameters(csv_path, disease_name, severity_csv_path=None):
     if row.empty:
         raise ValueError(f"Disease '{disease_name}' not found in parameter file: {csv_path}")
 
+    # Severity-related fields that should not warn if severity is disabled
+    severity_fields = {
+        "n_severity_levels", "p_severity_mild", "p_severity_moderate", "p_severity_severe",
+        "severity_proportions", "disability_weight_gbd", "severity_method"
+    }
+
     def get_value_safe(field, default):
+        is_severity_field = field in severity_fields
+        suppress_warning = (enable_severity is False) and is_severity_field
+        
         if field not in row.columns:
-            logger.warning(f"Column '{field}' missing for {disease_name}, using default: {default}")
+            if not suppress_warning:
+                logger.warning(f"Column '{field}' missing for {disease_name}, using default: {default}")
             return default
         val = row[field].values[0]
         if pd.isna(val):
-            logger.warning(f"Missing value for '{field}' in {disease_name}, using default: {default}")
+            if not suppress_warning:
+                logger.warning(f"Missing value for '{field}' in {disease_name}, using default: {default}")
             return default
         return val
 
@@ -551,8 +583,18 @@ class RemittingDisease(ss.NCD):
 
     def __init__(self, csv_path, pars=None, **kwargs):
         super().__init__()
-        self.csv_path = csv_path    
-        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)        
+        self.csv_path = csv_path
+        
+        # Extract enable_severity early to suppress warnings
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+        
+        disease_params = get_disease_parameters(
+            csv_path=self.csv_path, 
+            disease_name=self.disease_name,
+            enable_severity=enable_severity_val
+        )        
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
 
         # Calculate the mean in log-space (mu)
@@ -575,12 +617,28 @@ class RemittingDisease(ss.NCD):
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
         self.p_remission = ss.bernoulli(p=lambda self, sim, uids: self.pars.remission_rate) 
 
-        self.update_pars(pars, **kwargs)
+        # Extract enable_severity before update_pars (it's not a recognized parameter)
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+            # Create a copy without enable_severity for update_pars
+            pars_clean = {k: v for k, v in pars.items() if k != "enable_severity"}
+        else:
+            pars_clean = pars
         
-        # Initialize severity system
-        initialize_severity_system(self, disease_params, pars)
+        self.update_pars(pars_clean, **kwargs)
+        
+        # Restore enable_severity to pars for initialize_severity_system
+        pars_for_severity = pars.copy() if pars else {}
+        if enable_severity_val is not None:
+            pars_for_severity["enable_severity"] = enable_severity_val
+        
+        # Initialize severity system (may return None if disabled)
+        severity_config = initialize_severity_system(self, disease_params, pars_for_severity)
+        self._severity_enabled = severity_config is not None
 
-        self.define_states(
+        # Define states - conditionally include severity_level
+        states = [
             ss.BoolState('susceptible', default=True),
             ss.BoolState('at_risk', default=True),   
             ss.BoolState('affected'),
@@ -591,9 +649,12 @@ class RemittingDisease(ss.NCD):
             ss.FloatArr('ti_dead'), 
             ss.FloatArr('rel_sus', default=1.0),  
             ss.FloatArr('rel_death', default=1.0),
-            ss.IntArr('severity_level', default=0),  # 0=mild, 1=moderate, 2=severe, etc.
-            reset=True,
-        )
+        ]
+        # Only add severity_level if severity is enabled
+        if self._severity_enabled:
+            states.append(ss.IntArr('severity_level', default=0))  # 0=mild, 1=moderate, 2=severe, etc.
+        
+        self.define_states(*states, reset=True)
 
     def init_post(self):
 
@@ -621,7 +682,7 @@ class RemittingDisease(ss.NCD):
         self.susceptible[uids] = False
         self.affected[uids] = True
         # Assign severity levels to new cases
-        if len(uids) > 0 and hasattr(self, 'severity_proportions'):
+        if len(uids) > 0 and hasattr(self, 'severity_proportions') and hasattr(self, 'severity_level'):
             severity_levels = assign_severity_level(uids, self.severity_proportions)
             self.severity_level[uids] = severity_levels
 
@@ -755,7 +816,16 @@ class AcuteDisease(ss.NCD):
     def __init__(self, csv_path=None, pars=None, **kwargs):
         super().__init__()
         self.csv_path = csv_path
-        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        # Extract enable_severity early to suppress warnings
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+        
+        disease_params = get_disease_parameters(
+            csv_path=self.csv_path, 
+            disease_name=self.disease_name,
+            enable_severity=enable_severity_val
+        )
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
 
         # Calculate mean in log-space (mu)
@@ -774,12 +844,29 @@ class AcuteDisease(ss.NCD):
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
-        self.update_pars(pars, **kwargs)
         
-        # Initialize severity system
-        initialize_severity_system(self, disease_params, pars)
+        # Extract enable_severity before update_pars (it's not a recognized parameter)
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+            # Create a copy without enable_severity for update_pars
+            pars_clean = {k: v for k, v in pars.items() if k != "enable_severity"}
+        else:
+            pars_clean = pars
+        
+        self.update_pars(pars_clean, **kwargs)
+        
+        # Restore enable_severity to pars for initialize_severity_system
+        pars_for_severity = pars.copy() if pars else {}
+        if enable_severity_val is not None:
+            pars_for_severity["enable_severity"] = enable_severity_val
+        
+        # Initialize severity system (may return None if disabled)
+        severity_config = initialize_severity_system(self, disease_params, pars_for_severity)
+        self._severity_enabled = severity_config is not None
 
-        self.define_states(
+        # Define states - conditionally include severity_level
+        states = [
             ss.BoolState('susceptible', default=True),
             ss.BoolState('at_risk', default=True),
             ss.BoolState('affected'),
@@ -788,9 +875,12 @@ class AcuteDisease(ss.NCD):
             ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus', default=1.0),
             ss.FloatArr('rel_death', default=1.0),
-            ss.IntArr('severity_level', default=0),  # 0=mild, 1=moderate, 2=severe, etc.
-            reset=True,
-        )
+        ]
+        # Only add severity_level if severity is enabled
+        if self._severity_enabled:
+            states.append(ss.IntArr('severity_level', default=0))  # 0=mild, 1=moderate, 2=severe, etc.
+        
+        self.define_states(*states, reset=True)
 
     def init_post(self):
         
@@ -817,7 +907,7 @@ class AcuteDisease(ss.NCD):
         self.affected[uids] = True
         self.at_risk[uids] = False
         # Assign severity levels to new cases
-        if len(uids) > 0 and hasattr(self, 'severity_proportions'):
+        if len(uids) > 0 and hasattr(self, 'severity_proportions') and hasattr(self, 'severity_level'):
             severity_levels = assign_severity_level(uids, self.severity_proportions)
             self.severity_level[uids] = severity_levels
 
@@ -919,7 +1009,16 @@ class AcuteSurgicalDisease(ss.NCD):
     def __init__(self, csv_path=None, pars=None, **kwargs):
         super().__init__()
         self.csv_path = csv_path
-        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        # Extract enable_severity early to suppress warnings
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+        
+        disease_params = get_disease_parameters(
+            csv_path=self.csv_path, 
+            disease_name=self.disease_name,
+            enable_severity=enable_severity_val
+        )
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
 
         sigma = 0.5
@@ -943,13 +1042,29 @@ class AcuteSurgicalDisease(ss.NCD):
         self.p_acquire = ss.bernoulli(
             p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids)
         )
-        self.update_pars(pars, **kwargs)
         
-        # Initialize severity system
-        initialize_severity_system(self, disease_params, pars)
+        # Extract enable_severity before update_pars (it's not a recognized parameter)
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+            # Create a copy without enable_severity for update_pars
+            pars_clean = {k: v for k, v in pars.items() if k != "enable_severity"}
+        else:
+            pars_clean = pars
+        
+        self.update_pars(pars_clean, **kwargs)
+        
+        # Restore enable_severity to pars for initialize_severity_system
+        pars_for_severity = pars.copy() if pars else {}
+        if enable_severity_val is not None:
+            pars_for_severity["enable_severity"] = enable_severity_val
+        
+        # Initialize severity system (may return None if disabled)
+        severity_config = initialize_severity_system(self, disease_params, pars_for_severity)
+        self._severity_enabled = severity_config is not None
 
-        # Define states
-        self.define_states(
+        # Define states - conditionally include severity_level
+        states = [
             ss.BoolState("susceptible", default=True),
             ss.BoolState("at_risk", default=True),
             ss.BoolState("affected"),
@@ -960,9 +1075,12 @@ class AcuteSurgicalDisease(ss.NCD):
             ss.FloatArr("ti_surgery"),
             ss.FloatArr("rel_sus", default=1.0),
             ss.FloatArr("rel_death", default=1.0),
-            ss.IntArr("severity_level", default=0),  # 0=mild, 1=moderate, 2=severe, etc.
-            reset=True,
-        )
+        ]
+        # Only add severity_level if severity is enabled
+        if self._severity_enabled:
+            states.append(ss.IntArr("severity_level", default=0))  # 0=mild, 1=moderate, 2=severe, etc.
+        
+        self.define_states(*states, reset=True)
 
     def init_post(self):
         super().init_post()
@@ -983,7 +1101,7 @@ class AcuteSurgicalDisease(ss.NCD):
         self.at_risk[uids] = False
         self.rel_death[uids] = self.pars.rel_mortality_untreated
         # Assign severity levels to new cases
-        if len(uids) > 0 and hasattr(self, 'severity_proportions'):
+        if len(uids) > 0 and hasattr(self, 'severity_proportions') and hasattr(self, 'severity_level'):
             severity_levels = assign_severity_level(uids, self.severity_proportions)
             self.severity_level[uids] = severity_levels
 
@@ -1082,7 +1200,16 @@ class ChronicDisease(ss.NCD):
     def __init__(self, csv_path, pars=None, **kwargs):
         super().__init__()
         self.csv_path = csv_path
-        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        # Extract enable_severity early to suppress warnings
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+        
+        disease_params = get_disease_parameters(
+            csv_path=self.csv_path, 
+            disease_name=self.disease_name,
+            enable_severity=enable_severity_val
+        )
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
 
         sigma = 0.5
@@ -1100,12 +1227,29 @@ class ChronicDisease(ss.NCD):
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
-        self.update_pars(pars, **kwargs)
         
-        # Initialize severity system
-        initialize_severity_system(self, disease_params, pars)
+        # Extract enable_severity before update_pars (it's not a recognized parameter)
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+            # Create a copy without enable_severity for update_pars
+            pars_clean = {k: v for k, v in pars.items() if k != "enable_severity"}
+        else:
+            pars_clean = pars
+        
+        self.update_pars(pars_clean, **kwargs)
+        
+        # Restore enable_severity to pars for initialize_severity_system
+        pars_for_severity = pars.copy() if pars else {}
+        if enable_severity_val is not None:
+            pars_for_severity["enable_severity"] = enable_severity_val
+        
+        # Initialize severity system (may return None if disabled)
+        severity_config = initialize_severity_system(self, disease_params, pars_for_severity)
+        self._severity_enabled = severity_config is not None
 
-        self.define_states(
+        # Define states - conditionally include severity_level
+        states = [
             ss.BoolState('susceptible', default=True),
             ss.BoolState('at_risk', default=True),
             ss.BoolState('affected'),
@@ -1114,9 +1258,12 @@ class ChronicDisease(ss.NCD):
             ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus', default=1.0),
             ss.FloatArr('rel_death', default=1.0),
-            ss.IntArr('severity_level', default=0),  # 0=mild, 1=moderate, 2=severe, etc.
-            reset=True,
-        )
+        ]
+        # Only add severity_level if severity is enabled
+        if self._severity_enabled:
+            states.append(ss.IntArr('severity_level', default=0))  # 0=mild, 1=moderate, 2=severe, etc.
+        
+        self.define_states(*states, reset=True)
 
     def init_post(self):
  
@@ -1143,7 +1290,7 @@ class ChronicDisease(ss.NCD):
         self.affected[uids] = True
         self.at_risk[uids] = False
         # Assign severity levels to new cases
-        if len(uids) > 0 and hasattr(self, 'severity_proportions'):
+        if len(uids) > 0 and hasattr(self, 'severity_proportions') and hasattr(self, 'severity_level'):
             severity_levels = assign_severity_level(uids, self.severity_proportions)
             self.severity_level[uids] = severity_levels
 
@@ -1253,7 +1400,16 @@ class GenericSIS(ss.SIS):
     def __init__(self, csv_path, pars=None, **kwargs):
         super().__init__()
         self.csv_path = csv_path
-        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        # Extract enable_severity early to suppress warnings
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+        
+        disease_params = get_disease_parameters(
+            csv_path=self.csv_path, 
+            disease_name=self.disease_name,
+            enable_severity=enable_severity_val
+        )
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
 
         sigma = 0.5
@@ -1277,12 +1433,29 @@ class GenericSIS(ss.SIS):
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
         self.p_remission = ss.bernoulli(p=lambda self, sim, uids: self.pars.remission_rate)
-        self.update_pars(pars, **kwargs)
         
-        # Initialize severity system
-        initialize_severity_system(self, disease_params, pars)
+        # Extract enable_severity before update_pars (it's not a recognized parameter)
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+            # Create a copy without enable_severity for update_pars
+            pars_clean = {k: v for k, v in pars.items() if k != "enable_severity"}
+        else:
+            pars_clean = pars
+        
+        self.update_pars(pars_clean, **kwargs)
+        
+        # Restore enable_severity to pars for initialize_severity_system
+        pars_for_severity = pars.copy() if pars else {}
+        if enable_severity_val is not None:
+            pars_for_severity["enable_severity"] = enable_severity_val
+        
+        # Initialize severity system (may return None if disabled)
+        severity_config = initialize_severity_system(self, disease_params, pars_for_severity)
+        self._severity_enabled = severity_config is not None
 
-        self.define_states(
+        # Define states - conditionally include severity_level
+        states = [
             ss.BoolState('susceptible', default=True),
             ss.BoolState('at_risk', default=True),
             ss.BoolState('infected'),
@@ -1294,9 +1467,12 @@ class GenericSIS(ss.SIS):
             ss.FloatArr('immunity', default=0.0),  # Required by base ss.SIS.update_immunity()
             ss.FloatArr('rel_sus', default=1.0),
             ss.FloatArr('rel_death', default=1.0),
-            ss.IntArr('severity_level', default=0),  # 0=mild, 1=moderate, 2=severe, etc.
-            reset=True,
-        )
+        ]
+        # Only add severity_level if severity is enabled
+        if self._severity_enabled:
+            states.append(ss.IntArr('severity_level', default=0))  # 0=mild, 1=moderate, 2=severe, etc.
+        
+        self.define_states(*states, reset=True)
 
     def init_post(self):
         super().init_post()
@@ -1323,7 +1499,7 @@ class GenericSIS(ss.SIS):
         self.infected[uids] = True
         self.at_risk[uids] = False
         # Assign severity levels to new cases
-        if len(uids) > 0 and hasattr(self, 'severity_proportions'):
+        if len(uids) > 0 and hasattr(self, 'severity_proportions') and hasattr(self, 'severity_level'):
             severity_levels = assign_severity_level(uids, self.severity_proportions)
             self.severity_level[uids] = severity_levels
 
@@ -1574,7 +1750,16 @@ class GenericSIR(ss.SIR):
     def __init__(self, csv_path, pars=None, **kwargs):
         super().__init__()
         self.csv_path = csv_path
-        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        # Extract enable_severity early to suppress warnings
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+        
+        disease_params = get_disease_parameters(
+            csv_path=self.csv_path, 
+            disease_name=self.disease_name,
+            enable_severity=enable_severity_val
+        )
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
         
         sigma = 0.5
@@ -1596,13 +1781,28 @@ class GenericSIR(ss.SIR):
         self.p_acquire   = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
         self.p_remission = ss.bernoulli(p=lambda self, sim, uids: self.pars.remission_rate)
 
-        self.update_pars(pars, **kwargs)
+        # Extract enable_severity before update_pars (it's not a recognized parameter)
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+            # Create a copy without enable_severity for update_pars
+            pars_clean = {k: v for k, v in pars.items() if k != "enable_severity"}
+        else:
+            pars_clean = pars
         
-        # Initialize severity system
-        initialize_severity_system(self, disease_params, pars)
+        self.update_pars(pars_clean, **kwargs)
+        
+        # Restore enable_severity to pars for initialize_severity_system
+        pars_for_severity = pars.copy() if pars else {}
+        if enable_severity_val is not None:
+            pars_for_severity["enable_severity"] = enable_severity_val
+        
+        # Initialize severity system (may return None if disabled)
+        severity_config = initialize_severity_system(self, disease_params, pars_for_severity)
+        self._severity_enabled = severity_config is not None
 
-        # States
-        self.define_states(
+        # Define states - conditionally include severity_level
+        states = [
             ss.BoolState('susceptible', default=True),
             ss.BoolState('at_risk', default=True),     # convenience mask for who can acquire
             ss.BoolState('infected'),
@@ -1613,9 +1813,12 @@ class GenericSIR(ss.SIR):
             ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus',   default=1.0),
             ss.FloatArr('rel_death', default=1.0),
-            ss.IntArr('severity_level', default=0),  # 0=mild, 1=moderate, 2=severe, etc.
-            reset=True,
-        )
+        ]
+        # Only add severity_level if severity is enabled
+        if self._severity_enabled:
+            states.append(ss.IntArr('severity_level', default=0))  # 0=mild, 1=moderate, 2=severe, etc.
+        
+        self.define_states(*states, reset=True)
 
     def init_post(self):
         super().init_post()
@@ -1637,7 +1840,7 @@ class GenericSIR(ss.SIR):
         self.infected[uids]    = True
         self.at_risk[uids]     = False
         # Assign severity levels to new cases
-        if len(uids) > 0 and hasattr(self, 'severity_proportions'):
+        if len(uids) > 0 and hasattr(self, 'severity_proportions') and hasattr(self, 'severity_level'):
             severity_levels = assign_severity_level(uids, self.severity_proportions)
             self.severity_level[uids] = severity_levels
 
@@ -1771,7 +1974,7 @@ class GenericSIR(ss.SIR):
         return dur
     
     
-class NonAcquiredDisease(ss.Module):
+class NonAcquiredDisease(ss.Disease):
     """
     Base class for congenital or neonatal (non-acquired) diseases.
 
@@ -1781,47 +1984,115 @@ class NonAcquiredDisease(ss.Module):
         - Static genetic disorders (Down Syndrome, Chromosomal Abnormalities)
 
     Features:
-        - No acquisition or remission processes
-        - No 'at_risk' or 'susceptible' states
-        - Static prevalence initialized at birth
-        - Optional neonatal restriction (<28 days)
-        - Mortality via p_death
+        - Inherits from ss.Disease to follow standard disease pattern
+        - Acquired immediately at birth (treated as "born with")
+        - Age-dependent mortality probability function
+        - Separate result categories for post-processing (neonatal, infant, later deaths)
     """
-    depends_on = ["Deaths", "DeathsExtended"]
 
-    def __init__(self, csv_path, pars=None, is_neonatal=False, **kwargs):
+    def __init__(self, csv_path, pars=None, **kwargs):
         super().__init__()
         self.csv_path = csv_path
-        self.is_neonatal = is_neonatal
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
 
         # Load parameters
-        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        # Extract enable_severity early to suppress warnings
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+        
+        disease_params = get_disease_parameters(
+            csv_path=self.csv_path, 
+            disease_name=self.disease_name,
+            enable_severity=enable_severity_val
+        )
 
-        # Define parameters (no acquisition or remission)
+        # Get age-dependent mortality parameters
+        # Support both single p_death (for backward compatibility) and age-dependent dict
+        p_death_base = disease_params.get("p_death", 0.0)
+        p_death_by_age = disease_params.get("p_death_by_age", None)  # Dict like {0: 0.1, 1: 0.05, ...}
+        
+        # Create age-dependent probability function
+        if p_death_by_age is not None and isinstance(p_death_by_age, dict):
+            # Age-dependent mortality
+            def p_death_age_fn(self, sim, uids):
+                """Age-dependent mortality probability."""
+                ages_years = sim.people.age[uids] / 365.25  # Convert days to years
+                ages_years = np.clip(ages_years, 0, None)  # Ensure non-negative
+                
+                # Get age group (0=neonatal, 1=infant, 2=child, etc.)
+                # For now, use simple age bins: <1 month (neonatal), <1 year (infant), >=1 year
+                p_death_arr = np.zeros(len(uids))
+                
+                # Neonatal (< 28 days / ~0.077 years)
+                neonatal_mask = ages_years < (28 / 365.25)
+                if neonatal_mask.any():
+                    p_death_arr[neonatal_mask] = p_death_by_age.get(0, p_death_base)
+                
+                # Infant (28 days to 1 year)
+                infant_mask = (ages_years >= (28 / 365.25)) & (ages_years < 1.0)
+                if infant_mask.any():
+                    p_death_arr[infant_mask] = p_death_by_age.get(1, p_death_base)
+                
+                # Child/adult (>= 1 year)
+                older_mask = ages_years >= 1.0
+                if older_mask.any():
+                    p_death_arr[older_mask] = p_death_by_age.get(2, p_death_base)
+                
+                return p_death_arr
+            
+            p_death = ss.bernoulli(p=p_death_age_fn)
+        else:
+            # Simple constant probability (backward compatibility)
+            p_death = ss.bernoulli(p_death_base)
+        
+        # Define parameters - now includes acquisition (but will be set to 0, acquired at birth)
         self.define_pars(
-            p_death=ss.bernoulli(disease_params.get("p_death", 0.0)),
+            p_death=p_death,
             dur_condition=disease_params.get("dur_condition", 1.0),
             max_disease_duration=disease_params.get("max_disease_duration", 1.0),
             rel_sus_hiv=disease_params.get("rel_sus_hiv", 1.0),
             affected_sex=disease_params.get("affected_sex", "both"),
+            p_acquire_multiplier=0.0,  # No ongoing acquisition - only at birth
+            p_acquire=0.0,  # No ongoing acquisition
             init_prev=pars.get("init_prev", ss.bernoulli(0.01)) if pars else ss.bernoulli(0.01),
         )
-        self.update_pars(pars, **kwargs)
         
-        # Initialize severity system
-        initialize_severity_system(self, disease_params, pars)
+        # Extract enable_severity before update_pars (it's not a recognized parameter)
+        enable_severity_val = None
+        if pars and "enable_severity" in pars:
+            enable_severity_val = pars.get("enable_severity")
+            # Create a copy without enable_severity for update_pars
+            pars_clean = {k: v for k, v in pars.items() if k != "enable_severity"}
+        else:
+            pars_clean = pars
+        
+        self.update_pars(pars_clean, **kwargs)
+        
+        # Restore enable_severity to pars for initialize_severity_system
+        pars_for_severity = pars.copy() if pars else {}
+        if enable_severity_val is not None:
+            pars_for_severity["enable_severity"] = enable_severity_val
+        
+        # Initialize severity system (may return None if disabled)
+        severity_config = initialize_severity_system(self, disease_params, pars_for_severity)
+        self._severity_enabled = severity_config is not None
 
-        # Define minimal states
-        self.define_states(
+        # Define states matching ss.NCD pattern - conditionally include severity_level
+        states = [
+            ss.BoolState("susceptible", default=True, label="Susceptible"),
+            ss.BoolState("at_risk", default=True, label="At risk"),
             ss.BoolState("affected", default=False, label="Affected"),
             ss.FloatArr("rel_death", default=1.0, label="Relative mortality multiplier"),
             ss.FloatArr("rel_sus", default=1.0, label="Relative susceptibility"),
             ss.FloatArr("ti_affected", label="Time of becoming affected"),
             ss.FloatArr("ti_dead", label="Time of death"),
-            ss.IntArr("severity_level", default=0, label="Severity level"),  # 0=mild, 1=moderate, 2=severe, etc.
-            reset=True,
-        )
+        ]
+        # Only add severity_level if severity is enabled
+        if self._severity_enabled:
+            states.append(ss.IntArr("severity_level", default=0, label="Severity level"))  # 0=mild, 1=moderate, 2=severe, etc.
+        
+        self.define_states(*states, reset=True)
 
     # ---------------------------------------------------------------------
     # Initialization lifecycle
@@ -1831,31 +2102,35 @@ class NonAcquiredDisease(ss.Module):
         return
 
     def init_post(self):
-        """Initialize congenital/neonatal prevalence at birth."""
+        """Acquire disease immediately at birth (treat as 'born with')."""
         super().init_post()
         sim = self.sim
         n = len(sim.people)
 
-        # Draw initial affected status
+        # Draw initial affected status (prevalence at birth)
         if hasattr(self.pars.init_prev, "rvs"):
             affected = self.pars.init_prev.rvs(sim.people.uid)
         elif callable(self.pars.init_prev):
-            affected = np.array(self.pars.init_prev(), dtype=bool)
+            affected = np.array(self.pars.init_prev(sim, sim.people.uid), dtype=bool)
         else:
             p = float(self.pars.init_prev)
             affected = np.random.rand(n) < p
 
-        self.affected[:] = affected
-        self.ti_affected[affected] = self.ti
-        
-        # Assign severity levels to affected individuals
+        # Acquire disease immediately (set states as if acquired)
         affected_uids = np.where(affected)[0]
-        if len(affected_uids) > 0 and hasattr(self, 'severity_proportions'):
-            severity_levels = assign_severity_level(affected_uids, self.severity_proportions)
-            self.severity_level[affected_uids] = severity_levels
+        if len(affected_uids) > 0:
+            self.susceptible[affected_uids] = False
+            self.at_risk[affected_uids] = False
+            self.affected[affected_uids] = True
+            self.ti_affected[affected_uids] = self.ti
+            
+            # Assign severity levels to affected individuals
+            if hasattr(self, 'severity_proportions') and hasattr(self, 'severity_level'):
+                severity_levels = assign_severity_level(affected_uids, self.severity_proportions)
+                self.severity_level[affected_uids] = severity_levels
 
         n_affected = affected.sum()
-        logger.info(f"[INIT] {self.disease_name}: {n_affected}/{n} ({n_affected/n:.3%}) affected at birth")
+        logger.info(f"[INIT] {self.disease_name}: {n_affected}/{n} ({n_affected/n:.3%}) acquired at birth")
 
     def init_results(self):
         super().init_results()
@@ -1863,20 +2138,27 @@ class NonAcquiredDisease(ss.Module):
         if "prevalence" not in existing:
             self.define_results(ss.Result("prevalence", dtype=float, scale=False, label="Prevalence"))
         if "new_deaths" not in existing:
-            self.define_results(ss.Result("new_deaths", dtype=int, scale=True, label="Deaths"))
+            self.define_results(ss.Result("new_deaths", dtype=int, scale=True, label="Total Deaths"))
         if "n_affected" not in existing:
             self.define_results(ss.Result("n_affected", dtype=int, scale=False, label="Affected"))
+        # Separate result categories for post-processing
+        if "neonatal_deaths" not in existing:
+            self.define_results(ss.Result("neonatal_deaths", dtype=int, scale=True, label="Neonatal Deaths (<28 days)"))
+        if "infant_deaths" not in existing:
+            self.define_results(ss.Result("infant_deaths", dtype=int, scale=True, label="Infant Deaths (28d-1yr)"))
+        if "later_deaths" not in existing:
+            self.define_results(ss.Result("later_deaths", dtype=int, scale=True, label="Later Deaths (>=1yr)"))
 
     # ---------------------------------------------------------------------
     # Step logic
     # ---------------------------------------------------------------------
     def step_state(self):
-        """No within-step state transitions for congenital diseases."""
+        """No within-step state transitions for congenital diseases (no acquisition/remission)."""
         return
 
     def step(self):
-        """Apply mortality among affected individuals."""
-        # Skip the very first timestep so neonatal deaths are not applied before survivorship baseline
+        """Apply age-dependent mortality among affected individuals."""
+        # Skip the very first timestep so deaths are not applied before survivorship baseline
         if self.ti == 0:
             return
 
@@ -1886,13 +2168,6 @@ class NonAcquiredDisease(ss.Module):
         if not len(affected_uids):
             return
 
-        # Restrict to neonates if needed
-        if self.is_neonatal:
-            ages = getattr(sim.people, "age_years", sim.people.age)
-            affected_uids = affected_uids[ages[affected_uids] < (28 / 365)]
-            if not len(affected_uids):
-                return
-
         # Update severity dynamically based on treatment effectiveness
         if hasattr(self, 'severity_level') and len(affected_uids) > 0:
             try:
@@ -1900,7 +2175,26 @@ class NonAcquiredDisease(ss.Module):
             except Exception as e:
                 logger.debug(f"Severity update failed for {self.disease_name}: {e}")
 
-        base_p = self.pars.p_death.pars.get("p", 0)
+        # Get age-dependent mortality probabilities
+        ages_years = sim.people.age[affected_uids] / 365.25  # Convert days to years
+        ages_years = np.clip(ages_years, 0, None)  # Ensure non-negative
+        
+        # Calculate mortality probabilities using age-dependent function
+        # Check if p_death is a function (age-dependent) or constant
+        if hasattr(self.pars.p_death, 'pars'):
+            p_val = self.pars.p_death.pars.get('p', None)
+            if callable(p_val):
+                # Age-dependent function
+                p_death_arr = p_val(self, sim, affected_uids)
+            else:
+                # Constant probability
+                base_p = float(p_val) if p_val is not None else 0.0
+                p_death_arr = np.full(len(affected_uids), base_p)
+        else:
+            # Fallback: try to get constant value
+            base_p = float(self.pars.p_death) if not callable(self.pars.p_death) else 0.0
+            p_death_arr = np.full(len(affected_uids), base_p)
+        
         rel_death = self.rel_death[affected_uids]
         
         # Apply severity-based mortality multiplier
@@ -1908,22 +2202,37 @@ class NonAcquiredDisease(ss.Module):
             severity_mortality_mult = get_severity_mortality_multiplier(self, affected_uids)
             rel_death = rel_death * severity_mortality_mult
         
-        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
+        # Calculate death probabilities
+        death_probs = p_death_arr * rel_death
+        deaths = affected_uids[np.random.rand(len(affected_uids)) < death_probs]
 
+        # Categorize deaths by age for post-processing
         if len(deaths):
+            ages_deaths = ages_years[np.isin(affected_uids, deaths)]
+            neonatal_deaths = deaths[ages_deaths < (28 / 365.25)]
+            infant_deaths = deaths[(ages_deaths >= (28 / 365.25)) & (ages_deaths < 1.0)]
+            later_deaths = deaths[ages_deaths >= 1.0]
+            
             sim.people.request_death(deaths)
             # Set ti_dead to current timestep so deaths are finalized immediately
             sim.people.ti_dead[deaths] = ti
-            logger.debug(f"[STEP] {self.disease_name}: {len(deaths)} deaths requested at timestep {ti}")
+            logger.debug(f"[STEP] {self.disease_name}: {len(deaths)} deaths requested at timestep {ti} "
+                        f"(neonatal={len(neonatal_deaths)}, infant={len(infant_deaths)}, later={len(later_deaths)})")
             
             # Finalize deaths immediately to ensure they're committed
-            # This is safe because step_die() only finalizes deaths with ti_dead <= ti
-            # and is idempotent (can be called multiple times)
             finalized = sim.people.step_die()
             if len(finalized) > 0:
                 logger.debug(f"[STEP] {self.disease_name}: {len(finalized)} deaths finalized at timestep {ti}")
+        else:
+            neonatal_deaths = np.array([], dtype=int)
+            infant_deaths = np.array([], dtype=int)
+            later_deaths = np.array([], dtype=int)
 
+        # Store results
         self.results.new_deaths[ti] = len(deaths)
+        self.results.neonatal_deaths[ti] = len(neonatal_deaths)
+        self.results.infant_deaths[ti] = len(infant_deaths)
+        self.results.later_deaths[ti] = len(later_deaths)
         self.results.prevalence[ti] = np.count_nonzero(self.affected) / len(sim.people)
         self.results.n_affected[ti] = np.count_nonzero(self.affected)
 
@@ -1999,10 +2308,8 @@ class StaticCondition(NonAcquiredDisease):
     """
 
     def __init__(self, csv_path, pars=None, **kwargs):
-        # Remove is_neonatal from kwargs if present, since StaticCondition is not neonatal-restricted
-        # (it can cause deaths at any age, not just < 28 days)
-        kwargs.pop('is_neonatal', None)
-        super().__init__(csv_path, pars, is_neonatal=False, **kwargs)
+        # StaticCondition diseases are lifelong conditions (no age restriction)
+        super().__init__(csv_path, pars, **kwargs)
         self.define_pars(dur_condition=np.inf, max_disease_duration=np.inf)
 
     def step(self):
