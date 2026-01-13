@@ -1,8 +1,32 @@
 import os
+import mighti  # ensures we know the installed package path
 import pandas as pd
 import logging
+import re
+import numpy as np
+
 logging.basicConfig(level=logging.INFO)
 
+
+# -------------------------------------------------------------------------
+# Define base path for data output — always points to active MIGHTI install
+# -------------------------------------------------------------------------
+MIGHTI_BASE = os.path.dirname(mighti.__file__)
+DATA_DIR = os.path.join(MIGHTI_BASE, "data")
+
+# Create the folder if it doesn’t exist
+os.makedirs(DATA_DIR, exist_ok=True)
+
+def data_path(filename):
+    """Return full path for a file inside mighti/data/"""
+    return os.path.join(DATA_DIR, filename)
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+WPP_DATA = os.path.join(PROJECT_ROOT, "wpp_data")
+
+def wpp_path(filename):
+    """Return full path for files in wpp_data directory."""
+    return os.path.join(WPP_DATA, filename)
 
 cause_map = {
     "Diabetes mellitus type 1": "Type1Diabetes",
@@ -32,7 +56,19 @@ cause_map = {
     "Asthma": "Asthma",
     "Chronic obstructive pulmonary disease": "COPD",
     "Alzheimer’s disease and other dementias": "AlzheimersDisease",
-    "Parkinson’s disease": "ParkinsonsDisease"
+    "Parkinson’s disease": "ParkinsonsDisease",
+    "Neonatal encephalopathy due to birth asphyxia and trauma": "NeonatalEncephalopathy",
+    "Neonatal preterm birth": "NeonatalPretermBirth",
+    "Neonatal sepsis and other neonatal infections": "NeonatalSepsis",
+    "Neural tube defects": "NeuralTubeDefects",
+    "Congenital heart anomalies": "CongenitalHeartAnomalies",
+    "Congenital musculoskeletal and limb anomalies": "CongenitalMusculoskeletal",
+    "Digestive congenital anomalies": "DigestiveCongenitalAnomalies",
+    "Down syndrome": "DownSyndrome",
+    "Other chromosomal abnormalities": "ChromosomalAbnormalities",
+    "Diarrheal disease": "DiarrhealDisease",
+    "Esophageal cancer": "EsophagealCancer",
+    "Protein-energy malnutrition": "ProteinEnergyMalnutrition",
 }
 
 def process_population_data(male_csv, female_csv, output_csv, country):
@@ -164,93 +200,78 @@ def reshape_fertility_to_asfr(input_csv, region_name, output_csv):
     return df_long
 
 
-import re
-
 def create_and_fill_prevalence_template_from_long_format(
     raw_csv,
     output_csv,
     start_year=1987,
     end_year=2021,
-    age_range=range(0, 101, 5)
+    age_starts=None
 ):
     """
-    Create and fill a prevalence template using a long-format prevalence file.
-
-    Args:
-        raw_csv (str): Path to the raw prevalence data in long format (age, year, sex, cause, val).
-        output_csv (str): Path to save the filled prevalence CSV.
-        start_year (int): Start year for the template.
-        end_year (int): End year for the template.
-        age_range (range): Age range (e.g., range(0, 101, 5)).
+    Create and fill a prevalence template with numeric Age values (0, 5, 10, 15...).
     """
 
+    if age_starts is None:
+        # lower bounds for age groups, consistent with GBD
+        age_starts = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
 
-    def map_age_group(age_str):
-        """
-        Map age group strings like '80-84 years', '<5 years', '85+ years' to integer start age.
-        """
-        if isinstance(age_str, str):
-            age_str = age_str.strip()
-            if re.match(r'^\<\s*5', age_str):
-                return 0
-            elif re.match(r'^\d+\s*\-\s*\d+', age_str):
-                return int(re.match(r'^(\d+)', age_str).group(1))
-            elif re.match(r'^\d+\+?', age_str):
-                return int(re.match(r'^(\d+)', age_str).group(1))
-        return None
-
-    # Step 1: Create empty template
+    # Step 1 — make the base grid
     modeled_conditions = list(set(cause_map.values()))
-    expected_columns = [f"{cond}_{sex}" for cond in modeled_conditions for sex in ['male', 'female']]
+    expected_cols = [f"{cond}_{sex}" for cond in modeled_conditions for sex in ["male", "female"]]
     grid = pd.MultiIndex.from_product(
-        [age_range, range(start_year, end_year + 1)],
+        [age_starts, range(start_year, end_year + 1)],
         names=["Age", "Year"]
     ).to_frame(index=False)
-    for col in expected_columns:
-        grid[col] = float('nan')
+    for c in expected_cols:
+        grid[c] = np.nan
 
-    # Step 2: Load and preprocess raw data
-    raw_df = pd.read_csv(raw_csv)
-    raw_df = raw_df.rename(columns={'cause': 'condition', 'val': 'prevalence'})
+    # Step 2 — load raw prevalence file
+    df = pd.read_csv(raw_csv).rename(columns={"cause": "condition", "val": "prevalence"})
+    df["condition"] = df["condition"].map(cause_map)
+    df = df.dropna(subset=["condition"])
 
-    # Map age group strings → int
-    raw_df['age_group'] = raw_df['age'].apply(map_age_group)
-    raw_df = raw_df.dropna(subset=['age_group'])  # drop unmatched ages
+    # normalize sex labels
+    df["sex"] = df["sex"].str.lower().map(
+        {"male": "male", "m": "male", "female": "female", "f": "female"}
+    )
 
-    # Extract year (start year if in range)
-    raw_df['year'] = raw_df['year'].astype(str).str.extract(r'^(\d{4})').astype(float).astype('Int64')
+    # extract numeric year
+    df["year"] = df["year"].astype(str).str.extract(r"(\d{4})").astype(float).astype("Int64")
 
-    # Standardize sex
-    raw_df['sex'] = raw_df['sex'].str.lower().map({'male': 'male', 'm': 'male', 'female': 'female', 'f': 'female'})
+    # normalize prevalence (% → fraction)
+    if df["prevalence"].max() > 1.5:
+        df["prevalence"] /= 100.0
 
-    # Map cause to MIGHTI condition
-    raw_df['condition'] = raw_df['condition'].map(cause_map)
-    raw_df = raw_df.dropna(subset=['condition', 'year', 'sex', 'prevalence'])
+    # Step 3 — map GBD-style age labels to numeric start
+    def get_age_start(label):
+        if isinstance(label, str):
+            label = label.strip()
+            if re.match(r"^<\s*5", label):
+                return 0
+            m = re.match(r"^(\d+)", label)
+            if m:
+                return int(m.group(1))
+        return np.nan
 
-    # Normalize prevalence if needed (assume percentage)
-    if raw_df['prevalence'].max() > 1.5:
-        raw_df['prevalence'] /= 100.0
+    df["Age"] = df["age"].apply(get_age_start)
+    df = df.dropna(subset=["Age"])
 
-    # Step 3: Fill template
-    for (cond, sex), group in raw_df.groupby(['condition', 'sex']):
+    # Step 4 — fill grid
+    for (cond, sex), group in df.groupby(["condition", "sex"]):
         col = f"{cond}_{sex}"
         if col in grid.columns:
-            for _, row in group.iterrows():
-                mask = (grid['Age'] == row['age_group']) & (grid['Year'] == row['year'])
-                grid.loc[mask, col] = row['prevalence']
+            for _, r in group.iterrows():
+                mask = (grid["Age"] == r["Age"]) & (grid["Year"] == r["year"])
+                grid.loc[mask, col] = r["prevalence"]
 
-    # Step 4: Save
+    # Step 5 — save
     os.makedirs(os.path.dirname(output_csv), exist_ok=True)
     grid.to_csv(output_csv, index=False)
-    logging.info(f"✅ Filled prevalence template saved to {output_csv}")
-
+    logging.info(f"Filled prevalence template saved to {output_csv}")
     return grid
 
 
-
 def create_condition_metadata_table(long_csv_path, output_csv):
-
-
     # Load raw data
     raw = pd.read_csv(long_csv_path)
 
@@ -328,7 +349,7 @@ def create_condition_metadata_table(long_csv_path, output_csv):
     # Save to CSV
     os.makedirs(os.path.dirname(output_csv), exist_ok=True)
     merged.to_csv(output_csv, index=False)
-    logging.info(f"✅ Condition metadata table saved to {output_csv}")
+    logging.info(f" Condition metadata table saved to {output_csv}")
 
     return merged
 
@@ -358,53 +379,74 @@ def extract_prevalence_timeseries_by_sex(long_csv_path, output_csv):
     # Save
     os.makedirs(os.path.dirname(output_csv), exist_ok=True)
     wide.to_csv(output_csv, index=False)
-    print(f"✅ Prevalence time series saved to {output_csv}")
+    print(f" Prevalence time series saved to {output_csv}")
     return wide
 
 if __name__ == "__main__":
-    region = 'eswatini'
-    Region = 'Eswatini'
+    region = "eswatini"
+    Region = "Eswatini"
 
-    # ### Age distribution data ###
-    # male_csv = 'population_single_age_male.csv'
-    # female_csv = 'population_single_age_female.csv'
-    # output_csv = f"../mighti/data/{region}_age_distribution.csv"
-    
-    # process_population_data(male_csv, female_csv, output_csv, country = Region)
-    
-    
-    # ### Life table ###
-    # life_table = extract_life_table_by_country(
-    #     'life_table_male_1986_1995.csv', 'life_table_male_1996_2005.csv', 'life_table_male_2006_2015.csv', 'life_table_male_2016_2023.csv',
-    #     'life_table_female_1986_1995.csv', 'life_table_female_1996_2005.csv', 'life_table_female_2006_2015.csv', 'life_table_female_2016_2023.csv',
-    #     country=Region
-    # )
-    
-    # # Extract and save mx and ex
-    # mx_df = extract_indicator_from_life_table(life_table, 'mx', f"../mighti/data/{region}_mx.csv")
-    # ex_df = extract_indicator_from_life_table(life_table, 'ex', f"../mighti/data/{region}_ex.csv")
-    
-    # output_csv_mortality = f"../mighti/data/{region}_mortality_rates.csv"
+    print(f"Running WPP + GBD data processing for: {Region}")
+    print(f"Saving all outputs under: {DATA_DIR}")
+
+    # -------------------------------------------------------------
+    # 1. Age distribution
+    # -------------------------------------------------------------
+    male_csv = wpp_path("population_single_age_male.csv")
+    female_csv = wpp_path("population_single_age_female.csv")
+    output_csv_age = data_path(f"{region}_age_distribution.csv")
+    # process_population_data(male_csv, female_csv, output_csv_age, country=Region)
+
+    # -------------------------------------------------------------
+    # 2. Life table (mortality and life expectancy)
+    # -------------------------------------------------------------
+    male_life_files = [
+        wpp_path("life_table_male_1986_1995.csv"),
+        wpp_path("life_table_male_1996_2005.csv"),
+        wpp_path("life_table_male_2006_2015.csv"),
+        wpp_path("life_table_male_2016_2023.csv"),
+    ]
+    female_life_files = [
+        wpp_path("life_table_female_1986_1995.csv"),
+        wpp_path("life_table_female_1996_2005.csv"),
+        wpp_path("life_table_female_2006_2015.csv"),
+        wpp_path("life_table_female_2016_2023.csv"),
+    ]
+
+    # life_table = extract_life_table_by_country(*male_life_files, *female_life_files, country=Region)
+
+    # mx/ex extraction
+    # mx_df = extract_indicator_from_life_table(life_table, "mx", data_path(f"{region}_mx.csv"))
+    # ex_df = extract_indicator_from_life_table(life_table, "ex", data_path(f"{region}_ex.csv"))
+
+    # mortality rates
+    # output_csv_mortality = data_path(f"{region}_mortality_rates.csv")
     # reshape_mx_to_mortality_rates(mx_df, output_csv_mortality)
-    
-    # csv_path_fertility = f"../mighti/data/{region}_asfr.csv"
-    # reshape_fertility_to_asfr(
-    #     input_csv="fertility_by_single_age_of_mother.csv",
-    #     region_name=Region,
-    #     output_csv=csv_path_fertility
-    # )
 
-    
-    
-    prevalence_raw_csv=f"{region}_prevalence_all_ncds.csv"   
-    # prevalence_output_csv=f"../mighti/data/{region}_prevalence.csv"
-    # create_and_fill_prevalence_template_from_long_format(prevalence_raw_csv,prevalence_output_csv)
-    
-    # long_csv_path = f"{region}_p_death_estimation_parameters.csv" 
-    # output_csv_parameters = f"../mighti/data/{region}_parameters.csv"
-    # create_condition_metadata_table(long_csv_path,output_csv_parameters)
-    
-    output_prevalence_csv = f"../mighti/data/{region}_postprocess_check_prevalence.csv"
-    extract_prevalence_timeseries_by_sex(prevalence_raw_csv, output_prevalence_csv)
-    
+    # -------------------------------------------------------------
+    # 3. Fertility (ASFR)
+    # -------------------------------------------------------------
+    # fertility_input_csv = wpp_path("fertility_by_single_age_of_mother.csv")
+    # fertility_output_csv = data_path(f"{region}_asfr.csv")
+    # reshape_fertility_to_asfr(fertility_input_csv, Region, fertility_output_csv)
+
+    # -------------------------------------------------------------
+    # 4. Prevalence (GBD long-format to MIGHTI template)
+    # -------------------------------------------------------------
+    prevalence_raw_csv = wpp_path("eswatini_all_disease.csv")
+    prevalence_output_csv = data_path(f"{region}_prevalence.csv")
+    create_and_fill_prevalence_template_from_long_format(prevalence_raw_csv, prevalence_output_csv)
+
+    # -------------------------------------------------------------
+    # 5. Parameter table (derived from GBD long format)
+    # -------------------------------------------------------------
+    # long_csv_path = wpp_path(f"{region}_p_death_estimation_parameters.csv")
+    # output_csv_parameters = data_path(f"{region}_parameters.csv")
+    # create_condition_metadata_table(long_csv_path, output_csv_parameters)
+
+    # -------------------------------------------------------------
+    # 6. Post-processing check: prevalence by sex
+    # -------------------------------------------------------------
+    # output_prevalence_check_csv = data_path(f"{region}_postprocess_check_prevalence.csv")
+    # extract_prevalence_timeseries_by_sex(prevalence_raw_csv, output_prevalence_check_csv)
     

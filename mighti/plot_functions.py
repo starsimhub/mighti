@@ -72,30 +72,44 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     ax.grid(True)
     plt.show()
     
-
+    
 def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year):
     """
     Plot mean prevalence over time for a given disease and both sexes, including observed data points.
-    Parameters:
-    - sim: The simulation object (provides `sim.timevec`)
-    - prevalence_analyzer: Analyzer with stored prevalence results
-    - disease: Name of the disease (e.g., 'HIV', 'Type2Diabetes')
-    - prevalence_data_df: DataFrame from `brazil_prevalence_timeseries_by_sex.csv`
-    - init_year: Simulation start year
-    - end_year: Simulation end year
+    Ensures x-axis uses numeric years, not dates.
     """
     import numpy as np
     import matplotlib.pyplot as plt
+    import pandas as pd
+    from matplotlib import units, dates
 
-    # Extract simulated values
+    disease = disease.lower()
+
+    # --- Safe getter ---
+    def _safe_get_result(analyzer, key, sim):
+        val = analyzer.results.get(key)
+        if val is None:
+            return np.zeros(len(sim.timevec))
+        if hasattr(val, "values"):
+            val = val.values
+        val = np.array(val, dtype=float)
+        if len(val) != len(sim.timevec):
+            val = np.pad(val, (0, max(0, len(sim.timevec) - len(val))), mode="edge")[:len(sim.timevec)]
+        return val
+
+    # --- Extract results ---
     def extract_results(key_pattern):
-        return [_safe_get_result(prevalence_analyzer, f'{disease}_{key_pattern}_{i}', sim)
-                for i in range(len(prevalence_analyzer.age_bins))]
+        matching_keys = [k for k in prevalence_analyzer.results.keys()
+                         if k.startswith(f"{disease}_{key_pattern}_")]
+        matching_keys = sorted(matching_keys, key=lambda x: int(x.split('_')[-1]))
+        if not matching_keys:
+            print(f" No keys found for pattern {disease}_{key_pattern}_")
+        return [_safe_get_result(prevalence_analyzer, k, sim) for k in matching_keys]
 
-    male_num = np.sum(extract_results('num_male'), axis=0)
-    female_num = np.sum(extract_results('num_female'), axis=0)
-    male_den = np.sum(extract_results('den_male'), axis=0)
-    female_den = np.sum(extract_results('den_female'), axis=0)
+    male_num = np.sum(extract_results("num_male"), axis=0)
+    female_num = np.sum(extract_results("num_female"), axis=0)
+    male_den = np.sum(extract_results("den_male"), axis=0)
+    female_den = np.sum(extract_results("den_female"), axis=0)
 
     male_den[male_den == 0] = 1
     female_den[female_den == 0] = 1
@@ -104,143 +118,55 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
     total_female_prev = np.nan_to_num(female_num / female_den) * 100
 
     mask = (sim.timevec >= init_year) & (sim.timevec <= end_year)
+    time_years = np.array(sim.timevec[mask], dtype=float)
 
-    # --- Plot ---
-    plt.figure(figsize=(10, 5))
-    plt.plot(sim.timevec[mask], total_male_prev[mask], label='Male Simulated', color='blue', linewidth=3)
-    plt.plot(sim.timevec[mask], total_female_prev[mask], label='Female Simulated', color='red', linewidth=3)
+    # --- Plot simulated curves ---
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.plot(time_years, total_male_prev[mask], label="Male Simulated", color="blue", lw=3)
+    ax.plot(time_years, total_female_prev[mask], label="Female Simulated", color="red", lw=3)
 
-    # Normalize column names for safety
-    prevalence_data_df.columns = [col.strip().lower() for col in prevalence_data_df.columns]
+    # --- Clean observed data ---
+    df = prevalence_data_df.copy()
+    df.columns = [c.strip().lower() for c in df.columns]
+    if "year" not in df.columns:
+        raise ValueError("prevalence_data_df must include a 'year' column")
+
+    df["year"] = pd.to_numeric(df["year"], errors="coerce")
+    df = df.dropna(subset=["year"])
+    df["year"] = df["year"].astype(int)
+
+    most_recent = df["year"].max()
+    df = df[(df["year"] >= init_year) & (df["year"] <= min(end_year, most_recent))]
+
     disease_col = disease.lower()
 
-    if disease_col in prevalence_data_df.columns:
-        for sex, color in [('male', 'blue'), ('female', 'red')]:
-            obs = prevalence_data_df[(prevalence_data_df["sex"].str.lower() == sex)]
-            obs = obs[(obs["year"] >= init_year) & (obs["year"] <= end_year)]
-
+    if disease_col in df.columns and "sex" in df.columns:
+        for sex, color in [("male", "blue"), ("female", "red")]:
+            obs = df[df["sex"].str.lower() == sex]
             if not obs.empty:
-                plt.scatter(
-                    obs["year"], obs[disease_col] * 100,  # Convert to percentage
+                ax.scatter(
+                    obs["year"].astype(float), obs[disease_col] * 100,
                     label=f"{sex.capitalize()} Observed",
-                    color=color, edgecolor='black', marker='o', s=100
+                    color=color, edgecolor="black", s=80, zorder=5
                 )
 
-    plt.title(f"{disease} Prevalence Over Time (All Ages)")
-    plt.xlabel("Year")
-    plt.ylabel("Prevalence (%)")
-    plt.grid(True)
-    plt.legend()
+    # --- Ensure numeric (not datetime) x-axis ---
+    ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{int(x)}"))
+    units.registry[np.ndarray] = None   # disable automatic datetime conversion
+
+    # --- Style ---
+    ax.set_title(f"{disease.capitalize()} Prevalence Over Time (All Ages)", fontsize=16)
+    ax.set_xlabel("Year", fontsize=14)
+    ax.set_ylabel("Prevalence (%)", fontsize=14)
+    ax.set_xlim(init_year - 1, end_year + 1)
+    ax.set_ylim(bottom=0)
+    ax.legend(frameon=False, fontsize=12)
+    ax.grid(True, alpha=0.4)
     plt.tight_layout()
     plt.show()
 
-    return total_male_prev, total_female_prev
-
-
-def plot_age_group_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year, age_groups=None):
-    """
-    Plot age group prevalence over time for a given disease and both sexes, including observed data points.
-    Create a figure with two panels: one for males and one for females.
-    Age groups are color-coded and shared between male and female plots.
-
-    Parameters:
-    - sim: The simulation object (provides `sim.timevec`)
-    - prevalence_analyzer: The prevalence analyzer with stored results
-    - disease: Name of the disease (e.g., 'HIV', 'Type2Diabetes')
-    - prevalence_data_df: The DataFrame containing observed prevalence data
-    - init_year: The initial year of the simulation
-    - end_year: The end year of the simulation
-    - age_groups: List of tuples defining age group ranges and labels, e.g., [(0, 5, "0-4"), (5, 15, "5-14"), ...]
-    """
-    if age_groups is None:
-        age_groups = [
-            (0, 15, "0-15"),
-            (15, 20, "15-20"),
-            (20, 25, "20-25"),
-            (25, 30, "25-30"),
-            (30, 35, "30-35"),
-            (35, 40, "35-40"),
-            (40, 45, "40-45"),
-            (45, 50, "45-50"),
-            (50, 55, "50-55"),
-            (55, 60, "55-60"),
-            (60, 65, "60-65"),
-            (65, 70, "65-70"),
-            (70, 75, "70-75"),
-            (75, 80, "75-80"),
-            (80, 100, "80+")
-        ]
-
-    colors = plt.cm.tab10(np.linspace(0, 1, len(age_groups)))
-
-    def extract_results(key_pattern):
-        return [_safe_get_result(prevalence_analyzer, f'{disease}_{key_pattern}_{i}', sim) for i in range(len(age_groups))]
-
-    male_num_bins = extract_results('num_male')
-    female_num_bins = extract_results('num_female')
-    male_den_bins = extract_results('den_male')
-    female_den_bins = extract_results('den_female')
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(18, 6), sharey=True)
-    ax_male, ax_female = axes
-
-    for i, (start_age, end_age, label) in enumerate(age_groups):
-        color = colors[i]
-        
-        male_prevalence = np.nan_to_num(male_num_bins[i] / male_den_bins[i]) * 100
-        female_prevalence = np.nan_to_num(female_num_bins[i] / female_den_bins[i]) * 100
-        mask = (sim.timevec >= init_year) & (sim.timevec <= end_year)
-        ax_male.plot(sim.timevec[mask], male_prevalence[mask], label=label, color=color, linestyle='solid')
-        ax_female.plot(sim.timevec[mask], female_prevalence[mask], label=label, color=color, linestyle='solid')
-
-    # Plot observed prevalence data if available
-    observed_lines = []
-    if prevalence_data_df is not None:
-        for i, (start_age, end_age, label) in enumerate(age_groups):
-            color = colors[i]
-            age_mask = (prevalence_data_df['Age'] >= start_age) & (prevalence_data_df['Age'] < end_age)
-
-            male_col = f'{disease}_male'
-            female_col = f'{disease}_female'
-
-            if male_col in prevalence_data_df.columns:
-                observed_male_data = prevalence_data_df[age_mask][['Year', male_col]].dropna()
-                observed_male_data = observed_male_data.groupby('Year', as_index=False).mean()
-                observed_male_data[male_col] *= 100
-
-                observed_male_data = observed_male_data[(observed_male_data['Year'] >= init_year) & (observed_male_data['Year'] <= end_year)]
-
-                obs_line, = ax_male.plot([], [], 'o', color=color, label=label)
-                ax_male.scatter(observed_male_data['Year'], observed_male_data[male_col], 
-                                color=color, marker='o', s=150)  
-                observed_lines.append(obs_line)
-
-            if female_col in prevalence_data_df.columns:
-                observed_female_data = prevalence_data_df[age_mask][['Year', female_col]].dropna()
-                observed_female_data = observed_female_data.groupby('Year', as_index=False).mean()
-                observed_female_data[female_col] *= 100
-
-                observed_female_data = observed_female_data[(observed_female_data['Year'] >= init_year) & (observed_female_data['Year'] <= end_year)]
-
-                ax_female.scatter(observed_female_data['Year'], observed_female_data[female_col], 
-                                  color=color, marker='o', s=150) 
-
-    ax_male.set_xlabel('Year')
-    ax_male.set_ylabel(f'{disease.capitalize()} Prevalence (%)')
-    ax_male.set_title(f'Male {disease.capitalize()} Prevalence by Age Group')
-    ax_male.grid()
-
-    ax_female.set_xlabel('Year')
-    ax_female.set_ylabel(f'{disease.capitalize()} Prevalence (%)')
-    ax_female.set_title(f'Female {disease.capitalize()} Prevalence by Age Group')
-    ax_female.grid()
-
-    lines, labels = ax_male.get_legend_handles_labels()
-    unique_labels = {label: line for label, line in zip(labels, lines)}
-    fig.legend(unique_labels.values(), unique_labels.keys(), loc='lower center', ncol=5)
-
-    plt.tight_layout(rect=[0, 0.1, 1, 1])
-    # plt.show()
+    print(f" Observed data restricted to {init_year}–{min(end_year, most_recent)} ({len(df)} rows used).")
+    return total_male_prev, total_female_prev   
     
     
 # ---------------------------------------------------------------------
@@ -289,7 +215,7 @@ def plot_mx_comparison(sim_mx_df, observed_mx_csv, year, age_interval=5, figsize
 
     axes[-1].set_xlabel('Age Group', fontsize=24)
     plt.tight_layout()
-    # plt.show()    
+    plt.show()    
     
 
 def plot_life_expectancy(life_table, observed_data, year, max_age=100, figsize=(14, 10), title=None):
@@ -335,5 +261,55 @@ def plot_life_expectancy(life_table, observed_data, year, max_age=100, figsize=(
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.subplots_adjust(bottom=0.1)
-    # plt.show()
+    plt.show()
     return fig, (ax1, ax2)
+
+
+def plot_cost_effectiveness_plane(results, wtp_thresholds=[100, 500, 1000],
+                                  figsize=(8, 6),savepath=None,show=True):
+    
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Plot each result as a scatter point
+    for res in results:
+        ax.scatter(res['delta_daly'], res['delta_cost'], label=res['label'], s=80)
+        ax.annotate(res['label'], (res['delta_daly'], res['delta_cost']), fontsize=10,
+                    xytext=(5, 5), textcoords='offset points')
+
+    # Plot WTP threshold lines
+    x_vals = np.linspace(0, max([r['delta_daly'] for r in results]) * 1.1, 100)
+    for wtp in wtp_thresholds:
+        ax.plot(x_vals, wtp * x_vals, linestyle='--', label=f'${wtp}/DALY')
+
+    # Axis labels and formatting
+    ax.set_xlabel('Incremental DALYs averted', fontsize=12)
+    ax.set_ylabel('Incremental cost ($)', fontsize=12)
+    ax.axhline(0, color='gray', linewidth=0.5)
+    ax.axvline(0, color='gray', linewidth=0.5)
+    ax.legend()
+    ax.set_title('Cost-Effectiveness Plane', fontsize=14)
+    ax.grid(True)
+
+    if savepath:
+        plt.savefig(savepath, bbox_inches='tight')
+    if show:
+        plt.show()
+    plt.close(fig)
+
+
+def plot_adherence_by_condition(sim, label):
+    results = sim.results[label]
+    t = np.array(results["time"])
+    with_cond = np.array(results["on_with_condition"])
+    without_cond = np.array(results["on_without_condition"])
+
+    plt.plot(t, with_cond, label="With condition")
+    plt.plot(t, without_cond, label="Without condition")
+    plt.xlabel("Year")
+    plt.ylabel("Proportion on ART")
+    plt.title(f"Adherence by {label}")
+    plt.ylim(0, 1)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+    

@@ -1,0 +1,97 @@
+"""
+Test: Neonatal disease mortality functionality
+----------------------------------------------
+Checks that neonatal and congenital diseases (NonAcquiredDisease base class)
+correctly initialize affected newborns and contribute to deaths <28 days.
+
+Outputs:
+    - Printed death counts and fractions
+    - Histogram saved to Figures/test_neonatal_deaths.png
+"""
+
+import starsim as ss
+import mighti as mi
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def test_neonatal_disease_mortality():
+    n_agents = 10_000
+    start, stop = 2007, 2008
+    csv_path = "mighti/data/eswatini_parameters.csv"
+
+    # -------------------------------------------------------------
+    # Baseline: no neonatal disease
+    # -------------------------------------------------------------
+    ppl_base = mi.make_people_with_age_sex(
+        csv_path="mighti/data/eswatini_age_distribution.csv",
+        init_year=start, n_agents=n_agents,
+    )
+    sim_base = ss.Sim(
+        n_agents=n_agents, start=start, stop=stop,
+        people=ppl_base, diseases=[], label="baseline"
+    )
+    sim_base.run()
+    deaths_base = (~sim_base.people.alive).sum()
+
+    # -------------------------------------------------------------
+    # Neonatal scenario
+    # -------------------------------------------------------------
+    ppl = mi.make_people_with_age_sex(
+        csv_path="mighti/data/eswatini_age_distribution.csv",
+        init_year=start, n_agents=n_agents,
+    )
+
+    neonatal = mi.NeonatalEncephalopathy(csv_path=csv_path)
+
+    # Force prevalence and mortality so that we can see an effect
+    neonatal.pars.init_prev = ss.bernoulli(p=0.05)   # 5% of newborns affected
+    neonatal.pars.p_death = ss.bernoulli(p=0.4)      # 40% mortality for testing
+
+    # # Initialize states and results
+    # neonatal.init_post()
+    # neonatal.init_results()
+
+    sim_neonatal = ss.Sim(
+        n_agents=n_agents, start=start, stop=stop,
+        people=ppl, diseases=[neonatal],
+        label="neonatal"
+    )
+    sim_neonatal.run()
+
+    deaths_neonatal = (~sim_neonatal.people.alive).sum()
+    death_ages = sim_neonatal.people.age[~sim_neonatal.people.alive]
+
+    # -------------------------------------------------------------
+    # Assertions and summary
+    # -------------------------------------------------------------
+    print(f"Baseline deaths: {deaths_base}")
+    print(f"Neonatal deaths: {deaths_neonatal}")
+
+    assert deaths_neonatal > deaths_base, \
+        "Neonatal diseases should increase early deaths"
+
+    frac_infant = np.mean(death_ages < 1)
+    frac_neonatal = np.mean(death_ages < (28/365))
+    print(f"Fraction of deaths <1y:  {frac_infant:.3f}")
+    print(f"Fraction of deaths <28d: {frac_neonatal:.3f}")
+
+    assert frac_neonatal > 0.5, \
+        "Most deaths from neonatal diseases should occur <28 days"
+
+    # -------------------------------------------------------------
+    # Histogram output
+    # -------------------------------------------------------------
+    plt.hist(death_ages * 365, bins=40, range=(0, 365), color="salmon", edgecolor="k")
+    plt.xlabel("Age at death (days)")
+    plt.ylabel("Count")
+    plt.title("Distribution of neonatal deaths (<1 year)")
+    plt.tight_layout()
+    plt.savefig("Figures/test_neonatal_deaths.png", dpi=300)
+    print("Saved: Figures/test_neonatal_deaths.png")
+
+    print("[✓] Neonatal disease mortality test passed.")
+
+
+if __name__ == "__main__":
+    test_neonatal_disease_mortality()

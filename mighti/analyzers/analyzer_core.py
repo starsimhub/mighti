@@ -9,48 +9,140 @@ import starsim as ss
 
 __all__ = ["DeathsByAgeSexAnalyzer", "SurvivorshipAnalyzer", "ConditionAtDeathAnalyzer"]
 
-
 class DeathsByAgeSexAnalyzer(ss.Analyzer):
-    """Tracks infant deaths and age- and sex-specific deaths."""
+    """Tracks infant deaths and deaths by age/sex, Starsim-3.0.3 compatible."""
+
+    def __init__(self, max_age=100, **kwargs):
+        super().__init__(**kwargs)
+        self.max_age = max_age
+        self._dead_prev = None  # snapshot of who was dead in previous step
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        self._dead_prev = np.zeros(len(sim.people), dtype=bool)
 
     def init_results(self):
         super().init_results()
         self.define_results(
-            ss.Result('infant_deaths', label='Cumulative infant deaths', dtype=int),
-            ss.Result('male_deaths_by_age', label='Number of male deaths by age', dtype=int, shape=101),
-            ss.Result('female_deaths_by_age', label='Number of female deaths by age', dtype=int, shape=101)
+            ss.Result("infant_deaths", label="Cumulative infant deaths", dtype=int),
+            ss.Result("male_deaths_by_age",   label="Male deaths by age",   dtype=int, shape=self.max_age + 1),
+            ss.Result("female_deaths_by_age", label="Female deaths by age", dtype=int, shape=self.max_age + 1),
         )
 
-    def step(self):
-        people = self.sim.people
-        ti = self.sim.ti
-
-        self.results.infant_deaths[ti] = len(people.dead[people.age < 1])
-
-        for uid in people.dead.uids:
-            age_capped = min(int(np.floor(people.age[uid])), 100)
-            if people.female[uid]:
-                self.results.female_deaths_by_age[age_capped] += 1
-            else:
-                self.results.male_deaths_by_age[age_capped] += 1
-
-
-class SurvivorshipAnalyzer(ss.Analyzer):
-    """Computes survivorship by age and sex for life table construction."""
-
-    def __init__(self, max_age=100, **kwargs):
-        super().__init__(**kwargs)
-        self.name = 'survivorship_analyzer'
-
-        self.max_age = max_age
-        self.survivorship_data = {'Male': np.zeros(max_age), 'Female': np.zeros(max_age)}
+    def _ensure_size(self):
+        """Resize internal arrays if population size changes (future-proof)."""
+        n_now = len(self.sim.people)
+        if self._dead_prev is None:
+            self._dead_prev = np.zeros(n_now, dtype=bool)
+        elif self._dead_prev.size != n_now:
+            new = np.zeros(n_now, dtype=bool)
+            n_copy = min(self._dead_prev.size, n_now)
+            new[:n_copy] = self._dead_prev[:n_copy]
+            self._dead_prev = new
 
     def step(self):
         ppl = self.sim.people
-        for age in range(self.max_age):
-            for sex in ['Male', 'Female']:
-                self.survivorship_data[sex][age] += len(ppl.age[(ppl.age >= age) & (ppl.age < age+1) & (ppl.female == (sex=='Female'))])
-                
+        ti = self.sim.ti
+        self._ensure_size()
+
+        # New deaths this step
+        new_deaths_mask = ppl.dead & ~self._dead_prev
+        new_deaths = new_deaths_mask.uids
+
+        # Cumulative infant deaths
+        self.results.infant_deaths[ti] = int(np.count_nonzero(ppl.dead[ppl.age < 1]))
+
+        # Tally new deaths by age/sex
+        if len(new_deaths):
+            ages = np.clip(np.floor(ppl.age[new_deaths]).astype(int), 0, self.max_age)
+            fem = ppl.female[new_deaths]
+
+            if np.any(fem):
+                idx, cnt = np.unique(ages[fem], return_counts=True)
+                self.results.female_deaths_by_age[idx] += cnt
+            if np.any(~fem):
+                idx, cnt = np.unique(ages[~fem], return_counts=True)
+                self.results.male_deaths_by_age[idx] += cnt
+
+        # Update snapshot
+        self._dead_prev = np.array(ppl.dead, dtype=bool)
+
+    def finalize(self):
+        super().finalize() 
+
+    def finalize_results(self):
+        super().finalize_results()
+
+    def to_df(self):
+        ages = np.arange(self.max_age + 1)
+        return pd.concat([
+            pd.DataFrame({
+                "age": ages, "sex": "Male",
+                "deaths": self.results.male_deaths_by_age[:],
+            }),
+            pd.DataFrame({
+                "age": ages, "sex": "Female",
+                "deaths": self.results.female_deaths_by_age[:],
+            }),
+        ], ignore_index=True)
+
+
+class SurvivorshipAnalyzer(ss.Analyzer):
+    """
+    Computes true survivorship l(x): fraction of original cohort surviving to age x.
+    Compatible with all disease types (including neonatal).
+    """
+
+    def __init__(self, max_age=100, **kwargs):
+        super().__init__(**kwargs)
+        self.name = "survivorship_analyzer"
+        self.max_age = max_age
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result("lx_male",   shape=self.max_age + 1, dtype=float, label="Male survivorship l(x)"),
+            ss.Result("lx_female", shape=self.max_age + 1, dtype=float, label="Female survivorship l(x)"),
+        )
+
+    def step(self):
+        """No per-step logic (needed only to silence lifecycle warning)."""
+        pass
+
+    def finalize(self):
+        """Compute l(x) at the end of the sim."""
+        super().finalize() 
+        ppl = self.sim.people
+        n0_m = max(np.sum(~ppl.female), 1)
+        n0_f = max(np.sum(ppl.female), 1)
+
+        lx_m = np.zeros(self.max_age + 1)
+        lx_f = np.zeros(self.max_age + 1)
+
+        for a in range(self.max_age + 1):
+            alive_m = (~ppl.female) & (~ppl.dead) & (ppl.age >= a)
+            alive_f = (ppl.female) & (~ppl.dead) & (ppl.age >= a)
+            lx_m[a] = np.sum(alive_m) / n0_m
+            lx_f[a] = np.sum(alive_f) / n0_f
+
+        self.results.lx_male[:] = lx_m
+        self.results.lx_female[:] = lx_f
+
+    def finalize_results(self):
+        super().finalize_results()
+
+    def to_df(self):
+        records = []
+        year = int(self.sim.t.yearvec[-1])
+        for sex, key in (("Male", "lx_male"), ("Female", "lx_female")):
+            lx = getattr(self.results, key)
+            for age, val in enumerate(lx):
+                records.append({
+                    "year": year, "age": age, "sex": sex, "survival": float(val)
+                })
+        return pd.DataFrame(records)
+    
+
 class ConditionAtDeathAnalyzer(ss.Analyzer):
     """
     Simple analyzer that records who died, their age/sex/YLL,
@@ -71,7 +163,13 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
         self.name = "condition_at_death_analyzer"
 
     def init_results(self):
-        self.records = []
+        """Initialize analyzer results."""
+        super().init_results()
+        self.results = dict()
+        self.results['n_deaths'] = 0
+        self.results['by_cause'] = {}
+        self.results['by_sex'] = {}
+        self.results['by_age'] = {}
 
     def _had_condition(self, disease, uid):
         """Return True if agent had this condition at death."""

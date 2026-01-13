@@ -61,5 +61,40 @@ class InterventionAnalyzer(ss.Analyzer):
 
 
 class AdherenceAnalyzer(ss.Analyzer):
-    pass
+    def __init__(self, condition_key, intervention_key, label=None):
+        """
+        condition_key: str — e.g., "majordepressivedisorder.affected"
+        intervention_key: str — e.g., "hiv.on_art"
+        """
+        super().__init__()
+        self.condition_key = condition_key
+        self.intervention_key = intervention_key
+        self.label = label or f"on_{intervention_key}_by_{condition_key}"
 
+    def initialize(self, sim):
+        self.results = {
+            "time": [],
+            "on_with_condition": [],
+            "on_without_condition": [],
+        }
+
+    def apply(self, sim):
+        st = sim.people.states
+        cond = st.get(self.condition_key, np.zeros(sim.n_agents, dtype=bool))
+        on_tx = st.get(self.intervention_key, np.zeros(sim.n_agents, dtype=bool))
+
+        is_alive = st.get("alive", np.ones(sim.n_agents, dtype=bool))
+        eligible = is_alive & st.get("hiv.infected", np.ones(sim.n_agents, dtype=bool))  # modify if needed
+
+        cond_alive = eligible & cond
+        notcond_alive = eligible & ~cond
+
+        def safe_mean(arr1, arr2):
+            return np.nan if arr2.sum() == 0 else arr1[arr2].mean()
+
+        self.results["time"].append(sim.t)
+        self.results["on_with_condition"].append(safe_mean(on_tx, cond_alive))
+        self.results["on_without_condition"].append(safe_mean(on_tx, notcond_alive))
+
+    def finalize(self, sim):
+        sim.results[self.label] = self.results
