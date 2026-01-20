@@ -17,4 +17,6 @@ import sciris as sc
 rootdir = sc.thispath(__file__).parent
 
 # Import the version and print the license
-print(__license__)
+import logging
+logger = logging.getLogger(__name__)
+logger.debug(__license__)

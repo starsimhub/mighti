@@ -26,8 +26,15 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
         pd.DataFrame: A table with columns ['year', 'age', 'sex', 'mx'].
     """
     surv_an = sim.analyzers.survivorship_analyzer
-    lx_male = surv_an.results.lx_male
-    lx_female = surv_an.results.lx_female
+    # SurvivorshipAnalyzer stores l(x) as a *fraction* of the initial sex-specific cohort (≈1.0 at birth).
+    # To compute m(x) we must convert to person-years in a radix cohort.
+    lx_male = np.asarray(surv_an.results.lx_male, dtype=float)
+    lx_female = np.asarray(surv_an.results.lx_female, dtype=float)
+
+    ppl = sim.people
+    female = np.asarray(ppl.female, dtype=bool)
+    n0_male = max(int((~female).sum()), 1)
+    n0_female = max(int(female.sum()), 1)
 
     deaths_by_age = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
     person_years = {'Male': np.zeros(max_age + 1), 'Female': np.zeros(max_age + 1)}
@@ -46,12 +53,16 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
     current_year = year if year is not None else int(sim.t.yearvec[sim.t.ti])
 
     for age in range(max_age):
-        for sex, lx in [('Male', lx_male), ('Female', lx_female)]:
-            deaths = deaths_by_age[sex][age]
-            # person-years lived between x and x+1
-            Lx = 0.5 * (lx[age] + lx[age + 1])
+        for sex, lx_frac in [('Male', lx_male), ('Female', lx_female)]:
+            deaths = float(deaths_by_age[sex][age])
+            # Scale deaths to the requested radix cohort size for this sex
+            sex_scale = float(radix) / (n0_male if sex == 'Male' else n0_female)
+            deaths_scaled = deaths * sex_scale
+
+            # Person-years between x and x+1 in a radix cohort for this sex
+            Lx = 0.5 * (lx_frac[age] + lx_frac[age + 1]) * float(radix)
             person_years[sex][age] = Lx
-            mx = deaths / Lx if Lx > 0 else 0
+            mx = deaths_scaled / Lx if Lx > 0 else 0.0
 
             mortality_rates.append({
                 'year': current_year,
@@ -61,10 +72,14 @@ def calculate_mortality_rates(sim, deaths_module, year=None, max_age=100, radix=
             })
 
     # Handle open interval (max_age)
-    for sex, lx in [('Male', lx_male), ('Female', lx_female)]:
-        deaths = deaths_by_age[sex][max_age]
-        Lx = lx[max_age - 1]  # approximate with previous age group
-        mx = deaths / Lx if Lx > 0 else 0
+    for sex, lx_frac in [('Male', lx_male), ('Female', lx_female)]:
+        deaths = float(deaths_by_age[sex][max_age])
+        sex_scale = float(radix) / (n0_male if sex == 'Male' else n0_female)
+        deaths_scaled = deaths * sex_scale
+
+        # crude open-interval approximation using the last closed interval survivors
+        Lx = 0.5 * (lx_frac[max_age - 1] + lx_frac[max_age]) * float(radix)
+        mx = deaths_scaled / Lx if Lx > 0 else 0.0
         mortality_rates.append({'year': current_year, 'age': max_age, 'sex': sex, 'mx': mx})
 
     return pd.DataFrame(mortality_rates)
@@ -108,7 +123,8 @@ def calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100):
             T_accum += L_x[i]
             T_x[i] = T_accum
 
-        e_x = T_x / l_x
+        # Avoid divide-by-zero warnings when l_x reaches 0 at extreme ages
+        e_x = np.divide(T_x, l_x, out=np.zeros_like(T_x), where=(l_x > 0))
 
         return pd.DataFrame({
             'sex': sex,

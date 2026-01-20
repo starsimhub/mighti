@@ -33,16 +33,10 @@ class T2D_ReduceMortalityTx(treat_num):
     
     def init_pre(self, sim):
         super().init_pre(sim)
-        self._budget_module = sim.get_module("budget_constraint", optional=True)
 
     def apply(self, sim):
         super().apply(sim)  # normal intervention behavior
-
-        if self._budget_module:
-            n_treated = getattr(self, "n_treated", 0)
-            cost = n_treated * self.cost_per_person_year / sim.n_years
-            hrh_minutes = dict(doctor=5 * n_treated, nurse=30 * n_treated)
-            self._budget_module.register_usage(cost=cost, hrh_minutes=hrh_minutes, source=self.name)
+        # NOTE: economic/budget hooks intentionally removed
 
     def step(self):
         self.add_to_queue()

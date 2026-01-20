@@ -205,7 +205,9 @@ def create_and_fill_prevalence_template_from_long_format(
     output_csv,
     start_year=1987,
     end_year=2021,
-    age_starts=None
+    age_starts=None,
+    *,
+    overwrite: bool = False,
 ):
     """
     Create and fill a prevalence template with numeric Age values (0, 5, 10, 15...).
@@ -264,7 +266,11 @@ def create_and_fill_prevalence_template_from_long_format(
                 mask = (grid["Age"] == r["Age"]) & (grid["Year"] == r["year"])
                 grid.loc[mask, col] = r["prevalence"]
 
-    # Step 5 — save
+    # Step 5 — save (only if missing unless overwrite=True)
+    if (not overwrite) and os.path.exists(output_csv):
+        logging.info(f"Prevalence file already exists; keeping existing file: {output_csv}")
+        return grid
+
     os.makedirs(os.path.dirname(output_csv), exist_ok=True)
     grid.to_csv(output_csv, index=False)
     logging.info(f"Filled prevalence template saved to {output_csv}")

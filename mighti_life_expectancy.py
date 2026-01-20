@@ -21,6 +21,7 @@ import mighti as mi
 import numpy as np
 import pandas as pd
 import prepare_data_for_year
+import os
 import starsim as ss
 import stisim as sti
 from mighti.diseases.type2diabetes import T2D_ReduceMortalityTx
@@ -34,10 +35,19 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------
 # Simulation Settings
 # ---------------------------------------------------------------------
-n_agents = 10_000 
+n_agents = 1_000 
 inityear = 2007
-# endyear = 2008
+endyear = 2030
 region = 'eswatini'
+
+# ---- knobs (to make outputs interpretable) ----
+# If you want to see the historical Eswatini HIV-era dip (~1990s), you will need:
+# - an earlier inityear (e.g. 1980) and
+# - HIV mortality enabled (include_aids_deaths=True) and
+# - a plausible HIV epidemic trajectory (from data or generated endogenously).
+DEATH_RATE_SCALER = 1.0           # avoid arbitrary scaling unless you know why
+INCLUDE_AIDS_DEATHS = True        # must be True to see HIV-driven mortality impacts
+HIV_INIT_PREV_FALLBACK = 0.01     # used only if prevalence CSV has no HIV columns
 
 
 # ---------------------------------------------------------------------
@@ -82,14 +92,6 @@ df.columns = df.columns.str.strip()
 healthconditions = ['Type2Diabetes']
 diseases = ["HIV"] + healthconditions
 
-ncd_df = df[df["disease_class"] == "ncd"]
-chronic = ncd_df[ncd_df["disease_type"] == "chronic"]["condition"].tolist()
-acute = ncd_df[ncd_df["disease_type"] == "acute"]["condition"].tolist()
-remitting = ncd_df[ncd_df["disease_type"] == "remitting"]["condition"].tolist()
-communicable_diseases = df[df["disease_class"] == "sis"]["condition"].tolist()
-
-
-
 # ---------------------------------------------------------------------
 # Prevalence Data and Analyzers
 # ---------------------------------------------------------------------
@@ -97,7 +99,21 @@ prevalence_data_df = pd.read_csv(csv_prevalence)
 prevalence_data, age_bins = mi.initialize_prevalence_data(
     diseases, prevalence_data=prevalence_data_df, inityear=inityear
 )
-get_prev_fn = lambda d: lambda mod, sim, size: mi.age_sex_dependent_prevalence(d, prevalence_data, age_bins, sim, size)
+
+# Detect whether HIV prevalence exists in the prevalence CSV (many MIGHTI prevalence tables omit HIV)
+_has_hiv_prev_cols = any("hiv" in c.lower() for c in prevalence_data_df.columns)
+
+def make_init_prev_func(disease):
+    """Return a Starsim-compatible callable p(sim, uids, size=None) for ss.bernoulli()."""
+    def prevalence_func(sim, uids, size=None):
+        return mi.age_sex_dependent_prevalence(
+            disease=disease,
+            prevalence_data=prevalence_data,
+            age_bins=age_bins,
+            sim=sim,
+            size=size,
+        )
+    return prevalence_func
 
 
 # ---------------------------------------------------------------------
@@ -106,19 +122,16 @@ get_prev_fn = lambda d: lambda mod, sim, size: mi.age_sex_dependent_prevalence(d
 def make_sim(year):
     # Initialize the PrevalenceAnalyzer
     prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=diseases)
-    survivorship_analyzer = mi.SurvivorshipAnalyzer()
-    deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
+    survivorship_analyzer = mi.SurvivorshipAnalyzer(label="survivorship_analyzer")
+    deaths_analyzer = mi.DeathsByAgeSexAnalyzer(label="deaths_by_age_sex_analyzer")
     
-    death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
-        conditions=['hiv', 'type2diabetes'],
-        condition_attr_map={
-            'hiv': 'infected',
-            'type2diabetes': 'affected'  
-        }
-    )
+    # ConditionAtDeathAnalyzer in this repo does not take `condition_attr_map`
+    # (and it handles HIV separately), so keep this minimal.
+    death_cause_analyzer = mi.ConditionAtDeathAnalyzer(conditions=['hiv', 'type2diabetes'])
     death_rates = {'death_rate': pd.read_csv(csv_path_death), 'rate_units': 1}
     death = ss.Deaths(death_rates) 
-    death.death_rate_data *= 0.4
+    if DEATH_RATE_SCALER != 1.0:
+        death.death_rate_data *= float(DEATH_RATE_SCALER)
     fertility_rate = {'fertility_rate': pd.read_csv(csv_path_fertility)}
     pregnancy = ss.Pregnancy(pars=fertility_rate)
     
@@ -129,19 +142,24 @@ def make_sim(year):
     networks = [maternal, structuredsexual]
 
     
-    hiv_disease = sti.HIV(init_prev=ss.bernoulli(get_prev_fn('HIV')),
-                          init_prev_data=None,   
-                          p_hiv_death=None, 
-                          include_aids_deaths=False, 
-                          beta={'structuredsexual': [0.011023883426646121, 0.011023883426646121], 
-                                'maternal': [0.044227226248848076, 0.044227226248848076]})
+    hiv_init_prev = ss.bernoulli(p=make_init_prev_func("HIV")) if _has_hiv_prev_cols else ss.bernoulli(p=HIV_INIT_PREV_FALLBACK)
+    hiv_disease = sti.HIV(
+        init_prev=hiv_init_prev,
+        include_aids_deaths=bool(INCLUDE_AIDS_DEATHS),
+        beta={
+            'structuredsexual': [0.011023883426646121, 0.011023883426646121],
+            'maternal': [0.044227226248848076, 0.044227226248848076],
+        },
+    )
         # Best pars: {'hiv_beta_m2f': 0.011023883426646121, 'hiv_beta_m2c': 0.044227226248848076} seed: 12345
     
     disease_objects = []
     for dis in healthconditions:
         cls = getattr(mi, dis, None)
         if cls is not None:
-            disease_objects.append(cls(csv_path=csv_path_params, pars={"init_prev": ss.bernoulli(get_prev_fn(dis))}))
+            disease_objects.append(
+                cls(csv_path=csv_path_params, pars={"init_prev": ss.bernoulli(p=make_init_prev_func(dis))})
+            )
     disease_objects.append(hiv_disease)
     
     
@@ -167,17 +185,38 @@ def make_sim(year):
     intervention_df = pd.read_csv(csv_path_intervention)
     unified_product = ss.Tx(df=intervention_df, label='UnifiedTx')
 
+    # Some intervention CSVs may not include rows for every disease used in this script.
+    # Create minimal fallback Tx definitions so `treat_num`-style interventions don't crash.
+    def _make_tx_for(disease_key: str, label: str):
+        df_tx = intervention_df.copy()
+        if "disease" in df_tx.columns:
+            df_tx["disease"] = df_tx["disease"].astype(str).str.lower()
+            df_tx = df_tx[df_tx["disease"] == disease_key.lower()]
+
+        if df_tx.empty:
+            df_tx = pd.DataFrame(
+                {
+                    "disease": [disease_key.lower()],
+                    "state": ["affected"],
+                    "post_state": ["on_treatment"],
+                    "efficacy": [1.0],
+                }
+            )
+        return ss.Tx(df=df_tx, label=label)
+
 
     hiv_test = sti.HIVTest(test_prob_data=test_prob_data, years=test_years)
     art = sti.ART(coverage_data=art_coverage_data)
     vmmc = sti.VMMC(pars={'future_coverage': {'year': 2015, 'prop': 0.30}})
     prep = sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]})
 
-    t2d_tx = mi.T2D_ReduceMortalityTx(product=unified_product, prob=1.0,rel_death_reduction=0.54,
+    t2d_tx_product = _make_tx_for("type2diabetes", label="T2D_Tx")
+    t2d_tx = mi.T2D_ReduceMortalityTx(product=t2d_tx_product, prob=1.0, rel_death_reduction=0.54,
                                     eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
                                     label='T2D_ReduceMortalityTx')
 
-    depression_tx = mi.DepressionCare(product=unified_product, prob=0.1, label='depression_tx')
+    depression_tx_product = _make_tx_for("majordepressivedisorder", label="Depression_Tx")
+    depression_tx = mi.DepressionCare(product=depression_tx_product, prob=0.1, label='depression_tx')
 
     hospital_discharge = mi.ImproveHospitalDischarge(disease_name='depression', multiplier=10.0,
                                                     start_day=0,end_day=10,label='FastDischarge')
@@ -185,33 +224,26 @@ def make_sim(year):
     give_housing = mi.GiveHousingToDepressed(coverage=1, start_day=0)
 
     # Define interventions using these data
-    interventions1 = [hiv_test, art, vmmc, prep]
+    intervention_hiv = [hiv_test, art, vmmc, prep]
+    intervention_t2d = [t2d_tx]
+    intervention_both = [hiv_test, art, vmmc, prep, t2d_tx]
 
-    interventions2 = [hiv_test, art, vmmc, prep, t2d_tx]
 
-    interventions3 = [t2d_tx]
 
-    interventions4 = [hospital_discharge]
-
-    interventions5 = [give_housing]
-
-    interventions6 = [hiv_test, art, vmmc, prep, depression_tx]
-        
-
-    # sim = ss.Sim(
-    #     n_agents=n_agents,
-    #     networks=networks,
-    #     start=inityear,
-    #     stop=year,
-    #     people=ppl,
-    #     demographics=[pregnancy, death],
-    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
-    #     diseases=disease_objects,
-    #     connectors=interactions,
-    #     interventions = interventions,
-    #     copy_inputs=False,
-    #     label='HIV intervention'
-    # )
+    sim_with_hiv = ss.Sim(
+        n_agents=n_agents,
+        networks=networks,
+        start=inityear,
+        stop=year,
+        people=ppl,
+        demographics=[pregnancy, death],
+        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer],
+        diseases=disease_objects,
+        connectors=interactions,
+        interventions = intervention_hiv,
+        copy_inputs=False,
+        label='HIV intervention'
+    )
     
     
     # ### To run 2 simulation simultaneously #####
@@ -230,51 +262,8 @@ def make_sim(year):
         label='No_intervention'
     )
     
-    # sim_with = ss.Sim(
-    #     n_agents=n_agents,
-    #     networks=networks,
-    #     start=inityear,
-    #     stop=year,
-    #     people=ppl,
-    #     demographics=[pregnancy, death],
-    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-    #     diseases=disease_objects,
-    #     connectors=interactions,
-    #     copy_inputs=False,
-    #     label='HIV_intervention'
-    # )
-    
-    sim_with_t2d = ss.Sim(
-        n_agents=n_agents,
-        networks=networks,
-        start=inityear,
-        stop=year,
-        people=ppl,
-        demographics=[pregnancy, death],
-        analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-        diseases=disease_objects,
-        connectors=interactions,
-        interventions = interventions3,
-        copy_inputs=False,
-        label='T2D_intervention'
-    )
-    
-    # sim_with_both = ss.Sim(
-    #     n_agents=n_agents,
-    #     networks=networks,
-    #     start=inityear,
-    #     stop=year,
-    #     people=ppl,
-    #     demographics=[pregnancy, death],
-    #     analyzers=[deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer],
-    #     diseases=disease_objects,
-    #     connectors=interactions,
-    #     interventions = interventions2,
-    #     copy_inputs=False,
-    #     label='Both_intervention'
-    # )
  
-    msim = ss.MultiSim(sims=[sim_without, sim_with_t2d])
+    msim = ss.MultiSim(sims=[sim_with_hiv, sim_without])
 
     return msim
 
@@ -284,10 +273,29 @@ def make_sim(year):
 # Utility: Get Modules
 # ---------------------------------------------------------------------
 def get_deaths_module(sim):
-    for module in sim.modules:
-        if isinstance(module, mi.DeathsByAgeSexAnalyzer):
-            return module
-    raise ValueError("Deaths module not found in the simulation. Make sure you've added the DeathsByAgeSexAnalyzer to your simulation configuration")
+    """Fetch the DeathsByAgeSexAnalyzer from sim.analyzers (not sim.modules)."""
+    analyzers = getattr(sim, "analyzers", None)
+    if analyzers is None:
+        raise ValueError("Simulation has no analyzers attached.")
+
+    # dict / odict-like
+    if hasattr(analyzers, "values"):
+        for a in analyzers.values():
+            if isinstance(a, mi.DeathsByAgeSexAnalyzer):
+                return a
+        # fallback by common keys
+        if hasattr(analyzers, "get"):
+            for key in ("deaths_by_age_sex_analyzer", "deaths_analyzer", "deathsbyagesexanalyzer"):
+                a = analyzers.get(key, None)
+                if a is not None:
+                    return a
+    else:
+        # list-like
+        for a in analyzers:
+            if isinstance(a, mi.DeathsByAgeSexAnalyzer):
+                return a
+
+    raise ValueError("DeathsByAgeSexAnalyzer not found in sim.analyzers.")
 
 def get_pregnancy_module(sim):
     for module in sim.modules:
@@ -296,16 +304,15 @@ def get_pregnancy_module(sim):
     raise ValueError("Pregnancy module not found in the simulation.")
 
 
-    
-years = list(range(2008, 2050))  # or any range you like
-
+years = list(range(inityear+1, endyear))
 
 life_expectancy_by_year = []
 
 # Run MultiSim
 for year in years:
     msim = make_sim(year)
-    msim.run()
+
+    msim.run(parallel=False)
 
     for sim in msim.sims:
         label = sim.label
@@ -341,9 +348,19 @@ for year in years:
 # Convert to DataFrame
 le_df = pd.DataFrame(life_expectancy_by_year)
 
-# Pivot to view as year × scenario × sex
-pivot_df = le_df.pivot_table(index='year', columns=['scenario', 'sex'], values='e0').reset_index()
+highlights = [1990] if (min(years) <= 1990 <= max(years)) else None
+# le_df.to_csv("life_expectancy_timeseries_long.csv", index=False)
 
-# Display result
-pivot_df.to_csv("result_hivtest.csv", index=False)
- 
+# Wide table for easy inspection: year × scenario × sex
+pivot_df = le_df.pivot_table(index="year", columns=["scenario", "sex"], values="e0").reset_index()
+# pivot_df.to_csv("life_expectancy_timeseries_wide.csv", index=False)
+
+# Plots (pop up figures). Save only if you uncomment the fig.savefig(...) lines below.
+for sex in ["Both", "Male", "Female"]:
+    fig, ax = mi.plot_life_expectancy_timeseries(
+        le_df,
+        sex=sex,
+        highlight_years=highlights,
+        title=f"Eswatini e₀ over time ({sex})",
+    )
+    # fig.savefig(f"life_expectancy_timeseries_{sex.lower()}.png", dpi=200)
