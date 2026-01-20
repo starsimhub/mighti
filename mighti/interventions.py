@@ -6,40 +6,22 @@ Defines interventions.
 import starsim as ss
 import stisim as sti
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 _all_ = ['ART', 'ARTwithCASM', 'ARTNoAutoAdjust', 'ImproveHospitalDischarge', 'GiveHousingToDepressed', 'GiveHousingSupport', 'HousingSupportForAUD']
 
 
 class ART(sti.ART):
     """
-    ART intervention with optional integration to the BudgetConstraint module.
+    ART intervention.
     """
 
     def init_pre(self, sim):
         super().init_pre(sim)
-        # Store reference to budget module if present
-        self._budget_module = sim.get_module("budget_constraint", optional=True)
 
-    def apply(self, sim):
-        # Execute normal ART behavior (diagnosis, initiation, adherence updates, etc.)
-        super().apply(sim)
-
-        # If budget constraint active, register cost and HRH usage
-        if self._budget_module:
-            n_treated = getattr(self, "n_treated", 0)
-
-            # Safety guard: only proceed if n_treated > 0
-            if n_treated > 0:
-                cost = n_treated * getattr(self, "cost_per_person_year", 120) / sim.n_years
-                hrh_minutes = {
-                    "doctor": 5 * n_treated,
-                    "nurse": 30 * n_treated,
-                }
-                self._budget_module.register_usage(
-                    cost=cost,
-                    hrh_minutes=hrh_minutes,
-                    source=self.name,
-                )
+    # NOTE: economic/budget hooks intentionally removed
 
 
 class ARTwithCASM(sti.ART):
@@ -111,7 +93,7 @@ class ARTNoAutoAdjust(sti.ART):
                 ever_dropped = art_dropout_connector._ever_dropped
                 # Debug: verify we found it
                 if sim.ti % 12 == 0 and len(ever_dropped) > 0:  # Print once per year if there are dropped people
-                    print(f"[ARTNoAutoAdjust.art_coverage_correction] Found connector '{art_dropout_connector.label}', _ever_dropped={len(ever_dropped)}")
+                    logger.debug(f"[ARTNoAutoAdjust.art_coverage_correction] Found connector '{art_dropout_connector.label}', _ever_dropped={len(ever_dropped)}")
             elif sim.ti % 12 == 0:  # Debug: print if connector not found
                 connector_labels = []
                 if hasattr(sim, 'connectors'):
@@ -119,7 +101,7 @@ class ARTNoAutoAdjust(sti.ART):
                         connector_labels = list(sim.connectors.keys())
                     else:
                         connector_labels = [getattr(conn, 'label', 'no_label') for conn in sim.connectors]
-                print(f"[ARTNoAutoAdjust.art_coverage_correction] WARNING: Could not find ART dropout connector! Available connectors: {connector_labels}")
+                logger.warning(f"[ARTNoAutoAdjust.art_coverage_correction] Could not find ART dropout connector! Available connectors: {connector_labels}")
         
         # If target_coverage is provided and is an absolute number (likely > 1.0),
         # recalculate based on the actual eligible population (diagnosed HIV+)

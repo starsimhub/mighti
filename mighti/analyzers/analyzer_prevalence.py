@@ -16,6 +16,9 @@ It stores both counts and prevalence estimates for:
 import starsim as ss
 import numpy as np
 import sciris as sc
+import logging
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["PrevalenceAnalyzer", "PrevalenceAnalyzer_HIV", "PrevalenceAnalyzer_SDoH", "OnARTByConditionAnalyzer", "OnARTByConditionAndSexAnalyzer"]
 
@@ -347,9 +350,18 @@ class OnARTByConditionAnalyzer(ss.Analyzer):
             no_cond_count = no_cond_diag.sum()
             cond_art = (art & cond_diag).sum()
             no_cond_art = (art & no_cond_diag).sum()
-            print(f"[OnARTByConditionAnalyzer] Year {self.sim.t.year}, ti={ti}: "
-                  f"Cond diagnosed={cond_count}, Cond on ART={cond_art}, Coverage={self.cond_prob(art, cond_diag):.3f} | "
-                  f"NoCond diagnosed={no_cond_count}, NoCond on ART={no_cond_art}, Coverage={self.cond_prob(art, no_cond_diag):.3f}")
+            logger.debug(
+                "[OnARTByConditionAnalyzer] Year %s, ti=%s: Cond diagnosed=%s, Cond on ART=%s, Coverage=%0.3f | "
+                "NoCond diagnosed=%s, NoCond on ART=%s, Coverage=%0.3f",
+                getattr(self.sim.t, "year", "?"),
+                ti,
+                int(cond_count),
+                int(cond_art),
+                float(self.cond_prob(art, cond_diag)),
+                int(no_cond_count),
+                int(no_cond_art),
+                float(self.cond_prob(art, no_cond_diag)),
+            )
         
         # Calculate ART coverage among diagnosed HIV+ (tested positive)
         # This is what the user requested: "proportion on ART among people who are HIV+ and tested positive"

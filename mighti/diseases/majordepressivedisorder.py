@@ -6,7 +6,10 @@ housing-dependent recovery and a DepressionCare intervention.
 import numpy as np
 import starsim as ss
 import pandas as pd
+import logging
 from mighti.diseases.base_disease import RemittingDisease
+
+logger = logging.getLogger(__name__)
 
 
 # =====================================================================
@@ -137,10 +140,16 @@ class DepressionCare(ss.treat_num):
                 raise ValueError(f"[{self.label}] Disease '{self.disease}' not found.")
             self.eligibility = lambda sim: sim.diseases[self.disease].affected.uids
 
+        # Debug logging only (avoid stdout noise in production)
         dep = sim.diseases[self.disease]
-        print(f"[DEBUG INIT] {self.label}: linked to '{self.disease}', "
-            f"affected at start={int(dep.affected.sum())}, prob={self.prob}")
-        print(f"[DEBUG INIT] {self.label}: eligibility function set={self.eligibility is not None}")
+        logger.debug(
+            "[DepressionCare] %s linked to '%s' (affected at start=%s, prob=%s; eligibility_set=%s)",
+            getattr(self, "label", "DepressionCare"),
+            self.disease,
+            int(dep.affected.sum()),
+            self.prob,
+            self.eligibility is not None,
+        )
 
     def step(self):
         """Treat eligible individuals and apply remission/adherence effects."""
@@ -153,33 +162,41 @@ class DepressionCare(ss.treat_num):
             if not hasattr(self.sim.diseases, self.disease):
                 raise ValueError(f"[{self.label}] Disease '{self.disease}' not found in sim.diseases.")
             self.eligibility = lambda sim: sim.diseases[self.disease].affected.uids
-            print(f"[DEBUG DEPCARE] {self.label}: eligibility auto-set at step {cur_year:.1f}")
+            logger.debug("[DepressionCare] %s eligibility auto-set at year %.1f", self.label, cur_year)
 
         # 3) who’s eligible this step?
         eligible = self.eligibility(self.sim)
         n_eligible = len(eligible)
-        print(f"[DEBUG DEPCARE] {self.label}: year {cur_year:.1f} | eligible={n_eligible}")
+        logger.debug("[DepressionCare] %s year %.1f | eligible=%s", self.label, cur_year, n_eligible)
 
         # 3) apply coverage probability
         chooser = (np.random.rand(n_eligible) < self.prob)
         treated = eligible[chooser]
         self.treated_inds = ss.uids(treated)
-        print(f"[DEBUG DEPCARE] {self.label}: chose {len(treated)} to treat (prob={self.prob})")
+        logger.debug("[DepressionCare] %s treated=%s (prob=%s)", self.label, len(treated), self.prob)
 
         # 4) apply effects
         if len(treated):
             try:
                 dep.pars.remission_mult = float(self.remission_boost)
-                print(f"[DEBUG DEPCARE] {self.label}: boosted remission_mult → {float(dep.pars.remission_mult):.3f}")
+                logger.debug(
+                    "[DepressionCare] %s boosted remission_mult -> %.3f",
+                    self.label,
+                    float(dep.pars.remission_mult),
+                )
             except Exception as e:
-                print(f"[DEBUG DEPCARE] remission boost skipped: {e}")
+                logger.debug("[DepressionCare] %s remission boost skipped: %s", self.label, e)
 
             # Try to nudge ART if present
             for intv in self.sim.interventions.values():
                 if hasattr(intv, "label") and "ART" in intv.label.upper():
                     if hasattr(intv, "adherence_scale"):
                         intv.adherence_scale *= self.adherence_boost
-                        print(f"[DEBUG DEPCARE] ART adherence_scale → {intv.adherence_scale}")
+                        logger.debug(
+                            "[DepressionCare] %s ART adherence_scale -> %s",
+                            self.label,
+                            intv.adherence_scale,
+                        )
                     break
 
         return self.treated_inds    

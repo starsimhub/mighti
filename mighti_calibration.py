@@ -9,6 +9,9 @@ import pandas as pd
 import sciris as sc
 import starsim as ss
 import stisim as sti
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def make_sim():
@@ -107,16 +110,41 @@ def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None
     if isinstance(sim, ss.MultiSim):
         sim = sim.sims[0]
 
+    def _find_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
+        cols_lower = {c.lower(): c for c in df.columns}
+        for cand in candidates:
+            if cand in df.columns:
+                return cand
+            if cand.lower() in cols_lower:
+                return cols_lower[cand.lower()]
+        return None
+
+    if data is None:
+        raise ValueError("eval_fn requires observed HIV prevalence data via eval_kw={'data': ...}.")
+
+    hiv_female_col = _find_col(data, ["HIV_female", "hiv_female"])
+    hiv_male_col = _find_col(data, ["HIV_male", "hiv_male"])
+    if hiv_female_col is None or hiv_male_col is None:
+        hiv_like = [c for c in data.columns if "hiv" in c.lower()]
+        raise ValueError(
+            "Observed prevalence data is missing required columns for HIV by sex. "
+            f"Expected columns like 'HIV_female' and 'HIV_male'. "
+            f"Found HIV-like columns: {hiv_like}. "
+            "Please provide an HIV prevalence CSV with Age/Year and sex-stratified HIV prevalence."
+        )
+
     # Normalize observed data (if in %)
-    if data['HIV_female'].max() > 1:
-        data[['HIV_female', 'HIV_male']] /= 100.0
+    if pd.to_numeric(data[hiv_female_col], errors="coerce").max() > 1:
+        data[[hiv_female_col, hiv_male_col]] = data[[hiv_female_col, hiv_male_col]] / 100.0
 
     fit = 0
-    prev_analyzer = sim.analyzers.get('prevalence_analyzer')
-    prev_results = sim.results.get('prevalence_analyzer')
+    prev_analyzer = sim.analyzers.get('prevalence_analyzer') if hasattr(sim.analyzers, "get") else getattr(sim.analyzers, "prevalence_analyzer", None)
+    prev_results = sim.results.get('prevalence_analyzer') if hasattr(sim, "results") else None
+    if prev_analyzer is None or prev_results is None:
+        raise ValueError("PrevalenceAnalyzer results not found on sim; ensure analyzers include mi.PrevalenceAnalyzer with label 'prevalence_analyzer'.")
 
     for index, (age_low, age_high) in enumerate(prev_analyzer.age_bins):
-        prev_observed_data = data[data['Age'] == age_low][['Year', 'Age', 'HIV_female', 'HIV_male']].copy()
+        prev_observed_data = data[data['Age'] == age_low][['Year', 'Age', hiv_female_col, hiv_male_col]].copy()
         prev_observed_data['Year'] = prev_observed_data['Year'].astype(int)
 
         # Normalize analyzer time vector to int years
@@ -130,8 +158,8 @@ def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None
         })
 
         merged = pd.merge(prev_observed_data, prev_sim_data, on=['Year', 'Age'], how='inner')
-        merged['error'] = abs(merged['sim_HIV_female'] - merged['HIV_female']) + \
-                        abs(merged['sim_HIV_male'] - merged['HIV_male'])
+        merged['error'] = abs(merged['sim_HIV_female'] - merged[hiv_female_col]) + \
+                        abs(merged['sim_HIV_male'] - merged[hiv_male_col])
         fit += merged['error'].sum()
 
     n_obs = len(data['Age'].unique()) * 2

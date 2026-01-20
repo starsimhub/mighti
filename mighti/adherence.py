@@ -12,11 +12,15 @@ import numpy as np
 import sciris as sc
 import starsim as ss
 import stisim as sti
+import logging
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "AdherenceEngine",
     "ARTAdherenceDisruptor",
     "InterventionAdherenceDisruptor",
+    "AdherenceFromDepression",
     "CASM_REL_FACTORS",
     "SDOH_REL_FACTORS",
 ]
@@ -339,8 +343,7 @@ class AdherenceEngine(ss.Module):
 
     def init_pre(self, sim):
         super().init_pre(sim)
-
-        print(f"[AdherenceEngine] Initialized for sim '{sim.label}'")
+        logger.debug("[AdherenceEngine] Initialized for sim '%s'", getattr(sim, "label", "?"))
 
     def step(self):
         ppl = self.sim.people
@@ -361,7 +364,7 @@ class AdherenceEngine(ss.Module):
                 if self.sim.ti % 10 == 0:  # Print every 10 timesteps
                     possible_keys = [k for k in st.keys() if cond.lower() in k.lower()]
                     if possible_keys:
-                        print(f"[AdherenceEngine] WARNING: '{key}' not found, but found similar keys: {possible_keys}")
+                        logger.debug("[AdherenceEngine] Missing '%s'; similar keys: %s", key, possible_keys)
 
         # SDoH effects
         for sdoh_key, rel in self.sdoh_rel.items():
@@ -379,9 +382,14 @@ class AdherenceEngine(ss.Module):
                 aud_affected = np.asarray(st[aud_key], bool)
                 if aud_affected.any():
                     aud_adherence = adherence[aud_affected]
-                    print(f"[AdherenceEngine] Year {self.sim.t.year}: AUD individuals={aud_affected.sum()}, "
-                          f"Mean adherence (AUD)={aud_adherence.mean():.3f}, "
-                          f"Min={aud_adherence.min():.3f}, Max={aud_adherence.max():.3f}")
+                    logger.debug(
+                        "[AdherenceEngine] Year %s: AUD=%s, mean adherence=%0.3f, min=%0.3f, max=%0.3f",
+                        getattr(self.sim.t, "year", "?"),
+                        int(aud_affected.sum()),
+                        float(aud_adherence.mean()),
+                        float(aud_adherence.min()),
+                        float(aud_adherence.max()),
+                    )
 
 
 # =====================================================================
@@ -437,8 +445,8 @@ class ARTAdherenceDisruptor(ss.Connector):
                     if _original_post_art_decline is None:
                         _original_post_art_decline = hiv_class.post_art_decline
                     hiv_class.post_art_decline = _patched_post_art_decline
-                    if sim.ti == 0:  # Only print once
-                        print(f"[ARTAdherenceDisruptor] Applied monkey patch to {hiv_class.__name__}.post_art_decline")
+                    if sim.ti == 0:  # Only log once
+                        logger.debug("[ARTAdherenceDisruptor] Patched %s.post_art_decline", hiv_class.__name__)
             
             # Patch step_state
             if hasattr(hiv_class, 'step_state'):
@@ -448,8 +456,8 @@ class ARTAdherenceDisruptor(ss.Connector):
                     if _original_step_state is None:
                         _original_step_state = hiv_class.step_state
                     hiv_class.step_state = _patched_step_state
-                    if sim.ti == 0:  # Only print once
-                        print(f"[ARTAdherenceDisruptor] Applied monkey patch to {hiv_class.__name__}.step_state")
+                    if sim.ti == 0:  # Only log once
+                        logger.debug("[ARTAdherenceDisruptor] Patched %s.step_state", hiv_class.__name__)
             
             # Patch make_p_hiv_death
             if hasattr(hiv_class, 'make_p_hiv_death'):
@@ -459,8 +467,8 @@ class ARTAdherenceDisruptor(ss.Connector):
                     if _original_make_p_hiv_death is None:
                         _original_make_p_hiv_death = hiv_class.make_p_hiv_death
                     hiv_class.make_p_hiv_death = _patched_make_p_hiv_death
-                    if sim.ti == 0:  # Only print once
-                        print(f"[ARTAdherenceDisruptor] Applied monkey patch to {hiv_class.__name__}.make_p_hiv_death")
+                    if sim.ti == 0:  # Only log once
+                        logger.debug("[ARTAdherenceDisruptor] Patched %s.make_p_hiv_death", hiv_class.__name__)
 
     def step(self):
         sim = self.sim
@@ -491,17 +499,23 @@ class ARTAdherenceDisruptor(ss.Connector):
                     # Also remove from _dropped_due_to_aud if they're there
                     self._ever_dropped -= set(no_longer_aud)
                     self._dropped_due_to_aud -= set(no_longer_aud)
-                    if sim.ti % 12 == 0:  # Print once per year
-                        print(f"[ARTAdherenceDisruptor] Year {sim.t.year}: Removed {len(no_longer_aud)} people from _ever_dropped "
-                              f"(went into AUD remission, allow_reinitiation={self.allow_reinitiation_after_remission}, "
-                              f"dropped_due_to_aud={n_dropped_due_to_aud})")
+                    if sim.ti % 12 == 0:  # Log once per year
+                        logger.debug(
+                            "[ARTAdherenceDisruptor] Year %s: Removed %s from _ever_dropped (AUD remission; dropped_due_to_aud=%s)",
+                            getattr(sim.t, "year", "?"),
+                            int(len(no_longer_aud)),
+                            int(n_dropped_due_to_aud),
+                        )
                 else:
                     # Keep them in _ever_dropped permanently (especially if they dropped due to AUD)
                     # This means they won't be re-added even after remission
-                    if sim.ti % 12 == 0:  # Print once per year
-                        print(f"[ARTAdherenceDisruptor] Year {sim.t.year}: {len(no_longer_aud)} people in _ever_dropped went into remission "
-                              f"but remain excluded (allow_reinitiation={self.allow_reinitiation_after_remission}, "
-                              f"dropped_due_to_aud={n_dropped_due_to_aud})")
+                    if sim.ti % 12 == 0:  # Log once per year
+                        logger.debug(
+                            "[ARTAdherenceDisruptor] Year %s: %s in _ever_dropped went into remission but remain excluded (dropped_due_to_aud=%s)",
+                            getattr(sim.t, "year", "?"),
+                            int(len(no_longer_aud)),
+                            int(n_dropped_due_to_aud),
+                        )
 
         adher = np.asarray(st["adherence"], float)
         on_art = np.asarray(st["hiv.on_art"], bool)
@@ -511,7 +525,13 @@ class ARTAdherenceDisruptor(ss.Connector):
         
         # Debug: Always print on first few timesteps to verify it's running
         if sim.ti < 3:
-            print(f"[ARTAdherenceDisruptor] Year {sim.t.year}, ti={sim.ti}: Running! On ART={on_art.sum()}, Mean adherence={adher.mean():.3f}")
+            logger.debug(
+                "[ARTAdherenceDisruptor] Year %s, ti=%s: Running. On ART=%s, mean adherence=%0.3f",
+                getattr(sim.t, "year", "?"),
+                sim.ti,
+                int(on_art.sum()),
+                float(adher.mean()),
+            )
 
         # Sanity check: these should always match if 'adherence' was added via People.add()
         if len(adher) != len(on_art):
@@ -557,9 +577,12 @@ class ARTAdherenceDisruptor(ss.Connector):
                 # Remove from both _ever_dropped and _dropped_due_to_aud
                 self._ever_dropped -= set(to_remove)
                 self._dropped_due_to_aud -= set(to_remove)
-                if sim.ti % 12 == 0:  # Print once per year
-                    print(f"[ARTAdherenceDisruptor] Year {sim.t.year}: Removed {len(to_remove)} people from _ever_dropped "
-                          f"(dropout probability now 0.0, allowing re-initiation regardless of allow_reinitiation setting)")
+                if sim.ti % 12 == 0:  # Log once per year
+                    logger.debug(
+                        "[ARTAdherenceDisruptor] Year %s: Removed %s from _ever_dropped (dropout probability ~0)",
+                        getattr(sim.t, "year", "?"),
+                        int(len(to_remove)),
+                    )
 
         # Allow dropping people who are currently on ART
         # Strategy: require at least 24 timesteps (2 years) on ART to avoid HIV module errors
@@ -585,8 +608,16 @@ class ARTAdherenceDisruptor(ss.Connector):
                     sim_ti_months = sim_ti_float / dt_float  # Convert timesteps to months
                     
                     # Debug: print ti_art format detection
-                    if sim.ti % 12 == 0:  # Print once per year
-                        print(f"[ARTAdherenceDisruptor] Year {sim.t.year}, ti={sim.ti}: ti_art range=[{ti_art_on_art.min():.1f}, {ti_art_on_art.max():.1f}], sim.ti={sim_ti_float}, sim.ti_months={sim_ti_months:.1f}")
+                    if sim.ti % 12 == 0:  # Log once per year
+                        logger.debug(
+                            "[ARTAdherenceDisruptor] Year %s, ti=%s: ti_art range=[%0.1f, %0.1f], sim_ti=%0.1f, sim_ti_months=%0.1f",
+                            getattr(sim.t, "year", "?"),
+                            sim.ti,
+                            float(ti_art_on_art.min()),
+                            float(ti_art_on_art.max()),
+                            float(sim_ti_float),
+                            float(sim_ti_months),
+                        )
                     
                     # Check if ti_art is in years (> 1000), months, or timesteps
                     if ti_art_on_art.max() > 1000:
@@ -654,18 +685,11 @@ class ARTAdherenceDisruptor(ss.Connector):
                 aud_ti_art = ti_art[on_art & aud_affected]
                 aud_ti_art_min = aud_ti_art[aud_ti_art >= 0].min() if (aud_ti_art >= 0).any() else -1
                 aud_ti_art_max = aud_ti_art.max() if len(aud_ti_art) > 0 else -1
-                print(f"[ARTAdherenceDisruptor DEBUG] Year {sim.t.year}, ti={sim.ti}: On ART={n_on_art}, Valid={n_valid} ({n_valid/n_on_art*100:.1f}%), "
-                      f"ti_art range=[{ti_art_min:.0f}, {ti_art_max:.0f}], ti_art==ti (within 0.5)={ti_art_current}, "
-                      f"Just started (excluded)={just_started_count}, "
-                      f"AUD on ART={aud_on_art}, AUD valid={aud_valid}, "
-                      f"AUD ti_art range=[{aud_ti_art_min:.0f}, {aud_ti_art_max:.0f}], "
-                      f"Mean drop prob (AUD)={mean_drop_p_aud:.4f}, (NoAUD)={mean_drop_p_noaud:.4f}")
+                # Debug logging removed (too noisy for production)
+                pass
             else:
-                print(f"[ARTAdherenceDisruptor DEBUG] Year {sim.t.year}, ti={sim.ti}: On ART={n_on_art}, Valid={n_valid} ({n_valid/n_on_art*100:.1f}%), "
-                      f"ti_art range=[{ti_art_min:.0f}, {ti_art_max:.0f}], ti_art==ti (within 0.5)={ti_art_current}, "
-                      f"Just started (excluded)={just_started_count}, "
-                      f"AUD on ART={aud_on_art}, AUD valid={aud_valid}, "
-                      f"Mean drop prob (AUD)={mean_drop_p_aud:.4f}, (NoAUD)={mean_drop_p_noaud:.4f}")
+                # Debug logging removed (too noisy for production)
+                pass
         
         # Calculate dropout for valid people
         # Only consider people who are valid (on ART for at least 2 months)
@@ -683,14 +707,12 @@ class ARTAdherenceDisruptor(ss.Connector):
                 aud_rand = rand[aud_valid_mask]
                 aud_drop_p_filtered = drop_p[aud_valid_mask]
                 actual_aud_drops = (aud_rand < aud_drop_p_filtered).sum()
-                print(f"[ARTAdherenceDisruptor] Year {sim.t.year}, ti={sim.ti}: Valid={valid_art.sum()} (AUD={aud_valid}), "
-                      f"Expected AUD drops={expected_aud_drops:.1f}, Actual={actual_aud_drops}, "
-                      f"drop_ids.size={drop_ids.size}, mean_drop_prob={aud_drop_p.mean():.4f}")
+                # Debug logging removed (too noisy for production)
+                pass
                 # Additional debug: show some actual values
                 if len(aud_drop_p_filtered) > 0:
-                    print(f"  [DEBUG] AUD valid: {aud_valid}, drop_p range=[{aud_drop_p_filtered.min():.4f}, {aud_drop_p_filtered.max():.4f}], "
-                          f"rand range=[{aud_rand.min():.4f}, {aud_rand.max():.4f}], "
-                          f"rand < drop_p: {(aud_rand < aud_drop_p_filtered).sum()}")
+                    # Debug logging removed (too noisy for production)
+                    pass
 
         if drop_ids.size:
             # Skip additional safety check - valid_art already filtered to exclude people who just started
@@ -783,15 +805,27 @@ class ARTAdherenceDisruptor(ss.Connector):
                         aud_dropped_uids = [final_drop_ids[i] for i in range(len(final_drop_ids)) if aud_affected[final_drop_ids[i]]]
                         self._dropped_due_to_aud.update(aud_dropped_uids)
                         # Debug: verify we're only adding AUD-affected people
-                        if sim.ti % 12 == 0:  # Print once per year
-                            print(f"[ARTAdherenceDisruptor] Year {sim.t.year}: Added {len(aud_dropped_uids)} AUD-affected people to _dropped_due_to_aud "
-                                  f"(total dropped this step={final_drop_ids.size}, aud_dropped={aud_dropped})")
+                        if sim.ti % 12 == 0:  # Log once per year
+                            logger.debug(
+                                "[ARTAdherenceDisruptor] Year %s: Added %s to _dropped_due_to_aud (total dropped=%s, aud_dropped=%s)",
+                                getattr(sim.t, "year", "?"),
+                                int(len(aud_dropped_uids)),
+                                int(final_drop_ids.size),
+                                int(aud_dropped),
+                            )
                     
                     # Print when dropping with detailed debug info
                     if sim.ti % 5 == 0 or final_drop_ids.size > 10:
-                        print(f"[ARTAdherenceDisruptor] Year {sim.t.year}, ti={sim.ti}: Scheduled ART stop for {final_drop_ids.size} agents "
-                              f"(AUD={aud_dropped}, NoAUD={final_drop_ids.size - aud_dropped}, "
-                              f"mean_adherence={mean_adher_dropped:.3f}, mean_drop_prob={mean_drop_p_dropped:.4f})")
+                        logger.debug(
+                            "[ARTAdherenceDisruptor] Year %s, ti=%s: Scheduled ART stop for %s (AUD=%s, NoAUD=%s, mean_adherence=%0.3f, mean_drop_prob=%0.4f)",
+                            getattr(sim.t, "year", "?"),
+                            sim.ti,
+                            int(final_drop_ids.size),
+                            int(aud_dropped),
+                            int(final_drop_ids.size - aud_dropped),
+                            float(mean_adher_dropped),
+                            float(mean_drop_p_dropped),
+                        )
                     
                     # Yearly summary of dropout tracking
                     if sim.ti % 12 == 0:  # Once per year
@@ -809,11 +843,19 @@ class ARTAdherenceDisruptor(ss.Connector):
                         dropped_due_to_aud_currently_aud = len([uid for uid in self._dropped_due_to_aud if uid < len(aud_affected) and aud_affected[uid]])
                         dropped_due_to_aud_in_remission = len(self._dropped_due_to_aud) - dropped_due_to_aud_currently_aud
                         
-                        print(f"[ARTAdherenceDisruptor SUMMARY] Year {sim.t.year}: "
-                              f"_ever_dropped={len(self._ever_dropped)} (currently AUD={ever_dropped_aud}, currently No-AUD={ever_dropped_noaud}), "
-                              f"_dropped_due_to_aud={len(self._dropped_due_to_aud)} (currently AUD={dropped_due_to_aud_currently_aud}, in remission={dropped_due_to_aud_in_remission}), "
-                              f"allow_reinitiation={self.allow_reinitiation_after_remission}, "
-                              f"Currently on ART: AUD={aud_on_art}, No-AUD={noaud_on_art}")
+                        logger.debug(
+                            "[ARTAdherenceDisruptor SUMMARY] Year %s: _ever_dropped=%s (AUD=%s, No-AUD=%s), _dropped_due_to_aud=%s (AUD=%s, remission=%s), allow_reinitiation=%s, on ART: AUD=%s, No-AUD=%s",
+                            getattr(sim.t, "year", "?"),
+                            int(len(self._ever_dropped)),
+                            int(ever_dropped_aud),
+                            int(ever_dropped_noaud),
+                            int(len(self._dropped_due_to_aud)),
+                            int(dropped_due_to_aud_currently_aud),
+                            int(dropped_due_to_aud_in_remission),
+                            bool(self.allow_reinitiation_after_remission),
+                            int(aud_on_art),
+                            int(noaud_on_art),
+                        )
         
         # Final validation: Check CD4 values for people who have ti_stop_art set (scheduled to drop)
         # This catches any invalid CD4 values that might cause errors in the HIV module's step_state
@@ -853,7 +895,7 @@ class InterventionAdherenceDisruptor(ss.Module):
     IMPORTANT: Stores baseline values to avoid cumulative multiplication.
     """
 
-    def __init__(self, scale_art_efficacy=False, label="intervention_adherence_disruptor"):
+    def __init__(self, scale_art_efficacy=True, label="intervention_adherence_disruptor"):
         """
         Parameters
         ----------
@@ -895,10 +937,7 @@ class InterventionAdherenceDisruptor(ss.Module):
         adher = np.asarray(st["adherence"], float)
         scale = float(adher.mean())
         
-        # Debug: print adherence stats occasionally
-        if hasattr(sim, 'ti') and sim.ti % 5 == 0:
-            print(f"[{self.label}] Year {sim.t.year}: mean adherence={scale:.3f}, "
-                  f"min={adher.min():.3f}, max={adher.max():.3f}")
+        # (no stdout debug printing; keep module quiet for production)
 
         # 1. Starsim/sti HIV ART efficacy (pars.art_efficacy)
         # Only scale if explicitly enabled
@@ -909,7 +948,7 @@ class InterventionAdherenceDisruptor(ss.Module):
                     hiv.pars.art_efficacy = self._baseline_art_efficacy * scale
                 else:
                     # Fallback if init_post wasn't called (shouldn't happen)
-                    print(f"[WARNING] {self.label}: baseline_art_efficacy not set, skipping scaling")
+                    logger.warning("[%s] baseline_art_efficacy not set; skipping scaling", self.label)
 
         # 2. Any other interventions that still use rel_effect
         # Set to baseline * scale (not multiply current value)
@@ -925,5 +964,52 @@ class InterventionAdherenceDisruptor(ss.Module):
                         intv.rel_effect = baseline * adher
                 else:
                     # Fallback if baseline wasn't stored
-                    print(f"[WARNING] {self.label}: baseline for {label} not found, skipping scaling")
+                    logger.warning("[%s] baseline for %s not found; skipping scaling", self.label, label)
                     
+
+# =====================================================================
+# Legacy connector: AdherenceFromDepression
+# =====================================================================
+class AdherenceFromDepression(ss.Connector):
+    """
+    Legacy connector kept for backwards compatibility with older tests/workflows.
+
+    Computes a simple adherence score based on Major Depressive Disorder status
+    and records mean adherence over time.
+    """
+
+    def __init__(self, base=1.0, depression_factor=0.8, label="adherence_from_depression"):
+        super().__init__(label=label)
+        self.base = float(base)
+        self.depression_factor = float(depression_factor)
+        self.time = []
+        self.mean_adherence = []
+
+    def step(self):
+        sim = self.sim
+        ppl = sim.people
+        st = ppl.states
+
+        n = len(ppl)
+        adher = np.full(n, self.base, dtype=float)
+
+        dep = getattr(sim.diseases, "majordepressivedisorder", None)
+        if dep is not None and hasattr(dep, "affected"):
+            dep_mask = np.asarray(dep.affected, dtype=bool)
+            if len(dep_mask) != n:
+                dep_mask = np.pad(dep_mask, (0, max(0, n - len(dep_mask))), constant_values=False)[:n]
+            adher[dep_mask] *= self.depression_factor
+
+        adher = np.clip(adher, 0.0, 1.0)
+
+        # Persist into people state if present
+        if "adherence" in st:
+            try:
+                st["adherence"][:] = adher
+            except Exception:
+                pass
+
+        # Record time series
+        year = getattr(sim.t, "year", None)
+        self.time.append(float(year) if year is not None else float(getattr(sim, "now", sim.ti)))
+        self.mean_adherence.append(float(np.mean(adher)))

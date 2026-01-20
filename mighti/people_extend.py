@@ -50,7 +50,7 @@ def fixed_step_die(self):
         elif hasattr(module, "step_die"):
             module.step_die(death_uids)
 
-    logger.debug(f"[MIGHTI step_die] committed {len(death_uids)} deaths at ti={ti}")
+    # logger.debug(f"[MIGHTI step_die] committed {len(death_uids)} deaths at ti={ti}")
     return death_uids
 
 ss.People.step_die = fixed_step_die

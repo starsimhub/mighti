@@ -217,11 +217,8 @@ class HRHAnalyzer(ss.Analyzer):
         self.records = []
 
     def apply(self, sim):
-        econ = sim.get_module("budget_constraint", optional=True)
-        if econ and econ.resources:
-            used = {**econ.resources.summarize()}
-            used["t"] = sim.t
-            self.records.append(used)
+        # NOTE: BudgetConstraint-based accounting removed from non-economic package.
+        return
 
     def finalize(self, sim):
         self.df = pd.DataFrame(self.records)

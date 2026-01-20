@@ -69,7 +69,7 @@ class BaseSDoH(ss.Module):
     def init_pre(self, sim):
         """Register the state array on People."""
         super().init_pre(sim)
-        logger.debug(f"[{self.name}] init_pre called at t={sim.t if hasattr(sim, 't') else 'N/A'}")
+        # logger.debug(f"[{self.name}] init_pre called at t={sim.t if hasattr(sim, 't') else 'N/A'}")
 
         if not hasattr(sim.people, self.state_attr):
             arr = ss.BoolArr(self.state_attr)
@@ -102,7 +102,7 @@ class BaseSDoH(ss.Module):
         self.state[:] = np.random.rand(n) < base_prob
         prop_stable = np.mean(self.state)
         logger.info(f"[{self.name}] init_post: {prop_stable:.3f} stable (target {self.p_stable:.3f})")
-        print(f"[DEBUG] {self.name} init_post — stable={prop_stable:.3f}, expected={self.p_stable:.3f}")
+        # logger.debug(f"[{self.name}] init_post — stable={prop_stable:.3f}, expected={self.p_stable:.3f}")
 
     def step(self):
         """Yearly inheritance + stochastic transitions, tracking inherited proportion."""

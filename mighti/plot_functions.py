@@ -28,6 +28,75 @@ def _safe_get_result(analyzer, key, sim):
 
 logger = logging.getLogger(__name__)
 
+def plot_life_expectancy_timeseries(
+    le_df: pd.DataFrame,
+    *,
+    sex: str = "Both",
+    scenarios: list[str] | None = None,
+    highlight_years: list[int] | None = None,
+    title: str | None = None,
+    ylabel: str = "Life expectancy at birth (e₀)",
+    xlabel: str = "Year",
+    figsize: tuple[int, int] = (10, 5),
+    show: bool = True,
+):
+    """
+    Plot a time series of life expectancy at birth (e₀).
+
+    Expects a tidy DataFrame with columns:
+      - year (int)
+      - scenario (str)
+      - sex (str): 'Male', 'Female', or 'Both'
+      - e0 (float)
+    """
+    if le_df is None or len(le_df) == 0:
+        raise ValueError("le_df is empty; nothing to plot")
+
+    df = le_df.copy()
+    required = {"year", "scenario", "sex", "e0"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"le_df missing required columns: {sorted(missing)}")
+
+    df["year"] = pd.to_numeric(df["year"], errors="coerce")
+    df = df.dropna(subset=["year"])
+    df["year"] = df["year"].astype(int)
+    df["sex"] = df["sex"].astype(str)
+    df["scenario"] = df["scenario"].astype(str)
+    df["e0"] = pd.to_numeric(df["e0"], errors="coerce")
+    df = df.dropna(subset=["e0"])
+
+    # Filter
+    df = df[df["sex"].str.lower() == str(sex).lower()]
+    if scenarios is not None:
+        keep = {s.lower() for s in scenarios}
+        df = df[df["scenario"].str.lower().isin(keep)]
+
+    if df.empty:
+        raise ValueError("No rows left after filtering; check `sex`/`scenarios`")
+
+    # Plot
+    fig, ax = plt.subplots(figsize=figsize)
+    for scen, sub in df.groupby("scenario", sort=True):
+        sub = sub.sort_values("year")
+        ax.plot(sub["year"], sub["e0"], linewidth=2, label=scen)
+
+    # Optional highlights (e.g., 1990 HIV era inflection)
+    if highlight_years:
+        for y in highlight_years:
+            ax.axvline(int(y), color="k", linestyle="--", linewidth=1, alpha=0.35)
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.grid(True, alpha=0.3)
+    ax.legend(frameon=False)
+    ax.set_title(title or f"Life expectancy at birth over time ({sex})")
+    plt.tight_layout()
+
+    if show:
+        plt.show()
+    return fig, ax
+
 def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     """
     Plot mean prevalence over time for a given disease and both sexes.
@@ -39,7 +108,7 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
                          if k.startswith(f'{disease}_{key_pattern}_')]
         matching_keys = sorted(matching_keys, key=lambda x: int(x.split('_')[-1]))
         if not matching_keys:
-            print(f'No keys found for pattern {disease}_{key_pattern}_')
+            logger.debug("No keys found for pattern %s_%s_", disease, key_pattern)
         return [_safe_get_result(prevalence_analyzer, k, sim) for k in matching_keys]
 
     male_num_with_HIV = np.sum(extract_results('num_with_HIV_male'), axis=0)
@@ -103,7 +172,7 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
                          if k.startswith(f"{disease}_{key_pattern}_")]
         matching_keys = sorted(matching_keys, key=lambda x: int(x.split('_')[-1]))
         if not matching_keys:
-            print(f" No keys found for pattern {disease}_{key_pattern}_")
+            logger.debug("No keys found for pattern %s_%s_", disease, key_pattern)
         return [_safe_get_result(prevalence_analyzer, k, sim) for k in matching_keys]
 
     male_num = np.sum(extract_results("num_male"), axis=0)
@@ -165,7 +234,7 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
     plt.tight_layout()
     plt.show()
 
-    print(f" Observed data restricted to {init_year}–{min(end_year, most_recent)} ({len(df)} rows used).")
+    logger.info("Observed data restricted to %s–%s (%s rows used).", init_year, min(end_year, most_recent), len(df))
     return total_male_prev, total_female_prev   
     
     
