@@ -46,8 +46,10 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
         self._ensure_size()
 
         # New deaths this step
-        new_deaths_mask = ppl.dead & ~self._dead_prev
-        new_deaths = new_deaths_mask.uids
+        # NOTE: avoid `BoolArr & np.ndarray` due to Starsim 3.0.3 bug
+        # (`UnboundLocalError: other_raw` in starsim/arrays.py).
+        dead_now = np.asarray(ppl.dead, dtype=bool)
+        new_deaths = np.where(dead_now & ~self._dead_prev)[0]
 
         # Cumulative infant deaths
         self.results.infant_deaths[ti] = int(np.count_nonzero(ppl.dead[ppl.age < 1]))
@@ -65,7 +67,7 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
                 self.results.male_deaths_by_age[idx] += cnt
 
         # Update snapshot
-        self._dead_prev = np.array(ppl.dead, dtype=bool)
+        self._dead_prev = dead_now.copy()
 
     def finalize(self):
         super().finalize() 

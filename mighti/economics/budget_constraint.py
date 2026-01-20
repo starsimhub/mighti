@@ -11,7 +11,7 @@ import yaml
 from pathlib import Path
 
 from .resource_accounting import ResourcePool
-from economics.utils import csv_to_yaml 
+from .utils import csv_to_yaml 
 
 __all__ = ["BudgetConstraint"]
 
@@ -29,7 +29,12 @@ class BudgetConstraint(ss.Module):
 
     def __init__(self, pars=None, enforce=True, priority_file=None, label="budget_constraint"):
         super().__init__(label=label)
-        self.pars = pars or {}
+        # Starsim locks certain core attributes (incl. `pars`) after construction;
+        # use the helper to set them safely.
+        if hasattr(self, "setattribute"):
+            self.setattribute("pars", pars or {})
+        else:
+            self.pars = pars or {}
         self.enforce = enforce
         self.priority_file = priority_file
         self.resources = None
@@ -52,14 +57,26 @@ class BudgetConstraint(ss.Module):
             csv_to_yaml(pars_path, yaml_path)
 
             with open(yaml_path, "r") as f:
-                self.pars = yaml.safe_load(f)
+                loaded = yaml.safe_load(f)
+                if hasattr(self, "setattribute"):
+                    self.setattribute("pars", loaded)
+                else:
+                    self.pars = loaded
 
-            sim.log(f"[BudgetConstraint] Loaded from {pars_path.name} (auto-converted to YAML).")
+            msg = f"[BudgetConstraint] Loaded from {pars_path.name} (auto-converted to YAML)."
+            if hasattr(sim, "log"):
+                sim.log(msg)
+            else:
+                print(msg)
 
         # --- 2. Read YAML directly
         elif pars_path.suffix in (".yaml", ".yml"):
             with open(pars_path, "r") as f:
-                self.pars = yaml.safe_load(f)
+                loaded = yaml.safe_load(f)
+                if hasattr(self, "setattribute"):
+                    self.setattribute("pars", loaded)
+                else:
+                    self.pars = loaded
 
         # --- 3. Direct dict
         elif isinstance(self.pars, dict):
@@ -89,7 +106,11 @@ class BudgetConstraint(ss.Module):
 
         self.priority_list.sort_values("priority", inplace=True)
 
-        sim.log(f"[BudgetConstraint] Initialized with total budget ${self.resources.total_budget:,.0f}")
+        msg = f"[BudgetConstraint] Initialized with total budget ${self.resources.total_budget:,.0f}"
+        if hasattr(sim, "log"):
+            sim.log(msg)
+        else:
+            print(msg)
 
 
     def register_usage(self, cost, hrh_minutes=None, source=None):
@@ -121,7 +142,11 @@ class BudgetConstraint(ss.Module):
 
             # Stop if budget exhausted
             if self.enforce and not self.has_resources_for(est_cost, est_hrh):
-                sim.log(f"[BudgetConstraint] Resource limit reached before {name} at t={sim.t}")
+                msg = f"[BudgetConstraint] Resource limit reached before {name} at t={sim.t}"
+                if hasattr(sim, "log"):
+                    sim.log(msg)
+                else:
+                    print(msg)
                 break
 
             # Let intervention execute (and internally call register_usage)
@@ -132,11 +157,20 @@ class BudgetConstraint(ss.Module):
         timestep_log["total_cost"] = self.resources.used_budget
         self.history.append(timestep_log)
 
+    def step(self):
+        """Starsim 3.x expects modules to implement `step()`; delegate to `apply()`."""
+        return self.apply(self.sim)
 
-    def finalize_results(self, sim):
+
+    def finalize_results(self, sim=None):
         """Summarize cumulative costs and HRH utilization."""
-        summary = self.resources.summarize()
+        sim = sim or self.sim
+        summary = self.resources.summarize() if self.resources is not None else {}
         sim.results["budget_constraint"] = summary
-        sim.log(f"[BudgetConstraint] Final total cost: ${summary['total_cost']:,.0f}")
+        msg = f"[BudgetConstraint] Final total cost: ${summary['total_cost']:,.0f}"
+        if hasattr(sim, "log"):
+            sim.log(msg)
+        else:
+            print(msg)
         return summary
     

@@ -17,6 +17,7 @@ __all__ = [
     "AdherenceEngine",
     "ARTAdherenceDisruptor",
     "InterventionAdherenceDisruptor",
+    "AdherenceFromDepression",
     "CASM_REL_FACTORS",
     "SDOH_REL_FACTORS",
 ]
@@ -853,7 +854,7 @@ class InterventionAdherenceDisruptor(ss.Module):
     IMPORTANT: Stores baseline values to avoid cumulative multiplication.
     """
 
-    def __init__(self, scale_art_efficacy=False, label="intervention_adherence_disruptor"):
+    def __init__(self, scale_art_efficacy=True, label="intervention_adherence_disruptor"):
         """
         Parameters
         ----------
@@ -870,13 +871,13 @@ class InterventionAdherenceDisruptor(ss.Module):
         """Store baseline values after simulation is initialized."""
         super().init_post()
         sim = self.sim
-        
+
         # Store baseline ART efficacy (only if scaling is enabled)
         if self.scale_art_efficacy:
             hiv = getattr(sim.diseases, "hiv", None)
             if hiv is not None and hasattr(hiv.pars, "art_efficacy"):
                 self._baseline_art_efficacy = float(hiv.pars.art_efficacy)
-        
+
         # Store baseline rel_effect for each intervention
         for intv in sim.interventions:
             if hasattr(intv, "rel_effect"):
@@ -894,14 +895,13 @@ class InterventionAdherenceDisruptor(ss.Module):
 
         adher = np.asarray(st["adherence"], float)
         scale = float(adher.mean())
-        
+
         # Debug: print adherence stats occasionally
         if hasattr(sim, 'ti') and sim.ti % 5 == 0:
             print(f"[{self.label}] Year {sim.t.year}: mean adherence={scale:.3f}, "
                   f"min={adher.min():.3f}, max={adher.max():.3f}")
 
         # 1. Starsim/sti HIV ART efficacy (pars.art_efficacy)
-        # Only scale if explicitly enabled
         if self.scale_art_efficacy:
             hiv = getattr(sim.diseases, "hiv", None)
             if hiv is not None and hasattr(hiv.pars, "art_efficacy"):
@@ -926,4 +926,82 @@ class InterventionAdherenceDisruptor(ss.Module):
                 else:
                     # Fallback if baseline wasn't stored
                     print(f"[WARNING] {self.label}: baseline for {label} not found, skipping scaling")
-                    
+
+
+# =====================================================================
+# Legacy connector: AdherenceFromDepression
+# =====================================================================
+class AdherenceFromDepression(ss.Connector):
+    """
+    Legacy connector kept for backwards compatibility with older tests/workflows.
+
+    Computes a simple adherence score based on Major Depressive Disorder status
+    and records mean adherence over time.
+
+    Notes
+    -----
+    - Does not require `AdherenceEngine` (module) or extra `People` states.
+    - If a `people.states["adherence"]` array exists, it will be updated too.
+    """
+
+    def __init__(self, base=1.0, depression_factor=0.8, label="adherence_from_depression"):
+        super().__init__(label=label)
+        self.base = float(base)
+        self.depression_factor = float(depression_factor)
+        self.time = []
+        self.mean_adherence = []
+
+    def init_post(self):
+        super().init_post()
+        # Optional: create a people-level adherence state if the API supports it
+        try:
+            ppl = self.sim.people
+            if hasattr(ppl, "states") and "adherence" not in ppl.states:
+                # Starsim People may or may not support dynamic add; keep best-effort only
+                ppl.states["adherence"] = np.full(len(ppl), self.base, dtype=float)
+        except Exception:
+            pass
+
+    def step(self):
+        sim = self.sim
+        ppl = sim.people
+
+        n = len(ppl)
+        adher = np.full(n, self.base, dtype=float)
+
+        # Depression reduces adherence
+        dep = getattr(sim.diseases, "majordepressivedisorder", None)
+        if dep is not None and hasattr(dep, "affected"):
+            dep_mask = np.asarray(dep.affected, dtype=bool)
+            # Handle length mismatch defensively
+            if len(dep_mask) != n:
+                dep_mask = np.pad(dep_mask, (0, max(0, n - len(dep_mask))), constant_values=False)[:n]
+            adher[dep_mask] *= self.depression_factor
+
+        # Depression care can boost adherence for treated individuals (best-effort)
+        for intv in getattr(sim, "interventions", []) if not isinstance(getattr(sim, "interventions", {}), dict) else sim.interventions.values():
+            if intv is None:
+                continue
+            if intv.__class__.__name__.lower() == "depressioncare" or getattr(intv, "label", "").lower().startswith("depression"):
+                treated = getattr(intv, "treated_inds", None)
+                boost = float(getattr(intv, "adherence_boost", 1.0))
+                if treated is not None and len(treated):
+                    try:
+                        adher[np.asarray(treated, dtype=int)] *= boost
+                    except Exception:
+                        pass
+                break
+
+        adher = np.clip(adher, 0.0, 1.0)
+
+        # Persist into people state if available
+        try:
+            if hasattr(ppl, "states"):
+                ppl.states["adherence"] = adher
+        except Exception:
+            pass
+
+        # Record results
+        year = getattr(sim.t, "year", None)
+        self.time.append(float(year) if year is not None else float(getattr(sim, "now", sim.ti)))
+        self.mean_adherence.append(float(np.mean(adher)))

@@ -40,7 +40,8 @@ class T2D_ReduceMortalityTx(treat_num):
 
         if self._budget_module:
             n_treated = getattr(self, "n_treated", 0)
-            cost = n_treated * self.cost_per_person_year / sim.n_years
+            cost_ppy = getattr(self, "cost_per_person_year", 0.0) or 0.0
+            cost = n_treated * float(cost_ppy) / sim.n_years
             hrh_minutes = dict(doctor=5 * n_treated, nurse=30 * n_treated)
             self._budget_module.register_usage(cost=cost, hrh_minutes=hrh_minutes, source=self.name)
 
