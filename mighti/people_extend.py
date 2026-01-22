@@ -169,15 +169,17 @@ def make_people_with_age_sex(csv_path: str, init_year: int, n_agents: int,
 
     # Step 2: Build age distribution (use uniform sampling within each bin)
     ages_lower = age_sex_df["agestart"].to_numpy()
-    weights     = ((age_sex_df["male"] + age_sex_df["female"]) / 100.0).to_numpy()
-    weights    /= weights.sum()
+    # NOTE: avoid in-place ops on arrays that may be read-only under pandas CoW/Arrow
+    weights = ((age_sex_df["male"] + age_sex_df["female"]) / 100.0).to_numpy(copy=True).astype(float, copy=False)
+    wsum = float(weights.sum())
+    weights = weights / wsum if wsum > 0 else np.full_like(weights, 1.0 / len(weights))
 
     # Build a DataFrame for Starsim age_data (lower edge only for histogram)
     age_df = pd.DataFrame({
         "age": ages_lower,
         "value": weights
     })
-    age_df["value"] /= age_df["value"].sum()
+    age_df["value"] = age_df["value"] / age_df["value"].sum()
 
     # Step 3: Build p(female)
     p_map = build_p_female_map(age_sex_df, bin_width=bin_width, top_open=top_open)
