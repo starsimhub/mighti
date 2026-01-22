@@ -13,3 +13,4 @@ Supported filenames (optional, but recommended):
 These will be consumed by `us_data/region_data_builder.py` to generate (if missing):
 `mighti/data/nyc_mx.csv`, `mighti/data/nyc_age_distribution.csv`, `mighti/data/nyc_prevalence.csv`, etc.
 
+Note: the builder code lives in `data_prep/us_data/region_data_builder.py`.
