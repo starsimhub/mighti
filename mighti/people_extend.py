@@ -143,7 +143,7 @@ def set_p_by_age_factory(p_map: dict, *, bin_width: int = 5, top_open: int = 95)
 # 4. Unified builder for Starsim People 
 # ---------------------------------------------------------------------------
 def make_people_with_age_sex(csv_path: str, init_year: int, n_agents: int,
-                             *, out_dir: str = "data_processed",
+                             *, out_dir: str | None = None,
                              bin_width: int = 5, top_open: int = 95) -> ss.People:
     """
     Build Starsim-compatible People object using empirical age–sex distribution.
@@ -152,7 +152,9 @@ def make_people_with_age_sex(csv_path: str, init_year: int, n_agents: int,
     """
 
     region_name = os.path.splitext(os.path.basename(csv_path))[0].replace("_age_distribution", "")
-    out_csv = os.path.join(out_dir, f"{region_name}_age_sex_percent_{init_year}.csv")
+    out_csv = None
+    if out_dir:
+        out_csv = os.path.join(out_dir, f"{region_name}_age_sex_percent_{init_year}.csv")
 
     # Step 1: Export 5-year age–sex percent CSV
     age_sex_df = build_age_sex_percent(csv_path, init_year, out_csv,
