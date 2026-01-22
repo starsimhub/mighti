@@ -19,6 +19,7 @@ import mighti as mi
 import prepare_data_for_year
 import starsim as ss
 import stisim as sti
+from data_prep.us_data.region_data_builder import ensure_region_data
 
 
 # ---------------------------------------------------------------------
@@ -49,6 +50,7 @@ mx_path = f"mighti/data/{region}_mx.csv"
 ex_path = f"mighti/data/{region}_ex.csv"
 
 # Ensure required demographic files exist
+ensure_region_data(region=region, start_year=inityear, end_year=endyear, overwrite=False)
 prepare_data_for_year.prepare_data_for_year(region, inityear)
 prepare_data_for_year.prepare_data(region)
 

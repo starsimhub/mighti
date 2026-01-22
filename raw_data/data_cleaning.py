@@ -22,7 +22,7 @@ def data_path(filename):
     return os.path.join(DATA_DIR, filename)
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-WPP_DATA = os.path.join(PROJECT_ROOT, "wpp_data")
+WPP_DATA = os.path.join(PROJECT_ROOT, "raw_data", "wpp_data")
 
 def wpp_path(filename):
     """Return full path for files in wpp_data directory."""

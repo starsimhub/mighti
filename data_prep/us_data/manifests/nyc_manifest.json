@@ -1,0 +1,17 @@
+{
+  "region": "nyc",
+  "generated_at": "2026-01-21T09:31:27.738786Z",
+  "out_dir": "/Users/yamamn02/Documents/MIGHTI/mighti/data",
+  "raw_dir": "/Users/yamamn02/Documents/MIGHTI/raw_data/us_data/nyc",
+  "outputs": {
+    "mx": "/Users/yamamn02/Documents/MIGHTI/mighti/data/nyc_mx.csv",
+    "age_distribution": "/Users/yamamn02/Documents/MIGHTI/mighti/data/nyc_age_distribution.csv",
+    "prevalence": "/Users/yamamn02/Documents/MIGHTI/mighti/data/nyc_prevalence.csv",
+    "asfr": "/Users/yamamn02/Documents/MIGHTI/mighti/data/nyc_asfr.csv"
+  },
+  "raw_inputs_present": {
+    "mx_long": null,
+    "age_distribution_long": null,
+    "hiv_prevalence_by_age_sex": null
+  }
+}

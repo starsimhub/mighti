@@ -25,6 +25,7 @@ import os
 import starsim as ss
 import stisim as sti
 from mighti.diseases.type2diabetes import T2D_ReduceMortalityTx
+from data_prep.us_data.region_data_builder import ensure_region_data
 
 
 # Set up logging and random seeds for reproducibility
@@ -75,6 +76,7 @@ csv_path_age = f'mighti/data/{region}_age_distribution_{inityear}.csv'
 csv_path_intervention = f'mighti/data/{region}_intervention.csv'
 
 # Ensure required demographic files are prepared
+ensure_region_data(region=region, start_year=inityear, end_year=endyear, overwrite=False)
 prepare_data_for_year.prepare_data_for_year(region,inityear)
 prepare_data_for_year.prepare_data(region)
 
