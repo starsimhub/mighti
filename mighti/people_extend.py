@@ -172,15 +172,6 @@ def make_people_with_age_sex(csv_path: str, init_year: int, n_agents: int,
     weights     = ((age_sex_df["male"] + age_sex_df["female"]) / 100.0).to_numpy()
     weights    /= weights.sum()
 
-    # Instead of just storing the lower bin edge, sample uniformly within bin
-    rng = np.random.default_rng(42)
-    samples = []
-    for lo, w in zip(ages_lower, weights):
-        # draw roughly proportional number of samples (1e4 total as template)
-        n = int(w * 1e4)
-        samples.extend(rng.uniform(lo, lo + bin_width, n))
-    samples = np.array(samples)
-
     # Build a DataFrame for Starsim age_data (lower edge only for histogram)
     age_df = pd.DataFrame({
         "age": ages_lower,
@@ -194,16 +185,6 @@ def make_people_with_age_sex(csv_path: str, init_year: int, n_agents: int,
     # Step 4: Create People object (Starsim v3 automatically handles age sampling)
     ppl = ss.People(n_agents=n_agents, age_data=age_df)
     ppl.female.default.pars.p = set_p_by_age_factory(p_map, bin_width=bin_width, top_open=top_open)
-
-    # Step 5: Debug sampling to confirm 0–4 proportion
-    rng = np.random.default_rng(42)
-    sampled_ages = np.random.choice(age_df["age"], size=10000, p=age_df["value"])
-    hist, edges = np.histogram(sampled_ages, bins=list(range(0, 100, 5)))
-    proportions = (hist / hist.sum()).round(4)
-    sample_table = pd.DataFrame({
-        "agebin": [f"{int(edges[i])}-{int(edges[i+1]-1)}" for i in range(len(hist))],
-        "prop": proportions
-    })
 
     return ppl
 
