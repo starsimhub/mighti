@@ -8,6 +8,8 @@ import pandas as pd
 import starsim as ss
 from scipy.stats import lognorm
 
+from mighti.rng import get_rng
+
 
 __all__ = ['RemittingDisease', 'AcuteDisease', 'AcuteSurgicalDisease', 'ChronicDisease',
             'GenericSIS', 'GenericSIR', 'NonAcquiredDisease', 'StaticCondition']
@@ -116,7 +118,8 @@ class RemittingDisease(ss.NCD):
         # (2) initialize prevalence
         if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
             probs = self.pars.init_prev.rvs(self.sim.people.uid)          # ← fixed
-            affected = np.random.rand(len(self.sim.people)) < probs       # ← fixed
+            rng = get_rng(self.sim, salt=f"init_prev:{getattr(self, 'disease_name', self.__class__.__name__)}")
+            affected = rng.random(len(self.sim.people)) < probs
 
             if hasattr(self, "affected"):
                 self.affected[:] = affected
@@ -178,7 +181,8 @@ class RemittingDisease(ss.NCD):
         except Exception:
             pass
 
-        draws = np.random.rand(len(susceptible))
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
+        draws = rng.random(len(susceptible))
         new_cases = susceptible[draws < p_acq]
 
         self.affected[new_cases] = True
@@ -194,7 +198,7 @@ class RemittingDisease(ss.NCD):
             raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
 
         adjusted_p_death = base_p * rel_death
-        draws = np.random.rand(len(affected_uids))
+        draws = rng.random(len(affected_uids))
         deaths = affected_uids[draws < adjusted_p_death]
         self.ti_dead[deaths] = ti  
 
@@ -278,7 +282,8 @@ class AcuteDisease(ss.NCD):
         if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
             # Sample prevalence probabilities
             probs = self.pars.init_prev.rvs(sim.people.uid)
-            affected = np.random.rand(len(sim.people)) < probs
+            rng = get_rng(sim, salt=f"{self.__class__.__name__}:init_prev")
+            affected = rng.random(len(sim.people)) < probs
 
             # Assign disease state
             if hasattr(self, "affected"):
@@ -327,7 +332,8 @@ class AcuteDisease(ss.NCD):
         except Exception:
             pass
 
-        new_cases = susceptible[np.random.rand(len(susceptible)) < p_acq]
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
+        new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
         self.affected[new_cases] = True
         self.at_risk[new_cases] = False
         self.ti_affected[new_cases] = ti
@@ -336,7 +342,7 @@ class AcuteDisease(ss.NCD):
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
         base_p = self.pars.p_death.pars.get('p', 0)
-        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
+        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
 
         self.sim.people.request_death(deaths)
         self.ti_dead[deaths] = ti
@@ -440,7 +446,8 @@ class AcuteSurgicalDisease(ss.NCD):
 
         if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
             probs = self.pars.init_prev.rvs(sim.people.uid)
-            affected = np.random.rand(len(sim.people)) < probs
+            rng = get_rng(sim, salt=f"{self.__class__.__name__}:init_prev")
+            affected = rng.random(len(sim.people)) < probs
             if hasattr(self, "affected"):
                 self.affected[:] = affected
             if hasattr(self, "set_prognoses"):
@@ -473,6 +480,8 @@ class AcuteSurgicalDisease(ss.NCD):
     def step(self):
         ti = self.ti
         sim = self.sim
+        rng = get_rng(sim, salt=f"{self.__class__.__name__}:step")
+        rng = get_rng(sim, salt=f"{self.__class__.__name__}:step")
 
         # --- Acquisition ---
         susceptible = self.at_risk.uids
@@ -491,7 +500,7 @@ class AcuteSurgicalDisease(ss.NCD):
         except Exception:
             pass
 
-        new_cases = susceptible[np.random.rand(len(susceptible)) < p_acq]
+        new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
         self.affected[new_cases] = True
         self.at_risk[new_cases] = False
         self.ti_affected[new_cases] = ti
@@ -500,7 +509,7 @@ class AcuteSurgicalDisease(ss.NCD):
         # --- Surgery events ---
         affected_uids = self.affected.uids
         can_surgery = affected_uids[~self.surgery_done[affected_uids]]
-        surgeries = can_surgery[np.random.rand(len(can_surgery)) < self.pars.p_surgery]
+        surgeries = can_surgery[rng.random(len(can_surgery)) < self.pars.p_surgery]
         if len(surgeries):
             self.on_treatment[surgeries] = True
             self.surgery_done[surgeries] = True
@@ -511,7 +520,7 @@ class AcuteSurgicalDisease(ss.NCD):
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
         base_p = self.pars.p_death.pars.get("p", 0)
-        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
+        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
         if len(deaths):
             sim.people.request_death(deaths)
             self.ti_dead[deaths] = ti
@@ -583,7 +592,8 @@ class ChronicDisease(ss.NCD):
         if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
             # Sample prevalence probabilities
             probs = self.pars.init_prev.rvs(sim.people.uid)
-            affected = np.random.rand(len(sim.people)) < probs
+            rng = get_rng(sim, salt=f"{self.__class__.__name__}:init_prev")
+            affected = rng.random(len(sim.people)) < probs
 
             # Assign disease state
             if hasattr(self, "affected"):
@@ -632,7 +642,8 @@ class ChronicDisease(ss.NCD):
         except Exception:
             pass
 
-        new_cases = susceptible[np.random.rand(len(susceptible)) < p_acq]
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
+        new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
         self.affected[new_cases] = True
         self.at_risk[new_cases] = False
         self.ti_affected[new_cases] = ti
@@ -641,7 +652,7 @@ class ChronicDisease(ss.NCD):
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
         base_p = self.pars.p_death.pars.get('p', 0)
-        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
+        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
 
         self.sim.people.request_death(deaths)
         self.ti_dead[deaths] = ti
@@ -718,29 +729,39 @@ class GenericSIS(ss.SIS):
         )
 
     def init_post(self):
-        super().init_post()
+        """
+        Initialize infection prevalence.
 
-        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
+        We intentionally do NOT call Starsim's `Infection.init_post()` here because it uses
+        `init_prev.filter()` without passing uids, which is fragile for callable p(uids).
+        """
+        sim = self.sim
 
-        if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
-            # Sample prevalence probabilities
-            probs = self.pars.init_prev.rvs(sim.people.uid)
-            infected = np.random.rand(len(sim.people)) < probs
+        init_prev = getattr(self.pars, "init_prev", None)
+        if init_prev is None:
+            return
 
-            # Assign disease state
-            if hasattr(self, "infected"):
-                self.infected[:] = infected 
-
-            # Optionally set prognoses for infected agents
-            if hasattr(self, "set_prognoses"):
-                self.set_prognoses(np.where(infected)[0])
-
+        # Prefer Starsim distribution semantics: filter(uids) returns infected uids
+        if callable(getattr(init_prev, "filter", None)):
+            initial_uids = init_prev.filter(sim.people.uid)
+            if len(initial_uids):
+                self.set_prognoses(initial_uids, sources=-1)
         return
 
-    def set_prognoses(self, uids):
+    def set_prognoses(self, uids, sources=None, **kwargs):  # noqa: ARG002
+        """Set prognoses upon infection (Starsim-compatible signature)."""
+        # Do not call ss.SIS.set_prognoses() since we do not define SIS immunity states.
+        # Only call the base Disease logger hook.
+        try:
+            ss.Disease.set_prognoses(self, uids, sources)
+        except Exception:
+            pass
+        ti = self.t.ti
         self.susceptible[uids] = False
         self.infected[uids] = True
         self.at_risk[uids] = False
+        if hasattr(self, "ti_infected"):
+            self.ti_infected[uids] = ti
 
     def init_results(self):
         super().init_results()
@@ -774,7 +795,8 @@ class GenericSIS(ss.SIS):
         except Exception:
             pass
 
-        new_cases = susceptible[np.random.rand(len(susceptible)) < p_acq]
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
+        new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
         self.infected[new_cases] = True
         self.at_risk[new_cases] = False
         self.ti_infected[new_cases] = ti
@@ -783,7 +805,7 @@ class GenericSIS(ss.SIS):
         affected_uids = self.infected.uids
         rel_death = self.rel_death[affected_uids]
         base_p = self.pars.p_death.pars.get('p', 0)
-        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
+        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
 
         self.sim.people.request_death(deaths)
         self.ti_dead[deaths] = ti
@@ -864,24 +886,36 @@ class GenericSIR(ss.SIR):
         )
 
     def init_post(self):
-        super().init_post()
+        """
+        Initialize infection prevalence.
+
+        Do not call Starsim's base init_post; see GenericSIS.init_post rationale.
+        """
         sim = self.sim
 
-        # Initialize infection prevalence if provided
-        if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
-            probs = self.pars.init_prev.rvs(sim.people.uid)
-            init_inf = np.random.rand(len(sim.people)) < probs
+        init_prev = getattr(self.pars, "init_prev", None)
+        if init_prev is None:
+            return
 
-            self.infected[init_inf]   = True
-            self.susceptible[init_inf] = False
-            self.at_risk[init_inf]     = False
-            self.ti_infected[init_inf] = self.ti
+        if callable(getattr(init_prev, "filter", None)):
+            initial_uids = init_prev.filter(sim.people.uid)
+            if len(initial_uids):
+                self.set_prognoses(initial_uids, sources=-1)
+        return
 
-    def set_prognoses(self, uids):
-        # Enter I from S
+    def set_prognoses(self, uids, sources=None, **kwargs):  # noqa: ARG002
+        """Set prognoses upon infection (Starsim-compatible signature)."""
+        # Avoid ss.SIR.set_prognoses(); we manage event timing ourselves.
+        try:
+            ss.Disease.set_prognoses(self, uids, sources)
+        except Exception:
+            pass
+        ti = self.t.ti
         self.susceptible[uids] = False
-        self.infected[uids]    = True
-        self.at_risk[uids]     = False
+        self.infected[uids] = True
+        self.at_risk[uids] = False
+        if hasattr(self, "ti_infected"):
+            self.ti_infected[uids] = ti
 
     def init_results(self):
         super().init_results()
@@ -921,7 +955,7 @@ class GenericSIR(ss.SIR):
         except Exception:
             pass
 
-        new_cases = susceptible[np.random.rand(len(susceptible)) < p_acq]
+        new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
         if len(new_cases):
             self.infected[new_cases]    = True
             self.susceptible[new_cases] = False
@@ -939,7 +973,7 @@ class GenericSIR(ss.SIR):
         # --- Deaths among infected (optional relative risk) ---
         rel_death = self.rel_death[infected_uids] if len(infected_uids) else np.array([])
         base_p = self.pars.p_death.pars.get('p', 0)
-        deaths = infected_uids[np.random.rand(len(infected_uids)) < base_p * (rel_death if len(rel_death) else 1.0)]
+        deaths = infected_uids[rng.random(len(infected_uids)) < base_p * (rel_death if len(rel_death) else 1.0)]
         if len(deaths):
             sim.people.request_death(deaths)
             self.ti_dead[deaths] = ti
@@ -1028,6 +1062,7 @@ class NonAcquiredDisease(ss.Module):
         super().init_post()
         sim = self.sim
         n = len(sim.people)
+        rng = get_rng(sim, salt=f"{self.__class__.__name__}:init_prev")
 
         # Draw initial affected status
         if hasattr(self.pars.init_prev, "rvs"):
@@ -1036,7 +1071,7 @@ class NonAcquiredDisease(ss.Module):
             affected = np.array(self.pars.init_prev(), dtype=bool)
         else:
             p = float(self.pars.init_prev)
-            affected = np.random.rand(n) < p
+            affected = rng.random(n) < p
 
         self.affected[:] = affected
         self.ti_affected[affected] = self.ti
@@ -1082,7 +1117,8 @@ class NonAcquiredDisease(ss.Module):
 
         base_p = self.pars.p_death.pars.get("p", 0)
         rel_death = self.rel_death[affected_uids]
-        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
+        rng = get_rng(sim, salt=f"{self.__class__.__name__}:step")
+        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
 
         if len(deaths):
             sim.people.request_death(deaths)
@@ -1159,7 +1195,8 @@ class StaticCondition(NonAcquiredDisease):
 
         rel_death = self.rel_death[affected]
         base_p = self.pars.p_death.pars.get("p", 0)
-        deaths = affected[np.random.rand(len(affected)) < base_p * rel_death]
+        rng = get_rng(sim, salt=f"{self.__class__.__name__}:step")
+        deaths = affected[rng.random(len(affected)) < base_p * rel_death]
         if len(deaths):
             sim.people.request_death(deaths)
             self.ti_dead[deaths] = ti

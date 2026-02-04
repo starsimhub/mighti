@@ -1,22 +1,101 @@
+"""
+MIGHTI package top-level.
+
+Public API policy (v2):
+- Prefer *namespaces* (e.g. `mighti.diseases`, `mighti.analyzers`) over exporting
+  every class/function into the top-level `mighti` namespace.
+- Keep plotting utilities behind explicit imports (do not import matplotlib on
+  `import mighti`).
+"""
+
 from .version import __version__, __versiondate__, __license__
 
-from .utils import *
-from .sdoh import *
-from .people_extend import *
-from .life_expectancy import *
-from .interactions import *
-from .analyzers import *
-from .disease_definitions import *  
-from .plot_functions import *
-from .diseases import *  
-from .interventions import *
-from .adherence import *
+# Expose common namespaces (preferred usage: `mi.diseases.Foo`, `mi.analyzers.Bar`)
+from . import diseases  # noqa: F401
+from . import analyzers  # noqa: F401
+from . import interventions  # noqa: F401
+from . import interactions  # noqa: F401
+from . import sdoh  # noqa: F401
+from . import economics  # noqa: F401
+from . import calibration  # noqa: F401
+from . import people_extend  # noqa: F401
+from . import life_expectancy  # noqa: F401
+from . import figpaths  # noqa: F401
+from . import plot_style  # noqa: F401
+from . import init_people_sex  # noqa: F401
+
+# Keep a small set of core utilities convenient at top-level
+from .disease_definitions import (  # noqa: F401
+    initialize_prevalence_data,
+    age_sex_dependent_prevalence,
+)
+
+# Keep adherence primitives convenient (used broadly)
+from .adherence import (  # noqa: F401
+    AdherenceEngine,
+    ARTAdherenceDisruptor,
+    InterventionAdherenceDisruptor,
+    AdherenceFromDepression,
+    CASM_REL_FACTORS,
+    SDOH_REL_FACTORS,
+)
+
+# NOTE: plotting is intentionally NOT imported here.
+# Use: `from mighti.plot_functions import ...`
+
+def __getattr__(name: str):
+    """
+    Back-compat attribute resolver.
+
+    This allows older code to keep working with `mi.Type2Diabetes`,
+    `mi.SurvivorshipAnalyzer`, etc., while the preferred v2 style is:
+      - `mi.diseases.Type2Diabetes`
+      - `mi.analyzers.SurvivorshipAnalyzer`
+      - `mi.interactions.NCDHIVConnector`
+      - `mi.sdoh.NeighbourhoodSituation`
+    """
+    for mod in (
+        diseases,
+        analyzers,
+        interventions,
+        interactions,
+        sdoh,
+        people_extend,
+        life_expectancy,
+        figpaths,
+        plot_style,
+        init_people_sex,
+    ):
+        if hasattr(mod, name):
+            return getattr(mod, name)
+    raise AttributeError(f"module 'mighti' has no attribute {name!r}")
 
 
-import sciris as sc
-rootdir = sc.thispath(__file__).parent
-
-# Import the version and print the license
-import logging
-logger = logging.getLogger(__name__)
-logger.debug(__license__)
+__all__ = [
+    "__version__",
+    "__versiondate__",
+    "__license__",
+    # namespaces
+    "diseases",
+    "analyzers",
+    "interventions",
+    "interactions",
+    "sdoh",
+    "economics",
+    "calibration",
+    "people_extend",
+    "life_expectancy",
+    "figpaths",
+    "plot_style",
+    "init_people_sex",
+    # core utilities
+    "initialize_prevalence_data",
+    "age_sex_dependent_prevalence",
+    # adherence
+    "AdherenceEngine",
+    "ARTAdherenceDisruptor",
+    "InterventionAdherenceDisruptor",
+    "AdherenceFromDepression",
+    "CASM_REL_FACTORS",
+    "SDOH_REL_FACTORS",
+]

@@ -32,7 +32,7 @@ params_df.columns = params_df.columns.str.strip()
 def test_reduce_mortality_tx_runs():
 
     # Make disease
-    t2d = mi.Type2Diabetes(
+    t2d = mi.diseases.Type2Diabetes(
         csv_path=param_path,
         pars={
             'init_prev': ss.bernoulli(0.9),

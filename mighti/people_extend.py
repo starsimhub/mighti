@@ -53,7 +53,9 @@ def fixed_step_die(self):
     # logger.debug(f"[MIGHTI step_die] committed {len(death_uids)} deaths at ti={ti}")
     return death_uids
 
-ss.People.step_die = fixed_step_die
+# NOTE: We intentionally do NOT monkeypatch `ss.People.step_die` at import time.
+# If you need this alternative implementation for a specific workflow, call
+# `fixed_step_die(ppl)` directly or wrap it in your own People subclass/module.
 
 # ---------------------------------------------------------------------------
 # 1. Build 5-year age–sex percent table
@@ -144,12 +146,40 @@ def set_p_by_age_factory(p_map: dict, *, bin_width: int = 5, top_open: int = 95)
 # ---------------------------------------------------------------------------
 def make_people_with_age_sex(csv_path: str, init_year: int, n_agents: int,
                              *, out_dir: str | None = None,
+                             extra_states=None,
                              bin_width: int = 5, top_open: int = 95) -> ss.People:
     """
-    Build Starsim-compatible People object using empirical age–sex distribution.
-    Uses lower-bin ages (e.g., 0,5,10,...) for age_data to ensure correct sampling
-    of youngest agents (0–4 bin not undercounted).
+    Build a Starsim `People` object from demographic inputs.
+
+    Supported input formats
+    -----------------------
+    1) **Wide age–sex-by-year table** (raw input):
+       Columns: `age`, `sex`, and a column named exactly `str(init_year)` with population counts.
+       This format allows MIGHTI to derive an age distribution *and* an age-dependent sex assignment.
+
+    2) **Starsim-ready age distribution** (already processed):
+       Columns: `age`, `value` (where value is a weight/count/probability).
+       In this case, we use the provided age distribution directly and leave the default
+       sex assignment untouched (Starsim defaults apply).
     """
+
+    # If the caller already provides an age distribution (age,value), use it directly.
+    # This is what `prepare_data_for_year.prepare_data_for_year()` writes.
+    peek = pd.read_csv(csv_path, nrows=5)
+    cols = {c.strip() for c in peek.columns}
+    if {"age", "value"}.issubset(cols) and "sex" not in cols:
+        age_df = pd.read_csv(csv_path)
+        age_df.columns = age_df.columns.map(str.strip)
+        age_df = age_df[["age", "value"]].copy()
+        age_df["age"] = pd.to_numeric(age_df["age"], errors="coerce")
+        age_df["value"] = pd.to_numeric(age_df["value"], errors="coerce")
+        age_df = age_df.dropna(subset=["age", "value"])
+        v = age_df["value"].to_numpy(dtype=float)
+        vsum = float(v.sum())
+        if vsum > 0:
+            age_df["value"] = v / vsum
+        ppl = ss.People(n_agents=n_agents, age_data=age_df, extra_states=extra_states)
+        return ppl
 
     region_name = os.path.splitext(os.path.basename(csv_path))[0].replace("_age_distribution", "")
     out_csv = None
@@ -185,7 +215,7 @@ def make_people_with_age_sex(csv_path: str, init_year: int, n_agents: int,
     p_map = build_p_female_map(age_sex_df, bin_width=bin_width, top_open=top_open)
 
     # Step 4: Create People object (Starsim v3 automatically handles age sampling)
-    ppl = ss.People(n_agents=n_agents, age_data=age_df)
+    ppl = ss.People(n_agents=n_agents, age_data=age_df, extra_states=extra_states)
     ppl.female.default.pars.p = set_p_by_age_factory(p_map, bin_width=bin_width, top_open=top_open)
 
     return ppl
@@ -207,7 +237,7 @@ def make_people_with_age_sex(csv_path: str, init_year: int, n_agents: int,
 #         ppl = self.sim.people
 #         death_uids = ppl.step_die()  # Finalize all requested deaths
 #         if len(death_uids):
-#             print(f"[DeathsExtended] committed {len(death_uids)} deaths at ti={self.sim.ti}")
+#             pass
 
 #     def finalize(self):
 #         super().finalize()

@@ -1,0 +1,18 @@
+starsim==3.0.3
+STIsim==1.4.0
+pandas==2.3.1
+numpy==2.2.6
+scipy==1.16.1
+matplotlib==3.10.3
+sciris==3.2.4
+requests==2.32.4
+seaborn==0.13.2
+PyYAML==6.0.2
+openpyxl==3.1.5
+optuna==4.4.0
+
+# Dev/test/docs tools (pin for reproducibility)
+pytest==8.4.1
+Sphinx==8.2.3
+sphinx-rtd-theme==3.0.2
+numpydoc==1.9.0

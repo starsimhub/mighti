@@ -25,7 +25,7 @@ def make_sim():
     sexual = sti.StructuredSexual()
     maternal = ss.MaternalNet()
 
-    prevalence_analyzer = mi.PrevalenceAnalyzer(prevalence_data=pd.read_csv('mighti/data/eswatini_prevalence.csv'), diseases=['HIV'])
+    prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer(prevalence_data=pd.read_csv('mighti/data/eswatini_prevalence.csv'), diseases=['HIV'])
 
     sim = ss.Sim(
         dt=1,

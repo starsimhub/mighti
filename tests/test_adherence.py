@@ -38,7 +38,7 @@ def get_prevalence_function(disease):
             prevalence_data=prevalence_data,
             age_bins=age_bins,
             sim=sim,
-            size=size,
+            uids=uids,
         )
     return prevalence_func
 

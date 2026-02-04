@@ -13,6 +13,7 @@ of observed vs. simulated prevalence by age and sex.
 
 
 import os
+from pathlib import Path
 import optuna
 import mighti as mi
 import pandas as pd
@@ -21,6 +22,9 @@ import starsim as ss
 import stisim as sti
 from importlib import import_module
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # Config
@@ -29,14 +33,16 @@ init_year = 1990
 end_year = 2023
 total_trials = 100  # Set higher for production runs
 
-# base_path = "../"
-base_path = "/Users/yamamn02/Documents/MIGHTI/mighti/"
+# Resolve package-relative data paths (no hard-coded local paths)
+BASE_MIGHTI_DIR = Path(__file__).resolve().parents[1]  # .../mighti/
+DATA_DIR = BASE_MIGHTI_DIR / "data"
+
 # Paths
-path_prevalence = f"{base_path}data/{region}_prevalence.csv"
-path_parameters = f"{base_path}data/eswatini_parameters.csv"
+path_prevalence = str(DATA_DIR / f"{region}_prevalence.csv")
+path_parameters = str(DATA_DIR / f"{region}_parameters.csv")
 date_str = datetime.now().strftime("%Y%m%d")
-results_dir = f'results/calibration_{region}_{date_str}'
-os.makedirs(results_dir, exist_ok=True)
+results_dir = Path("outputs") / f"calibration_{region}_{date_str}"
+results_dir.mkdir(parents=True, exist_ok=True)
 
 # Load prevalence and parameter data
 prev_df = pd.read_csv(path_prevalence)
@@ -54,7 +60,7 @@ def try_get_condition_class(name):
         module = import_module("mighti.calibration.diseases_for_calibration")
         return getattr(module, name)
     except AttributeError:
-        print(f" Skipping {name}: not implemented in diseases_for_calibration.py")
+        logger.warning("Skipping %s: not implemented in diseases_for_calibration.py", name)
         return None
 
 def make_sim(disease_name, DiseaseClass):
@@ -74,7 +80,7 @@ def make_sim(disease_name, DiseaseClass):
         def prevalence_func(sim, uids, size=None):
             return mi.age_sex_dependent_prevalence(
                 disease=disease, prevalence_data=prevalence_data,
-                age_bins=age_bins, sim=sim, size=size,
+                age_bins=age_bins, sim=sim, uids=uids,
             )
         return prevalence_func
 
@@ -248,7 +254,11 @@ def run_calibration(disease_name, DiseaseClass):
         for k, v in calib.best_pars.items():
             f.write(f'{k}: {v}\n')
 
-    print(f" Done: {disease_name} → best p_acquire = {calib.best_pars['hc_p_acquire_multiplier']:.4f}")
+    logger.info(
+        "Done: %s → best p_acquire = %0.4f",
+        disease_name,
+        float(calib.best_pars["hc_p_acquire_multiplier"]),
+    )
     
     # Save to a single CSV file with all calibrated p_acquire values
     output_csv = f'{results_dir}/calibrated_p_acquire.csv'
@@ -271,5 +281,5 @@ if __name__ == '__main__':
             try:
                 run_calibration(disease_name, DiseaseClass)
             except Exception as e:
-                print(f" Error calibrating {disease_name}: {e}")
+                logger.exception("Error calibrating %s: %s", disease_name, e)
 

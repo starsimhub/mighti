@@ -31,6 +31,10 @@ import numpy as np
 logger = logging.getLogger('MIGHTI')
 logger.setLevel(logging.INFO) 
 
+from mighti.rng import seed_everything
+SEED = 12345
+seed_everything(SEED)
+
 
 
 # ---------------------------------------------------------------------
@@ -86,7 +90,7 @@ def get_prevalence_function(disease):
     def prevalence_func(sim, uids, size=None):
         return mi.age_sex_dependent_prevalence(
             disease=disease, prevalence_data=prevalence_data,
-            age_bins=age_bins, sim=sim, size=size,
+            age_bins=age_bins, sim=sim, uids=uids,
         )
     return prevalence_func
 
@@ -94,25 +98,25 @@ def get_prevalence_function(disease):
 # ---------------------------------------------------------------------
 # Analyzers
 # ---------------------------------------------------------------------
-prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=diseases)
-survivorship_analyzer = mi.SurvivorshipAnalyzer()
-deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
+prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=diseases)
+survivorship_analyzer = mi.analyzers.SurvivorshipAnalyzer()
+deaths_analyzer = mi.analyzers.DeathsByAgeSexAnalyzer()
 
-death_cause_analyzer = mi.ConditionAtDeathAnalyzer(
+death_cause_analyzer = mi.analyzers.ConditionAtDeathAnalyzer(
     conditions=healthconditions)
 
 analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer]
 
 
 # Analyzers
-microcosting_analyzer_base = mi.MicrocostingAnalyzer(
+microcosting_analyzer_base = mi.analyzers.MicrocostingAnalyzer(
     unit_costs={'art': 50}, 
     disability_weights={'hiv': 0.2, 'type2diabetes': 0.1},
     discount_rate_costs=0.03,
     discount_rate_outcomes=0.03,
     name='microcostinganalyzer'
 )
-microcosting_analyzer_intv = mi.MicrocostingAnalyzer(
+microcosting_analyzer_intv = mi.analyzers.MicrocostingAnalyzer(
     unit_costs={'art': 50}, 
     disability_weights={'hiv': 0.2, 'type2diabetes': 0.1},
     discount_rate=0.03,
@@ -120,7 +124,7 @@ microcosting_analyzer_intv = mi.MicrocostingAnalyzer(
     discount_rate_outcomes=0.03,
     name='microcostinganalyzer' )
 
-intervention_analyzer = mi.InterventionAnalyzer(interventions=['art'], name='intervention_analyzer')
+intervention_analyzer = mi.analyzers.InterventionAnalyzer(interventions=['art'], name='intervention_analyzer')
 
 analyzers_base = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, 
                   intervention_analyzer, death_cause_analyzer, microcosting_analyzer_base]
@@ -176,7 +180,7 @@ def make_init_prev_func(disease):
 
 # Other diseases
 for disease in healthconditions:
-    disease_class = getattr(mi, disease, None)
+    disease_class = getattr(mi.diseases, disease, None)
     if disease_class:
         init_prev = ss.bernoulli(p=make_init_prev_func(disease))
         disease_obj = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev})
@@ -187,11 +191,11 @@ for disease in healthconditions:
 # Interactions
 # ---------------------------------------------------------------------
 ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
-ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
+ncd_hiv_connector = mi.interactions.NCDHIVConnector(ncd_hiv_rel_sus)
 connectors = [ncd_hiv_connector]
 
-ncd_interactions = mi.read_interactions(csv_path_interactions) 
-connectors.extend(mi.create_connectors(ncd_interactions))
+ncd_interactions = mi.interactions.read_interactions(csv_path_interactions) 
+connectors.extend(mi.interactions.create_connectors(ncd_interactions))
 
 
 # -------------------------
@@ -234,7 +238,7 @@ interventions1 = [hiv_test, art, vmmc, prep]
 # ---------------------------------------------------------------------
 def get_deaths_module(sim):
     for module in sim.modules:
-        if isinstance(module, mi.DeathsByAgeSexAnalyzer):
+        if isinstance(module, mi.analyzers.DeathsByAgeSexAnalyzer):
             return module
     raise ValueError("Deaths module not found in the simulation. Make sure you've added the DeathsByAgeSexAnalyzer to your simulation configuration")
 
@@ -250,6 +254,7 @@ def get_pregnancy_module(sim):
 # ---------------------------------------------------------------------
 if __name__ == '__main__':
     sim_base = ss.Sim(
+        rand_seed=SEED,
         n_agents=n_agents,
         networks=networks,
         start=inityear,
@@ -263,6 +268,7 @@ if __name__ == '__main__':
     )
 
     sim_intv = ss.Sim(
+        rand_seed=SEED,
         n_agents=n_agents,
         networks=networks,
         start=inityear,

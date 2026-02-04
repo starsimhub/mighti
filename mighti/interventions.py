@@ -8,6 +8,8 @@ import stisim as sti
 import numpy as np
 import logging
 
+from mighti.rng import get_rng
+
 logger = logging.getLogger(__name__)
 
 _all_ = ['ART', 'ARTwithCASM', 'ARTNoAutoAdjust', 'ImproveHospitalDischarge', 'GiveHousingToDepressed', 'GiveHousingSupport', 'HousingSupportForAUD']
@@ -155,15 +157,33 @@ class ARTNoAutoAdjust(sti.ART):
                         corrected_target = current_on_art
                     
                     if sim.ti % 12 == 0 and ever_dropped_diagnosed > 0:
-                        print(f"[ARTNoAutoAdjust.art_coverage_correction] Year {sim.t.year}: Excluding {ever_dropped_diagnosed} _ever_dropped diagnosed people from coverage calculation "
-                              f"(diagnosed={n_diagnosed}, eligible={eligible_diagnosed}, target before={target_before_reduction}, after={corrected_target}, "
-                              f"current_on_art={current_on_art}, _ever_dropped={len(ever_dropped)})")
+                        logger.debug(
+                            "[ARTNoAutoAdjust.art_coverage_correction] Year %s: Excluding %s _ever_dropped diagnosed people from coverage calculation "
+                            "(diagnosed=%s, eligible=%s, target before=%s, after=%s, current_on_art=%s, _ever_dropped=%s)",
+                            sim.t.year,
+                            ever_dropped_diagnosed,
+                            n_diagnosed,
+                            eligible_diagnosed,
+                            target_before_reduction,
+                            corrected_target,
+                            current_on_art,
+                            len(ever_dropped),
+                        )
                 
                 # Debug output
                 if hasattr(sim, 't') and len(self._debug_coverage_calls) < 10:
                     self._debug_coverage_calls.append((sim.t.year, target_coverage, coverage_prop, n_diagnosed, corrected_target))
                     if len(self._debug_coverage_calls) <= 3 or sim.t.year in [2010, 2013, 2016, 2020]:
-                        print(f"[ARTNoAutoAdjust.art_coverage_correction] Year {sim.t.year}: coverage_prop={coverage_prop:.3f}, diagnosed={n_diagnosed}, target_count={corrected_target} (original={target_coverage:.0f}), excluding {len(ever_dropped)} dropped people")
+                        logger.debug(
+                            "[ARTNoAutoAdjust.art_coverage_correction] Year %s: coverage_prop=%0.3f, diagnosed=%s, "
+                            "target_count=%s (original=%0.0f), excluding %s dropped people",
+                            sim.t.year,
+                            coverage_prop,
+                            n_diagnosed,
+                            corrected_target,
+                            float(target_coverage) if target_coverage is not None else float("nan"),
+                            len(ever_dropped),
+                        )
                 
                 # Track that correction was called and what value was used
                 self._correction_called = True
@@ -199,9 +219,17 @@ class ARTNoAutoAdjust(sti.ART):
                     
                     if sim.ti % 12 == 0 and len(ever_dropped) > 0:
                         n_excluded_from_eligible = len([uid for uid in np.where(eligible_mask)[0] if uid in ever_dropped])
-                        print(f"[ARTNoAutoAdjust.art_coverage_correction] Year {sim.t.year}: Implemented own correction logic: "
-                              f"eligible={len(eligible_uids)} (excluded {n_excluded_from_eligible} _ever_dropped), "
-                              f"target={corrected_target}, current={n_on_art_before}, needed={n_needed}, adding={n_to_add}")
+                        logger.debug(
+                            "[ARTNoAutoAdjust.art_coverage_correction] Year %s: Implemented own correction logic: eligible=%s "
+                            "(excluded %s _ever_dropped), target=%s, current=%s, needed=%s, adding=%s",
+                            sim.t.year,
+                            len(eligible_uids),
+                            n_excluded_from_eligible,
+                            corrected_target,
+                            n_on_art_before,
+                            n_needed,
+                            n_to_add,
+                        )
                 else:
                     # No correction needed or can't do it - call parent as fallback
                     super().art_coverage_correction(sim, target_coverage=corrected_target)
@@ -220,9 +248,18 @@ class ARTNoAutoAdjust(sti.ART):
                         # Count AUD vs No-AUD among those on ART
                         aud_on_art = (on_art_after & aud_affected).sum()
                         noaud_on_art = (on_art_after & ~aud_affected).sum()
-                        print(f"[ARTNoAutoAdjust.art_coverage_correction] Year {sim.t.year}: Added {n_added_by_correction} people via correction "
-                              f"(target={corrected_target}, on_art before={n_on_art_before}, after={n_on_art_after}, "
-                              f"total on ART: AUD={aud_on_art}, No-AUD={noaud_on_art}, _ever_dropped={len(ever_dropped)})")
+                        logger.debug(
+                            "[ARTNoAutoAdjust.art_coverage_correction] Year %s: Added %s people via correction "
+                            "(target=%s, on_art before=%s, after=%s, total on ART: AUD=%s, No-AUD=%s, _ever_dropped=%s)",
+                            sim.t.year,
+                            n_added_by_correction,
+                            corrected_target,
+                            n_on_art_before,
+                            n_on_art_after,
+                            aud_on_art,
+                            noaud_on_art,
+                            len(ever_dropped),
+                        )
                 
                 return
             elif target_coverage is not None:
@@ -289,8 +326,12 @@ class ARTNoAutoAdjust(sti.ART):
                         stopping_uids_set = set(stopping_uids) if hasattr(stopping_uids, '__iter__') else {stopping_uids}
                         art_dropout_connector._ever_dropped.update(stopping_uids_set)
                         if sim.ti % 12 == 0:  # Print once per year
-                            print(f"[ARTNoAutoAdjust.step] Year {sim.t.year}: Stopped ART for {len(stopping_uids_set)} people, "
-                                  f"added to _ever_dropped (total _ever_dropped={len(art_dropout_connector._ever_dropped)})")
+                            logger.debug(
+                                "[ARTNoAutoAdjust.step] Year %s: Stopped ART for %s people, added to _ever_dropped (total _ever_dropped=%s)",
+                                sim.t.year,
+                                len(stopping_uids_set),
+                                len(art_dropout_connector._ever_dropped),
+                            )
                 except:
                     errormsg = f'Error stopping ART for {stopping_uids}'
                     raise ValueError(errormsg)
@@ -318,6 +359,7 @@ class ARTNoAutoAdjust(sti.ART):
             # Only apply when interaction is enabled (when adherence engine is present)
             # In "No interaction" scenarios, AUD should NOT affect ART initiation
             has_adherence_data = "adherence" in sim.people.states
+            rng = get_rng(sim, salt=f"{self.__class__.__name__}:step")
             
             # Only apply AUD reduction if interaction is enabled (adherence engine present)
             if has_adherence_data and aud_affected.any():
@@ -332,7 +374,7 @@ class ARTNoAutoAdjust(sti.ART):
                     # This should create a much more visible difference in ART coverage
                     aud_init_prob = np.power(adher[dx_uids], 3.0)  # Cube makes reduction very strong
                     # Apply reduction only to AUD individuals
-                    rand = np.random.rand(len(dx_uids))
+                    rand = rng.random(len(dx_uids))
                     # Keep people who pass both base init_prob AND (if AUD) the adherence-based prob
                     dx_to_treat = []
                     aud_filtered_out = 0
@@ -357,14 +399,24 @@ class ARTNoAutoAdjust(sti.ART):
                     if n_diagnosed_aud > 0 and sim.ti % 2 == 0:  # Print every 2 timesteps
                         mean_adher_aud = adher[dx_uids][dx_has_aud].mean() if dx_has_aud.any() else 0.0
                         mean_init_prob_aud = aud_init_prob[dx_has_aud].mean() if dx_has_aud.any() else 0.0
-                        print(f"[ARTNoAutoAdjust] Year {sim.t.year}: Diagnosed={n_diagnosed} (AUD={n_diagnosed_aud}), "
-                              f"Base willing={n_base_willing} (AUD={n_base_willing_aud}), "
-                              f"After AUD reduction={n_final_willing} (AUD={n_final_willing_aud}, filtered={aud_filtered_out}), "
-                              f"Mean adherence (AUD)={mean_adher_aud:.3f}, Mean init prob (AUD)={mean_init_prob_aud:.3f}")
+                        logger.debug(
+                            "[ARTNoAutoAdjust] Year %s: Diagnosed=%s (AUD=%s), Base willing=%s (AUD=%s), "
+                            "After AUD reduction=%s (AUD=%s, filtered=%s), Mean adherence (AUD)=%0.3f, Mean init prob (AUD)=%0.3f",
+                            sim.t.year,
+                            n_diagnosed,
+                            n_diagnosed_aud,
+                            n_base_willing,
+                            n_base_willing_aud,
+                            n_final_willing,
+                            n_final_willing_aud,
+                            aud_filtered_out,
+                            mean_adher_aud,
+                            mean_init_prob_aud,
+                        )
                 else:
                     # No adherence data: simple 50% reduction for AUD
                     aud_reduction_factor = 0.5
-                    rand = np.random.rand(len(dx_uids))
+                    rand = rng.random(len(dx_uids))
                     dx_to_treat = []
                     aud_filtered_out = 0
                     for i, uid in enumerate(dx_uids):
@@ -383,16 +435,31 @@ class ARTNoAutoAdjust(sti.ART):
                     # Debug output
                     n_final_willing = len(dx_to_treat)
                     if n_diagnosed_aud > 0 and sim.ti % 2 == 0:
-                        print(f"[ARTNoAutoAdjust] Year {sim.t.year}: Diagnosed={n_diagnosed} (AUD={n_diagnosed_aud}), "
-                              f"Base willing={n_base_willing} (AUD={n_base_willing_aud}), "
-                              f"After AUD reduction={n_final_willing} (AUD filtered={aud_filtered_out})")
+                        logger.debug(
+                            "[ARTNoAutoAdjust] Year %s: Diagnosed=%s (AUD=%s), Base willing=%s (AUD=%s), "
+                            "After AUD reduction=%s (AUD filtered=%s)",
+                            sim.t.year,
+                            n_diagnosed,
+                            n_diagnosed_aud,
+                            n_base_willing,
+                            n_base_willing_aud,
+                            n_final_willing,
+                            aud_filtered_out,
+                        )
             elif not has_adherence_data:
                 # No interaction enabled: AUD does NOT affect ART initiation
                 # This is the "No interaction" scenario - diseases exist but don't interact
                 dx_to_treat = dx_to_treat_base
                 if n_diagnosed_aud > 0 and sim.ti % 2 == 0:
-                    print(f"[ARTNoAutoAdjust] Year {sim.t.year}: NO INTERACTION - Diagnosed={n_diagnosed} (AUD={n_diagnosed_aud}), "
-                          f"Base willing={n_base_willing} (AUD={n_base_willing_aud}) - AUD does NOT reduce ART initiation")
+                    logger.debug(
+                        "[ARTNoAutoAdjust] Year %s: NO INTERACTION - Diagnosed=%s (AUD=%s), Base willing=%s (AUD=%s) - "
+                        "AUD does NOT reduce ART initiation",
+                        sim.t.year,
+                        n_diagnosed,
+                        n_diagnosed_aud,
+                        n_base_willing,
+                        n_base_willing_aud,
+                    )
             else:
                 # No AUD in population, use base (no reduction needed)
                 dx_to_treat = dx_to_treat_base
@@ -432,9 +499,16 @@ class ARTNoAutoAdjust(sti.ART):
                             aud_affected = np.asarray(sim.people.states.get("alcoholusedisorder.affected", []), dtype=bool) if "alcoholusedisorder.affected" in sim.people.states else np.zeros(len(sim.people), dtype=bool)
                             excluded_aud = len([uid for uid in (dropped_this_step | ever_dropped) if uid < len(aud_affected) and aud_affected[uid]])
                             excluded_noaud = total_excluded - excluded_aud
-                            print(f"[ARTNoAutoAdjust] Year {sim.t.year}: Excluding {total_excluded} dropped agents from re-initiation "
-                                  f"(this_step={len(dropped_this_step)}, ever={len(ever_dropped)}, "
-                                  f"AUD={excluded_aud}, No-AUD={excluded_noaud})")
+                            logger.debug(
+                                "[ARTNoAutoAdjust] Year %s: Excluding %s dropped agents from re-initiation "
+                                "(this_step=%s, ever=%s, AUD=%s, No-AUD=%s)",
+                                sim.t.year,
+                                total_excluded,
+                                len(dropped_this_step),
+                                len(ever_dropped),
+                                excluded_aud,
+                                excluded_noaud,
+                            )
                 
                 # Remove dropped agents from dx_to_treat to prevent immediate re-initiation
                 # CRITICAL: This prevents people who dropped out from being immediately re-added,
@@ -478,7 +552,11 @@ class ARTNoAutoAdjust(sti.ART):
                 ever_dropped = art_dropout_connector._ever_dropped
                 # Debug: verify we found it (only print if there are dropped people to avoid spam)
                 if sim.ti % 12 == 0 and len(ever_dropped) > 0:  # Print once per year if there are dropped people
-                    print(f"[ARTNoAutoAdjust.prioritize_art] Found connector '{art_dropout_connector.label}', _ever_dropped={len(ever_dropped)}")
+                    logger.debug(
+                        "[ARTNoAutoAdjust.prioritize_art] Found connector '%s', _ever_dropped=%s",
+                        art_dropout_connector.label,
+                        len(ever_dropped),
+                    )
             elif sim.ti % 12 == 0 and len(awaiting_art_uids) > 0:  # Debug: print if connector not found and there are people awaiting
                 connector_labels = []
                 if hasattr(sim, 'connectors'):
@@ -486,7 +564,10 @@ class ARTNoAutoAdjust(sti.ART):
                         connector_labels = list(sim.connectors.keys())
                     else:
                         connector_labels = [getattr(conn, 'label', 'no_label') for conn in sim.connectors]
-                print(f"[ARTNoAutoAdjust.prioritize_art] WARNING: Could not find ART dropout connector! Available connectors: {connector_labels}")
+                logger.warning(
+                    "[ARTNoAutoAdjust.prioritize_art] Could not find ART dropout connector! Available connectors: %s",
+                    connector_labels,
+                )
         
         # Exclude _ever_dropped people from awaiting_art_uids
         n_before = len(awaiting_art_uids)
@@ -497,7 +578,13 @@ class ARTNoAutoAdjust(sti.ART):
         
         # Debug: Always print when prioritize_art is called with _ever_dropped people (yearly)
         if sim.ti % 12 == 0 and len(ever_dropped) > 0:
-            print(f"[ARTNoAutoAdjust.prioritize_art] Year {sim.t.year}: prioritize_art called with n={n}, awaiting={n_before}, _ever_dropped={len(ever_dropped)}")
+            logger.debug(
+                "[ARTNoAutoAdjust.prioritize_art] Year %s: prioritize_art called with n=%s, awaiting=%s, _ever_dropped=%s",
+                sim.t.year,
+                n,
+                n_before,
+                len(ever_dropped),
+            )
         
         if ever_dropped:
             # Get detailed info about who's being excluded
@@ -514,12 +601,25 @@ class ARTNoAutoAdjust(sti.ART):
             # Always print when exclusion happens (yearly)
             if sim.ti % 12 == 0:
                 if n_excluded > 0:
-                    print(f"[ARTNoAutoAdjust.prioritize_art] Year {sim.t.year}: Excluded {n_excluded} dropped people from prioritize_art "
-                          f"(before={n_before}, after={n_after}, _ever_dropped={len(ever_dropped)}, "
-                          f"AUD={excluded_aud}, No-AUD={excluded_noaud})")
+                    logger.debug(
+                        "[ARTNoAutoAdjust.prioritize_art] Year %s: Excluded %s dropped people from prioritize_art "
+                        "(before=%s, after=%s, _ever_dropped=%s, AUD=%s, No-AUD=%s)",
+                        sim.t.year,
+                        n_excluded,
+                        n_before,
+                        n_after,
+                        len(ever_dropped),
+                        excluded_aud,
+                        excluded_noaud,
+                    )
                 elif len(excluded_list) == 0 and n_before > 0:
                     # Debug: No overlap between awaiting and _ever_dropped
-                    print(f"[ARTNoAutoAdjust.prioritize_art] Year {sim.t.year}: No overlap between awaiting_art_uids ({n_before}) and _ever_dropped ({len(ever_dropped)})")
+                    logger.debug(
+                        "[ARTNoAutoAdjust.prioritize_art] Year %s: No overlap between awaiting_art_uids (%s) and _ever_dropped (%s)",
+                        sim.t.year,
+                        n_before,
+                        len(ever_dropped),
+                    )
         
         # Call parent method with filtered UIDs
         # Track how many people are actually added by parent method
@@ -540,8 +640,16 @@ class ARTNoAutoAdjust(sti.ART):
                 on_art_after = np.asarray(sim.people.states.get("hiv.on_art", []), bool)
                 # This is approximate - we can't perfectly track who was just added
                 # But we can see if any AUD people are in the newly added group
-                print(f"[ARTNoAutoAdjust.prioritize_art] Year {sim.t.year}: Added {n_added} people to ART via prioritize_art "
-                      f"(n={n}, awaiting={n_before}, filtered to {n_after}, _ever_dropped excluded={n_excluded})")
+                logger.debug(
+                    "[ARTNoAutoAdjust.prioritize_art] Year %s: Added %s people to ART via prioritize_art "
+                    "(n=%s, awaiting=%s, filtered to %s, _ever_dropped excluded=%s)",
+                    sim.t.year,
+                    n_added,
+                    n,
+                    n_before,
+                    n_after,
+                    n_excluded,
+                )
     
     def apply(self, sim):
         """Override to add debug output."""
@@ -568,7 +676,18 @@ class ARTNoAutoAdjust(sti.ART):
                 self._debug_apply_calls.append((sim.t.year, n_diagnosed, n_on_art_after, expected_on_art, actual_coverage))
                 if len(self._debug_apply_calls) <= 3 or sim.t.year in [2010, 2013, 2016, 2020]:
                     correction_info = f", correction_returned={self._last_correction_value}" if self._correction_called and self._last_correction_value is not None else ", correction_not_called"
-                    print(f"[ARTNoAutoAdjust.apply] Year {sim.t.year}: diagnosed={n_diagnosed}, on_art={n_on_art_after}, expected={expected_on_art} (coverage={coverage_prop_expected:.3f}), actual_coverage={actual_coverage:.3f}, gap={gap}{correction_info}")
+                    logger.debug(
+                        "[ARTNoAutoAdjust.apply] Year %s: diagnosed=%s, on_art=%s, expected=%s (coverage=%0.3f), "
+                        "actual_coverage=%0.3f, gap=%s%s",
+                        sim.t.year,
+                        n_diagnosed,
+                        n_on_art_after,
+                        expected_on_art,
+                        coverage_prop_expected,
+                        actual_coverage,
+                        gap,
+                        correction_info,
+                    )
                 # Reset tracking for next timestep
                 self._correction_called = False
                 self._last_correction_value = None
@@ -624,10 +743,14 @@ class GiveHousingToDepressed(ss.Intervention):
         sim = self.sim
         if sim.ti < self.start_day:
             return
+        rng = get_rng(sim, salt=f"{self.__class__.__name__}:step")
 
         depression = sim.diseases.get('majordepressivedisorder', None)
         if depression is None or not hasattr(depression, 'affected'):
-            print(f"[{sim.year}] MajorDepressiveDisorder not found or missing 'affected'")
+            logger.warning(
+                "[GiveHousingToDepressed] MajorDepressiveDisorder not found or missing 'affected' at year %s",
+                getattr(sim.t, "year", "?"),
+            )
             return
 
         # Target depressed + unstably housed
@@ -639,7 +762,7 @@ class GiveHousingToDepressed(ss.Intervention):
         # Apply intervention with given coverage
         target_uids = target.uids
         n = len(target_uids)
-        mask = np.random.rand(n) < self.coverage
+        mask = rng.random(n) < self.coverage
         to_house = target_uids[mask]        
         ppl.neighbourhood_situation[to_house] = True
 
@@ -663,23 +786,28 @@ class GiveHousingSupport(ss.Intervention):
             else:
                 # Convert calendar year to ti
                 self.start_day = max(0, int(round(self.start_year - sim.pars['start'])))
-        # (optional) sanity print
-        print(f"[Init] {self.label}: start_day={self.start_day}")
+        logger.debug("[GiveHousingSupport] %s: start_day=%s", self.label, self.start_day)
 
     def apply(self):
         sim = self.sim
         if sim.ti < self.start_day:
             return
+        rng = get_rng(sim, salt=f"{self.__class__.__name__}:step")
         ppl = sim.people
         unstable = ~ppl.neighbourhood_situation
         adult = ppl.age >= 15
         target = unstable & adult
         uids = target.uids
         if len(uids):
-            to_house = uids[np.random.rand(len(uids)) < self.coverage]
+            to_house = uids[rng.random(len(uids)) < self.coverage]
             ppl.neighbourhood_situation[to_house] = True
-            print(f"[{sim.t.yearvec[sim.ti]:.1f}] {self.label} housed {len(to_house)} / {len(uids)}")
-            # print(f"[{sim.year}] {self.label} housed {len(to_house)} / {len(uids)}")
+            logger.info(
+                "[GiveHousingSupport] Year %s: %s housed %s / %s",
+                float(sim.t.yearvec[sim.ti]),
+                self.label,
+                len(to_house),
+                len(uids),
+            )
     def step(self):
         self.apply()
 
@@ -700,6 +828,7 @@ class HousingSupportForAUD(ss.Intervention):
         current_year = sim.t.year
         if current_year < self.start_year:
             return
+        rng = get_rng(sim, salt=f"{self.__class__.__name__}:step")
 
         ppl = sim.people
         aud = sim.diseases.alcoholusedisorder
@@ -710,7 +839,7 @@ class HousingSupportForAUD(ss.Intervention):
         if len(uids) == 0:
             return
 
-        mask = np.random.rand(len(uids)) < self.coverage
+        mask = rng.random(len(uids)) < self.coverage
         housed_uids = uids[mask]
         ppl.neighbourhood_situation[housed_uids] = True
 
@@ -718,6 +847,12 @@ class HousingSupportForAUD(ss.Intervention):
         if hasattr(aud, "relapse_rate"):
             aud.relapse_rate[housed_uids] *= self.relapse_reduction
 
-        print(f"[{current_year:.1f}] {self.label} housed {len(housed_uids)} of {len(uids)} eligible adults with AUD")
+        logger.info(
+            "[HousingSupportForAUD] Year %0.1f: %s housed %s of %s eligible adults with AUD",
+            float(current_year),
+            self.label,
+            len(housed_uids),
+            len(uids),
+        )
         
         

@@ -1,6 +1,9 @@
 import starsim as ss
 import numpy as np
 import pandas as pd
+import logging
+
+logger = logging.getLogger(__name__)
 
 __all__ = ['MicrocostingAnalyzer', 'HRHAnalyzer', 'summarize_microcosting_results']
 
@@ -45,7 +48,12 @@ class MicrocostingAnalyzer(ss.Analyzer):
         years = self.sim.t.yearvec
         n_years = len(years)
 
-        print(f"\n Finalizing MicrocostingAnalyzer for {n_alive:,} alive / {n_total:,} total agents across {n_years} years")
+        logger.info(
+            "Finalizing MicrocostingAnalyzer for %s alive / %s total agents across %s years",
+            f"{n_alive:,}",
+            f"{n_total:,}",
+            n_years,
+        )
 
         # Initialize arrays at full population size
         total_cost = np.zeros(n_total)
@@ -56,7 +64,7 @@ class MicrocostingAnalyzer(ss.Analyzer):
         # ---------------------------------------------------------------------
         # Event-based costs
         # ---------------------------------------------------------------------
-        print("\n Event-based costs:")
+        logger.info("Event-based costs:")
         for event, unit_cost in self.unit_costs.items():
             if event == 'art':
                 continue
@@ -71,18 +79,18 @@ class MicrocostingAnalyzer(ss.Analyzer):
                 cost = arr * unit_cost / ((1 + self.discount_rate_costs) ** (n_years - 1))
                 total_cost += cost
                 cost_details[f'{event}_cost'] = cost
-                print(f"  • {event}: {cost.sum():,.2f}")
+                logger.info("  - %s: %s", event, f"{cost.sum():,.2f}")
 
         # ---------------------------------------------------------------------
         # YLDs
         # ---------------------------------------------------------------------
-        print("\n YLDs by condition:")
+        logger.info("YLDs by condition:")
 
         for cond, weight in self.disability_weights.items():
 
             # Special logic for HIV (ti_infected-based)
             if cond == 'hiv' and hasattr(ppl, 'hiv') and hasattr(ppl.hiv, 'ti_infected'):
-                print(f"  Calculating HIV YLDs dynamically from ti_infected")
+                logger.debug("  Calculating HIV YLDs dynamically from ti_infected")
 
                 ti_infected_arr = np.full(n_total, np.nan)
                 ti_infected_arr[:len(ppl.hiv.ti_infected)] = ppl.hiv.ti_infected[:]  # Fill full-length array
@@ -97,12 +105,12 @@ class MicrocostingAnalyzer(ss.Analyzer):
                 yld[infected_mask] = dur_years * weight / ((1 + self.discount_rate_outcomes) ** (n_years - 1))
                 yld_details[f'{cond}_yld'] = yld
                 total_yld += yld
-                print(f"  {cond}: {yld.sum():.2f}")
+                logger.info("  - %s: %0.2f", cond, float(yld.sum()))
                 continue
 
             # New: dynamic condition duration lookup
             elif hasattr(self.sim.diseases, cond) and hasattr(self.sim.diseases[cond], 'duration'):
-                print(f"  Calculating {cond} YLDs from disease.duration")
+                logger.debug("  Calculating %s YLDs from disease.duration", cond)
                 disease = self.sim.diseases[cond]
                 durations = disease.duration
                 yld = durations * weight / ((1 + self.discount_rate_outcomes) ** (n_years - 1))
@@ -110,35 +118,35 @@ class MicrocostingAnalyzer(ss.Analyzer):
                     yld = np.pad(yld, (0, n_total - len(yld)))
                 total_yld += yld
                 yld_details[f'{cond}_yld'] = yld
-                print(f"  {cond}: {yld.sum():.2f}")
+                logger.info("  - %s: %0.2f", cond, float(yld.sum()))
 
             else:
-                print(f"  Missing: {cond} or duration attribute not found")
+                logger.debug("  Missing: %s or duration attribute not found", cond)
         
         
         # ---------------------------------------------------------------------
         # YLLs
         # ---------------------------------------------------------------------
-        print("\n YLLs from ConditionAtDeathAnalyzer:")
+        logger.info("YLLs from ConditionAtDeathAnalyzer:")
         condition_death = self.sim.analyzers.get('condition_at_death_analyzer', None)
         if condition_death and hasattr(condition_death, 'to_df'):
             df_yll = condition_death.to_df()
             n_deaths = len(df_yll)
-            print(f"  Number of deaths recorded: {n_deaths:,}")
+            logger.info("  - Number of deaths recorded: %s", f"{n_deaths:,}")
             if n_deaths:
                 yll_array_discounted = df_yll['yll'].to_numpy() / ((1 + self.discount_rate_outcomes) ** (n_years - 1))
                 discounted_series = pd.Series(yll_array_discounted, index=df_yll['uid'])
                 mapped = discounted_series.reindex(uids_all, fill_value=0.0).to_numpy()
                 total_yll += mapped
                 yll_details['yll'] = mapped
-                print(f"  • Total YLLs: {mapped.sum():,.2f}")
+                logger.info("  - Total YLLs: %s", f"{mapped.sum():,.2f}")
         else:
-            print(" ConditionAtDeathAnalyzer not found")
+            logger.debug("ConditionAtDeathAnalyzer not found")
 
         # ---------------------------------------------------------------------
         # ART costs
         # ---------------------------------------------------------------------
-        print("\n ART costing:")
+        logger.info("ART costing:")
         intervention_analyzer = self.sim.analyzers.get('intervention_analyzer', None)
         if intervention_analyzer is None:
             raise ValueError("MicrocostingAnalyzer requires 'intervention_analyzer' in sim.analyzers.")
@@ -153,7 +161,11 @@ class MicrocostingAnalyzer(ss.Analyzer):
             art_cost = art_counts * self.unit_costs['art'] / ((1 + self.discount_rate_costs) ** (n_years - 1))
             total_cost += art_cost
             cost_details['art_cost'] = art_cost
-            print(f"  • ART total cost: {art_cost.sum():,.2f} for {art_counts.sum():,} doses")
+            logger.info(
+                "  - ART total cost: %s for %s doses",
+                f"{art_cost.sum():,.2f}",
+                f"{int(art_counts.sum()):,}",
+            )
 
         # ---------------------------------------------------------------------
         # Final DataFrame
@@ -171,17 +183,11 @@ class MicrocostingAnalyzer(ss.Analyzer):
 
         self.detailed_outputs = df
 
-        print(f"\n Finalized MicrocostingAnalyzer")
-        print(f"   → Total cost: ${total_cost.sum():,.2f}")
-        print(f"   → Total YLD: {total_yld.sum():,.2f}")
-        print(f"   → Total YLL: {total_yll.sum():,.2f}")
-        print(f"   → Total DALY: {df['total_daly'].sum():,.2f}")
-
-        print(f"\n Finalized MicrocostingAnalyzer")
-        print(f"   → Total cost: ${total_cost.sum():,.2f}")
-        print(f"   → Total YLD: {total_yld.sum():,.2f}")
-        print(f"   → Total YLL: {total_yll.sum():,.2f}")
-        print(f"   → Total DALY: {df['total_daly'].sum():,.2f}")
+        logger.info("Finalized MicrocostingAnalyzer")
+        logger.info("  -> Total cost: $%s", f"{total_cost.sum():,.2f}")
+        logger.info("  -> Total YLD: %s", f"{total_yld.sum():,.2f}")
+        logger.info("  -> Total YLL: %s", f"{total_yll.sum():,.2f}")
+        logger.info("  -> Total DALY: %s", f"{df['total_daly'].sum():,.2f}")
 
         # ---------------------------------------------------------------------
         # Store summary results for programmatic access

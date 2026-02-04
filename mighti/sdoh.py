@@ -3,6 +3,8 @@ import numpy as np
 import starsim as ss
 import logging
 
+from mighti.rng import get_rng
+
 __all__ = [
     "NeighbourhoodSituation",
     "SocialContext",
@@ -89,6 +91,7 @@ class BaseSDoH(ss.Module):
         if n == 0 or self.state is None:
             logger.warning(f"[{self.name}] init_post: No people to initialize.")
             return
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:init")
 
         # --- Age-dependent baseline probability ---
         # FIX: Only adjust if explicitly requested (optional future param)
@@ -99,7 +102,7 @@ class BaseSDoH(ss.Module):
         logistic_mod = 1 / (1 + np.exp(-(age - 15) / 5))
         base_prob = np.clip(base_prob * (0.9 + 0.1 * logistic_mod), 0.05, 0.99)
 
-        self.state[:] = np.random.rand(n) < base_prob
+        self.state[:] = rng.random(n) < base_prob
         prop_stable = np.mean(self.state)
         logger.info(f"[{self.name}] init_post: {prop_stable:.3f} stable (target {self.p_stable:.3f})")
         # logger.debug(f"[{self.name}] init_post — stable={prop_stable:.3f}, expected={self.p_stable:.3f}")
@@ -108,6 +111,7 @@ class BaseSDoH(ss.Module):
         """Yearly inheritance + stochastic transitions, tracking inherited proportion."""
         sim = self.sim
         ppl = sim.people
+        rng = get_rng(sim, salt=f"{self.__class__.__name__}:step")
 
         # -------------------------------
         # 1. Intergenerational inheritance
@@ -124,12 +128,12 @@ class BaseSDoH(ss.Module):
                 babies = edges.p2[new_birth_inds]
                 n = len(babies)
                 total_births = n
-                inherit_mask = np.random.rand(n) < self.inherit_prob
+                inherit_mask = rng.random(n) < self.inherit_prob
                 inherited_now = inherit_mask.sum()
                 if inherited_now:
                     self.state[babies[inherit_mask]] = self.state[mothers[inherit_mask]]
                 if n - inherited_now > 0:
-                    self.state[babies[~inherit_mask]] = np.random.rand(n - inherited_now) < self.p_stable
+                    self.state[babies[~inherit_mask]] = rng.random(n - inherited_now) < self.p_stable
 
         # -------------------------------
         # 2. Stochastic transitions
@@ -143,8 +147,8 @@ class BaseSDoH(ss.Module):
         unhoused = ~state_np
         housed   = state_np
 
-        rand_loss = np.random.rand(len(ppl)) < p_loss
-        rand_gain = np.random.rand(len(ppl)) < p_gain
+        rand_loss = rng.random(len(ppl)) < p_loss
+        rand_gain = rng.random(len(ppl)) < p_gain
 
         lose_mask = housed & rand_loss
         gain_mask = unhoused & rand_gain
