@@ -49,7 +49,7 @@ def get_prev_func(disease):
             prevalence_data=prevalence_data,
             age_bins=age_bins,
             sim=sim,
-            size=uids,
+            uids=uids,
         )
     return func
 
@@ -65,7 +65,7 @@ hiv.pars.include_care = False
 hiv.pars.art_efficacy = 0.0
 hiv.pars.p_hiv_death = ss.bernoulli(p=0.00015)
 
-aud = mi.AlcoholUseDisorder(csv_path=param_path, init_prev=ss.bernoulli(p=0.10))
+aud = mi.diseases.AlcoholUseDisorder(csv_path=param_path, init_prev=ss.bernoulli(p=0.10))
 
 # ---------------------------------------------------------------------
 # Networks, demographics, connectors
@@ -75,7 +75,7 @@ networks = sti.StructuredSexual()
 # pregnancy = ss.Pregnancy(pars={"fertility_rate": pd.DataFrame({"year": [2007], "fertility_rate": [0.02]})})
 ppl = ss.People(n_agents=n_agents)  # minimal, avoids external CSVs
 
-connector = mi.NCDHIVConnector({"alcoholusedisorder": 2.47})
+connector = mi.interactions.NCDHIVConnector({"alcoholusedisorder": 2.47})
 
 # ---------------------------------------------------------------------
 # Build two sims (baseline vs connector)
@@ -106,7 +106,8 @@ sim_conn = ss.Sim(
 # ---------------------------------------------------------------------
 def test_hiv_aud_connector_msim():
     msim = ss.MultiSim([sim_base, sim_conn])
-    msim.run()
+    # Run serially to avoid multiprocessing restrictions in some environments (e.g. CI/sandboxes).
+    msim.run(parallel=False)
 
     # Extract mean AUD prevalence
     prev_base = msim.sims[0].results.alcoholusedisorder.prevalence.mean()

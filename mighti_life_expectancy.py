@@ -26,11 +26,16 @@ import starsim as ss
 import stisim as sti
 from mighti.diseases.type2diabetes import T2D_ReduceMortalityTx
 from data_prep.us_data.region_data_builder import ensure_region_data
+from mighti.plot_functions import plot_life_expectancy_timeseries
+from mighti.rng import seed_everything
 
 
 # Set up logging and random seeds for reproducibility
 logger = logging.getLogger('MIGHTI')
 logger.setLevel(logging.INFO) 
+
+SEED = 12345
+seed_everything(SEED)
 
 
 # ---------------------------------------------------------------------
@@ -113,7 +118,7 @@ def make_init_prev_func(disease):
             prevalence_data=prevalence_data,
             age_bins=age_bins,
             sim=sim,
-            size=size,
+            uids=uids,
         )
     return prevalence_func
 
@@ -123,13 +128,13 @@ def make_init_prev_func(disease):
 # ---------------------------------------------------------------------
 def make_sim(year):
     # Initialize the PrevalenceAnalyzer
-    prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=diseases)
-    survivorship_analyzer = mi.SurvivorshipAnalyzer(label="survivorship_analyzer")
-    deaths_analyzer = mi.DeathsByAgeSexAnalyzer(label="deaths_by_age_sex_analyzer")
+    prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=diseases)
+    survivorship_analyzer = mi.analyzers.SurvivorshipAnalyzer(label="survivorship_analyzer")
+    deaths_analyzer = mi.analyzers.DeathsByAgeSexAnalyzer(label="deaths_by_age_sex_analyzer")
     
     # ConditionAtDeathAnalyzer in this repo does not take `condition_attr_map`
     # (and it handles HIV separately), so keep this minimal.
-    death_cause_analyzer = mi.ConditionAtDeathAnalyzer(conditions=['hiv', 'type2diabetes'])
+    death_cause_analyzer = mi.analyzers.ConditionAtDeathAnalyzer(conditions=['hiv', 'type2diabetes'])
     death_rates = {'death_rate': pd.read_csv(csv_path_death), 'rate_units': 1}
     death = ss.Deaths(death_rates) 
     if DEATH_RATE_SCALER != 1.0:
@@ -157,7 +162,7 @@ def make_sim(year):
     
     disease_objects = []
     for dis in healthconditions:
-        cls = getattr(mi, dis, None)
+        cls = getattr(mi.diseases, dis, None)
         if cls is not None:
             disease_objects.append(
                 cls(csv_path=csv_path_params, pars={"init_prev": ss.bernoulli(p=make_init_prev_func(dis))})
@@ -166,11 +171,11 @@ def make_sim(year):
     
     
     ncd_hiv_rel_sus = df.set_index('condition')['rel_sus'].to_dict()
-    ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
+    ncd_hiv_connector = mi.interactions.NCDHIVConnector(ncd_hiv_rel_sus)
     interactions = [ncd_hiv_connector]
     
-    ncd_interactions = mi.read_interactions(csv_path_interactions) 
-    connectors = mi.create_connectors(ncd_interactions)
+    ncd_interactions = mi.interactions.read_interactions(csv_path_interactions) 
+    connectors = mi.interactions.create_connectors(ncd_interactions)
     
     interactions.extend(connectors)
         
@@ -213,17 +218,17 @@ def make_sim(year):
     prep = sti.Prep(pars={'coverage': [0, 0.05, 0.25], 'years': [2007, 2015, 2020]})
 
     t2d_tx_product = _make_tx_for("type2diabetes", label="T2D_Tx")
-    t2d_tx = mi.T2D_ReduceMortalityTx(product=t2d_tx_product, prob=1.0, rel_death_reduction=0.54,
-                                    eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
-                                    label='T2D_ReduceMortalityTx')
+    t2d_tx = mi.diseases.T2D_ReduceMortalityTx(product=t2d_tx_product, prob=1.0, rel_death_reduction=0.54,
+                                              eligibility=lambda sim: sim.diseases.type2diabetes.affected.uids,
+                                              label='T2D_ReduceMortalityTx')
 
     depression_tx_product = _make_tx_for("majordepressivedisorder", label="Depression_Tx")
-    depression_tx = mi.DepressionCare(product=depression_tx_product, prob=0.1, label='depression_tx')
+    depression_tx = mi.diseases.DepressionCare(product=depression_tx_product, prob=0.1, label='depression_tx')
 
-    hospital_discharge = mi.ImproveHospitalDischarge(disease_name='depression', multiplier=10.0,
-                                                    start_day=0,end_day=10,label='FastDischarge')
+    hospital_discharge = mi.interventions.ImproveHospitalDischarge(disease_name='depression', multiplier=10.0,
+                                                                   start_day=0, end_day=10, label='FastDischarge')
 
-    give_housing = mi.GiveHousingToDepressed(coverage=1, start_day=0)
+    give_housing = mi.interventions.GiveHousingToDepressed(coverage=1, start_day=0)
 
     # Define interventions using these data
     intervention_hiv = [hiv_test, art, vmmc, prep]
@@ -233,6 +238,7 @@ def make_sim(year):
 
 
     sim_with_hiv = ss.Sim(
+        rand_seed=SEED,
         n_agents=n_agents,
         networks=networks,
         start=inityear,
@@ -250,6 +256,7 @@ def make_sim(year):
     
     # ### To run 2 simulation simultaneously #####
     sim_without = ss.Sim(
+        rand_seed=SEED,
         n_agents=n_agents,
         networks=networks,
         start=inityear,
@@ -283,7 +290,7 @@ def get_deaths_module(sim):
     # dict / odict-like
     if hasattr(analyzers, "values"):
         for a in analyzers.values():
-            if isinstance(a, mi.DeathsByAgeSexAnalyzer):
+            if isinstance(a, mi.analyzers.DeathsByAgeSexAnalyzer):
                 return a
         # fallback by common keys
         if hasattr(analyzers, "get"):
@@ -294,7 +301,7 @@ def get_deaths_module(sim):
     else:
         # list-like
         for a in analyzers:
-            if isinstance(a, mi.DeathsByAgeSexAnalyzer):
+            if isinstance(a, mi.analyzers.DeathsByAgeSexAnalyzer):
                 return a
 
     raise ValueError("DeathsByAgeSexAnalyzer not found in sim.analyzers.")
@@ -359,7 +366,7 @@ pivot_df = le_df.pivot_table(index="year", columns=["scenario", "sex"], values="
 
 # Plots (pop up figures). Save only if you uncomment the fig.savefig(...) lines below.
 for sex in ["Both", "Male", "Female"]:
-    fig, ax = mi.plot_life_expectancy_timeseries(
+    fig, ax = plot_life_expectancy_timeseries(
         le_df,
         sex=sex,
         highlight_years=highlights,

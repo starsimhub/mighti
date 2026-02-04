@@ -38,15 +38,15 @@ def test_full_mighti_simulation():
 
     def get_prev_fn(disease):
         """
-        Return a Starsim-3.x compatible callable for init_prev: func(sim, size) -> probs
+        Return a Starsim-3.x compatible callable for init_prev: func(sim, uids, size=None) -> probs
         """
-        def prevalence_func(sim, size=None):
+        def prevalence_func(sim, uids, size=None):
             return mi.age_sex_dependent_prevalence(
                 disease=disease,
                 prevalence_data=prevalence_data,
                 age_bins=age_bins,
                 sim=sim,
-                size=size,
+                uids=uids,
             )
         return prevalence_func
 

@@ -48,7 +48,7 @@ def initialize_prevalence_data(diseases, prevalence_data, inityear):
 
 
 # Function to compute age and sex-dependent prevalence
-def age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size):
+def age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, uids=None, size=None):
     """
     Return the age- and sex-dependent prevalence for a given disease.
     
@@ -57,27 +57,55 @@ def age_sex_dependent_prevalence(disease, prevalence_data, age_bins, sim, size):
         prevalence_data (dict): Prevalence data for diseases.
         age_bins (dict): Age bins for diseases.
         sim (object): Simulation object with population data.
-        size (int): Size of the population subset.
+        uids (array-like): Agent indices to compute prevalence for (StarSim 3.x signature).
+        size (any): Back-compat alias for `uids` (some older call sites used `size`).
         
     Returns:
         np.array: Prevalence values for the subset of the population.
     """
-    ages = sim.people.age[size]
-    females = sim.people.female[size]
-    prevalence = np.zeros(len(ages))
-    disease_age_bins = age_bins[disease]  # Get age bins for the specific disease
+    # Prefer StarSim 3.x `uids`, but accept older `size` usage as an alias.
+    if uids is None:
+        uids = size
 
-    for i in range(len(ages)):
-        sex = 'female' if females[i] else 'male'
-        # Ensure bins are processed correctly
-        for j in range(len(disease_age_bins) - 1):
-            left = disease_age_bins[j]
-            right = disease_age_bins[j + 1]
-            if ages[i] >= left and ages[i] < right:
-                prevalence[i] = prevalence_data[disease][sex][left]
-                break
-        if ages[i] >= 80:  # For ages 80+
-            if 80 in prevalence_data[disease][sex]:  # Check if 80+ data is available
-                prevalence[i] = prevalence_data[disease][sex][80]
+    # Default to "all agents" if nothing was provided.
+    if uids is None:
+        if hasattr(sim, "people") and hasattr(sim.people, "uids"):
+            uids = sim.people.uids
+        elif hasattr(sim, "people") and hasattr(sim.people, "uid") and hasattr(sim.people.uid, "raw"):
+            uids = sim.people.uid.raw
+        else:
+            raise ValueError("Must provide `uids` (or legacy `size`) to compute prevalence.")
+
+    if isinstance(uids, slice):
+        uids = np.arange(len(sim.people))[uids]
+
+    uids = np.asarray(uids, dtype=int)
+    ages = np.asarray(sim.people.age[uids], dtype=float)
+    females = np.asarray(sim.people.female[uids], dtype=bool)
+
+    prevalence = np.zeros(len(uids), dtype=float)
+    disease_age_bins = np.asarray(age_bins[disease], dtype=float)  # age-bin left edges
+
+    if disease_age_bins.size == 0:
+        return prevalence
+
+    # Map each age to a left-edge bin (same behavior as "left <= age < right").
+    bin_idx = np.searchsorted(disease_age_bins, ages, side="right") - 1
+    bin_idx = np.clip(bin_idx, 0, disease_age_bins.size - 1)
+    left_edges = disease_age_bins[bin_idx].astype(int)
+
+    # Fill prevalence by sex and age bin.
+    for sex, mask in (("female", females), ("male", ~females)):
+        if not np.any(mask):
+            continue
+        sex_prev = prevalence_data[disease].get(sex, {})
+        # Default missing bins to 0.0 (robust to sparse tables).
+        prevalence[mask] = np.array([float(sex_prev.get(int(a), 0.0)) for a in left_edges[mask]], dtype=float)
+
+        # For ages 80+, override with 80+ bucket if available (matches legacy behavior).
+        if 80 in sex_prev:
+            over80 = mask & (ages >= 80)
+            if np.any(over80):
+                prevalence[over80] = float(sex_prev[80])
 
     return prevalence

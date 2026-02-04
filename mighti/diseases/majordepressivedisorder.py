@@ -8,6 +8,7 @@ import starsim as ss
 import pandas as pd
 import logging
 from mighti.diseases.base_disease import RemittingDisease
+from mighti.rng import get_rng
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,8 @@ class MajorDepressiveDisorder(RemittingDisease):
         p[housed_mask] = base * (1.0 + boost)
         p = np.clip(p, 0.0, 0.999999)
 
-        recovered_mask = np.random.rand(len(affected_uids)) < p
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
+        recovered_mask = rng.random(len(affected_uids)) < p
         recovered = affected_uids[recovered_mask]
 
         if len(recovered):
@@ -170,7 +172,8 @@ class DepressionCare(ss.treat_num):
         logger.debug("[DepressionCare] %s year %.1f | eligible=%s", self.label, cur_year, n_eligible)
 
         # 3) apply coverage probability
-        chooser = (np.random.rand(n_eligible) < self.prob)
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
+        chooser = (rng.random(n_eligible) < self.prob)
         treated = eligible[chooser]
         self.treated_inds = ss.uids(treated)
         logger.debug("[DepressionCare] %s treated=%s (prob=%s)", self.label, len(treated), self.prob)

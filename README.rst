@@ -10,9 +10,9 @@ MIGHTI is an agent-based modeling framework designed to simulate the dynamics of
 Requirements
 ------------
 
-- Python 3.9–3.13
-- Starsim 3.0
-- STIsim 1.4.0
+- Python 3.9–3.13 (CI runs on Python 3.12)
+- Starsim 3.0.x (tested with ``starsim==3.0.3``)
+- STIsim 1.4.0 (tested with ``STIsim==1.4.0``)
 
 Installation
 ------------
@@ -25,20 +25,22 @@ MIGHTI is **not yet available on PyPI**, but you can install it directly from Gi
     cd mighti
     pip install -e .
 
-
-Please also make sure to install its dependencies:
+For a fully reproducible environment (recommended), install pinned dependencies:
 
 .. code-block:: bash
 
-    pip install starsim stisim
+    pip install -r requirements.txt
 
 
 Running an Example
 ------------
 
-python mighti_main.py
+.. code-block:: bash
 
-This will run a sample simulation that includes demography, HIV, and NCD modules. Outputs will be saved in the outputs/ folder.
+    python mighti_main.py
+
+This will run a sample simulation that includes demography, HIV, and NCD modules.
+The example script saves a quick-check plot into the ``outputs/`` folder.
 
 You can also run:
 	•	mighti_demography.py — mortality and life expectancy module
@@ -49,6 +51,61 @@ Usage and Documentation
 ------------
 
 MIGHTI is based on Starsim, please refer to `Starsim documentation <https://docs.idmod.org/projects/starsim/en/latest/>`_ for additional information.
+
+Public API and Stability (v2 policy)
+------------
+
+MIGHTI is still evolving. To make it safe for others to build on, we define a **stable public API surface** and treat everything else as internal/experimental.
+
+**Stable entrypoints (preferred usage)**
+
+- Import MIGHTI as a namespace package:
+
+.. code-block:: python
+
+    import mighti as mi
+
+- Use **namespaces** for most functionality (stable module-level entrypoints):
+
+.. code-block:: python
+
+    # Diseases
+    t2d = mi.diseases.Type2Diabetes(...)
+
+    # Analyzers
+    prev = mi.analyzers.PrevalenceAnalyzer_HIV(...)
+
+    # Connectors / interactions
+    conn = mi.interactions.NCDHIVConnector(...)
+
+    # Social determinants of health (SDoH)
+    housing = mi.sdoh.NeighbourhoodSituation(...)
+
+    # Interventions
+    art = mi.interventions.ARTwithCASM(...)
+
+**Stable top-level helpers**
+
+- `mighti.initialize_prevalence_data()`
+- `mighti.age_sex_dependent_prevalence()` (StarSim v3 signature uses `uids`)
+
+**Plotting policy**
+
+Plotting utilities are available, but are intentionally **not** imported into the top-level namespace. Import explicitly when needed:
+
+.. code-block:: python
+
+    from mighti.plot_functions import plot_mean_prevalence
+
+**Backwards compatibility**
+
+Some older code may still work with `mi.SomeClass` due to a temporary compatibility shim. New code should prefer the namespace style above.
+
+**Internal/experimental (may change without notice)**
+
+- Anything in `mighti.calibration` and most stored calibration artifacts
+- Service-use analyzers in `mighti.analyzers.analyzer_serviceuse` (currently stubs)
+- Scripts in the repo root (e.g., `mighti_main.py`) are examples/drivers, not API contracts
 
 
 References
@@ -63,7 +120,7 @@ MIGHTI uses data from:
 Contributing
 ------------
 
-Contributions to the MIGHTI project are welcome! Please read `CONTRIBUTING.mst <https://github.com/starsimhub/mighti/blob/main/contributing.rst>`_ for details on our code of conduct, and the process for submitting pull requests.
+Contributions to the MIGHTI project are welcome! Please read `CONTRIBUTING.rst <https://github.com/starsimhub/mighti/blob/main/CONTRIBUTING.rst>`_ for details on our code of conduct, and the process for submitting pull requests.
 
 
 Disclaimer
@@ -89,7 +146,3 @@ The MIGHTI framework incorporates data from the following public sources:
 		•	Demographic and Health Surveys (DHS) https://dhsprogram.com/pubs/pdf/FR202/FR202.pdf
 
 		•	Swaziland HIV Incidence Measurement Survey (SHIMS) https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5291824/
-
-
-
-can you add requirements and dependencies as we stated in wiki?

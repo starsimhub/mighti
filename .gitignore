@@ -141,3 +141,21 @@ dmypy.json
 
 # Node.js and NPM
 node_modules
+
+# Local scratch (never commit)
+no-commit/
+.numba_cache/
+
+# Local environments (repo-specific names)
+.venv*/
+
+# Matplotlib cache (local)
+.mpl_cache/
+
+# Local outputs (drivers/notebooks)
+outputs/
+results/
+
+# Local duplicate packaging/scratch under data_prep
+data_prep/data_prep/
+data_prep/mighti/

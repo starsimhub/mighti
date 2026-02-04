@@ -8,6 +8,8 @@ import pandas as pd
 import starsim as ss
 from scipy.stats import lognorm
 
+from mighti.rng import get_rng
+
 
 __all__ = ['RemittingDisease', 'AcuteDisease', 'ChronicDisease', 'GenericSIS']
 
@@ -109,7 +111,8 @@ class RemittingDisease(ss.NCD):
         if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
             # Sample prevalence probabilities
             probs = self.pars.init_prev.rvs(sim.people.uid)
-            affected = np.random.rand(len(sim.people)) < probs
+            rng = get_rng(sim, salt=f"{self.__class__.__name__}:init_prev")
+            affected = rng.random(len(sim.people)) < probs
 
             # Assign disease state
             if hasattr(self, "affected"):
@@ -157,6 +160,7 @@ class RemittingDisease(ss.NCD):
 
     def step(self):
         ti = self.ti
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
 
         # New cases
         susceptible = (~self.affected).uids
@@ -176,7 +180,7 @@ class RemittingDisease(ss.NCD):
         except Exception:
             pass
 
-        draws = np.random.rand(len(susceptible))
+        draws = rng.random(len(susceptible))
         new_cases = susceptible[draws < p_acq]
 
         self.affected[new_cases] = True
@@ -192,7 +196,7 @@ class RemittingDisease(ss.NCD):
             raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
 
         adjusted_p_death = base_p * rel_death
-        draws = np.random.rand(len(affected_uids))
+        draws = rng.random(len(affected_uids))
         deaths = affected_uids[draws < adjusted_p_death]
         self.ti_dead[deaths] = ti  
 
@@ -253,7 +257,8 @@ class AcuteDisease(ss.NCD):
         if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
             # Sample prevalence probabilities
             probs = self.pars.init_prev.rvs(sim.people.uid)
-            affected = np.random.rand(len(sim.people)) < probs
+            rng = get_rng(sim, salt=f"{self.__class__.__name__}:init_prev")
+            affected = rng.random(len(sim.people)) < probs
 
             # Assign disease state
             if hasattr(self, "affected"):
@@ -301,6 +306,7 @@ class AcuteDisease(ss.NCD):
 
     def step(self):
         ti = self.ti
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
         susceptible = self.at_risk.uids
         # p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
         p_acq = calculate_p_acquire_generic(self, self.sim, susceptible)
@@ -318,7 +324,7 @@ class AcuteDisease(ss.NCD):
         except Exception:
             pass
 
-        new_cases = susceptible[np.random.rand(len(susceptible)) < p_acq]
+        new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
         self.affected[new_cases] = True
         self.at_risk[new_cases] = False
         self.ti_affected[new_cases] = ti
@@ -327,7 +333,7 @@ class AcuteDisease(ss.NCD):
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
         base_p = self.pars.p_death.pars.get('p', 0)
-        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
+        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
 
         self.sim.people.request_death(deaths)
         self.ti_dead[deaths] = ti
@@ -384,7 +390,8 @@ class ChronicDisease(ss.NCD):
         if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
             # Sample prevalence probabilities
             probs = self.pars.init_prev.rvs(sim.people.uid)
-            affected = np.random.rand(len(sim.people)) < probs
+            rng = get_rng(sim, salt=f"{self.__class__.__name__}:init_prev")
+            affected = rng.random(len(sim.people)) < probs
 
             # Assign disease state
             if hasattr(self, "affected"):
@@ -416,6 +423,7 @@ class ChronicDisease(ss.NCD):
 
     def step(self):
         ti = self.ti
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
         susceptible = self.at_risk.uids
 
         p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
@@ -433,7 +441,7 @@ class ChronicDisease(ss.NCD):
         except Exception:
             pass
 
-        new_cases = susceptible[np.random.rand(len(susceptible)) < p_acq]
+        new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
         self.affected[new_cases] = True
         self.at_risk[new_cases] = False
         self.ti_affected[new_cases] = ti
@@ -442,7 +450,7 @@ class ChronicDisease(ss.NCD):
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
         base_p = self.pars.p_death.pars.get('p', 0)
-        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
+        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
 
         self.sim.people.request_death(deaths)
         self.ti_dead[deaths] = ti
@@ -508,7 +516,8 @@ class GenericSIS(ss.SIS):
         if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
             # Sample prevalence probabilities
             probs = self.pars.init_prev.rvs(sim.people.uid)
-            affected = np.random.rand(len(sim.people)) < probs
+            rng = get_rng(sim, salt=f"{self.__class__.__name__}:init_prev")
+            affected = rng.random(len(sim.people)) < probs
 
             # Assign disease state
             if hasattr(self, "affected"):
@@ -557,6 +566,7 @@ class GenericSIS(ss.SIS):
 
     def step(self):
         ti = self.ti
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
         susceptible = self.at_risk.uids
         p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
 
@@ -573,7 +583,7 @@ class GenericSIS(ss.SIS):
         except Exception:
             pass
 
-        new_cases = susceptible[np.random.rand(len(susceptible)) < p_acq]
+        new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
         self.infected[new_cases] = True
         self.at_risk[new_cases] = False
         self.ti_infected[new_cases] = ti
@@ -582,7 +592,7 @@ class GenericSIS(ss.SIS):
         affected_uids = self.infected.uids
         rel_death = self.rel_death[affected_uids]
         base_p = self.pars.p_death.pars.get('p', 0)
-        deaths = affected_uids[np.random.rand(len(affected_uids)) < base_p * rel_death]
+        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
 
         self.sim.people.request_death(deaths)
         self.ti_dead[deaths] = ti
@@ -636,7 +646,6 @@ class Type1Diabetes(ChronicDisease):
 
 class Type2Diabetes(RemittingDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
-        print("[CALIB] Initializing Type2Diabetes for calibration")
         self.disease_name = 'Type2Diabetes'
         super().__init__(csv_path, pars, **kwargs)
 

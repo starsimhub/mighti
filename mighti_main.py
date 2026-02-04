@@ -20,6 +20,10 @@ import prepare_data_for_year
 import starsim as ss
 import stisim as sti
 from data_prep.us_data.region_data_builder import ensure_region_data
+from mighti.plot_functions import plot_mean_prevalence
+from mighti.plot_style import apply_mighti_style
+from mighti.rng import seed_everything
+from pathlib import Path
 
 
 # ---------------------------------------------------------------------
@@ -27,6 +31,10 @@ from data_prep.us_data.region_data_builder import ensure_region_data
 # ---------------------------------------------------------------------
 logger = logging.getLogger("MIGHTI")
 logger.setLevel(logging.INFO)
+
+# Reproducibility (example script)
+SEED = 12345
+seed_everything(SEED)
 
 n_agents = 10_000
 inityear = 2007
@@ -86,7 +94,7 @@ def get_prevalence_function(disease):
             prevalence_data=prevalence_data,
             age_bins=age_bins,
             sim=sim,
-            size=size,
+            uids=uids,
         )
     return prevalence_func
 
@@ -94,7 +102,7 @@ def get_prevalence_function(disease):
 # ---------------------------------------------------------------------
 # Analyzers
 # ---------------------------------------------------------------------
-prevalence_analyzer = mi.PrevalenceAnalyzer_HIV(
+prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(
     prevalence_data=prevalence_data,
     diseases=diseases,
 )
@@ -123,7 +131,14 @@ extra_states = [
     # ss.BoolArr("healthcare_system"),
 ]
 
-ppl = ss.People(n_agents, age_data=pd.read_csv(csv_path_age), extra_states=extra_states)
+# Build People from the empirical age–sex distribution (no file outputs)
+ppl = mi.people_extend.make_people_with_age_sex(
+    csv_path=csv_path_age,
+    init_year=inityear,
+    n_agents=n_agents,
+    out_dir=None,
+    extra_states=extra_states,
+)
 
 maternal = ss.MaternalNet()
 structuredsexual = sti.StructuredSexual()
@@ -139,7 +154,7 @@ adherence_engine = mi.AdherenceEngine(
 art_disruptor = mi.ARTAdherenceDisruptor(base_dropout=0.10)
 intervention_disruptor = mi.InterventionAdherenceDisruptor()
 
-sdoh_modules = mi.NeighbourhoodSituation(csv_path=csv_path_sdoh)
+sdoh_modules = mi.sdoh.NeighbourhoodSituation(csv_path=csv_path_sdoh)
 # ---------------------------------------------------------------------
 # Diseases
 # ---------------------------------------------------------------------
@@ -172,7 +187,7 @@ def make_init_prev_func(disease):
     return lambda sim, uids, size=None: prev_func_local(sim, uids, size)
 
 for disease in healthconditions:
-    disease_class = getattr(mi, disease, None)
+    disease_class = getattr(mi.diseases, disease, None)
     if disease_class is None:
         continue
     init_prev = ss.bernoulli(p=make_init_prev_func(disease))
@@ -187,11 +202,11 @@ for disease in healthconditions:
 # Connectors (HIV ↔ NCD, plus other NCD interactions)
 # ---------------------------------------------------------------------
 ncd_hiv_rel_sus = df.set_index("condition")["rel_sus"].to_dict()
-ncd_hiv_connector = mi.NCDHIVConnector(ncd_hiv_rel_sus)
+ncd_hiv_connector = mi.interactions.NCDHIVConnector(ncd_hiv_rel_sus)
 connectors = [ncd_hiv_connector]
 
-ncd_interactions = mi.read_interactions(csv_path_interactions)
-connectors.extend(mi.create_connectors(ncd_interactions))
+ncd_interactions = mi.interactions.read_interactions(csv_path_interactions)
+connectors.extend(mi.interactions.create_connectors(ncd_interactions))
 
 
 # ---------------------------------------------------------------------
@@ -239,7 +254,12 @@ def get_deaths_module(sim):
 # Main
 # ---------------------------------------------------------------------
 if __name__ == "__main__":
+    out_dir = Path("outputs")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    apply_mighti_style()
+
     sim = ss.Sim(
+        rand_seed=SEED,
         n_agents=n_agents,
         start=inityear,
         stop=endyear,
@@ -262,7 +282,7 @@ if __name__ == "__main__":
     prevalence_check_df = pd.read_csv(
         f"mighti/data/{region}_postprocess_check_prevalence.csv"
     )
-    mi.plot_mean_prevalence(
+    plot_mean_prevalence(
         sim,
         prevalence_analyzer,
         "MajorDepressiveDisorder",
@@ -270,6 +290,17 @@ if __name__ == "__main__":
         inityear,
         endyear,
     )
+
+    # Save the most recent figure (if any) to outputs/
+    try:
+        import matplotlib.pyplot as plt
+
+        fig = plt.gcf()
+        fig.savefig(out_dir / f"{region}_MajorDepressiveDisorder_prevalence.png")
+        plt.close(fig)
+        logger.info("Saved example plot to %s", out_dir)
+    except Exception as e:
+        logger.debug("Plot save skipped: %s", e)
 
     # Other plots (commented out for now)
     # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, "CardiovascularDiseases")
