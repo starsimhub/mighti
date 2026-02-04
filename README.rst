@@ -52,6 +52,20 @@ Usage and Documentation
 
 MIGHTI is based on Starsim, please refer to `Starsim documentation <https://docs.idmod.org/projects/starsim/en/latest/>`_ for additional information.
 
+Data policy (raw vs curated)
+------------
+
+MIGHTI main is released as a **modeling platform/library** plus small example driver scripts.
+To keep releases lightweight and reduce licensing/provenance risk, we follow this convention:
+
+- **Included in releases**:
+  - Curated, minimal example inputs in ``mighti/data/`` (enough to run the example scripts)
+  - Small fixtures in ``tests/test_data/`` used by the automated test suite
+- **Not included in stable releases**:
+  - ``raw_data/`` and associated cleaning/pre-processing scripts and raw source files
+
+If you need to rebuild curated inputs from raw sources, see ``raw_data/README.md`` and related tooling in this repository (development use).
+
 Public API and Stability (v2 policy)
 ------------
 
