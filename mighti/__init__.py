@@ -23,6 +23,8 @@ from . import life_expectancy  # noqa: F401
 from . import figpaths  # noqa: F401
 from . import plot_style  # noqa: F401
 from . import init_people_sex  # noqa: F401
+from . import mortality_competing  # noqa: F401
+from . import stisim_competing  # noqa: F401
 
 # Keep a small set of core utilities convenient at top-level
 from .disease_definitions import (  # noqa: F401
@@ -65,6 +67,8 @@ def __getattr__(name: str):
         figpaths,
         plot_style,
         init_people_sex,
+        mortality_competing,
+        stisim_competing,
     ):
         if hasattr(mod, name):
             return getattr(mod, name)
@@ -88,6 +92,8 @@ __all__ = [
     "figpaths",
     "plot_style",
     "init_people_sex",
+    "mortality_competing",
+    "stisim_competing",
     # core utilities
     "initialize_prevalence_data",
     "age_sex_dependent_prevalence",

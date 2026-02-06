@@ -8,7 +8,7 @@ from mighti.diseases.base_disease import NonAcquiredDisease
 class NeonatalJaundice(NonAcquiredDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
         self.disease_name = 'NeonatalJaundice'
-        super().__init__(csv_path, pars, **kwargs)
+        super().__init__(csv_path, pars, is_neonatal=True, **kwargs)
         self.define_pars(label='NeonatalJaundice')
         return
     
