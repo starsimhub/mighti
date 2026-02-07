@@ -7,7 +7,7 @@ import pandas as pd
 import starsim as ss
 
 
-__all__ = ["DeathsByAgeSexAnalyzer", "SurvivorshipAnalyzer", "ConditionAtDeathAnalyzer"]
+__all__ = ["DeathsByAgeSexAnalyzer", "AgeSexMxAnalyzer", "SurvivorshipAnalyzer", "ConditionAtDeathAnalyzer"]
 
 class DeathsByAgeSexAnalyzer(ss.Analyzer):
     """Tracks infant deaths and deaths by age/sex, Starsim-3.0.3 compatible."""
@@ -86,6 +86,124 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
                 "deaths": self.results.female_deaths_by_age[:],
             }),
         ], ignore_index=True)
+
+
+class AgeSexMxAnalyzer(ss.Analyzer):
+    """
+    Record per-timestep age-sex exposure and deaths to estimate realized m(x).
+
+    - Exposure is counted at the start of the timestep via `start_step()` using alive agents.
+    - Deaths are counted after deaths are resolved (analyzer `step()` runs after `people.step_die()`).
+
+    This yields a simple period estimate:
+
+        m_x(t) ≈ deaths_x(t) / exposure_x(t) / dt_year
+
+    where exposure_x(t) is the number of alive agents aged in [x, x+1) at the start of the step.
+    """
+
+    def __init__(self, max_age=100, **kwargs):
+        super().__init__(**kwargs)
+        # Stable key for `sim.analyzers.age_sex_mx_analyzer`
+        self.name = "age_sex_mx_analyzer"
+        self.max_age = max_age
+        self._dead_prev = None
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        self._dead_prev = np.zeros(len(sim.people), dtype=bool)
+
+    def init_results(self):
+        super().init_results()
+        npts = int(self.sim.t.npts)
+        shape = (npts, self.max_age + 1)
+        self.define_results(
+            ss.Result("exposure_male", dtype=float, shape=shape, label="Exposure (male) by age"),
+            ss.Result("exposure_female", dtype=float, shape=shape, label="Exposure (female) by age"),
+            ss.Result("deaths_male", dtype=int, shape=shape, label="Deaths (male) by age"),
+            ss.Result("deaths_female", dtype=int, shape=shape, label="Deaths (female) by age"),
+        )
+
+    def _ensure_size(self):
+        n_now = len(self.sim.people)
+        if self._dead_prev is None:
+            self._dead_prev = np.zeros(n_now, dtype=bool)
+        elif self._dead_prev.size != n_now:
+            new = np.zeros(n_now, dtype=bool)
+            n_copy = min(self._dead_prev.size, n_now)
+            new[:n_copy] = self._dead_prev[:n_copy]
+            self._dead_prev = new
+
+    def start_step(self):
+        """Count exposure by age/sex at start of step."""
+        super().start_step()
+        ppl = self.sim.people
+        ti = self.sim.ti
+        self._ensure_size()
+
+        auids = np.asarray(ppl.auids, dtype=int)
+        if len(auids) == 0:
+            return
+
+        ages = np.clip(np.floor(ppl.age[auids]).astype(int), 0, self.max_age)
+        fem = np.asarray(ppl.female[auids], dtype=bool)
+
+        # Counts for this timestep only (overwrite; shape is time-indexed)
+        if np.any(fem):
+            idx, cnt = np.unique(ages[fem], return_counts=True)
+            self.results.exposure_female[ti, idx] = cnt.astype(float)
+        if np.any(~fem):
+            idx, cnt = np.unique(ages[~fem], return_counts=True)
+            self.results.exposure_male[ti, idx] = cnt.astype(float)
+        return
+
+    def step(self):
+        """Count new deaths this step by age/sex."""
+        ppl = self.sim.people
+        ti = self.sim.ti
+        self._ensure_size()
+
+        dead_now = np.asarray(ppl.dead, dtype=bool)
+        new_deaths = np.where(dead_now & ~self._dead_prev)[0]
+        if len(new_deaths):
+            ages = np.clip(np.floor(ppl.age[new_deaths]).astype(int), 0, self.max_age)
+            fem = np.asarray(ppl.female[new_deaths], dtype=bool)
+            if np.any(fem):
+                idx, cnt = np.unique(ages[fem], return_counts=True)
+                self.results.deaths_female[ti, idx] = cnt
+            if np.any(~fem):
+                idx, cnt = np.unique(ages[~fem], return_counts=True)
+                self.results.deaths_male[ti, idx] = cnt
+
+        self._dead_prev = dead_now.copy()
+        return
+
+    def to_mx_df(self, *, year: int | None = None) -> pd.DataFrame:
+        """Return tidy DataFrame with realized m(x) for the requested year (or last year)."""
+        years = np.asarray(self.sim.t.yearvec, dtype=float)
+        if year is None:
+            ti = int(self.sim.t.npts - 1)
+        else:
+            ti = int(np.argmin(np.abs(years - float(year))))
+
+        dt_year = float(getattr(self.sim.t, "dt_year", 1.0))
+        ages = np.arange(self.max_age + 1)
+
+        def make(sex: str):
+            if sex == "Female":
+                deaths = np.asarray(self.results.deaths_female[ti, :], dtype=float)
+                expo = np.asarray(self.results.exposure_female[ti, :], dtype=float)
+            else:
+                deaths = np.asarray(self.results.deaths_male[ti, :], dtype=float)
+                expo = np.asarray(self.results.exposure_male[ti, :], dtype=float)
+            # Use NaN when exposure is 0 to avoid divide-by-zero artifacts/spikes and
+            # to keep log-scale plotting sane.
+            mx = np.divide(deaths, expo, out=np.full_like(deaths, np.nan), where=expo > 0) / dt_year
+            return pd.DataFrame({"age": ages, "sex": sex, "mx": mx, "deaths": deaths, "exposure": expo})
+
+        out = pd.concat([make("Female"), make("Male")], ignore_index=True)
+        out["year"] = float(years[ti])
+        return out
 
 
 class SurvivorshipAnalyzer(ss.Analyzer):

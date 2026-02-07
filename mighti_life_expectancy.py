@@ -99,6 +99,24 @@ df.columns = df.columns.str.strip()
 healthconditions = ['Type2Diabetes']
 diseases = ["HIV"] + healthconditions
 
+# Neonatal conditions are modeled as NonAcquiredDisease with prevalence assigned at birth.
+# NOTE: these are not part of the age/sex prevalence table; they use `pars.init_prev` instead.
+NEONATAL_CONDITIONS = [
+    "NeonatalEncephalopathy",
+    "NeonatalPretermBirth",
+    "NeonatalSepsis",
+    "NeonatalJaundice",
+]
+
+# Birth prevalence assumptions for the example script.
+# Set these based on your preferred data source when doing real analyses.
+NEONATAL_BIRTH_PREV = {
+    "NeonatalEncephalopathy": 0.0,
+    "NeonatalPretermBirth": 0.0,
+    "NeonatalSepsis": 0.0,
+    "NeonatalJaundice": 0.0,
+}
+
 # ---------------------------------------------------------------------
 # Prevalence Data and Analyzers
 # ---------------------------------------------------------------------
@@ -167,6 +185,18 @@ def make_sim(year):
             disease_objects.append(
                 cls(csv_path=csv_path_params, pars={"init_prev": ss.bernoulli(p=make_init_prev_func(dis))})
             )
+
+    # Neonatal diseases (assigned at birth; mortality restricted to <28 days)
+    for dis in NEONATAL_CONDITIONS:
+        cls = getattr(mi.diseases, dis, None)
+        if cls is None:
+            continue
+        disease_objects.append(
+            cls(
+                csv_path=csv_path_params,
+                pars={"init_prev": ss.bernoulli(p=float(NEONATAL_BIRTH_PREV.get(dis, 0.0)))},
+            )
+        )
     disease_objects.append(hiv_disease)
     
     

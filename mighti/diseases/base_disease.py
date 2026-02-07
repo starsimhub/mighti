@@ -61,7 +61,64 @@ def get_disease_parameters(csv_path, disease_name):
     }
 
 
-class RemittingDisease(ss.NCD):
+class _CompetingMortalityMixin:
+    """
+    Minimal protocol for "competing mortality" mode.
+
+    - Disease modules should *report* death pressure via `_set_death_pressure()`
+      instead of directly calling `people.request_death()`.
+    - `mighti.mortality_competing.CompetingRisksDeaths` will allocate all-cause
+      deaths and store an attribution mapping on the sim for this timestep.
+    - During `step_die()`, we set `ti_dead` (and optionally results) only for
+      deaths attributed to this module.
+    """
+
+    def _competing_enabled(self) -> bool:
+        sim = getattr(self, "sim", None)
+        return bool(getattr(sim, "_mighti_competing_mortality", False))
+
+    def _set_death_pressure(self, uids, p) -> None:
+        self._death_pressure_uids = np.asarray(uids, dtype=int)
+        self._death_pressure_p = np.asarray(p, dtype=float)
+
+    def get_death_pressure(self):
+        u = getattr(self, "_death_pressure_uids", None)
+        p = getattr(self, "_death_pressure_p", None)
+        if u is None or p is None:
+            return np.array([], dtype=int), np.array([], dtype=float)
+        return u, p
+
+    def _attributed_deaths(self, death_uids: np.ndarray) -> np.ndarray:
+        sim = getattr(self, "sim", None)
+        cause_map = getattr(sim, "_mighti_death_cause", None)
+        if not isinstance(cause_map, dict) or not len(death_uids):
+            return np.array([], dtype=int)
+        my_name = getattr(self, "name", self.__class__.__name__)
+        keep = [uid for uid in death_uids if cause_map.get(int(uid)) == my_name]
+        return np.asarray(keep, dtype=int)
+
+    def step_die(self, uids):
+        # In legacy mode, deaths (and ti_dead) are handled inside step()
+        if not self._competing_enabled():
+            return
+
+        ti = getattr(self, "ti", None)
+        if ti is None:
+            return
+
+        attributed = self._attributed_deaths(np.asarray(uids, dtype=int))
+        if len(attributed):
+            if hasattr(self, "ti_dead"):
+                self.ti_dead[attributed] = ti
+            if hasattr(self, "results") and "new_deaths" in getattr(self, "results", {}):
+                try:
+                    self.results.new_deaths[ti] = len(attributed)
+                except Exception:
+                    pass
+        return
+
+
+class RemittingDisease(_CompetingMortalityMixin, ss.NCD):
     """ Base class for all remitting diseases."""
 
     def __init__(self, csv_path, pars=None, **kwargs):
@@ -198,12 +255,17 @@ class RemittingDisease(ss.NCD):
             raise ValueError(f"Cannot extract base death probability from {self.pars.p_death}")
 
         adjusted_p_death = base_p * rel_death
-        draws = rng.random(len(affected_uids))
-        deaths = affected_uids[draws < adjusted_p_death]
-        self.ti_dead[deaths] = ti  
-
-        self.sim.people.request_death(deaths)
-        self.results.new_deaths[ti] = len(deaths)
+        if self._competing_enabled():
+            # Report death pressure; actual deaths are allocated by CompetingRisksDeaths
+            self._set_death_pressure(affected_uids, adjusted_p_death)
+            deaths = np.array([], dtype=int)
+            self.results.new_deaths[ti] = 0
+        else:
+            draws = rng.random(len(affected_uids))
+            deaths = affected_uids[draws < adjusted_p_death]
+            self.ti_dead[deaths] = ti
+            self.sim.people.request_death(deaths)
+            self.results.new_deaths[ti] = len(deaths)
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
@@ -235,7 +297,7 @@ class RemittingDisease(ss.NCD):
         return dur
 
 
-class AcuteDisease(ss.NCD):
+class AcuteDisease(_CompetingMortalityMixin, ss.NCD):
     """Base class for all acute diseases."""
 
     def __init__(self, csv_path=None, pars=None, **kwargs):
@@ -342,10 +404,14 @@ class AcuteDisease(ss.NCD):
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
         base_p = self.pars.p_death.pars.get('p', 0)
-        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
-
-        self.sim.people.request_death(deaths)
-        self.ti_dead[deaths] = ti
+        p_death = base_p * rel_death
+        if self._competing_enabled():
+            self._set_death_pressure(affected_uids, p_death)
+            deaths = np.array([], dtype=int)
+        else:
+            deaths = affected_uids[rng.random(len(affected_uids)) < p_death]
+            self.sim.people.request_death(deaths)
+            self.ti_dead[deaths] = ti
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
@@ -379,7 +445,7 @@ class AcuteDisease(ss.NCD):
     
 
 
-class AcuteSurgicalDisease(ss.NCD):
+class AcuteSurgicalDisease(_CompetingMortalityMixin, ss.NCD):
     """
     Acute disease with a possible surgical intervention event.
 
@@ -520,10 +586,15 @@ class AcuteSurgicalDisease(ss.NCD):
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
         base_p = self.pars.p_death.pars.get("p", 0)
-        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
-        if len(deaths):
-            sim.people.request_death(deaths)
-            self.ti_dead[deaths] = ti
+        p_death = base_p * rel_death
+        if self._competing_enabled():
+            self._set_death_pressure(affected_uids, p_death)
+            deaths = np.array([], dtype=int)
+        else:
+            deaths = affected_uids[rng.random(len(affected_uids)) < p_death]
+            if len(deaths):
+                sim.people.request_death(deaths)
+                self.ti_dead[deaths] = ti
 
         # --- Results ---
         self.results.new_cases[ti] = len(new_cases)
@@ -546,7 +617,7 @@ class AcuteSurgicalDisease(ss.NCD):
         return dur
     
 
-class ChronicDisease(ss.NCD):
+class ChronicDisease(_CompetingMortalityMixin, ss.NCD):
     """Base class for chronic diseases."""
 
     def __init__(self, csv_path, pars=None, **kwargs):
@@ -652,10 +723,14 @@ class ChronicDisease(ss.NCD):
         affected_uids = self.affected.uids
         rel_death = self.rel_death[affected_uids]
         base_p = self.pars.p_death.pars.get('p', 0)
-        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
-
-        self.sim.people.request_death(deaths)
-        self.ti_dead[deaths] = ti
+        p_death = base_p * rel_death
+        if self._competing_enabled():
+            self._set_death_pressure(affected_uids, p_death)
+            deaths = np.array([], dtype=int)
+        else:
+            deaths = affected_uids[rng.random(len(affected_uids)) < p_death]
+            self.sim.people.request_death(deaths)
+            self.ti_dead[deaths] = ti
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
@@ -687,7 +762,7 @@ class ChronicDisease(ss.NCD):
         return dur
     
 
-class GenericSIS(ss.SIS):
+class GenericSIS(_CompetingMortalityMixin, ss.SIS):
     """Base class for communicable diseases (SIS model)."""
 
     def __init__(self, csv_path, pars=None, **kwargs):
@@ -805,10 +880,14 @@ class GenericSIS(ss.SIS):
         affected_uids = self.infected.uids
         rel_death = self.rel_death[affected_uids]
         base_p = self.pars.p_death.pars.get('p', 0)
-        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
-
-        self.sim.people.request_death(deaths)
-        self.ti_dead[deaths] = ti
+        p_death = base_p * rel_death
+        if self._competing_enabled():
+            self._set_death_pressure(affected_uids, p_death)
+            deaths = np.array([], dtype=int)
+        else:
+            deaths = affected_uids[rng.random(len(affected_uids)) < p_death]
+            self.sim.people.request_death(deaths)
+            self.ti_dead[deaths] = ti
 
         # Results
         self.results.new_cases[ti] = len(new_cases)
@@ -840,7 +919,7 @@ class GenericSIS(ss.SIS):
         return dur
 
 
-class GenericSIR(ss.SIR):
+class GenericSIR(_CompetingMortalityMixin, ss.SIR):
     """Base class for communicable diseases (SIR model)."""
 
     def __init__(self, csv_path, pars=None, **kwargs):
@@ -935,6 +1014,7 @@ class GenericSIR(ss.SIR):
     def step(self):
         ti = self.ti
         sim = self.sim
+        rng = get_rng(sim, salt=f"{self.__class__.__name__}:step")
 
         # --- Acquire infection (S → I) ---
         susceptible = self.at_risk.uids & self.susceptible.uids  # ensure truly in S
@@ -973,10 +1053,15 @@ class GenericSIR(ss.SIR):
         # --- Deaths among infected (optional relative risk) ---
         rel_death = self.rel_death[infected_uids] if len(infected_uids) else np.array([])
         base_p = self.pars.p_death.pars.get('p', 0)
-        deaths = infected_uids[rng.random(len(infected_uids)) < base_p * (rel_death if len(rel_death) else 1.0)]
-        if len(deaths):
-            sim.people.request_death(deaths)
-            self.ti_dead[deaths] = ti
+        p_death = base_p * (rel_death if len(rel_death) else 1.0)
+        if self._competing_enabled():
+            self._set_death_pressure(infected_uids, p_death)
+            deaths = np.array([], dtype=int)
+        else:
+            deaths = infected_uids[rng.random(len(infected_uids)) < p_death]
+            if len(deaths):
+                sim.people.request_death(deaths)
+                self.ti_dead[deaths] = ti
 
         # --- Results ---
         self.results.new_cases[ti]  = len(new_cases)
@@ -1002,7 +1087,7 @@ class GenericSIR(ss.SIR):
         return dur
     
     
-class NonAcquiredDisease(ss.Module):
+class NonAcquiredDisease(_CompetingMortalityMixin, ss.Disease):
     """
     Base class for congenital or neonatal (non-acquired) diseases.
 
@@ -1064,20 +1149,115 @@ class NonAcquiredDisease(ss.Module):
         n = len(sim.people)
         rng = get_rng(sim, salt=f"{self.__class__.__name__}:init_prev")
 
-        # Draw initial affected status
-        if hasattr(self.pars.init_prev, "rvs"):
-            affected = self.pars.init_prev.rvs(sim.people.uid)
-        elif callable(self.pars.init_prev):
-            affected = np.array(self.pars.init_prev(), dtype=bool)
+        # For neonatal diseases: only initialize among existing neonates at sim start.
+        # For congenital/static conditions: initialize across the whole population at sim start
+        # to represent prevalent conditions in the initial age structure.
+        if self.is_neonatal:
+            ages = getattr(sim.people, "age_years", sim.people.age)
+            target_uids = np.where(np.asarray(ages, dtype=float) < (28 / 365))[0].astype(int)
         else:
-            p = float(self.pars.init_prev)
-            affected = rng.random(n) < p
+            target_uids = np.arange(n, dtype=int)
+
+        affected = np.zeros(n, dtype=bool)
+        if len(target_uids):
+            affected[target_uids] = self._draw_affected_for_uids(target_uids, rng=rng)
 
         self.affected[:] = affected
         self.ti_affected[affected] = self.ti
 
         n_affected = affected.sum()
         logger.info(f"[INIT] {self.disease_name}: {n_affected}/{n} ({n_affected/n:.3%}) affected at birth")
+
+    def _draw_affected_for_uids(self, uids: np.ndarray, *, rng: np.random.Generator) -> np.ndarray:
+        """
+        Draw boolean affected status for a given uid subset using pars.init_prev.
+
+        Supports:
+        - StarSim distributions with .rvs(uids)
+        - Callables returning bool arrays
+        - Scalar float probabilities
+        """
+        uids = np.asarray(uids, dtype=int)
+
+        init_prev = getattr(self.pars, "init_prev", None)
+        if init_prev is None:
+            return np.zeros(len(uids), dtype=bool)
+
+        # StarSim distribution-like
+        if hasattr(init_prev, "rvs"):
+            try:
+                draws = init_prev.rvs(uids)
+            except Exception:
+                draws = init_prev.rvs(self.sim.people.uid)
+                draws = np.asarray(draws)[uids]
+            draws = np.asarray(draws)
+            if draws.dtype == bool:
+                return draws.astype(bool)
+            # interpret as probabilities
+            probs = np.asarray(draws, dtype=float)
+            probs = np.clip(probs, 0.0, 1.0)
+            return rng.random(len(uids)) < probs
+
+        # Callable returning bool/probabilities
+        if callable(init_prev):
+            draws = np.asarray(init_prev(), dtype=float)
+            if draws.dtype == bool:
+                return draws[uids].astype(bool) if draws.size == len(self.sim.people) else draws.astype(bool)
+            if draws.size == len(self.sim.people):
+                probs = np.clip(draws[uids], 0.0, 1.0)
+            else:
+                probs = np.clip(draws, 0.0, 1.0)
+            return rng.random(len(uids)) < probs
+
+        # Scalar probability
+        p = float(init_prev)
+        p = float(np.clip(p, 0.0, 1.0))
+        return rng.random(len(uids)) < p
+
+    def _newborn_uids_this_step(self) -> np.ndarray:
+        """Return newborn uids for this timestep using MaternalNet edges, if present."""
+        sim = self.sim
+        maternal = sim.networks.get("maternalnet", None) if hasattr(sim, "networks") else None
+        if maternal is None or not hasattr(maternal, "edges"):
+            return np.array([], dtype=int)
+
+        edges = maternal.edges
+        if not hasattr(edges, "start") or not hasattr(edges, "p2"):
+            return np.array([], dtype=int)
+
+        try:
+            birth_inds = np.where(np.asarray(edges.start) == sim.ti)[0]
+        except Exception:
+            return np.array([], dtype=int)
+
+        if birth_inds.size == 0:
+            return np.array([], dtype=int)
+
+        babies = np.asarray(edges.p2)[birth_inds]
+        babies = babies[np.isfinite(babies)].astype(int, copy=False)
+        babies = babies[(babies >= 0) & (babies < len(sim.people))]
+        if babies.size == 0:
+            return np.array([], dtype=int)
+
+        # Deduplicate in case of repeated edges
+        return np.unique(babies)
+
+    def _assign_newborn_cases(self) -> None:
+        """Assign affected status to newborns at the current timestep."""
+        babies = self._newborn_uids_this_step()
+        if babies.size == 0:
+            return
+
+        sim = self.sim
+        rng = get_rng(sim, salt=f"{self.__class__.__name__}:birth")
+        affected_babies = self._draw_affected_for_uids(babies, rng=rng)
+
+        if affected_babies.size != babies.size:
+            affected_babies = np.resize(np.asarray(affected_babies, dtype=bool), babies.size)
+
+        # Write state
+        self.affected[babies] = affected_babies
+        self.ti_affected[babies[affected_babies]] = self.ti
 
     def init_results(self):
         super().init_results()
@@ -1098,7 +1278,13 @@ class NonAcquiredDisease(ss.Module):
 
     def step(self):
         """Apply mortality among affected individuals."""
-        # Skip the very first timestep so neonatal deaths are not applied before survivorship baseline
+        # Always assign newborn cases first (if births occurred this timestep)
+        self._assign_newborn_cases()
+        # Ensure no stale pressure is carried across timesteps
+        if self._competing_enabled():
+            self._set_death_pressure(np.array([], dtype=int), np.array([], dtype=float))
+
+        # Skip the very first timestep so deaths are not applied before survivorship baseline
         if self.ti == 0:
             return
 
@@ -1118,22 +1304,41 @@ class NonAcquiredDisease(ss.Module):
         base_p = self.pars.p_death.pars.get("p", 0)
         rel_death = self.rel_death[affected_uids]
         rng = get_rng(sim, salt=f"{self.__class__.__name__}:step")
-        deaths = affected_uids[rng.random(len(affected_uids)) < base_p * rel_death]
-
-        if len(deaths):
-            sim.people.request_death(deaths)
-            logger.debug(f"[STEP] {self.disease_name}: {len(deaths)} deaths at timestep {ti}")
-
-        self.results.new_deaths[ti] = len(deaths)
+        p_death = base_p * rel_death
+        if self._competing_enabled():
+            self._set_death_pressure(affected_uids, p_death)
+            deaths = np.array([], dtype=int)
+            self.results.new_deaths[ti] = 0
+        else:
+            deaths = affected_uids[rng.random(len(affected_uids)) < p_death]
+            if len(deaths):
+                sim.people.request_death(deaths)
+                logger.debug(f"[STEP] {self.disease_name}: {len(deaths)} deaths at timestep {ti}")
+            self.results.new_deaths[ti] = len(deaths)
         self.results.prevalence[ti] = np.count_nonzero(self.affected) / len(sim.people)
         self.results.n_affected[ti] = np.count_nonzero(self.affected)
 
     def step_die(self, uids):
-        """Record death times for affected individuals."""
-        if len(uids):
-            affected_dead = uids[self.affected[uids]]
-            if len(affected_dead):
-                self.ti_dead[affected_dead] = self.sim.people.ti_dead[affected_dead]
+        """Record cause-attributed death times for this condition."""
+        uids = np.asarray(uids, dtype=int)
+        if not len(uids):
+            return
+
+        if self._competing_enabled():
+            attributed = self._attributed_deaths(uids)
+            if len(attributed):
+                self.ti_dead[attributed] = self.sim.people.ti_dead[attributed]
+                # new_deaths is set here so downstream analyzers see it even if step() wrote 0
+                try:
+                    self.results.new_deaths[self.ti] = len(attributed)
+                except Exception:
+                    pass
+            return
+
+        # Legacy behavior: record death times for *anyone affected at death* (used by some analyses)
+        affected_dead = uids[self.affected[uids]]
+        if len(affected_dead):
+            self.ti_dead[affected_dead] = self.sim.people.ti_dead[affected_dead]
         return
 
     # ---------------------------------------------------------------------
@@ -1151,6 +1356,9 @@ class NonAcquiredDisease(ss.Module):
     # ---------------------------------------------------------------------
     def finalize(self):
         super().finalize()
+        if self._competing_enabled():
+            # Do not overwrite per-timestep cause-attributed `ti_dead`
+            return
         ppl = self.sim.people
         dead = ppl.dead.uids
         affected_dead = dead[self.affected[dead]]
@@ -1189,6 +1397,16 @@ class StaticCondition(NonAcquiredDisease):
         """Lifelong condition — mortality only, no remission."""
         ti = self.ti
         sim = self.sim
+
+        # Assign to newborns if births occurred this timestep
+        self._assign_newborn_cases()
+        if self._competing_enabled():
+            self._set_death_pressure(np.array([], dtype=int), np.array([], dtype=float))
+
+        # Skip the very first timestep for consistency with NonAcquiredDisease
+        if self.ti == 0:
+            return np.array([])
+
         affected = self.affected.uids
         if not len(affected):
             return np.array([])
@@ -1196,10 +1414,15 @@ class StaticCondition(NonAcquiredDisease):
         rel_death = self.rel_death[affected]
         base_p = self.pars.p_death.pars.get("p", 0)
         rng = get_rng(sim, salt=f"{self.__class__.__name__}:step")
-        deaths = affected[rng.random(len(affected)) < base_p * rel_death]
-        if len(deaths):
-            sim.people.request_death(deaths)
-            self.ti_dead[deaths] = ti
+        p_death = base_p * rel_death
+        if self._competing_enabled():
+            self._set_death_pressure(affected, p_death)
+            deaths = np.array([], dtype=int)
+        else:
+            deaths = affected[rng.random(len(affected)) < p_death]
+            if len(deaths):
+                sim.people.request_death(deaths)
+                self.ti_dead[deaths] = ti
 
         self.results.new_deaths[ti] = len(deaths)
         self.results.prevalence[ti] = np.count_nonzero(self.affected) / len(sim.people)
