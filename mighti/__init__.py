@@ -24,6 +24,7 @@ from . import figpaths  # noqa: F401
 from . import plot_style  # noqa: F401
 from . import init_people_sex  # noqa: F401
 from . import mortality_competing  # noqa: F401
+from . import mortality_additive  # noqa: F401
 from . import stisim_competing  # noqa: F401
 
 # Keep a small set of core utilities convenient at top-level
@@ -68,6 +69,7 @@ def __getattr__(name: str):
         plot_style,
         init_people_sex,
         mortality_competing,
+        mortality_additive,
         stisim_competing,
     ):
         if hasattr(mod, name):
@@ -93,6 +95,7 @@ __all__ = [
     "plot_style",
     "init_people_sex",
     "mortality_competing",
+    "mortality_additive",
     "stisim_competing",
     # core utilities
     "initialize_prevalence_data",

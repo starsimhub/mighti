@@ -81,7 +81,8 @@ class CompetingRisksDeaths(ss.Disease):
         self.metadata = sc.mergedicts(
             sc.objdict(
                 data_cols=dict(year="Time", sex="Sex", age="AgeGrpStart", value="mx"),
-                sex_keys={"Female": "f", "Male": "m"},
+                # Accept both UN/WPP-style labels and Starsim internal labels
+                sex_keys={"Female": "f", "Male": "m", "f": "f", "m": "m"},
             ),
             metadata,
         )

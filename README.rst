@@ -11,6 +11,7 @@ Requirements
 ------------
 
 - Python 3.9–3.13 (CI runs on Python 3.12)
+- NumPy >= 2.0 (required by STIsim 1.4.0+; older NumPy will crash with ``argsort(..., stable=True)``)
 - Starsim 3.0.x (tested with ``starsim==3.0.3``)
 - STIsim 1.4.0 (tested with ``STIsim==1.4.0``)
 
@@ -23,13 +24,39 @@ MIGHTI is **not yet available on PyPI**, but you can install it directly from Gi
 
     git clone https://github.com/starsimhub/mighti.git
     cd mighti
-    pip install -e .
 
 For a fully reproducible environment (recommended), install pinned dependencies:
 
 .. code-block:: bash
 
     pip install -r requirements.txt
+    pip install -e .
+
+If you installed with ``pip install -e .`` but are seeing an error like
+``TypeError: argsort() got an unexpected keyword argument 'stable'``, your NumPy
+is too old. Fix with:
+
+.. code-block:: bash
+
+    pip install -U "numpy>=2.0.0"
+
+If you see an error during import that mentions Numba caching (e.g.,
+``RuntimeError: cannot cache function ... no locator available``), this is an
+environment issue (commonly on very new Python versions). A quick workaround is
+to disable JIT:
+
+.. code-block:: bash
+
+    export NUMBA_DISABLE_JIT=1
+
+
+Mortality modeling modes (important for LE work)
+------------
+
+MIGHTI supports two mortality patterns:
+
+- **All-cause capped competing risks** (`mighti.mortality_competing.CompetingRisksDeaths`): matches observed all-cause \(m(x)\) and attributes deaths to modeled vs residual without double counting.
+- **Additive hazards (background + modeled)** (`mighti.mortality_additive.AdditiveHazardDeaths`): all-cause hazard is the sum of background + modeled hazards; supports calibration of background mortality and scenario forecasting where removing modeled causes can increase life expectancy.
 
 
 Running an Example
