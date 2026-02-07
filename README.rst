@@ -11,6 +11,7 @@ Requirements
 ------------
 
 - Python 3.9–3.13 (CI runs on Python 3.12)
+- NumPy >= 2.0 (required by STIsim 1.4.0+; older NumPy may crash on ``argsort(..., stable=True)``)
 - Starsim 3.0.x (tested with ``starsim==3.0.3``)
 - STIsim 1.4.0 (tested with ``STIsim==1.4.0``)
 
@@ -23,13 +24,21 @@ MIGHTI is **not yet available on PyPI**, but you can install it directly from Gi
 
     git clone https://github.com/starsimhub/mighti.git
     cd mighti
-    pip install -e .
 
 For a fully reproducible environment (recommended), install pinned dependencies:
 
 .. code-block:: bash
 
     pip install -r requirements.txt
+    pip install -e .
+
+If you installed with ``pip install -e .`` but are seeing an error like
+``TypeError: argsort() got an unexpected keyword argument 'stable'``, your NumPy
+is too old. Fix with:
+
+.. code-block:: bash
+
+    pip install -U "numpy>=2.0.0"
 
 
 Running an Example
