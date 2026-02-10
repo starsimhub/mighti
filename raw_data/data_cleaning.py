@@ -1,89 +1,72 @@
-import logging
+"""
+Single entrypoint for generating `mighti/data/` inputs from `raw_data/`.
 
-from cleaning.paths import data_path, wpp_path, disease_data_path, ensure_data_dir
-from cleaning.demography import (
-    process_population_data,
-    extract_life_table_by_country,
-    extract_indicator_from_life_table,
-    reshape_mx_to_mortality_rates,
-    reshape_fertility_to_asfr,
-)
+Keep the actual transformation logic in `raw_data/cleaning/*` and keep this file
+as a thin runner so there is one canonical data cleaning script.
+"""
+
+import logging
+import pandas as pd
+
+from cleaning.paths import data_path, disease_data_path, ensure_data_dir
 from cleaning.disease import (
     create_and_fill_prevalence_template_from_long_format,
-    create_condition_metadata_table,
-    extract_prevalence_timeseries_by_sex,
+    ensure_conditions_in_parameters_csv,
+    fill_p_death_and_duration_from_gbd_long_files,
 )
 
 
 logging.basicConfig(level=logging.INFO)
-DATA_DIR = ensure_data_dir()
 
-if __name__ == "__main__":
+
+def run_eswatini_pipeline(*, year_for_parameters: int = 2007, overwrite_outputs: bool = True) -> None:
     region = "eswatini"
     Region = "Eswatini"
+    data_dir = ensure_data_dir()
 
-    print(f"Running WPP + GBD data processing for: {Region}")
-    print(f"Saving all outputs under: {DATA_DIR}")
-
-    # -------------------------------------------------------------
-    # 1. Age distribution
-    # -------------------------------------------------------------
-    male_csv = wpp_path("population_single_age_male.csv")
-    female_csv = wpp_path("population_single_age_female.csv")
-    output_csv_age = data_path(f"{region}_age_distribution.csv")
-    # process_population_data(male_csv, female_csv, output_csv_age, country=Region)
+    print(f"Running GBD data processing for: {Region}")
+    print(f"Saving outputs under: {data_dir}")
 
     # -------------------------------------------------------------
-    # 2. Life table (mortality and life expectancy)
+    # 1) Prevalence (GBD long-format by age/sex → MIGHTI prevalence grid)
     # -------------------------------------------------------------
-    male_life_files = [
-        wpp_path("life_table_male_1986_1995.csv"),
-        wpp_path("life_table_male_1996_2005.csv"),
-        wpp_path("life_table_male_2006_2015.csv"),
-        wpp_path("life_table_male_2016_2023.csv"),
-    ]
-    female_life_files = [
-        wpp_path("life_table_female_1986_1995.csv"),
-        wpp_path("life_table_female_1996_2005.csv"),
-        wpp_path("life_table_female_2006_2015.csv"),
-        wpp_path("life_table_female_2016_2023.csv"),
-    ]
-
-    # life_table = extract_life_table_by_country(*male_life_files, *female_life_files, country=Region)
-
-    # mx/ex extraction
-    # mx_df = extract_indicator_from_life_table(life_table, "mx", data_path(f"{region}_mx.csv"))
-    # ex_df = extract_indicator_from_life_table(life_table, "ex", data_path(f"{region}_ex.csv"))
-
-    # mortality rates
-    # output_csv_mortality = data_path(f"{region}_mortality_rates.csv")
-    # reshape_mx_to_mortality_rates(mx_df, output_csv_mortality)
-
-    # -------------------------------------------------------------
-    # 3. Fertility (ASFR)
-    # -------------------------------------------------------------
-    # fertility_input_csv = wpp_path("fertility_by_single_age_of_mother.csv")
-    # fertility_output_csv = data_path(f"{region}_asfr.csv")
-    # reshape_fertility_to_asfr(fertility_input_csv, Region, fertility_output_csv)
-
-    # -------------------------------------------------------------
-    # 4. Prevalence (GBD long-format to MIGHTI template)
-    # -------------------------------------------------------------
-    # GBD-style long-format prevalence lives under raw_data/disease_data/
     prevalence_raw_csv = disease_data_path(f"{region}_disease_prevalence_agesex.csv")
     prevalence_output_csv = data_path(f"{region}_prevalence.csv")
-    create_and_fill_prevalence_template_from_long_format(prevalence_raw_csv, prevalence_output_csv)
+    create_and_fill_prevalence_template_from_long_format(
+        prevalence_raw_csv,
+        prevalence_output_csv,
+        start_year=2007,
+        end_year=2021,
+        overwrite=overwrite_outputs,
+    )
 
     # -------------------------------------------------------------
-    # 5. Parameter table (derived from GBD long format)
+    # 2) Disease parameter table (p_death, dur_condition) from all-cause exports
     # -------------------------------------------------------------
-    # long_csv_path = wpp_path(f"{region}_p_death_estimation_parameters.csv")
-    # output_csv_parameters = data_path(f"{region}_parameters.csv")
-    # create_condition_metadata_table(long_csv_path, output_csv_parameters)
+    parameters_csv = data_path(f"{region}_parameters.csv")
 
-    # -------------------------------------------------------------
-    # 6. Post-processing check: prevalence by sex
-    # -------------------------------------------------------------
-    # output_prevalence_check_csv = data_path(f"{region}_postprocess_check_prevalence.csv")
-    # extract_prevalence_timeseries_by_sex(prevalence_raw_csv, output_prevalence_check_csv)
-    
+    # Ensure the parameter table has all expected conditions/columns
+    ensure_conditions_in_parameters_csv(parameters_csv, overwrite=True)
+
+    # Fill p_death and dur_condition for any causes present in these all-cause exports
+    allcause_percent = disease_data_path("allcause_percent.csv")
+    allcause_rate = disease_data_path("allcause_rate.csv")
+
+    filled = fill_p_death_and_duration_from_gbd_long_files(
+        parameters_csv_path=parameters_csv,
+        gbd_long_csv_paths=[allcause_rate, allcause_percent],
+        year=year_for_parameters,
+        location=Region,
+        output_csv_path=parameters_csv,
+        overwrite_existing=False,
+    )
+
+    # Quick summary
+    p_death_n = pd.to_numeric(filled["p_death"], errors="coerce").notna().sum()
+    dur_n = pd.to_numeric(filled["dur_condition"], errors="coerce").notna().sum()
+    print(f"Filled p_death for {p_death_n} conditions; dur_condition for {dur_n} conditions (year={year_for_parameters})")
+    return
+
+
+if __name__ == "__main__":
+    run_eswatini_pipeline()

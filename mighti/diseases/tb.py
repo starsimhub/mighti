@@ -1,26 +1,17 @@
 """
-Module defining TB infectiou as a infectious disease model.
+Module defining Tuberculosis (TB) as an infectious disease model.
+
+Note: This is currently a placeholder SIR model. A more realistic TB model
+would include latent infection, prolonged duration, and treatment dynamics.
 """
 
 
-# from mighti.diseases.base_disease import GenericSIS
+from mighti.diseases.base_disease import GenericSIR
 
 
-# class TB(GenericSIS):
-#     def __init__(self, csv_path, pars=None, **kwargs):
-#         self.disease_name = 'TB'
-#         super().__init__(csv_path, pars, **kwargs)
-#         self.define_pars(label = 'TB')
-#         if not hasattr(self.pars, 'p_acquire'):
-#             self.pars.p_acquire = 1
-#         return
-    
-
-
-# tb = mtb.TB(dict(
-#     label='TB',
-#     unit='day',
-#     dt=7,
-#     beta=ss.rate_prob(0.0025, unit='year')
-# ))
-    
+class Tuberculosis(GenericSIR):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = "Tuberculosis"
+        super().__init__(csv_path, pars, **kwargs)
+        self.define_pars(label="Tuberculosis")
+        return

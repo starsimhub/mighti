@@ -1,0 +1,42 @@
+measure,location,sex,age,cause,metric,year,val,upper,lower
+Prevalence,Eswatini,Both,All ages,Acute hepatitis,Percent,2007,0.004923465,0.005398813,0.004486092
+Prevalence,Eswatini,Both,All ages,Alcohol use disorders,Percent,2007,0.015113434,0.018917146,0.011959645
+Prevalence,Eswatini,Both,All ages,Alzheimer's disease and other dementias,Percent,2007,0.002064726,0.002341477,0.00177378
+Prevalence,Eswatini,Both,All ages,Amphetamine use disorders,Percent,2007,0.000625187,0.000880858,0.000408486
+Prevalence,Eswatini,Both,All ages,Anxiety disorders,Percent,2007,0.036072749,0.04546251,0.026450043
+Prevalence,Eswatini,Both,All ages,Asthma,Percent,2007,0.045937106,0.055970074,0.037166675
+Prevalence,Eswatini,Both,All ages,Breast cancer,Percent,2007,0.001315022,0.002615939,0.000683515
+Prevalence,Eswatini,Both,All ages,COVID-19,Percent,2007,0.0,0.0,0.0
+Prevalence,Eswatini,Both,All ages,Cannabis use disorders,Percent,2007,0.002531662,0.003731634,0.001675038
+Prevalence,Eswatini,Both,All ages,Cardiovascular diseases,Percent,2007,0.046313269,0.050356221,0.04207236
+Prevalence,Eswatini,Both,All ages,Cervical cancer,Percent,2007,0.00582309,0.013124925,0.001957406
+Prevalence,Eswatini,Both,All ages,Cirrhosis and other chronic liver diseases,Percent,2007,0.191955234,0.207149043,0.178934616
+Prevalence,Eswatini,Both,All ages,Cocaine use disorders,Percent,2007,0.000368249,0.000518531,0.000260069
+Prevalence,Eswatini,Both,All ages,Colon and rectum cancer,Percent,2007,0.000181548,0.000317255,0.000100644
+Prevalence,Eswatini,Both,All ages,Congenital heart anomalies,Percent,2007,0.00297788,0.003312135,0.002632899
+Prevalence,Eswatini,Both,All ages,Congenital musculoskeletal and limb anomalies,Percent,2007,0.002722519,0.003459182,0.002094645
+Prevalence,Eswatini,Both,All ages,Diabetes mellitus type 1,Percent,2007,0.000135834,0.000167578,0.000105775
+Prevalence,Eswatini,Both,All ages,Diabetes mellitus type 2,Percent,2007,0.032928243,0.035355306,0.030456276
+Prevalence,Eswatini,Both,All ages,Diarrheal diseases,Percent,2007,0.01892739,0.021687505,0.016833811
+Prevalence,Eswatini,Both,All ages,Digestive congenital anomalies,Percent,2007,0.000740282,0.000901122,0.000572514
+Prevalence,Eswatini,Both,All ages,Down syndrome,Percent,2007,0.000348247,0.000433232,0.000276246
+Prevalence,Eswatini,Both,All ages,Esophageal cancer,Percent,2007,0.000102037,0.000170663,5.43e-05
+Prevalence,Eswatini,Both,All ages,Hemolytic disease and other neonatal jaundice,Percent,2007,0.000945367,0.001047802,0.000844893
+Prevalence,Eswatini,Both,All ages,Interpersonal violence,Percent,2007,0.040161217,0.044929107,0.035969094
+Prevalence,Eswatini,Both,All ages,Lower respiratory infections,Percent,2007,0.001463311,0.001583989,0.001371466
+Prevalence,Eswatini,Both,All ages,Major depressive disorder,Percent,2007,0.019763505,0.025173774,0.014445673
+Prevalence,Eswatini,Both,All ages,Maternal disorders,Percent,2007,0.0019788171645019,0.0024780565433826,0.001567646695215
+Prevalence,Eswatini,Both,All ages,Musculoskeletal disorders,Percent,2007,0.103712219,0.110498083,0.096679056
+Prevalence,Eswatini,Both,All ages,Neonatal encephalopathy due to birth asphyxia and trauma,Percent,2007,0.000680489,0.00103391,0.00041012
+Prevalence,Eswatini,Both,All ages,Neonatal preterm birth,Percent,2007,0.009367146,0.012775571,0.00736017
+Prevalence,Eswatini,Both,All ages,Neonatal sepsis and other neonatal infections,Percent,2007,0.001752012,0.002626373,0.001136146
+Prevalence,Eswatini,Both,All ages,Neural tube defects,Percent,2007,0.000194182,0.000240629,0.000156716
+Prevalence,Eswatini,Both,All ages,Opioid use disorders,Percent,2007,0.001210906,0.001476195,0.000942209
+Prevalence,Eswatini,Both,All ages,Other chromosomal abnormalities,Percent,2007,0.000811841,0.000951216,0.00069317
+Prevalence,Eswatini,Both,All ages,Other drug use disorders,Percent,2007,8.45e-05,0.000110612,6.2e-05
+Prevalence,Eswatini,Both,All ages,Parkinson's disease,Percent,2007,0.000203821,0.000237226,0.000171942
+Prevalence,Eswatini,Both,All ages,Prostate cancer,Percent,2007,0.000248587,0.000413089,0.000147006
+Prevalence,Eswatini,Both,All ages,Protein-energy malnutrition,Percent,2007,0.005059816,0.005491371,0.00467284
+Prevalence,Eswatini,Both,All ages,Road injuries,Percent,2007,0.017801123,0.019471362,0.016329606
+Prevalence,Eswatini,Both,All ages,"Tracheal, bronchus, and lung cancer",Percent,2007,3.59e-05,6.23e-05,1.95e-05
+Prevalence,Eswatini,Both,All ages,Tuberculosis,Percent,2007,0.3127317437248327,0.353606672436296,0.2695725208990167
