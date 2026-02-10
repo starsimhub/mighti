@@ -18,10 +18,39 @@ import numpy as np
 import sciris as sc
 import logging
 
+from mighti.diseases.base_disease import GenericSIS, GenericSIR
+
 logger = logging.getLogger(__name__)
 
 __all__ = ["PrevalenceAnalyzer", "PrevalenceAnalyzer_HIV", "PrevalenceAnalyzer_SDoH", "OnARTByConditionAnalyzer", "OnARTByConditionAndSexAnalyzer"]
 
+
+def _status_attr_for_disease_module(dis, disease_name: str) -> str:
+    """
+    Decide which boolean state to use for prevalence for a disease module.
+
+    - SIS/SIR communicable diseases: `infected`
+    - NCD-like conditions: `affected`
+
+    HIV is special-cased because it may come from external packages (e.g. STIsim) but
+    should always be treated as an infectious process for prevalence.
+    """
+    name = (disease_name or "").lower()
+    if name == "hiv":
+        return "infected"
+
+    # Prefer type-based detection
+    if isinstance(dis, (GenericSIS, GenericSIR, ss.SIS, ss.SIR)):
+        return "infected"
+
+    # Fallback: attribute-based detection for external/legacy disease modules
+    if hasattr(dis, "infected"):
+        return "infected"
+    if hasattr(dis, "affected"):
+        return "affected"
+
+    # Last resort: default to affected
+    return "affected"
 
 
 # ---------------------------------------------------------------------
@@ -93,8 +122,11 @@ class PrevalenceAnalyzer(ss.Analyzer):
                 continue
 
             # Use appropriate attribute (infected vs affected)
-            status_attr = "infected" if disease in ["hiv","hpv","flu","viralhepatitis","tb"] else "affected"
-            has_disease = getattr(dis, status_attr)
+            status_attr = _status_attr_for_disease_module(dis, disease)
+            has_disease = getattr(dis, status_attr, None)
+            if has_disease is None:
+                logger.warning(f"PrevalenceAnalyzer: '{disease}' has no '{status_attr}' attribute; skipping")
+                continue
 
             # Total prevalence
             num_total = np.sum(has_disease)
@@ -205,8 +237,11 @@ class PrevalenceAnalyzer_HIV(ss.Analyzer):
 
         for disease in self.diseases:
             dis = getattr(sim.diseases, disease)
-            status_attr = "infected" if disease in ["hiv", "hpv", "flu", "viralhepatitis", "tb", "diarrhealdisease"] else "affected"
-            has_disease = getattr(dis, status_attr)
+            status_attr = _status_attr_for_disease_module(dis, disease)
+            has_disease = getattr(dis, status_attr, None)
+            if has_disease is None:
+                logger.warning(f"PrevalenceAnalyzer_HIV: '{disease}' has no '{status_attr}' attribute; skipping")
+                continue
 
             # Track stratified prevalences
             total_num_with_HIV = total_den_with_HIV = 0
