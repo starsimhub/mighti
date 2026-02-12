@@ -51,10 +51,6 @@ Running an Example
 This will run a sample simulation that includes demography, HIV, and NCD modules.
 The example script saves a quick-check plot into the ``outputs/`` folder.
 
-You can also run:
-	•	mighti_demography.py — mortality and life expectancy module
-	•	mighti_calibration.py — Optuna-based parameter calibration
-
 
 Usage and Documentation
 ------------
@@ -130,14 +126,6 @@ Some older code may still work with `mi.SomeClass` due to a temporary compatibil
 - Service-use analyzers in `mighti.analyzers.analyzer_serviceuse` (currently stubs)
 - Scripts in the repo root (e.g., `mighti_main.py`) are examples/drivers, not API contracts
 
-
-References
-------------
-
-MIGHTI uses data from:
-	•	Demography: UN WPP 2024
-	•	NCDs: Global Burden of Disease (GBD)
-	•	HIV: DHS, SHIMS
 
 
 Contributing
