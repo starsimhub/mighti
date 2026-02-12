@@ -3,7 +3,7 @@ import numpy as np
 import starsim as ss
 import logging
 
-from mighti.rng import get_rng
+from mighti.util.rng import get_rng
 
 __all__ = [
     "NeighbourhoodSituation",
@@ -59,7 +59,7 @@ class BaseSDoH(ss.Module):
                 if "inherit_prob" in row.columns and pd.notna(row["inherit_prob"].iloc[0]):
                     self.inherit_prob = float(row["inherit_prob"].iloc[0])
 
-        logger.info(f"[{self.name}] Initialized module with baseline={self.p_stable:.3f}, inherit={self.inherit_prob:.3f}")
+        # logger.info(f"[{self.name}] Initialized module with baseline={self.p_stable:.3f}, inherit={self.inherit_prob:.3f}")
 
         self.state = None  # will link to People later
 
@@ -78,7 +78,7 @@ class BaseSDoH(ss.Module):
             sim.people.states.append(arr, overwrite=False)
             setattr(sim.people, self.state_attr, arr)
             arr.link_people(sim.people)
-            logger.debug(f"[{self.name}] State '{self.state_attr}' registered on People")
+            # logger.debug(f"[{self.name}] State '{self.state_attr}' registered on People")
 
         self.state = getattr(sim.people, self.state_attr)
 
@@ -89,7 +89,7 @@ class BaseSDoH(ss.Module):
         ppl = self.sim.people
         n = len(ppl)
         if n == 0 or self.state is None:
-            logger.warning(f"[{self.name}] init_post: No people to initialize.")
+            # logger.warning(f"[{self.name}] init_post: No people to initialize.")
             return
         rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:init")
 
@@ -104,8 +104,7 @@ class BaseSDoH(ss.Module):
 
         self.state[:] = rng.random(n) < base_prob
         prop_stable = np.mean(self.state)
-        logger.info(f"[{self.name}] init_post: {prop_stable:.3f} stable (target {self.p_stable:.3f})")
-        # logger.debug(f"[{self.name}] init_post — stable={prop_stable:.3f}, expected={self.p_stable:.3f}")
+        # logger.info(f"[{self.name}] init_post: {prop_stable:.3f} stable (target {self.p_stable:.3f})")
 
     def step(self):
         """Yearly inheritance + stochastic transitions, tracking inherited proportion."""
@@ -169,11 +168,11 @@ class BaseSDoH(ss.Module):
         sim.sdoh_results[self.name]["prop_stable"].append(prop_stable)
         sim.sdoh_results[self.name]["prop_inherited"].append(prop_inherited)
 
-        if sim.ti % 5 == 0:  # log every 5 years
-            logger.info(
-                f"[{self.name}] {sim.t.year}: stable={prop_stable:.3f}, "
-                f"inherited={prop_inherited:.2f}, +{gain_mask.sum()} gained, -{lose_mask.sum()} lost"
-            )
+        # if sim.ti % 5 == 0:  # log every 5 years
+            # logger.info(
+            #     f"[{self.name}] {sim.t.year}: stable={prop_stable:.3f}, "
+            #     f"inherited={prop_inherited:.2f}, +{gain_mask.sum()} gained, -{lose_mask.sum()} lost"
+            # )
 
 
 # ---------------------------------------------------------------------
@@ -192,7 +191,7 @@ class NeighbourhoodSituation(BaseSDoH):
             state_attr="neighbourhood_situation",
             **kwargs,
         )
-        logger.info(f"[NeighbourhoodSituation] Module initialized with p_stable={self.p_stable:.3f}")
+        # logger.info(f"[NeighbourhoodSituation] Module initialized with p_stable={self.p_stable:.3f}")
 
 
 class SocialContext(BaseSDoH):
@@ -249,3 +248,4 @@ class HealthCareSystem(BaseSDoH):
             state_attr="healthcare_system",
             **kwargs,
         )
+        

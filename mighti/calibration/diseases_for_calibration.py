@@ -8,7 +8,7 @@ import pandas as pd
 import starsim as ss
 from scipy.stats import lognorm
 
-from mighti.rng import get_rng
+from mighti.util.rng import get_rng
 
 
 __all__ = ['RemittingDisease', 'AcuteDisease', 'ChronicDisease', 'GenericSIS']
@@ -230,7 +230,9 @@ class AcuteDisease(ss.NCD):
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
             p_acquire=1,
-            init_prev=None
+            # Starsim base classes often define `init_prev` as a distribution.
+            # Setting it to None can trigger "Updating dist ... to NoneType not supported".
+            init_prev=ss.bernoulli(0.0),
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -270,7 +272,7 @@ class AcuteDisease(ss.NCD):
 
         return
 
-    def set_prognoses(self, uids):
+    def set_prognoses(self, uids, sources=None, **kwargs):  # noqa: ARG002
         sim = self.sim
         p = self.pars
     
@@ -283,11 +285,26 @@ class AcuteDisease(ss.NCD):
         rec_uids = np.setdiff1d(uids, dead_uids)
         dead_indices = np.isin(uids, dead_uids)
         rec_indices = ~dead_indices
-    
-        self.ti_dead[dead_uids] = self.ti + dur_condition[dead_indices] / self.t.dt
-    
+
+        # Convert durations (years) into numeric timesteps and add to current ti.
+        # Avoid Starsim time/rate objects here; ti_* arrays expect numeric timestep indices.
+        try:
+            ti0 = float(sim.ti)
+        except Exception:
+            ti0 = float(self.ti)
+        try:
+            dt = float(getattr(sim, "dt", getattr(self.t, "dt", 1.0)))
+        except Exception:
+            dt = 1.0
+        dt = dt if dt > 0 else 1.0
+
+        dur_condition = np.asarray(dur_condition, dtype=float)
+        offset = np.maximum(dur_condition / dt, 0.0)
+
+        self.ti_dead[dead_uids] = ti0 + offset[dead_indices]
+
         if hasattr(self, "ti_reversed"):
-            self.ti_reversed[rec_uids] = self.ti + dur_condition[rec_indices] / self.t.dt
+            self.ti_reversed[rec_uids] = ti0 + offset[rec_indices]
     
     def init_results(self):
         super().init_results()
@@ -483,7 +500,8 @@ class GenericSIS(ss.SIS):
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
             p_acquire=1,
-            init_prev=None
+            # See AcuteDisease: avoid changing dist types by setting None.
+            init_prev=ss.bernoulli(0.0),
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -497,7 +515,7 @@ class GenericSIS(ss.SIS):
             ss.BoolState('infected'),
             ss.BoolState('on_treatment'),
             ss.FloatArr('ti_infected'),
-            ss.FloatArr('ti_reversed'),
+            ss.FloatArr('ti_recovered'),
             ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus', default=1.0),
             ss.FloatArr('rel_death', default=1.0),
@@ -505,37 +523,23 @@ class GenericSIS(ss.SIS):
         )
 
     def init_post(self):
-        """
-        Initialize disease prevalence after people are created.
-        Compatible with Starsim >=3.0 and callable init_prev.
-        """
-        super().init_post()
-
-        sim = self.sim  # Starsim assigns this automatically in init_pre(sim)
-
-        if hasattr(self.pars, "init_prev") and callable(getattr(self.pars.init_prev, "rvs", None)):
-            # Sample prevalence probabilities
-            probs = self.pars.init_prev.rvs(sim.people.uid)
-            rng = get_rng(sim, salt=f"{self.__class__.__name__}:init_prev")
-            affected = rng.random(len(sim.people)) < probs
-
-            # Assign disease state
-            if hasattr(self, "affected"):
-                self.affected[:] = affected
-
-            # Optionally set prognoses for affected agents
-            if hasattr(self, "set_prognoses"):
-                self.set_prognoses(np.where(affected)[0])
-
-        return
+        # Use Starsim Infection.init_post(), which seeds infections via
+        # `init_prev.filter()` and calls `set_prognoses(initial_cases, sources=-1)`.
+        return super().init_post()
 
 
-    def set_prognoses(self, uids):
+    def set_prognoses(self, uids, sources=None, **kwargs):  # noqa: ARG002
         sim = self.sim
         p = self.pars
     
         self.susceptible[uids] = False
         self.infected[uids] = True
+
+        try:
+            ti0 = float(sim.ti)
+        except Exception:
+            ti0 = float(self.ti)
+        self.ti_infected[uids] = ti0
     
         dur_condition = p.dur_condition.rvs(size=len(uids))
     
@@ -543,11 +547,155 @@ class GenericSIS(ss.SIS):
         rec_uids = np.setdiff1d(uids, dead_uids)
         dead_indices = np.isin(uids, dead_uids)
         rec_indices = ~dead_indices
-    
-        self.ti_dead[dead_uids] = self.ti + dur_condition[dead_indices] / self.t.dt
-    
-        if hasattr(self, "ti_reversed"):
-            self.ti_reversed[rec_uids] = self.ti + dur_condition[rec_indices] / self.t.dt
+
+        # Numeric timestep arithmetic only (avoid Starsim time/rate objects here)
+        try:
+            dt = float(getattr(sim, "dt", getattr(self.t, "dt", 1.0)))
+        except Exception:
+            dt = 1.0
+        dt = dt if dt > 0 else 1.0
+
+        dur_condition = np.asarray(dur_condition, dtype=float)
+        offset = np.maximum(dur_condition / dt, 0.0)
+
+        self.ti_dead[dead_uids] = ti0 + offset[dead_indices]
+
+        self.ti_recovered[rec_uids] = ti0 + offset[rec_indices]
+
+    def step(self):
+        """Acquire new infections using `calculate_p_acquire_generic()`."""
+        ti = self.ti
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
+
+        susceptible = self.susceptible.uids
+        if len(susceptible) == 0:
+            return np.array([], dtype=int)
+
+        p_acq = calculate_p_acquire_generic(self, self.sim, susceptible)
+
+        if self.pars.affected_sex == "female":
+            p_acq[self.sim.people.male[susceptible]] = 0
+        elif self.pars.affected_sex == "male":
+            p_acq[self.sim.people.female[susceptible]] = 0
+
+        try:
+            p_acq = p_acq * self.rel_sus[susceptible]
+        except Exception:
+            pass
+
+        p_acq = np.clip(p_acq, 0.0, 1.0)
+        new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
+        if len(new_cases):
+            self.set_prognoses(new_cases, sources=-1)
+        return new_cases
+
+    def step_state(self):
+        """Progress infected -> susceptible when `ti_recovered` is reached."""
+        ti = self.ti
+        recovered = (self.infected & (self.ti_recovered <= ti)).uids
+        if len(recovered):
+            self.infected[recovered] = False
+            self.susceptible[recovered] = True
+        return
+
+
+class GenericSIR(ss.SIR):
+    """Base class for communicable diseases using an SIR-style model."""
+
+    def __init__(self, csv_path, pars=None, **kwargs):
+        super().__init__()
+        self.csv_path = csv_path
+        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+
+        sigma = 0.5
+        mu = np.log(disease_params["dur_condition"]) - (sigma**2) / 2
+
+        self.define_pars(
+            dur_condition=lognorm(s=sigma, scale=np.exp(mu)),  # duration in years (we convert to timesteps)
+            p_death=ss.bernoulli(disease_params["p_death"]),
+            max_disease_duration=disease_params["max_disease_duration"],
+            rel_sus_hiv=disease_params["rel_sus_hiv"],
+            affected_sex=disease_params["affected_sex"],
+            p_acquire=1,
+            init_prev=ss.bernoulli(0.0),
+        )
+
+        self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
+        self.update_pars(pars, **kwargs)
+
+        self.define_states(
+            ss.BoolState("susceptible", default=True),
+            ss.BoolState("at_risk", default=True),
+            ss.BoolState("infected"),
+            ss.BoolState("recovered"),
+            ss.BoolState("on_treatment"),
+            ss.FloatArr("ti_infected"),
+            ss.FloatArr("ti_recovered"),
+            ss.FloatArr("ti_dead"),
+            ss.FloatArr("rel_sus", default=1.0),
+            ss.FloatArr("rel_death", default=1.0),
+            reset=True,
+        )
+
+    def init_post(self):
+        return super().init_post()
+
+    def set_prognoses(self, uids, sources=None, **kwargs):  # noqa: ARG002
+        """Set prognoses for new infections, using numeric timestep arithmetic."""
+        sim = self.sim
+        p = self.pars
+
+        self.susceptible[uids] = False
+        self.infected[uids] = True
+        self.recovered[uids] = False
+
+        ti = float(sim.ti)
+        self.ti_infected[uids] = ti
+
+        dur_condition = np.asarray(p.dur_condition.rvs(size=len(uids)), dtype=float)
+
+        dead_uids = p.p_death.filter(uids)
+        rec_uids = np.setdiff1d(uids, dead_uids)
+        dead_indices = np.isin(uids, dead_uids)
+        rec_indices = ~dead_indices
+
+        try:
+            dt = float(getattr(sim, "dt", getattr(self.t, "dt", 1.0)))
+        except Exception:
+            dt = 1.0
+        dt = dt if dt > 0 else 1.0
+
+        offset = np.maximum(dur_condition / dt, 0.0)
+        self.ti_dead[dead_uids] = ti + offset[dead_indices]
+        self.ti_recovered[rec_uids] = ti + offset[rec_indices]
+        return
+
+    def step(self):
+        """Acquire new infections using `calculate_p_acquire_generic()`."""
+        ti = self.ti
+        rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
+
+        susceptible = self.susceptible.uids
+        if len(susceptible) == 0:
+            return np.array([], dtype=int)
+
+        p_acq = calculate_p_acquire_generic(self, self.sim, susceptible)
+
+        if self.pars.affected_sex == "female":
+            p_acq[self.sim.people.male[susceptible]] = 0
+        elif self.pars.affected_sex == "male":
+            p_acq[self.sim.people.female[susceptible]] = 0
+
+        try:
+            p_acq = p_acq * self.rel_sus[susceptible]
+        except Exception:
+            pass
+
+        p_acq = np.clip(p_acq, 0.0, 1.0)
+        new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
+        if len(new_cases):
+            self.set_prognoses(new_cases, sources=-1)
+        return new_cases
 
     def init_results(self):
         super().init_results()
@@ -973,13 +1121,76 @@ class Flu(GenericSIS):
         return
 
 
-class TB(GenericSIS):
+class Tuberculosis(GenericSIR):
     def __init__(self, csv_path, pars=None, **kwargs):
-        self.disease_name = 'TB'
+        self.disease_name = 'Tuberculosis'
         super().__init__(csv_path, pars, **kwargs)
         
-        self.define_pars(label = 'TB')
+        self.define_pars(label = 'Tuberculosis')
         if not hasattr(self.pars, 'p_acquire'):
             self.pars.p_acquire_multiplier = 1  
         return
-    
+
+
+class SelfHarm(AcuteDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'SelfHarm'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'SelfHarm')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class MaternalConditions(AcuteDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'MaternalConditions'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'MaternalConditions')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class DiarrhealDisease(AcuteDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'DiarrhealDisease'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'DiarrhealDisease')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+
+class LowerRespiratoryInfections(AcuteDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'LowerRespiratoryInfections'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'LowerRespiratoryInfections')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+class COVID19(GenericSIS):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'COVID19'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'COVID19')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return
+
+class InterpersonalViolence(AcuteDisease):
+    def __init__(self, csv_path, pars=None, **kwargs):
+        self.disease_name = 'InterpersonalViolence'
+        super().__init__(csv_path, pars, **kwargs)
+        
+        self.define_pars(label = 'InterpersonalViolence')
+        if not hasattr(self.pars, 'p_acquire'):
+            self.pars.p_acquire_multiplier = 1  
+        return

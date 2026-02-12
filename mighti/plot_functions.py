@@ -28,6 +28,184 @@ def _safe_get_result(analyzer, key, sim):
 
 logger = logging.getLogger(__name__)
 
+def _coerce_sim_years(sim) -> np.ndarray:
+    """
+    Return a numeric year vector aligned to sim.timevec.
+    Handles numeric years, datetime-like, or pandas Timestamp.
+    """
+    tv = np.array(getattr(sim, "timevec", []))
+    if tv.size == 0:
+        return tv.astype(float)
+    # If timevec is already numeric years, use directly
+    if tv.dtype.kind in ("i", "u", "f"):
+        years = tv.astype(float)
+        # Heuristic: treat as years if values look like calendar years
+        finite = years[np.isfinite(years)]
+        if finite.size and (finite.min() >= 1800) and (finite.max() <= 2500):
+            return years
+
+    # Try datetime conversion
+    try:
+        dt = pd.to_datetime(tv)
+        years = dt.year.to_numpy(dtype=float)
+        # Guard: if conversion produced all-NaT, fallback
+        if np.all(pd.isna(dt)):
+            raise ValueError("timevec not datetime-like")
+        return years
+    except Exception:
+        pass
+    # Fallback: numeric
+    return np.asarray(tv, dtype=float)
+
+
+def plot_hiv_prevalence_vs_observed(
+    sim,
+    prevalence_analyzer,
+    observed_hiv_df: pd.DataFrame,
+    *,
+    age_starts: list[int] | None = None,
+    start_year: int | None = None,
+    end_year: int | None = None,
+    ncols: int = 3,
+    figsize: tuple[int, int] = (14, 8),
+    title: str | None = None,
+    show: bool = True,
+):
+    """
+    Plot simulated HIV prevalence vs observed, stratified by age bin and sex.
+
+    This is designed to work with `mi.analyzers.PrevalenceAnalyzer_HIV`, which
+    stores per-age-bin results as:
+      - `hiv_prev_male_{i}`, `hiv_prev_female_{i}` (proportions 0-1)
+
+    Observed data is expected in *wide* format with columns:
+      - `Age` (lower bound of age bin, e.g. 15, 20, 25...)
+      - `Year`
+      - `HIV_male`, `HIV_female` (either proportions 0-1 or %)
+    """
+    if observed_hiv_df is None or len(observed_hiv_df) == 0:
+        raise ValueError("observed_hiv_df is empty; nothing to plot")
+
+    # Default bins: match common reporting bins and keep the figure readable
+    if age_starts is None:
+        age_starts = [15, 20, 25, 30, 35, 40, 45, 50]
+
+    # Build mapping from age_start -> analyzer index
+    age_bins = getattr(prevalence_analyzer, "age_bins", None)
+    if not age_bins:
+        raise ValueError("prevalence_analyzer has no `age_bins`; expected PrevalenceAnalyzer_HIV-like analyzer")
+    age_to_i = {int(a0): i for i, (a0, _a1) in enumerate(age_bins)}
+
+    chosen = [a for a in age_starts if int(a) in age_to_i]
+    if not chosen:
+        raise ValueError(f"No requested age bins found in analyzer.age_bins. Requested={age_starts}, available={[int(a0) for a0,_ in age_bins]}")
+
+    # Prefer pulling time series from sim.results (more reliable than analyzer.results)
+    results_store = None
+    try:
+        if hasattr(sim, "analyzers") and hasattr(sim, "results"):
+            # Starsim often stores analyzers as dict label->analyzer
+            if isinstance(sim.analyzers, dict):
+                for label, analyzer in sim.analyzers.items():
+                    if analyzer is prevalence_analyzer:
+                        results_store = sim.results.get(label)
+                        break
+                # Fallback: match by analyzer name if object identity differs
+                if results_store is None:
+                    want_name = getattr(prevalence_analyzer, "name", None)
+                    for label, analyzer in sim.analyzers.items():
+                        if want_name and getattr(analyzer, "name", None) == want_name:
+                            results_store = sim.results.get(label)
+                            break
+    except Exception:
+        results_store = None
+
+    def _get_series(key: str) -> np.ndarray:
+        if isinstance(results_store, dict) and key in results_store:
+            return np.asarray(results_store[key], dtype=float)
+        return _safe_get_result(prevalence_analyzer, key, sim).astype(float)
+
+    # Sim years and mask
+    years = _coerce_sim_years(sim)
+    if years.size == 0:
+        raise ValueError("sim.timevec is empty")
+    y0 = int(np.nanmin(years)) if start_year is None else int(start_year)
+    y1 = int(np.nanmax(years)) if end_year is None else int(end_year)
+    sim_mask = (years >= y0) & (years <= y1)
+
+    # Clean observed
+    df = observed_hiv_df.copy()
+    # Support mixed case column names
+    colmap = {c.lower(): c for c in df.columns}
+    for req in ("age", "year", "hiv_male", "hiv_female"):
+        if req not in colmap:
+            raise ValueError(f"observed_hiv_df missing required column {req!r}. Found columns={list(df.columns)}")
+    age_col = colmap["age"]
+    year_col = colmap["year"]
+    m_col = colmap["hiv_male"]
+    f_col = colmap["hiv_female"]
+
+    df[age_col] = pd.to_numeric(df[age_col], errors="coerce")
+    df[year_col] = pd.to_numeric(df[year_col], errors="coerce")
+    df[m_col] = pd.to_numeric(df[m_col], errors="coerce")
+    df[f_col] = pd.to_numeric(df[f_col], errors="coerce")
+    df = df.dropna(subset=[age_col, year_col])
+    df[age_col] = df[age_col].astype(int)
+    df[year_col] = df[year_col].astype(int)
+    df = df[(df[year_col] >= y0) & (df[year_col] <= y1)]
+
+    # Determine observed units (0-1 vs %)
+    obs_max = float(np.nanmax([df[m_col].max(skipna=True), df[f_col].max(skipna=True)])) if len(df) else 0.0
+    obs_scale = 100.0 if obs_max <= 1.5 else 1.0  # treat <=1.5 as proportion
+
+    # Layout
+    n = len(chosen)
+    ncols = max(1, int(ncols))
+    nrows = int(np.ceil(n / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, sharex=True, sharey=True)
+    axes = np.atleast_1d(axes).ravel()
+
+    for ax_idx, a0 in enumerate(chosen):
+        ax = axes[ax_idx]
+        i = age_to_i[int(a0)]
+
+        sim_m = _get_series(f"hiv_prev_male_{i}") * 100.0
+        sim_f = _get_series(f"hiv_prev_female_{i}") * 100.0
+
+        ax.plot(years[sim_mask], sim_m[sim_mask], color="blue", lw=2.5, label="Sim male" if ax_idx == 0 else None)
+        ax.plot(years[sim_mask], sim_f[sim_mask], color="red", lw=2.5, label="Sim female" if ax_idx == 0 else None)
+
+        obs = df[df[age_col] == int(a0)]
+        if len(obs):
+            ax.scatter(obs[year_col].astype(float), obs[m_col] * obs_scale, color="blue", edgecolor="black", s=35, zorder=5, label="Obs male" if ax_idx == 0 else None)
+            ax.scatter(obs[year_col].astype(float), obs[f_col] * obs_scale, color="red", edgecolor="black", s=35, zorder=5, label="Obs female" if ax_idx == 0 else None)
+
+        a1 = age_bins[i][1]
+        ax.set_title(f"Age {int(a0)}–{int(a1)-1}" if np.isfinite(a1) else f"Age {int(a0)}+", fontsize=11)
+        ax.grid(True, alpha=0.25)
+
+    # Hide unused axes
+    for j in range(n, len(axes)):
+        axes[j].axis("off")
+
+    # Shared labels
+    fig.suptitle(title or "HIV prevalence: simulated vs observed", fontsize=14)
+    for ax in axes[:n]:
+        ax.set_xlim(y0, y1)
+        ax.set_ylim(bottom=0)
+    fig.supxlabel("Year")
+    fig.supylabel("Prevalence (%)")
+
+    # One legend (from first axis)
+    handles, labels = axes[0].get_legend_handles_labels()
+    if handles:
+        fig.legend(handles, labels, loc="upper right", frameon=False)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    if show:
+        plt.show()
+    return fig, axes[:n]
+
 def plot_life_expectancy_timeseries(
     le_df: pd.DataFrame,
     *,
@@ -175,10 +353,38 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
             logger.debug("No keys found for pattern %s_%s_", disease, key_pattern)
         return [_safe_get_result(prevalence_analyzer, k, sim) for k in matching_keys]
 
-    male_num = np.sum(extract_results("num_male"), axis=0)
-    female_num = np.sum(extract_results("num_female"), axis=0)
-    male_den = np.sum(extract_results("den_male"), axis=0)
-    female_den = np.sum(extract_results("den_female"), axis=0)
+    n_t = len(sim.timevec)
+
+    def _to_len_n(x):
+        x = np.atleast_1d(np.asarray(x, dtype=float))
+        if x.size == 1:
+            return np.full(n_t, float(x.flat[0]))
+        return x
+
+    male_num = _to_len_n(np.sum(extract_results("num_male"), axis=0))
+    female_num = _to_len_n(np.sum(extract_results("num_female"), axis=0))
+    male_den = _to_len_n(np.sum(extract_results("den_male"), axis=0))
+    female_den = _to_len_n(np.sum(extract_results("den_female"), axis=0))
+
+    # Fallback: if no per-sex keys (e.g. disease not in analyzer list), use total keys
+    if (np.asarray(male_den) == 0).all() or (np.asarray(female_den) == 0).all():
+        num_total_key = f"{disease}_num_total"
+        den_total_key = f"{disease}_den_total"
+        if num_total_key in prevalence_analyzer.results and den_total_key in prevalence_analyzer.results:
+            total_num = _safe_get_result(prevalence_analyzer, num_total_key, sim)
+            total_den = _safe_get_result(prevalence_analyzer, den_total_key, sim)
+            total_den = np.atleast_1d(np.asarray(total_den, dtype=float))
+            if total_den.size == 1:
+                total_den = np.broadcast_to(total_den, (n_t,)).copy()
+            total_den[total_den == 0] = 1
+            # Use same total for both sexes so at least one line is non-zero
+            male_num = female_num = total_num.astype(float) / 2.0
+            male_den = female_den = total_den.astype(float) / 2.0
+        else:
+            logger.warning(
+                "No prevalence results for disease '%s'. Is it in the analyzer's disease list?",
+                disease,
+            )
 
     male_den[male_den == 0] = 1
     female_den[female_den == 0] = 1

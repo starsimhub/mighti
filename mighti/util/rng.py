@@ -1,16 +1,5 @@
 """
 Deterministic random number helpers for MIGHTI.
-
-Why this exists
----------------
-StarSim simulations can be seeded via ``rand_seed``. However, MIGHTI code should
-avoid using NumPy's global RNG (``np.random``) directly, because it can break
-reproducibility and make tests flaky. This module provides a small, stable API:
-
-    - ``get_rng(sim, salt=...)`` → returns a NumPy Generator scoped to a sim
-
-The returned generator is cached on the sim object so repeated calls advance the
-same stream.
 """
 
 from __future__ import annotations
@@ -28,6 +17,7 @@ def _mix_seed(base_seed: int, salt: str) -> int:
     Mix a base integer seed with a salt string into a 32-bit seed.
     Uses SHA256 for stability across Python versions/platforms.
     """
+
     msg = f"{int(base_seed)}::{salt}".encode("utf-8")
     digest = hashlib.sha256(msg).digest()
     return int.from_bytes(digest[:4], byteorder="little", signed=False)
@@ -41,6 +31,7 @@ def get_rng(sim: Any | None, *, salt: str = "mighti") -> np.random.Generator:
     - Each unique ``salt`` gets its own independent stream (cached per sim).
     - If no sim/seed is available, returns an unseeded default generator.
     """
+
     if sim is None:
         return np.random.default_rng()
 
@@ -70,7 +61,9 @@ def seed_everything(seed: int) -> None:
     model code. This function is mainly for example driver scripts that still
     use libraries relying on NumPy's legacy global RNG.
     """
+
     import random
 
     random.seed(int(seed))
     np.random.seed(int(seed))
+

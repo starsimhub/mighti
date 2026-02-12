@@ -32,7 +32,7 @@ import pandas as pd
 import sciris as sc
 import starsim as ss
 
-from mighti.rng import get_rng
+from mighti.util.rng import get_rng
 
 __all__ = ["CompetingRisksDeaths"]
 

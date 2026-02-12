@@ -76,18 +76,18 @@ mighti.survivorship\_analyzer module
    :undoc-members:
    :show-inheritance:
 
-mighti.utils module
--------------------
+mighti.util.utils module
+------------------------
 
-.. automodule:: mighti.utils
+.. automodule:: mighti.util.utils
    :members:
    :undoc-members:
    :show-inheritance:
 
-mighti.version module
----------------------
+mighti.util.version module
+--------------------------
 
-.. automodule:: mighti.version
+.. automodule:: mighti.util.version
    :members:
    :undoc-members:
    :show-inheritance:

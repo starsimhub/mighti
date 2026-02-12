@@ -1,13 +1,12 @@
 """
 Central plotting defaults for MIGHTI.
-
-This module intentionally does *not* apply style on import. Call
-``apply_mighti_style()`` from driver scripts or notebooks.
 """
 
 from __future__ import annotations
 
 from typing import Any, Optional
+
+__all__ = ["apply_mighti_style"]
 
 
 def apply_mighti_style(
@@ -26,6 +25,7 @@ def apply_mighti_style(
     - Seaborn is optional; if unavailable we still set Matplotlib rcParams.
     - Safe/idempotent to call multiple times.
     """
+
     import matplotlib.pyplot as plt
 
     try:
@@ -59,3 +59,4 @@ def apply_mighti_style(
     }
     base.update(overrides)
     plt.rcParams.update(base)
+

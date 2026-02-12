@@ -8,7 +8,7 @@ import stisim as sti
 import numpy as np
 import logging
 
-from mighti.rng import get_rng
+from mighti.util.rng import get_rng
 
 logger = logging.getLogger(__name__)
 

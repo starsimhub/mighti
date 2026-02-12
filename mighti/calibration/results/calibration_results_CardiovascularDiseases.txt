@@ -1,2 +1,0 @@
-Best parameters:
-hc_p_acquire_multiplier: 0.018473489286541737

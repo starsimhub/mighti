@@ -156,6 +156,12 @@ no-commit/
 outputs/
 results/
 
+# Calibration artifacts (generated)
+mighti/calibration/results/
+starsim_calibration.db
+mighti/calibration/starsim_calibration.db
+*.db
+
 # Local duplicate packaging/scratch under data_prep
 data_prep/data_prep/
 data_prep/mighti/

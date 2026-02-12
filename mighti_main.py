@@ -19,10 +19,9 @@ import mighti as mi
 import prepare_data_for_year
 import starsim as ss
 import stisim as sti
-from data_prep.us_data.region_data_builder import ensure_region_data
 from mighti.plot_functions import plot_mean_prevalence
-from mighti.plot_style import apply_mighti_style
-from mighti.rng import seed_everything
+from mighti.util.plot_style import apply_mighti_style
+from mighti.util.rng import seed_everything
 from pathlib import Path
 
 
@@ -36,7 +35,7 @@ logger.setLevel(logging.INFO)
 SEED = 12345
 seed_everything(SEED)
 
-n_agents = 10_000
+n_agents = 100_000
 inityear = 2007
 endyear = 2020
 region = "eswatini"
@@ -58,7 +57,6 @@ mx_path = f"mighti/data/{region}_mx.csv"
 ex_path = f"mighti/data/{region}_ex.csv"
 
 # Ensure required demographic files exist
-ensure_region_data(region=region, start_year=inityear, end_year=endyear, overwrite=False)
 prepare_data_for_year.prepare_data_for_year(region, inityear)
 prepare_data_for_year.prepare_data(region)
 
@@ -68,27 +66,46 @@ prepare_data_for_year.prepare_data(region)
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
-# healthconditions = ['Type2Diabetes']
+healthconditions = ['COPD']
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
-healthconditions = [
-    condition
-    for condition in df.condition
-    if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]
-]
+# healthconditions = [
+#     condition
+#     for condition in df.condition
+#     if condition not in ["HIV", "TB", "HPV", "Flu", "ViralHepatitis"]
+# ]
 diseases = ["HIV"] + healthconditions
 
 # ---------------------------------------------------------------------
 # Read prevalence table and build callable prevalence data
 # ---------------------------------------------------------------------
 prevalence_data_df = pd.read_csv(csv_prevalence)
+hc_diseases = [d for d in diseases if str(d).lower() != "hiv"]
 prevalence_data, age_bins = mi.initialize_prevalence_data(
-    diseases=diseases,
+    diseases=hc_diseases,
     prevalence_data=prevalence_data_df,
+    inityear=inityear,
+)
+
+## HIV prevalence comes from a dedicated wide file (Age/Year/HIV_male/HIV_female)
+hiv_prev_df = pd.read_csv("mighti/data/eswatini_prevalence_hiv.csv")
+hiv_prev_data, hiv_age_bins = mi.initialize_prevalence_data(
+    diseases=["HIV"],
+    prevalence_data=hiv_prev_df,
     inityear=inityear,
 )
 
 def get_prevalence_function(disease):
     def prevalence_func(sim, uids, size=None):
+        # Use the dedicated HIV prevalence table so we don't need to mix HIV columns
+        # into `eswatini_prevalence.csv`.
+        if str(disease).lower() == "hiv":
+            return mi.age_sex_dependent_prevalence(
+                disease=disease,
+                prevalence_data=hiv_prev_data,
+                age_bins=hiv_age_bins,
+                sim=sim,
+                uids=uids,
+            )
         return mi.age_sex_dependent_prevalence(
             disease=disease,
             prevalence_data=prevalence_data,
@@ -103,7 +120,7 @@ def get_prevalence_function(disease):
 # Analyzers
 # ---------------------------------------------------------------------
 prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(
-    prevalence_data=prevalence_data,
+    prevalence_data=prevalence_data,  # ok for non-HIV diseases; HIV plotting uses sim results
     diseases=diseases,
 )
 # survivorship_analyzer = mi.SurvivorshipAnalyzer()
@@ -162,8 +179,8 @@ disease_objects = []
 
 # --- HIV ---
 hiv = sti.HIV(
-    beta_m2f=0.955,
-    beta_m2c=0.0039,
+    beta_m2f= 0.041126225026336546,
+    beta_m2c=0.02313161100759324,
     init_prev=0.15,
 )
 
@@ -258,11 +275,14 @@ if __name__ == "__main__":
     out_dir.mkdir(parents=True, exist_ok=True)
     apply_mighti_style()
 
+    # dt=1: one timestep per year. Disease p_acquire is per-timestep (no scaling), so dt=1
+    # keeps prevalence from being inflated by multiple draws per year.
     sim = ss.Sim(
         rand_seed=SEED,
         n_agents=n_agents,
         start=inityear,
         stop=endyear,
+        dt=1,
         people=ppl,
         networks=networks,
         demographics=[pregnancy, death],
@@ -278,37 +298,33 @@ if __name__ == "__main__":
     # Run simulation
     sim.run()
 
-    # Prevalence plot check (HIV + MDD example)
+    # Prevalence plot: use a disease that is actually in the sim (first non-HIV)
+    plot_disease = next((d for d in diseases if str(d).lower() != "hiv"), diseases[0] if diseases else "Type2Diabetes")
     prevalence_check_df = pd.read_csv(
         f"mighti/data/{region}_postprocess_check_prevalence.csv"
     )
     plot_mean_prevalence(
         sim,
         prevalence_analyzer,
-        "MajorDepressiveDisorder",
+        plot_disease,
         prevalence_check_df,
         inityear,
         endyear,
     )
 
-    # Save the most recent figure (if any) to outputs/
-    try:
-        import matplotlib.pyplot as plt
+    import pandas as pd
+    from mighti.plot_functions import plot_hiv_prevalence_vs_observed
 
-        fig = plt.gcf()
-        fig.savefig(out_dir / f"{region}_MajorDepressiveDisorder_prevalence.png")
-        plt.close(fig)
-        logger.info("Saved example plot to %s", out_dir)
-    except Exception as e:
-        logger.debug("Plot save skipped: %s", e)
+    obs = pd.read_csv("mighti/data/eswatini_prevalence_hiv.csv")
 
-    # Other plots (commented out for now)
-    # mi.plot_mean_prevalence_plhiv(sim, prevalence_analyzer, "CardiovascularDiseases")
-    # mi.plot_adherence_by_condition(sim, analyzers, casm_keys)
-    # male_prev, female_prev = mi.plot_mean_prevalence(
-    #     sim, prevalence_analyzer, "DownSyndrome", prevalence_data_df,
-    #     init_year=2000, end_year=2020,
-    # )
-    # for t, pm, pf in zip(sim.timevec, male_prev, female_prev):
-    #     year = t.year if hasattr(t, "year") else int(t)
-    #     print(f"Year {year} | Male: {pm:.2f}% | Female: {pf:.2f}%")
+    # after you run sim and have access to the prevalence analyzer object
+    plot_hiv_prevalence_vs_observed(
+        sim,
+        prevalence_analyzer,
+        obs,
+        age_starts=[15, 20, 25, 30, 35, 40, 45],  # pick bins you want
+        start_year=1990,
+        end_year=2023,
+    )
+    from mighti.plot_functions import plot_mean_prevalence_plhiv
+    plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'COPD')  

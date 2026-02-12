@@ -8,7 +8,7 @@ import starsim as ss
 import pandas as pd
 import logging
 from mighti.diseases.base_disease import RemittingDisease
-from mighti.rng import get_rng
+from mighti.util.rng import get_rng
 
 logger = logging.getLogger(__name__)
 

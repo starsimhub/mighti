@@ -8,13 +8,15 @@ Provides a three-component adherence pipeline:
 3. InterventionAdherenceDisruptor (adherence → ART efficacy scaling)
 """
 
+from __future__ import annotations
+
 import numpy as np
 import sciris as sc
 import starsim as ss
 import stisim as sti
 import logging
 
-from mighti.rng import get_rng
+from mighti.util.rng import get_rng
 
 logger = logging.getLogger(__name__)
 
@@ -23,23 +25,34 @@ __all__ = [
     "ARTAdherenceDisruptor",
     "InterventionAdherenceDisruptor",
     "AdherenceFromDepression",
+    "BASELINE_ADHERENCE_PHARMACOTHERAPY",
+    "CASM_NONADHERENCE_OR",
     "CASM_REL_FACTORS",
     "SDOH_REL_FACTORS",
 ]
 
 # ---------------------------------------------------------------------
+# HRMM-style defaults (paper-compatible)
+# ---------------------------------------------------------------------
+# Baseline adherence probability under pharmacotherapy
+BASELINE_ADHERENCE_PHARMACOTHERAPY = 0.62
+
+# Odds ratio (OR) for NON-adherence in presence of CASM conditions
+CASM_NONADHERENCE_OR = {
+    "AlcoholUseDisorder": 1.41,
+    "MajorDepressiveDisorder": 2.21,
+    "AnxietyDisorder": 2.04,
+    "ChronicPain": 1.34,
+    "TobaccoUse": 1.18,
+    "OpioidUseDisorder": 1.18,
+    "StimulantUseDisorder": 1.81,
+}
+
+# ---------------------------------------------------------------------
 # CASM adherence multipliers (1/OR from Table S2)
 #   Values < 1 => reduced adherence when condition is present
 # ---------------------------------------------------------------------
-CASM_REL_FACTORS = {
-    "AlcoholUseDisorder":      1 / 1.41,
-    "MajorDepressiveDisorder": 1 / 2.21,
-    "AnxietyDisorder":         1 / 2.04,
-    "ChronicPain":             1 / 1.34,
-    "TobaccoUse":              1 / 1.18,
-    "OpioidUseDisorder":       1 / 1.18,
-    "StimulantUseDisorder":    1 / 1.81,
-}
+CASM_REL_FACTORS = {k: 1.0 / float(v) for k, v in CASM_NONADHERENCE_OR.items()}
 
 # ---------------------------------------------------------------------
 # SDoH multipliers (<1 = structural adherence penalty)
@@ -70,44 +83,107 @@ class AdherenceEngine(ss.Module):
       SDOH_REL_FACTORS keys (e.g. 'neighbourhood_situation').
     """
 
-    def __init__(self, casm_rel=None, sdoh_rel=None, label="adherence_engine"):
+    def __init__(
+        self,
+        casm_rel: dict | None = None,
+        sdoh_rel: dict | None = None,
+        *,
+        # HRMM-style "odds of non-adherence" model (compat with `adherence_unified.py`)
+        baseline_adherence: float | None = None,
+        casm_nonadherence_or: dict | None = None,
+        use_odds_model: bool = False,
+        label: str = "adherence_engine",
+    ):
         super().__init__(label=label)
         self.casm_rel = casm_rel or CASM_REL_FACTORS.copy()
         self.sdoh_rel = sdoh_rel or SDOH_REL_FACTORS.copy()
+        self.baseline_adherence = baseline_adherence
+        self.casm_nonadherence_or = casm_nonadherence_or
+        self.use_odds_model = bool(use_odds_model)
 
     def init_pre(self, sim):
         super().init_pre(sim)
         logger.debug("[AdherenceEngine] Initialized for sim '%s'", getattr(sim, "label", "?"))
+        st = sim.people.states
+        if "adherence" not in st:
+            try:
+                arr = ss.FloatArr("adherence", default=1.0)
+                sim.people.states.append(arr, overwrite=False)
+                st["adherence"][:] = 1.0
+            except Exception:
+                st["adherence"] = np.ones(len(sim.people), dtype=float)
+
+    @staticmethod
+    def _odds(p: float) -> float:
+        p = float(np.clip(p, 1e-12, 1.0 - 1e-12))
+        return p / (1.0 - p)
+
+    @staticmethod
+    def _p_from_odds(o: np.ndarray) -> np.ndarray:
+        o = np.asarray(o, dtype=float)
+        return o / (1.0 + o)
 
     def step(self):
         ppl = self.sim.people
         st = ppl.states
         n = len(ppl)
 
-        # Start from perfect adherence and apply multiplicative penalties
-        adherence = np.ones(n, dtype=float)
+        # Decide model:
+        # - Default (backwards compatible): multiplicative penalties on [0,1] adherence starting at 1.0
+        # - Optional (paper-compatible): baseline adherence p0 with CASM odds ratios acting on non-adherence odds
+        odds_mode = self.use_odds_model or (self.baseline_adherence is not None) or (self.casm_nonadherence_or is not None)
 
-        # CASM effects
-        for cond, rel in self.casm_rel.items():
-            key = f"{cond.lower()}.affected"  # e.g. 'majordepressivedisorder.affected'
-            if key in st:
-                affected = np.asarray(st[key], bool)
-                adherence[affected] *= rel
-            else:
-                # Debug: check if state exists with different casing
-                if self.sim.ti % 10 == 0:  # Print every 10 timesteps
-                    possible_keys = [k for k in st.keys() if cond.lower() in k.lower()]
-                    if possible_keys:
-                        logger.debug("[AdherenceEngine] Missing '%s'; similar keys: %s", key, possible_keys)
+        if odds_mode:
+            p0 = float(np.clip(self.baseline_adherence if self.baseline_adherence is not None else BASELINE_ADHERENCE_PHARMACOTHERAPY, 1e-12, 1.0 - 1e-12))
+            or_map = (self.casm_nonadherence_or or CASM_NONADHERENCE_OR).copy()
 
-        # SDoH effects
+            odds_nonadh_0 = self._odds(1.0 - p0)
+            mult = np.ones(n, dtype=float)
+            for cond, or_nonadh in or_map.items():
+                key = f"{cond.lower()}.affected"
+                if key in st:
+                    affected = np.asarray(st[key], dtype=bool)
+                    if len(affected) != n:
+                        affected = np.resize(affected, n)
+                    mult[affected] *= float(or_nonadh)
+            odds_nonadh = odds_nonadh_0 * mult
+            p_nonadh = self._p_from_odds(odds_nonadh)
+            adherence = 1.0 - p_nonadh
+        else:
+            # Start from perfect adherence and apply multiplicative penalties
+            adherence = np.ones(n, dtype=float)
+
+            # CASM effects
+            for cond, rel in self.casm_rel.items():
+                key = f"{cond.lower()}.affected"  # e.g. 'majordepressivedisorder.affected'
+                if key in st:
+                    affected = np.asarray(st[key], bool)
+                    if len(affected) != n:
+                        affected = np.resize(affected, n)
+                    adherence[affected] *= float(rel)
+                else:
+                    # Debug: check if state exists with different casing
+                    if self.sim.ti % 10 == 0:  # Print every 10 timesteps
+                        possible_keys = [k for k in st.keys() if cond.lower() in k.lower()]
+                        if possible_keys:
+                            logger.debug("[AdherenceEngine] Missing '%s'; similar keys: %s", key, possible_keys)
+
+        # SDoH effects (applies to both models)
         for sdoh_key, rel in self.sdoh_rel.items():
             if sdoh_key in st:
                 flagged = np.asarray(st[sdoh_key], bool)
-                adherence[flagged] *= rel
+                if len(flagged) != n:
+                    flagged = np.resize(flagged, n)
+                adherence[flagged] *= float(rel)
 
         # Clip to [0, 1] and write back into the dynamic state
-        st["adherence"][:] = np.clip(adherence, 0.0, 1.0)
+        if "adherence" in st:
+            try:
+                st["adherence"][:] = np.clip(adherence, 0.0, 1.0)
+            except Exception:
+                st["adherence"] = np.clip(adherence, 0.0, 1.0)
+        else:
+            st["adherence"] = np.clip(adherence, 0.0, 1.0)
         
         # Debug: print adherence stats for AUD individuals
         if self.sim.ti % 10 == 0:  # Print every 10 timesteps
@@ -214,8 +290,22 @@ class ARTAdherenceDisruptor(ss.Connector):
         adher = np.asarray(st["adherence"], float)
         on_art = np.asarray(st["hiv.on_art"], bool)
         
+        n = len(on_art)
+
+        def _bool_mask(key: str) -> np.ndarray:
+            """Return a boolean mask of length n; missing -> all False."""
+            arr = st.get(key, None)
+            if arr is None:
+                return np.zeros(n, dtype=bool)
+            out = np.asarray(arr, dtype=bool)
+            if out.size == 0:
+                return np.zeros(n, dtype=bool)
+            if out.shape[0] != n:
+                out = np.resize(out, n)
+            return out
+
         # Get AUD status to apply different dropout rates
-        aud_affected = np.asarray(st.get("alcoholusedisorder.affected", []), dtype=bool) if "alcoholusedisorder.affected" in st else np.zeros(len(adher), dtype=bool)
+        aud_affected = _bool_mask("alcoholusedisorder.affected")
         
         # Debug: Always print on first few timesteps to verify it's running
         if sim.ti < 3:
@@ -360,7 +450,11 @@ class ARTAdherenceDisruptor(ss.Connector):
         if sim.ti % 5 == 0 and on_art.sum() > 0:
             n_on_art = on_art.sum()
             n_valid = valid_art.sum()
-            aud_affected = np.asarray(st.get("alcoholusedisorder.affected", []), dtype=bool)
+            aud_affected = np.asarray(st.get("alcoholusedisorder.affected", np.zeros_like(on_art)), dtype=bool)
+            if aud_affected.size == 0:
+                aud_affected = np.zeros_like(on_art, dtype=bool)
+            elif aud_affected.shape[0] != on_art.shape[0]:
+                aud_affected = np.resize(aud_affected, on_art.shape[0])
             aud_on_art = (on_art & aud_affected).sum()
             aud_valid = (valid_art & aud_affected).sum()
             mean_drop_p_aud = drop_p[on_art & aud_affected].mean() if aud_on_art > 0 else 0.0
@@ -392,7 +486,11 @@ class ARTAdherenceDisruptor(ss.Connector):
         
         # Debug: print expected vs actual drops occasionally
         if sim.ti % 5 == 0 and valid_art.sum() > 0:  # Every 5 timesteps (less verbose)
-            aud_affected = np.asarray(st.get("alcoholusedisorder.affected", []), dtype=bool)
+            aud_affected = np.asarray(st.get("alcoholusedisorder.affected", np.zeros_like(on_art)), dtype=bool)
+            if aud_affected.size == 0:
+                aud_affected = np.zeros_like(on_art, dtype=bool)
+            elif aud_affected.shape[0] != on_art.shape[0]:
+                aud_affected = np.resize(aud_affected, on_art.shape[0])
             aud_valid = (valid_art & aud_affected).sum()
             if aud_valid > 0:
                 aud_drop_p = drop_p[valid_art & aud_affected]
@@ -450,9 +548,9 @@ class ARTAdherenceDisruptor(ss.Connector):
                 final_drop_ids = np.array(final_drop_ids, dtype=int)
                 
                 if final_drop_ids.size:
-                    # Track who we're about to drop
-                    aud_affected = np.asarray(st.get("alcoholusedisorder.affected", []), dtype=bool)
-                    aud_dropped = aud_affected[final_drop_ids].sum()
+                    # Track who we're about to drop (AUD may not be present)
+                    aud_affected = _bool_mask("alcoholusedisorder.affected")
+                    aud_dropped = int(aud_affected[final_drop_ids].sum()) if aud_affected.size else 0
                     mean_adher_dropped = adher[final_drop_ids].mean() if final_drop_ids.size > 0 else 0.0
                     mean_drop_p_dropped = drop_p[final_drop_ids].mean() if final_drop_ids.size > 0 else 0.0
                     
@@ -526,7 +624,7 @@ class ARTAdherenceDisruptor(ss.Connector):
                     if sim.ti % 12 == 0:  # Once per year
                         # Get current ART status for context
                         on_art = np.asarray(st.get("hiv.on_art", []), bool) if "hiv.on_art" in st else np.zeros(len(ppl), dtype=bool)
-                        aud_affected = np.asarray(st.get("alcoholusedisorder.affected", []), dtype=bool) if "alcoholusedisorder.affected" in st else np.zeros(len(ppl), dtype=bool)
+                        aud_affected = _bool_mask("alcoholusedisorder.affected")
                         aud_on_art = (on_art & aud_affected).sum()
                         noaud_on_art = (on_art & ~aud_affected).sum()
                         

@@ -11,6 +11,22 @@ import starsim as ss
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+class PeopleCustom(ss.People):
+    """
+    Starsim People with a custom overall female probability.
+
+    This used to live in `mighti.init_people_sex` (legacy compatibility). It is
+    kept here to centralize all People initialization helpers in one module.
+    """
+
+    def __init__(self, n_agents, age_data=None, extra_states=None, mock: bool = False):  # noqa: ARG002
+        super().__init__(n_agents=n_agents, age_data=age_data, extra_states=extra_states)
+        # Keep the module name 'people' so StarSim internals can plan correctly.
+        self.name = "people"
+
+        # Override the default sampler used when .init_vals() runs
+        self.female.default = ss.bernoulli(name="female", p=0.522)
+
 
 def fixed_step_die(self):
     """

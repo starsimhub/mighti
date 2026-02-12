@@ -8,7 +8,7 @@ import pandas as pd
 import starsim as ss
 from scipy.stats import lognorm
 
-from mighti.rng import get_rng
+from mighti.util.rng import get_rng
 
 
 __all__ = ['RemittingDisease', 'AcuteDisease', 'AcuteSurgicalDisease', 'ChronicDisease',
@@ -141,7 +141,8 @@ class RemittingDisease(_CompetingMortalityMixin, ss.NCD):
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
             p_acquire=disease_params["p_acquire"],
-            init_prev=None
+            # Avoid changing distribution types by setting None (Starsim restriction).
+            init_prev=ss.bernoulli(0.0),
         )
         
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -318,7 +319,8 @@ class AcuteDisease(_CompetingMortalityMixin, ss.NCD):
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
             p_acquire=disease_params["p_acquire"],
-            init_prev=None,
+            # Avoid Starsim "update dist to NoneType" errors.
+            init_prev=ss.bernoulli(0.0),
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -483,7 +485,7 @@ class AcuteSurgicalDisease(_CompetingMortalityMixin, ss.NCD):
             rel_mortality_treated=disease_params.get("rel_mortality_treated", 0.5),
             rel_mortality_untreated=disease_params.get("rel_mortality_untreated", 2.0),
             cost_surgery=disease_params.get("cost_surgery", 0.0),
-            init_prev=None,
+            init_prev=ss.bernoulli(0.0),
         )
 
         self.p_acquire = ss.bernoulli(
@@ -637,7 +639,7 @@ class ChronicDisease(_CompetingMortalityMixin, ss.NCD):
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
             p_acquire=disease_params["p_acquire"],
-            init_prev=None,
+            init_prev=ss.bernoulli(0.0),
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))

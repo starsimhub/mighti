@@ -1,49 +1,101 @@
 """
-Calibrate betas for HIV
+Calibrate HIV betas against observed prevalence (by sex and age bins).
+
+This script used to be hard-coded for Eswatini. It now supports:
+- changing region and input CSV paths via CLI flags
+- changing sim settings (n_agents, years, seed, trials) without editing code
+
+Example
+-------
+python mighti_calibration.py --region eswatini --start 1990 --stop 2023 --n-agents 10000 --trials 200
 """
 
 
-import optuna
-import mighti as mi
-import pandas as pd
-import sciris as sc
-import starsim as ss
-import stisim as sti
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
-def make_sim():
-  
-    hiv = sti.HIV(beta_m2f=0.05, beta_m2c=0.025, init_prev=0.15)
-    fertility_rate = {'fertility_rate': pd.read_csv('mighti/data/eswatini_asfr.csv')}
+@dataclass(frozen=True)
+class CalibConfig:
+    region: str
+    data_dir: Path
+    prevalence_hiv_csv: Path
+    asfr_csv: Path
+    mortality_csv: Path
+    n_agents: int
+    total_pop: int
+    start: int
+    stop: int
+    dt: float
+    init_prev: float
+    trials: int
+    sampler_seed: int
+    keep_db: bool
+
+
+def _resolve_default_paths(region: str, data_dir: Path) -> dict[str, Path]:
+    """Resolve default input file paths for a region."""
+    return {
+        "prevalence_hiv_csv": data_dir / f"{region}_prevalence_hiv.csv",
+        "asfr_csv": data_dir / f"{region}_asfr.csv",
+        "mortality_csv": data_dir / f"{region}_mortality_rates.csv",
+    }
+
+
+def _require_exists(path: Path, label: str) -> Path:
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Missing {label}: {path}. "
+            "Pass an explicit path via CLI or place the expected file under --data-dir."
+        )
+    return path
+
+
+def make_sim(cfg: CalibConfig):
+    """Build and initialize a simulation for HIV calibration."""
+    import pandas as pd
+    import starsim as ss
+    import stisim as sti
+    import mighti as mi
+
+    hiv = sti.HIV(beta_m2f=0.05, beta_m2c=0.025, init_prev=float(cfg.init_prev))
+
+    fertility_rate = {"fertility_rate": pd.read_csv(cfg.asfr_csv)}
     pregnancy = ss.Pregnancy(pars=fertility_rate)
-    death_rates = {'death_rate': pd.read_csv('mighti/data/eswatini_mortality_rates.csv'), 'rate_units': 1}
-    death = ss.Deaths(death_rates)  # Assuming death_rate is a yearly rate
+
+    death_rates = {"death_rate": pd.read_csv(cfg.mortality_csv), "rate_units": 1}
+    death = ss.Deaths(death_rates)
 
     sexual = sti.StructuredSexual()
     maternal = ss.MaternalNet()
 
-    prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer(prevalence_data=pd.read_csv('mighti/data/eswatini_prevalence.csv'), diseases=['HIV'])
+    obs_df = pd.read_csv(cfg.prevalence_hiv_csv)
+    prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(prevalence_data=obs_df, diseases=["HIV"])
 
     sim = ss.Sim(
-        dt=1,
-        n_agents=10_000,
-        total_pop=9_980_999,
-        start=1990,
-        stop= 2023,
+        dt=cfg.dt,
+        n_agents=int(cfg.n_agents),
+        total_pop=int(cfg.total_pop),
+        start=int(cfg.start),
+        stop=int(cfg.stop),
         diseases=hiv,
         networks=[sexual, maternal],
         demographics=[pregnancy, death],
-        analyzers=prevalence_analyzer,
+        analyzers=[prevalence_analyzer],
+        label=f"HIV calibration ({cfg.region})",
     )
 
     sim.init()
-
     return sim
 
 def build_sim(sim, calib_pars):
+    # Local import so `--help` works without Starsim installed/importable
     hiv = sim.diseases.hiv
     nw = sim.networks.structuredsexual
 
@@ -69,18 +121,20 @@ def build_sim(sim, calib_pars):
     return sim
 
 
-def run_calib(calib_pars=None, total_trials=10, keep_db=False):
+def run_calib(cfg: CalibConfig, calib_pars=None):
     """
     Run the calibration simulation with the given parameters.
 
     Args:
         calib_pars (dict): Dictionary of calibration parameters.
-        total_trials (int): Total number of trials for the calibration.
-        keep_db (bool): Whether to keep the database after calibration. If kept it can be used to continue a calibration with more trials
     """
-    sim = make_sim()
+    import optuna
+    import pandas as pd
+    import sciris as sc
+    import starsim as ss
 
-    data = pd.read_csv('mighti/data/eswatini_prevalence.csv')
+    sim = make_sim(cfg)
+    data = pd.read_csv(cfg.prevalence_hiv_csv)
     
     calib = ss.Calibration(
         sim=sim,
@@ -88,12 +142,12 @@ def run_calib(calib_pars=None, total_trials=10, keep_db=False):
         build_fn=build_sim,
         eval_fn=eval_fn,  
         eval_kw={'data': data}, 
-        total_trials=total_trials,
+        total_trials=int(cfg.trials),
         n_workers=1,
-        keep_db=keep_db,
+        keep_db=bool(cfg.keep_db),
         die=True,
         reseed=False,
-        sampler=optuna.samplers.TPESampler(seed=12345) 
+        sampler=optuna.samplers.TPESampler(seed=int(cfg.sampler_seed)),
     )
 
     calib.calibrate()
@@ -107,6 +161,9 @@ def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None
     """
     Custom evaluation function for HIV calibration
     """
+    import pandas as pd
+    import starsim as ss
+    import mighti as mi
     if isinstance(sim, ss.MultiSim):
         sim = sim.sims[0]
 
@@ -141,7 +198,22 @@ def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None
     prev_analyzer = sim.analyzers.get('prevalence_analyzer') if hasattr(sim.analyzers, "get") else getattr(sim.analyzers, "prevalence_analyzer", None)
     prev_results = sim.results.get('prevalence_analyzer') if hasattr(sim, "results") else None
     if prev_analyzer is None or prev_results is None:
-        raise ValueError("PrevalenceAnalyzer results not found on sim; ensure analyzers include mi.PrevalenceAnalyzer with label 'prevalence_analyzer'.")
+        # More robust: search analyzer dict for the prevalence analyzer and use that key for results
+        prev_label = None
+        prev_analyzer = None
+        for label, analyzer in getattr(sim, "analyzers", {}).items():
+            if isinstance(analyzer, mi.analyzers.PrevalenceAnalyzer_HIV):
+                prev_label = label
+                prev_analyzer = analyzer
+                break
+        if prev_label is None or prev_analyzer is None:
+            raise ValueError(
+                "PrevalenceAnalyzer_HIV not found on sim; ensure analyzers include "
+                "mi.analyzers.PrevalenceAnalyzer_HIV()."
+            )
+        prev_results = sim.results.get(prev_label)
+        if prev_results is None:
+            raise ValueError(f"PrevalenceAnalyzer_HIV results not found under key {prev_label!r}.")
 
     for index, (age_low, age_high) in enumerate(prev_analyzer.age_bins):
         prev_observed_data = data[data['Age'] == age_low][['Year', 'Age', hiv_female_col, hiv_male_col]].copy()
@@ -166,10 +238,57 @@ def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None
     return fit / n_obs
 
 
+def _parse_args(argv: list[str] | None = None) -> CalibConfig:
+    parser = argparse.ArgumentParser(description="Calibrate HIV transmission betas against observed prevalence.")
+    parser.add_argument("--region", default="eswatini", help="Region name (used to build default file names).")
+    parser.add_argument("--data-dir", default="mighti/data", help="Directory containing region CSV inputs.")
+    parser.add_argument("--prevalence-hiv-csv", default=None, help="Observed HIV prevalence CSV (Age/Year/HIV_female/HIV_male).")
+    parser.add_argument("--asfr-csv", default=None, help="ASFR CSV for pregnancy module.")
+    parser.add_argument("--mortality-csv", default=None, help="Mortality rates CSV for deaths module.")
+    parser.add_argument("--n-agents", type=int, default=10_000, help="Number of agents.")
+    parser.add_argument("--total-pop", type=int, default=9_980_999, help="Total population scaling (for analyzers).")
+    parser.add_argument("--start", type=int, default=1990, help="Start year.")
+    parser.add_argument("--stop", type=int, default=2023, help="Stop year.")
+    parser.add_argument("--dt", type=float, default=1.0, help="Timestep size (years).")
+    parser.add_argument("--init-prev", type=float, default=0.15, help="Initial HIV prevalence used by the HIV module (not the observed data).")
+    parser.add_argument("--trials", type=int, default=100, help="Total Optuna trials.")
+    parser.add_argument("--sampler-seed", type=int, default=12345, help="Seed for the Optuna sampler.")
+    parser.add_argument("--keep-db", action="store_true", help="Keep calibration DB so you can resume later.")
+    args = parser.parse_args(argv)
+
+    data_dir = Path(args.data_dir).expanduser()
+    defaults = _resolve_default_paths(args.region, data_dir)
+
+    prevalence_hiv_csv = Path(args.prevalence_hiv_csv).expanduser() if args.prevalence_hiv_csv else defaults["prevalence_hiv_csv"]
+    asfr_csv = Path(args.asfr_csv).expanduser() if args.asfr_csv else defaults["asfr_csv"]
+    mortality_csv = Path(args.mortality_csv).expanduser() if args.mortality_csv else defaults["mortality_csv"]
+
+    return CalibConfig(
+        region=str(args.region),
+        data_dir=data_dir,
+        prevalence_hiv_csv=_require_exists(prevalence_hiv_csv, "prevalence-hiv-csv"),
+        asfr_csv=_require_exists(asfr_csv, "asfr-csv"),
+        mortality_csv=_require_exists(mortality_csv, "mortality-csv"),
+        n_agents=int(args.n_agents),
+        total_pop=int(args.total_pop),
+        start=int(args.start),
+        stop=int(args.stop),
+        dt=float(args.dt),
+        init_prev=float(args.init_prev),
+        trials=int(args.trials),
+        sampler_seed=int(args.sampler_seed),
+        keep_db=bool(args.keep_db),
+    )
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
+    import sciris as sc
+
     T = sc.tic()
+
+    cfg = _parse_args()
 
     # Define the calibration parameters. These are parsed in build_sim() as: {hiv/nw}_{parameter_name}
     # where hiv is for STIsim HIV parameters and nw is for StructuredSexual network parameters.
@@ -178,7 +297,7 @@ if __name__ == '__main__':
         hiv_beta_m2c = dict(low=0.0001, high=0.1, guess=0.001), # Network females in risk group 1 concurrent partners
     )
 
-    calib = run_calib(calib_pars=calib_pars, total_trials=100, keep_db=False)
+    calib = run_calib(cfg=cfg, calib_pars=calib_pars)
 
     sc.toc(T)
     print('Done.')

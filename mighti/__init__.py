@@ -8,7 +8,7 @@ Public API policy (v2):
   `import mighti`).
 """
 
-from .version import __version__, __versiondate__, __license__
+from .util.version import __version__, __versiondate__, __license__
 
 # Expose common namespaces (preferred usage: `mi.diseases.Foo`, `mi.analyzers.Bar`)
 from . import diseases  # noqa: F401
@@ -20,9 +20,8 @@ from . import economics  # noqa: F401
 from . import calibration  # noqa: F401
 from . import people_extend  # noqa: F401
 from . import life_expectancy  # noqa: F401
-from . import figpaths  # noqa: F401
-from . import plot_style  # noqa: F401
-from . import init_people_sex  # noqa: F401
+from .util import figpaths  # noqa: F401
+from .util import plot_style  # noqa: F401
 from . import mortality_competing  # noqa: F401
 from . import mortality_additive  # noqa: F401
 from . import stisim_competing  # noqa: F401
@@ -67,7 +66,6 @@ def __getattr__(name: str):
         life_expectancy,
         figpaths,
         plot_style,
-        init_people_sex,
         mortality_competing,
         mortality_additive,
         stisim_competing,
@@ -93,7 +91,6 @@ __all__ = [
     "life_expectancy",
     "figpaths",
     "plot_style",
-    "init_people_sex",
     "mortality_competing",
     "mortality_additive",
     "stisim_competing",
