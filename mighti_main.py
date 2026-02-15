@@ -19,7 +19,6 @@ import mighti as mi
 import prepare_data_for_year
 import starsim as ss
 import stisim as sti
-from mighti.plot_functions import plot_mean_prevalence
 from mighti.util.plot_style import apply_mighti_style
 from mighti.util.rng import seed_everything
 from pathlib import Path
@@ -177,13 +176,6 @@ sdoh_modules = mi.sdoh.NeighbourhoodSituation(csv_path=csv_path_sdoh)
 # ---------------------------------------------------------------------
 disease_objects = []
 
-# --- HIV ---
-# hiv = sti.HIV(
-#     beta_m2f=0.002824808975498053,
-#     beta_m2c=0.0015347394768786338,
-#     init_prev=0.15,
-# )
-
 hiv = sti.HIV(
     beta_m2f=0.03362975603278965,
     beta_m2c=0.008587993382382253,
@@ -245,7 +237,7 @@ hiv_test = sti.HIVTest(
     years=[2003, 2005, 2007, 2010, 2014, 2016, 2050],
 )
 
-art = mi.ARTwithCASM(coverage_data=art_coverage_data)
+art = mi.interventions.ARTwithCASM(coverage_data=art_coverage_data)
 art.casm_sensitivity = "pharma"  # interpreted by CASMAdherenceConnector
 art.rel_effect = 1.0             # baseline; adherence scales this
 
@@ -309,6 +301,9 @@ if __name__ == "__main__":
     prevalence_check_df = pd.read_csv(
         f"mighti/data/{region}_postprocess_check_prevalence.csv"
     )
+
+    from mighti.analysis.plotting import plot_mean_prevalence
+
     plot_mean_prevalence(
         sim,
         prevalence_analyzer,
@@ -318,8 +313,7 @@ if __name__ == "__main__":
         endyear,
     )
 
-    import pandas as pd
-    from mighti.plot_functions import plot_hiv_prevalence_vs_observed
+    from mighti.analysis.plotting import plot_hiv_prevalence_vs_observed
 
     obs = pd.read_csv("mighti/data/eswatini_prevalence_hiv.csv")
 
@@ -332,5 +326,6 @@ if __name__ == "__main__":
         start_year=1990,
         end_year=2023,
     )
-    from mighti.plot_functions import plot_mean_prevalence_plhiv
+
+    from mighti.analysis.plotting import plot_mean_prevalence_plhiv
     plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'COPD')  

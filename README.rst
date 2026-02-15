@@ -136,7 +136,7 @@ Plotting utilities are available, but are intentionally **not** imported into th
 
 .. code-block:: python
 
-    from mighti.plot_functions import plot_mean_prevalence
+    from mighti.analysis.plotting import plot_mean_prevalence
 
 **Backwards compatibility**
 

@@ -13,27 +13,34 @@ from .util.version import __version__, __versiondate__, __license__
 # Expose common namespaces (preferred usage: `mi.diseases.Foo`, `mi.analyzers.Bar`)
 from . import diseases  # noqa: F401
 from . import analyzers  # noqa: F401
+from . import analysis  # noqa: F401
+from . import demography  # noqa: F401
 from . import interventions  # noqa: F401
 from . import interactions  # noqa: F401
 from . import sdoh  # noqa: F401
 from . import economics  # noqa: F401
 from . import calibration  # noqa: F401
-from . import people_extend  # noqa: F401
-from . import life_expectancy  # noqa: F401
+from . import initialization  # noqa: F401
+from . import data  # noqa: F401
+
+# Back-compat module aliases (historical locations at top-level `mighti.*`)
+from .demography import people_extend  # noqa: F401
+from .analysis import life_expectancy  # noqa: F401
+from .demography import mortality_competing  # noqa: F401
+from .demography import mortality_additive  # noqa: F401
+from .demography import stisim_competing  # noqa: F401
+
 from .util import figpaths  # noqa: F401
 from .util import plot_style  # noqa: F401
-from . import mortality_competing  # noqa: F401
-from . import mortality_additive  # noqa: F401
-from . import stisim_competing  # noqa: F401
 
 # Keep a small set of core utilities convenient at top-level
-from .disease_definitions import (  # noqa: F401
+from .initialization.prevalence import (  # noqa: F401
     initialize_prevalence_data,
     age_sex_dependent_prevalence,
 )
 
 # Keep adherence primitives convenient (used broadly)
-from .adherence import (  # noqa: F401
+from .interventions.adherence import (  # noqa: F401
     AdherenceEngine,
     ARTAdherenceDisruptor,
     InterventionAdherenceDisruptor,
@@ -43,7 +50,7 @@ from .adherence import (  # noqa: F401
 )
 
 # NOTE: plotting is intentionally NOT imported here.
-# Use: `from mighti.plot_functions import ...`
+# Use: `from mighti.analysis.plotting import ...` (or `mi.analysis.plotting...`)
 
 def __getattr__(name: str):
     """
@@ -59,9 +66,12 @@ def __getattr__(name: str):
     for mod in (
         diseases,
         analyzers,
+        analysis,
         interventions,
         interactions,
         sdoh,
+        demography,
+        initialization,
         people_extend,
         life_expectancy,
         figpaths,
@@ -82,11 +92,15 @@ __all__ = [
     # namespaces
     "diseases",
     "analyzers",
+    "analysis",
+    "demography",
     "interventions",
     "interactions",
     "sdoh",
     "economics",
     "calibration",
+    "initialization",
+    "data",
     "people_extend",
     "life_expectancy",
     "figpaths",

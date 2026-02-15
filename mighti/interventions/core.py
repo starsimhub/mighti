@@ -12,7 +12,17 @@ from mighti.util.rng import get_rng
 
 logger = logging.getLogger(__name__)
 
-_all_ = ['ART', 'ARTwithCASM', 'ARTNoAutoAdjust', 'ImproveHospitalDischarge', 'GiveHousingToDepressed', 'GiveHousingSupport', 'HousingSupportForAUD']
+__all__ = [
+    "ART",
+    "ARTwithCASM",
+    "ARTNoAutoAdjust",
+    "ImproveHospitalDischarge",
+    "GiveHousingToDepressed",
+    "GiveHousingSupport",
+    "HousingSupportForAUD",
+]
+# Back-compat (older code may have referenced this private name)
+_all_ = __all__
 
 
 class ART(sti.ART):

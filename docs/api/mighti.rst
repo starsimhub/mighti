@@ -23,7 +23,7 @@ mighti.analyzers module
 mighti.disease\_definitions module
 ----------------------------------
 
-.. automodule:: mighti.disease_definitions
+.. automodule:: mighti.initialization.prevalence
    :members:
    :undoc-members:
    :show-inheritance:
@@ -44,34 +44,34 @@ mighti.interventions module
    :undoc-members:
    :show-inheritance:
 
-mighti.life\_expectancy module
-------------------------------
+mighti.analysis.life\_expectancy module
+---------------------------------------
 
-.. automodule:: mighti.life_expectancy
+.. automodule:: mighti.analysis.life_expectancy
    :members:
    :undoc-members:
    :show-inheritance:
 
-mighti.plot\_functions module
------------------------------
+mighti.analysis.plotting module
+-------------------------------
 
-.. automodule:: mighti.plot_functions
+.. automodule:: mighti.analysis.plotting
    :members:
    :undoc-members:
    :show-inheritance:
 
-mighti.prevalence\_analyzer module
-----------------------------------
+mighti.analyzers.analyzer\_prevalence module
+-------------------------------------------
 
-.. automodule:: mighti.prevalence_analyzer
+.. automodule:: mighti.analyzers.analyzer_prevalence
    :members:
    :undoc-members:
    :show-inheritance:
 
-mighti.survivorship\_analyzer module
-------------------------------------
+mighti.analyzers.analyzer\_core module
+-------------------------------------
 
-.. automodule:: mighti.survivorship_analyzer
+.. automodule:: mighti.analyzers.analyzer_core
    :members:
    :undoc-members:
    :show-inheritance:
