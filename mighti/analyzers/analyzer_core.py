@@ -5,9 +5,16 @@ Analyzers for demographic outcomes such as age-specific deaths and survivorship.
 import numpy as np
 import pandas as pd
 import starsim as ss
+from typing import Callable, Dict, Tuple
 
 
-__all__ = ["DeathsByAgeSexAnalyzer", "AgeSexMxAnalyzer", "SurvivorshipAnalyzer", "ConditionAtDeathAnalyzer"]
+__all__ = [
+    "DeathsByAgeSexAnalyzer",
+    "AgeSexMxAnalyzer",
+    "SurvivorshipAnalyzer",
+    "ConditionAtDeathAnalyzer",
+    "CauseOfDeathYLLAnalyzer",
+]
 
 class DeathsByAgeSexAnalyzer(ss.Analyzer):
     """Tracks infant deaths and deaths by age/sex, Starsim-3.0.3 compatible."""
@@ -277,9 +284,47 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
         super().__init__(**kwargs)
         # Store non-HIV conditions only (HIV tracked separately)
         self.conditions = [c.lower() for c in (conditions or []) if c.lower() != "hiv"]
+        # Back-compat: this used to be a single scalar "reference age". It can now
+        # also be a callable(sex, age)->remaining LE, or a tidy DataFrame with
+        # columns ['age','sex','ex'] representing remaining LE e(x).
         self.ex_life_expectancy = ex_life_expectancy
+        self._ex_lookup: Callable[[str, float], float] | None = None
         self.records = []
         self.name = "condition_at_death_analyzer"
+
+    @staticmethod
+    def _make_ex_lookup_from_df(df_ex: pd.DataFrame) -> Callable[[str, float], float]:
+        cols = {c.lower(): c for c in df_ex.columns}
+        for req in ("age", "sex", "ex"):
+            if req not in cols:
+                raise ValueError("ex_life_expectancy DataFrame must include columns: age, sex, ex")
+        d = df_ex.rename(columns={cols["age"]: "age", cols["sex"]: "sex", cols["ex"]: "ex"}).copy()
+        d["age"] = pd.to_numeric(d["age"], errors="coerce").fillna(0).astype(int)
+        d["sex"] = d["sex"].astype(str).str.strip().str.title()
+        d["ex"] = pd.to_numeric(d["ex"], errors="coerce").fillna(0.0).astype(float)
+        max_age = int(d["age"].max()) if len(d) else 0
+        table: Dict[Tuple[str, int], float] = {(r.sex, int(r.age)): float(r.ex) for r in d.itertuples(index=False)}
+
+        def lookup(sex: str, age: float) -> float:
+            s = str(sex).strip().title()
+            a = int(np.floor(float(age)))
+            if a < 0:
+                a = 0
+            if a > max_age:
+                return 0.0
+            return float(table.get((s, a), 0.0))
+
+        return lookup
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        ex = self.ex_life_expectancy
+        if callable(ex):
+            self._ex_lookup = ex  # callable(sex, age)->remaining LE
+        elif isinstance(ex, pd.DataFrame):
+            self._ex_lookup = self._make_ex_lookup_from_df(ex)
+        else:
+            self._ex_lookup = None
 
     def init_results(self):
         """Initialize analyzer results."""
@@ -331,11 +376,16 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
             age = float(ppl.age[uid])
             sex = "Female" if ppl.female[uid] else "Male"
 
-            # Simple YLL estimate (replace later with life-table lookup if needed)
-            le = 75 if sex == "Female" else 70
-            if isinstance(self.ex_life_expectancy, (int, float)):
-                le = float(self.ex_life_expectancy)
-            yll = max(0.0, le - age)
+            # Years of life lost (YLL)
+            # - If `ex_life_expectancy` is callable or a DataFrame: interpret as remaining LE e(x)
+            # - If numeric: interpret as a constant reference age (back-compat)
+            if self._ex_lookup is not None:
+                yll = max(0.0, float(self._ex_lookup(sex, age)))
+            else:
+                ref_age = 75.0 if sex == "Female" else 70.0
+                if isinstance(self.ex_life_expectancy, (int, float)):
+                    ref_age = float(self.ex_life_expectancy)
+                yll = max(0.0, ref_age - age)
 
             rec = dict(uid=int(uid), year=year, age=age, sex=sex, yll=yll)
 
@@ -366,5 +416,83 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
 
     def to_df(self):
         """Return DataFrame of recorded deaths and conditions."""
+        return pd.DataFrame(self.records)
+
+
+class CauseOfDeathYLLAnalyzer(ss.Analyzer):
+    """
+    Record deaths with cause-of-death labels (if available) and YLL against a
+    reference remaining life expectancy table.
+
+    Cause labels
+    ------------
+    If `CompetingRisksDeaths` is used, it writes a per-timestep dict:
+      `sim._mighti_death_cause: {uid -> cause_name}`
+    This analyzer reads from that dict for each newly-dead uid. If absent, the
+    cause is recorded as "unknown".
+
+    Reference life expectancy
+    -------------------------
+    `reference_ex` may be:
+    - callable(sex, age)->remaining LE e(x)
+    - tidy DataFrame with columns ['age','sex','ex'] representing e(x)
+    """
+
+    def __init__(self, reference_ex, *, max_age: int = 100, **kwargs):
+        super().__init__(**kwargs)
+        self.name = "cause_of_death_yll_analyzer"
+        self.max_age = int(max_age)
+        self.reference_ex = reference_ex
+        self._ex_lookup: Callable[[str, float], float] | None = None
+        self._dead_prev = None
+        self.records = []
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        self._dead_prev = np.zeros(len(sim.people), dtype=bool)
+        ex = self.reference_ex
+        if callable(ex):
+            self._ex_lookup = ex
+        elif isinstance(ex, pd.DataFrame):
+            self._ex_lookup = ConditionAtDeathAnalyzer._make_ex_lookup_from_df(ex)
+        else:
+            raise ValueError("reference_ex must be a callable or a DataFrame with columns: age, sex, ex")
+
+    def _ensure_size(self):
+        n_now = len(self.sim.people)
+        if self._dead_prev is None:
+            self._dead_prev = np.zeros(n_now, dtype=bool)
+        elif self._dead_prev.size != n_now:
+            new = np.zeros(n_now, dtype=bool)
+            n_copy = min(self._dead_prev.size, n_now)
+            new[:n_copy] = self._dead_prev[:n_copy]
+            self._dead_prev = new
+
+    def step(self):
+        ppl = self.sim.people
+        ti = self.sim.ti
+        year = float(self.sim.t.yearvec[ti])
+        self._ensure_size()
+
+        dead_now = np.asarray(ppl.dead, dtype=bool)
+        new_deaths = np.where(dead_now & ~self._dead_prev)[0]
+        if len(new_deaths) == 0:
+            self._dead_prev = dead_now.copy()
+            return
+
+        cause_map = getattr(self.sim, "_mighti_death_cause", {}) or {}
+
+        for uid in new_deaths:
+            age = float(ppl.age[uid])
+            sex = "Female" if ppl.female[uid] else "Male"
+            yll = max(0.0, float(self._ex_lookup(sex, age))) if self._ex_lookup is not None else 0.0
+            cause = str(cause_map.get(int(uid), "unknown"))
+            self.records.append(
+                dict(uid=int(uid), year=year, age=age, sex=sex, cause=cause, yll=yll)
+            )
+
+        self._dead_prev = dead_now.copy()
+
+    def to_df(self) -> pd.DataFrame:
         return pd.DataFrame(self.records)
     

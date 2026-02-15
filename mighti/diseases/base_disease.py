@@ -8,7 +8,7 @@ import pandas as pd
 import starsim as ss
 from scipy.stats import lognorm
 
-from mighti.rng import get_rng
+from mighti.util.rng import get_rng
 
 
 __all__ = ['RemittingDisease', 'AcuteDisease', 'AcuteSurgicalDisease', 'ChronicDisease',
@@ -141,7 +141,8 @@ class RemittingDisease(_CompetingMortalityMixin, ss.NCD):
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
             p_acquire=disease_params["p_acquire"],
-            init_prev=None
+            # Avoid changing distribution types by setting None (Starsim restriction).
+            init_prev=ss.bernoulli(0.0),
         )
         
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -318,7 +319,8 @@ class AcuteDisease(_CompetingMortalityMixin, ss.NCD):
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
             p_acquire=disease_params["p_acquire"],
-            init_prev=None,
+            # Avoid Starsim "update dist to NoneType" errors.
+            init_prev=ss.bernoulli(0.0),
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -483,7 +485,7 @@ class AcuteSurgicalDisease(_CompetingMortalityMixin, ss.NCD):
             rel_mortality_treated=disease_params.get("rel_mortality_treated", 0.5),
             rel_mortality_untreated=disease_params.get("rel_mortality_untreated", 2.0),
             cost_surgery=disease_params.get("cost_surgery", 0.0),
-            init_prev=None,
+            init_prev=ss.bernoulli(0.0),
         )
 
         self.p_acquire = ss.bernoulli(
@@ -637,7 +639,7 @@ class ChronicDisease(_CompetingMortalityMixin, ss.NCD):
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
             p_acquire=disease_params["p_acquire"],
-            init_prev=None,
+            init_prev=ss.bernoulli(0.0),
         )
 
         self.p_acquire = ss.bernoulli(p=lambda self, sim, uids: calculate_p_acquire_generic(self, sim, uids))
@@ -796,12 +798,54 @@ class GenericSIS(_CompetingMortalityMixin, ss.SIS):
             ss.BoolState('infected'),
             ss.BoolState('on_treatment'),
             ss.FloatArr('ti_infected'),
+            # Starsim's SIS implementation expects `ti_recovered` for recovery timing/state updates.
+            # We keep `ti_reversed` for backward-compatibility with older MIGHTI codepaths.
+            ss.FloatArr('ti_recovered'),
             ss.FloatArr('ti_reversed'),
             ss.FloatArr('ti_dead'),
             ss.FloatArr('rel_sus', default=1.0),
             ss.FloatArr('rel_death', default=1.0),
             reset=True,
         )
+
+    def step_state(self):
+        """
+        Handle remission/recovery transitions (I → S).
+
+        Notes
+        -----
+        Starsim's built-in `ss.SIS.step_state()` relies on `ti_recovered` being defined and
+        scheduled. MIGHTI historically modeled remission as a per-timestep probability
+        (`remission_rate`), so we implement recovery directly here for robustness across
+        Starsim versions.
+        """
+        ti = self.ti
+        infected_uids = self.infected.uids
+        if not len(infected_uids):
+            return
+
+        if hasattr(self, "p_remission"):
+            rec = infected_uids[self.p_remission.filter(infected_uids)]
+        else:
+            # Fallback: treat remission_rate as per-timestep probability
+            p = float(getattr(self.pars, "remission_rate", 0.0) or 0.0)
+            if p <= 0.0:
+                return
+            rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step_state")
+            rec = infected_uids[rng.random(len(infected_uids)) < p]
+
+        if not len(rec):
+            return
+
+        self.infected[rec] = False
+        self.susceptible[rec] = True
+        self.at_risk[rec] = True
+
+        # Track recovery time for analyzers and for any downstream code expecting it
+        if hasattr(self, "ti_recovered"):
+            self.ti_recovered[rec] = ti
+        if hasattr(self, "ti_reversed"):
+            self.ti_reversed[rec] = ti
 
     def init_post(self):
         """
@@ -810,6 +854,10 @@ class GenericSIS(_CompetingMortalityMixin, ss.SIS):
         We intentionally do NOT call Starsim's `Infection.init_post()` here because it uses
         `init_prev.filter()` without passing uids, which is fragile for callable p(uids).
         """
+        # Still call the base Module hook to initialize state arrays and satisfy Starsim's
+        # required-method checker.
+        ss.Module.init_post(self)
+
         sim = self.sim
 
         init_prev = getattr(self.pars, "init_prev", None)
@@ -818,9 +866,17 @@ class GenericSIS(_CompetingMortalityMixin, ss.SIS):
 
         # Prefer Starsim distribution semantics: filter(uids) returns infected uids
         if callable(getattr(init_prev, "filter", None)):
-            initial_uids = init_prev.filter(sim.people.uid)
+            try:
+                initial_uids = init_prev.filter(sim.people.uid)
+            except TypeError:
+                # Fallback for Starsim distributions that take no args
+                initial_uids = init_prev.filter()
             if len(initial_uids):
                 self.set_prognoses(initial_uids, sources=-1)
+            try:
+                self.pars._n_initial_cases = len(initial_uids)
+            except Exception:
+                pass
         return
 
     def set_prognoses(self, uids, sources=None, **kwargs):  # noqa: ARG002
@@ -854,7 +910,7 @@ class GenericSIS(_CompetingMortalityMixin, ss.SIS):
 
     def step(self):
         ti = self.ti
-        susceptible = self.at_risk.uids
+        susceptible = self.at_risk.uids & self.susceptible.uids
         p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
 
         if self.pars.affected_sex == "female":
@@ -873,6 +929,7 @@ class GenericSIS(_CompetingMortalityMixin, ss.SIS):
         rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
         new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
         self.infected[new_cases] = True
+        self.susceptible[new_cases] = False
         self.at_risk[new_cases] = False
         self.ti_infected[new_cases] = ti
 
@@ -970,6 +1027,10 @@ class GenericSIR(_CompetingMortalityMixin, ss.SIR):
 
         Do not call Starsim's base init_post; see GenericSIS.init_post rationale.
         """
+        # Still call the base Module hook to initialize state arrays and satisfy Starsim's
+        # required-method checker.
+        ss.Module.init_post(self)
+
         sim = self.sim
 
         init_prev = getattr(self.pars, "init_prev", None)
@@ -977,9 +1038,16 @@ class GenericSIR(_CompetingMortalityMixin, ss.SIR):
             return
 
         if callable(getattr(init_prev, "filter", None)):
-            initial_uids = init_prev.filter(sim.people.uid)
+            try:
+                initial_uids = init_prev.filter(sim.people.uid)
+            except TypeError:
+                initial_uids = init_prev.filter()
             if len(initial_uids):
                 self.set_prognoses(initial_uids, sources=-1)
+            try:
+                self.pars._n_initial_cases = len(initial_uids)
+            except Exception:
+                pass
         return
 
     def set_prognoses(self, uids, sources=None, **kwargs):  # noqa: ARG002

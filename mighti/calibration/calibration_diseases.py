@@ -1,16 +1,9 @@
-# """
-# NOTICE; THIS DOES NOT WORK WITH STARSIM==2.3.1, starsim==2.2.0, stisim==1.0.1, numpy==2.2.6
-# Calibrate disease acquisition parameter (p_acquire) for a specified condition
-# using MIGHTI and prevalence data. Outputs best-fit parameter and comparison
-# of observed vs. simulated prevalence by age and sex.
-# """
 """
-NOTICE; THIS DOES NOT WORK WITH STARSIM==2.3.1, starsim==2.2.0, stisim==1.0.1, numpy==2.2.6
-Calibrate disease acquisition parameter (p_acquire) for a specified condition
-using MIGHTI and prevalence data. Outputs best-fit parameter and comparison
-of observed vs. simulated prevalence by age and sex.
+Calibrate disease acquisition (p_acquire_multiplier) for specified conditions using
+MIGHTI prevalence data. Uses disease classes from diseases_for_calibration (p_acquire=1
+so the calibrated parameter is p_acquire_multiplier). Outputs best-fit parameter and
+writes results to calibration_results_<Condition>.txt and calibrated_p_acquire.csv.
 """
-
 
 import os
 from pathlib import Path
@@ -26,217 +19,184 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 # Config
-region = 'eswatini'
-init_year = 1990
+region = "eswatini"
+init_year = 2007
 end_year = 2023
 total_trials = 100  # Set higher for production runs
 
-# Resolve package-relative data paths (no hard-coded local paths)
 BASE_MIGHTI_DIR = Path(__file__).resolve().parents[1]  # .../mighti/
 DATA_DIR = BASE_MIGHTI_DIR / "data"
 
 # Paths
 path_prevalence = str(DATA_DIR / f"{region}_prevalence.csv")
 path_parameters = str(DATA_DIR / f"{region}_parameters.csv")
+path_fertility = str(DATA_DIR / f"{region}_asfr.csv")
+path_mortality = str(DATA_DIR / f"{region}_mortality_rates.csv")
+
 date_str = datetime.now().strftime("%Y%m%d")
-results_dir = Path("outputs") / f"calibration_{region}_{date_str}"
+# Results under package dir so path works from repo root or from mighti/calibration/
+results_dir = BASE_MIGHTI_DIR / "calibration" / "results" / f"calibration_{region}_{date_str}"
 results_dir.mkdir(parents=True, exist_ok=True)
 
-# Load prevalence and parameter data
+# Load prevalence once for eval
 prev_df = pd.read_csv(path_prevalence)
 param_df = pd.read_csv(path_parameters)
+
 # conditions = param_df['condition'].unique().tolist()
+# Conditions to calibrate (or use param_df['condition'].unique().tolist())
+conditions = ["InterpersonalViolence"]
 
-conditions = ['CardiovascularDiseases']
-# conditions = ['LungCancer', 'ProstateCancer',
-#               'AlcoholUseDisorder', 'RoadInjuries', 'ChronicLiverDisease',
-#               'Asthma']
 
-# Try importing condition class dynamically
 def try_get_condition_class(name):
+    """Get disease class from diseases_for_calibration (p_acquire=1, calibrate p_acquire_multiplier)."""
     try:
         module = import_module("mighti.calibration.diseases_for_calibration")
         return getattr(module, name)
     except AttributeError:
-        logger.warning("Skipping %s: not implemented in diseases_for_calibration.py", name)
+        logger.warning("Skipping %s: not in diseases_for_calibration", name)
         return None
+
 
 def make_sim(disease_name, DiseaseClass):
     """
-    Lightweight MIGHTI calibration sim — updated for StarSim 3.x
-    Mirrors MIGHTI main structure but keeps the compact format.
+    Build a sim for calibrating one disease: HIV + single condition from
+    diseases_for_calibration. dt=1 (annual), p_acquire=1 in disease so we fit p_acquire_multiplier.
     """
-
-    # --- Prevalence setup ---
-    diseases = ["HIV"] + conditions
-    prevalence_data_df = pd.read_csv(f"mighti/data/{region}_prevalence.csv")
+    diseases = ["HIV", disease_name]
+    prevalence_data_df = pd.read_csv(path_prevalence)
     prevalence_data, age_bins = mi.initialize_prevalence_data(
-        diseases=diseases, prevalence_data=prevalence_data_df, inityear=init_year
+        diseases=diseases,
+        prevalence_data=prevalence_data_df,
+        inityear=init_year,
     )
 
-    def get_prevalence_function(disease):
+    def get_prevalence_function(d):
         def prevalence_func(sim, uids, size=None):
             return mi.age_sex_dependent_prevalence(
-                disease=disease, prevalence_data=prevalence_data,
-                age_bins=age_bins, sim=sim, uids=uids,
+                disease=d,
+                prevalence_data=prevalence_data,
+                age_bins=age_bins,
+                sim=sim,
+                uids=uids,
+                size=size,
             )
         return prevalence_func
 
-    # -----------------------------------------------------------------
-    # Basic configuration
-    # -----------------------------------------------------------------
-    disease_objects = []
-
-    hiv = sti.HIV()  
-
-    # Assign prevalence
-    prev_func = get_prevalence_function('HIV')
+    # HIV
+    hiv = sti.HIV()
     hiv.pars.init_prev = ss.bernoulli(
-        p=lambda sim, uids, size=None: prev_func(sim, uids, size)
+        p=lambda sim, uids, size=None: get_prevalence_function("HIV")(sim, uids, size)
     )
-
-    # Transmission parameters
     hiv.pars.beta = {
-        'structuredsexual': [0.029594299274445842, 0.029594299274445842],
-        'maternal': [0.0011249414706988527, 0.0011249414706988527],
+        "structuredsexual": [0.029594299274445842, 0.029594299274445842],
+        "maternal": [0.0011249414706988527, 0.0011249414706988527],
     }
     hiv.pars.include_aids_deaths = True
     hiv.pars.p_hiv_death = ss.bernoulli(p=0.00015)
     hiv.pars.include_care = True
     hiv.pars.art_efficacy = 0.9
 
-    disease_objects.append(hiv)
+    # Disease under calibration — from diseases_for_calibration (p_acquire=1)
+    init_prev = ss.bernoulli(p=get_prevalence_function(disease_name))
+    health_condition = DiseaseClass(csv_path=path_parameters, pars={"init_prev": init_prev})
 
-    # -----------------------------------------------------------------
-    # Disease under calibration
-    # -----------------------------------------------------------------
-    def make_init_prev_func(disease):
-        prev_func = get_prevalence_function(disease)
-        return lambda sim, uids, size=None: prev_func(sim, uids, size)
-
-    for disease in conditions:
-        disease_class = getattr(mi, disease, None)
-        if disease_class:
-            init_prev = ss.bernoulli(p=make_init_prev_func(disease))
-            disease_obj = disease_class(csv_path=path_parameters, pars={"init_prev": init_prev})
-            disease_objects.append(disease_obj)
-
-    # -----------------------------------------------------------------
     # Demographics
-    # -----------------------------------------------------------------
-    death_rates = {"death_rate": pd.read_csv(f"mighti/data/{region}_mortality_rates.csv"), "rate_units": 1}
+    death_rates = {"death_rate": pd.read_csv(path_mortality), "rate_units": 1}
     death = ss.Deaths(pars=death_rates)
-
-    fertility_rate = {"fertility_rate": pd.read_csv(f"mighti/data/{region}_asfr.csv")}
+    fertility_rate = {"fertility_rate": pd.read_csv(path_fertility)}
     pregnancy = ss.Pregnancy(pars=fertility_rate)
+    networks = [ss.MaternalNet(), sti.StructuredSexual()]
 
-    maternal = ss.MaternalNet()
-    structuredsexual = sti.StructuredSexual()
-    networks = [maternal, structuredsexual]
-
-    # -----------------------------------------------------------------
-    # Analyzer
-    # -----------------------------------------------------------------
-    prevalence_analyzer = mi.PrevalenceAnalyzer(
-        prevalence_data=prevalence_data, diseases=diseases
+    # Prevalence analyzer (HIV-stratified to match calibration_original)
+    prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(
+        prevalence_data=prevalence_data,
+        diseases=diseases,
     )
 
-    # -----------------------------------------------------------------
-    # Build simulation
-    # -----------------------------------------------------------------
     sim = ss.Sim(
         dt=1,
         n_agents=10_000,
         total_pop=9_980_999,
         start=init_year,
         stop=end_year,
-        diseases=disease_objects,
+        diseases=[hiv, health_condition],
         networks=networks,
         demographics=[pregnancy, death],
         analyzers=[prevalence_analyzer],
         copy_inputs=False,
         label=f"Calibration - {disease_name}",
     )
-
     sim.init()
     return sim
 
 
-# Build function
-def build_sim(sim, calib_pars):
-    hc = sim.diseases[disease_name.lower()]
-    for k, pars in calib_pars.items():
-        if k == 'rand_seed':
-            sim.pars.rand_seed = pars
-            continue
-        v = pars['value']
-        if 'hc_' in k:
-            k = k.replace('hc_', '')
-            hc.pars[k] = v
-    return sim
-
-
-def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None):
-    if isinstance(sim, ss.MultiSim):
-        sim = sim.sims[0]
-    fit = 0
-
-    # Find prevalence analyzer dynamically
-    for label, analyzer in sim.analyzers.items():
-        if isinstance(analyzer, mi.PrevalenceAnalyzer):
-            prev_analyzer = analyzer
-            prev_results = sim.results[label]
-            break
-    else:
-        raise KeyError("No PrevalenceAnalyzer found in sim.analyzers")
-
-    key_base = disease_name.lower()     
-    disease = sim.diseases[key_base]
-    sex = disease.pars.affected_sex.lower()
-
-    for index, (age_low, age_high) in enumerate(prev_analyzer.age_bins):
-        obs = data[data['Age'] == age_low][['Year', 'Age']]
-        sim_df = pd.DataFrame({'Year': prev_analyzer.timevec, 'Age': age_low})
-
-        if sex in ['female', 'both']:
-            obs[f'{disease_name}_female'] = data[data['Age'] == age_low][f'{disease_name}_female'].values
-            sim_df['sim_female'] = prev_results[f'{key_base}_prev_female_{index}']   # changed
-            sim_df['error_f'] = abs(sim_df['sim_female'] - obs[f'{disease_name}_female'])
-
-        if sex in ['male', 'both']:
-            obs[f'{disease_name}_male'] = data[data['Age'] == age_low][f'{disease_name}_male'].values
-            sim_df['sim_male'] = prev_results[f'{key_base}_prev_male_{index}']       # changed
-            sim_df['error_m'] = abs(sim_df['sim_male'] - obs[f'{disease_name}_male'])
-       
-        # Merge and sum
-        obs["Year"] = pd.to_datetime(obs["Year"], errors="coerce").dt.year.astype("Int64")
-        sim_df["Year"] = pd.to_datetime(sim_df["Year"], errors="coerce").dt.year.astype("Int64")
-        merged = pd.merge(obs, sim_df, on=['Year', 'Age'], how='inner')
- 
-        if 'error_f' in merged:
-            fit += merged['error_f'].sum()
-        if 'error_m' in merged:
-            fit += merged['error_m'].sum()
-
-    return fit
-
-
-# Calibration runner
 def run_calibration(disease_name, DiseaseClass):
-    sim = make_sim(disease_name, DiseaseClass)
+    """
+    Run calibration for one disease. Uses closures so build_sim and eval_fn
+    see the correct disease_name (avoids wrong value when looping over conditions).
+    """
+    orig_disease_name = disease_name
 
-    calib_pars = dict(
-        hc_p_acquire_multiplier=dict(low=0.0001, high=0.10, guess=0.01),
-    )
+    def build_sim_local(sim, calib_pars):
+        if isinstance(sim, ss.MultiSim):
+            sim = sim.sims[0]
+        hc = sim.diseases[orig_disease_name.lower()]
+        for k, pars in calib_pars.items():
+            if k == "rand_seed":
+                sim.pars.rand_seed = pars
+                continue
+            v = pars["value"]
+            if "hc_" in k:
+                hc.pars[k.replace("hc_", "")] = v
+        return sim
 
+    def eval_fn_local(sim, data=None, **kwargs):
+        if isinstance(sim, ss.MultiSim):
+            sim = sim.sims[0]
+        fit = 0.0
+        prev_analyzer = None
+        prev_label = None
+        for label, analyzer in sim.analyzers.items():
+            if isinstance(analyzer, (mi.analyzers.PrevalenceAnalyzer, mi.analyzers.PrevalenceAnalyzer_HIV)):
+                prev_analyzer = analyzer
+                prev_label = label
+                break
+        if prev_analyzer is None or prev_label is None:
+            raise KeyError("No PrevalenceAnalyzer in sim.analyzers")
+        prev_results = sim.results[prev_label]
+        key_base = orig_disease_name.lower()
+
+        for index, (age_low, _) in enumerate(prev_analyzer.age_bins):
+            obs = data[data['Age'] == age_low][['Year', 'Age', f'{disease_name}_female', f'{disease_name}_male']].copy()
+
+            # Ensure obs Year is int
+            obs['Year'] = obs['Year'].astype(int)
+
+            # Convert timevec (datetime) -> int year
+            year_sim = pd.to_datetime(prev_analyzer.timevec).year
+
+            sim_df = pd.DataFrame({
+                'Year': year_sim.astype(int),
+                'Age': age_low,
+                'sim_female': prev_results[f'{disease_name.lower()}_prev_female_{index}'],
+                'sim_male': prev_results[f'{disease_name.lower()}_prev_male_{index}']
+            })
+            merged = pd.merge(obs, sim_df, on=['Year', 'Age'], how='inner')
+            if merged.empty:
+                continue
+            fit += (merged["sim_female"] - merged[f"{orig_disease_name}_female"]).abs().sum()
+            fit += (merged["sim_male"] - merged[f"{orig_disease_name}_male"]).abs().sum()
+        return float(fit)
+
+    sim = make_sim(orig_disease_name, DiseaseClass)
+    calib_pars = {"hc_p_acquire_multiplier": dict(low=0.0001, high=0.10, guess=0.011)}
     calib = ss.Calibration(
         sim=sim,
         calib_pars=calib_pars,
-        build_fn=build_sim,
-        eval_fn=eval_fn,
-        eval_kw={'data': prev_df},
+        build_fn=build_sim_local,
+        eval_fn=eval_fn_local,
+        eval_kw={"data": prev_df},
         total_trials=total_trials,
         n_workers=1,
         keep_db=False,
@@ -246,40 +206,28 @@ def run_calibration(disease_name, DiseaseClass):
     )
     calib.calibrate()
     calib.check_fit()
-
-    sc.saveobj(f'{results_dir}/calib_{disease_name}_{sc.getdate()}.obj', calib)
-
-    with open(f'{results_dir}/calibration_results_{disease_name}.txt', 'w') as f:
-        f.write('Best parameters:\n')
+    sc.saveobj(results_dir / f"calib_{orig_disease_name}_{sc.getdate()}.obj", calib)
+    with open(results_dir / f"calibration_results_{orig_disease_name}.txt", "w") as f:
+        f.write("Best parameters:\n")
         for k, v in calib.best_pars.items():
-            f.write(f'{k}: {v}\n')
-
-    logger.info(
-        "Done: %s → best p_acquire = %0.4f",
-        disease_name,
-        float(calib.best_pars["hc_p_acquire_multiplier"]),
-    )
-    
-    # Save to a single CSV file with all calibrated p_acquire values
-    output_csv = f'{results_dir}/calibrated_p_acquire.csv'
-    row = {'condition': disease_name, 'p_acquire': calib.best_pars['hc_p_acquire_multiplier']}
-    row_df = pd.DataFrame([row])
-    
-    if not os.path.exists(output_csv):
+            f.write(f"{k}: {v}\n")
+    logger.info("Done: %s → best p_acquire_multiplier = %0.6f", orig_disease_name, float(calib.best_pars["hc_p_acquire_multiplier"]))
+    output_csv = results_dir / "calibrated_p_acquire.csv"
+    row_df = pd.DataFrame([{"condition": orig_disease_name, "p_acquire": calib.best_pars["hc_p_acquire_multiplier"]}])
+    if not output_csv.exists():
         row_df.to_csv(output_csv, index=False)
     else:
-        row_df.to_csv(output_csv, mode='a', header=False, index=False)
-    
+        row_df.to_csv(output_csv, mode="a", header=False, index=False)
     return calib
 
 
-# Main loop
-if __name__ == '__main__':
+# Main
+if __name__ == "__main__":
     for disease_name in conditions:
         DiseaseClass = try_get_condition_class(disease_name)
-        if DiseaseClass is not None:
-            try:
-                run_calibration(disease_name, DiseaseClass)
-            except Exception as e:
-                logger.exception("Error calibrating %s: %s", disease_name, e)
-
+        if DiseaseClass is None:
+            continue
+        try:
+            run_calibration(disease_name, DiseaseClass)
+        except Exception as e:
+            logger.exception("Error calibrating %s: %s", disease_name, e)

@@ -1,16 +1,22 @@
 import os
 import logging
 
-import mighti  # ensures we know the installed package path
-
 
 logger = logging.getLogger(__name__)
 
+# Project root (repo root)
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 
 # -------------------------------------------------------------------------
-# Define base path for data output — always points to active MIGHTI install
+# Define base path for data output
+#
+# IMPORTANT: We intentionally do NOT import `mighti` here.
+# Importing `mighti` pulls in `starsim` which may trigger heavy numba/matplotlib
+# initialization and can fail in some environments. Instead, we write outputs
+# to the repo-local `mighti/data/` folder.
 # -------------------------------------------------------------------------
-MIGHTI_BASE = os.path.dirname(mighti.__file__)
+MIGHTI_BASE = os.path.join(PROJECT_ROOT, "mighti")
 DATA_DIR = os.path.join(MIGHTI_BASE, "data")
 
 
@@ -26,7 +32,6 @@ def data_path(filename: str) -> str:
     return os.path.join(DATA_DIR, filename)
 
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 RAW_DATA_DIR = os.path.join(PROJECT_ROOT, "raw_data")
 WPP_DATA = os.path.join(PROJECT_ROOT, "raw_data", "wpp_data")
 
@@ -88,5 +93,18 @@ cause_map = {
     "Diarrheal disease": "DiarrhealDisease",
     "Esophageal cancer": "EsophagealCancer",
     "Protein-energy malnutrition": "ProteinEnergyMalnutrition",
+
+    # -------------------------------------------------------------
+    # Additions for Eswatini COD + prevalence alignment (2026-02)
+    # -------------------------------------------------------------
+    "Tuberculosis": "Tuberculosis",
+    "Lower respiratory infections": "LowerRespiratoryInfections",
+    "COVID-19": "COVID19",
+    "Maternal hemorrhage": "MaternalConditions",
+    "Maternal sepsis and other maternal infections": "MaternalConditions",
+    "Maternal hypertensive disorders": "MaternalConditions",
+    "Maternal obstructed labor and uterine rupture": "MaternalConditions",
+    "Maternal abortion and miscarriage": "MaternalConditions",
+    "Maternal disorders": "MaternalConditions",
 }
 
