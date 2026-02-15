@@ -10,16 +10,19 @@ import starsim as ss
 import stisim as sti
 
 import mighti as mi
+from pathlib import Path
 
 
 def test_hpv_increases_hiv_rel_sus():
     n_agents = 500
+    thisdir = Path(__file__).resolve().parent
+    param_path = str(thisdir / "test_data" / "eswatini_parameters.csv")
 
     # HIV needs a sexual network module available; we don't run transmission here,
     # but include the network for safe initialization.
     hiv = sti.HIV(init_prev=0.0, beta={"structuredsexual": [0.0, 0.0]})
     hpv = mi.diseases.HPV(
-        csv_path="mighti/data/eswatini_parameters.csv",
+        csv_path=param_path,
         pars={"init_prev": ss.bernoulli(p=0.5)},
     )
 

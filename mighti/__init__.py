@@ -21,7 +21,6 @@ from . import sdoh  # noqa: F401
 from . import economics  # noqa: F401
 from . import calibration  # noqa: F401
 from . import initialization  # noqa: F401
-from . import data  # noqa: F401
 
 # Back-compat module aliases (historical locations at top-level `mighti.*`)
 from .demography import people_extend  # noqa: F401
@@ -100,7 +99,6 @@ __all__ = [
     "economics",
     "calibration",
     "initialization",
-    "data",
     "people_extend",
     "life_expectancy",
     "figpaths",

@@ -1,4 +1,6 @@
-﻿condition,p_death,dur_condition,rel_sus,remission_rate,max_disease_duration,disease_type,disease_class,affected_sex
+condition,p_death,dur_condition,rel_sus,remission_rate,max_disease_duration,disease_type,disease_class,affected_sex
 HIV,,,,,,chronic,,
 Type2Diabetes,0.0005653,13.50683346,1.95,0.024,30,remitting,ncd,both
 AlcoholUseDisorder,0.0000111,2.891861943,2.47,,,remitting,ncd,both
+MajorDepressiveDisorder,0.0000100,1.0,1.0,0.10,10,remitting,ncd,both
+HPV,0.0001000,1.0,1.0,0.00,10,infectious,sis,both
