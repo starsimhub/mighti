@@ -11,7 +11,7 @@ Requirements
 ------------
 
 - Python 3.9–3.13 (CI runs on Python 3.12)
-- NumPy >= 2.0 (required by STIsim 1.4.0+; older NumPy will crash with ``argsort(..., stable=True)``)
+- NumPy >= 2.0 (required by STIsim 1.4.0+; older NumPy may crash on ``argsort(..., stable=True)``)
 - Starsim 3.0.x (tested with ``starsim==3.0.3``)
 - STIsim 1.4.0 (tested with ``STIsim==1.4.0``)
 
@@ -40,24 +40,6 @@ is too old. Fix with:
 
     pip install -U "numpy>=2.0.0"
 
-If you see an error during import that mentions Numba caching (e.g.,
-``RuntimeError: cannot cache function ... no locator available``), this is an
-environment issue (commonly on very new Python versions). A quick workaround is
-to disable JIT:
-
-.. code-block:: bash
-
-    export NUMBA_DISABLE_JIT=1
-
-
-Mortality modeling modes (important for LE work)
-------------
-
-MIGHTI supports two mortality patterns:
-
-- **All-cause capped competing risks** (`mighti.mortality_competing.CompetingRisksDeaths`): matches observed all-cause \(m(x)\) and attributes deaths to modeled vs residual without double counting.
-- **Additive hazards (background + modeled)** (`mighti.mortality_additive.AdditiveHazardDeaths`): all-cause hazard is the sum of background + modeled hazards; supports calibration of background mortality and scenario forecasting where removing modeled causes can increase life expectancy.
-
 
 Running an Example
 ------------
@@ -68,10 +50,6 @@ Running an Example
 
 This will run a sample simulation that includes demography, HIV, and NCD modules.
 The example script saves a quick-check plot into the ``outputs/`` folder.
-
-You can also run:
-	•	mighti_demography.py — mortality and life expectancy module
-	•	mighti_calibration.py — Optuna-based parameter calibration
 
 
 Usage and Documentation
@@ -136,7 +114,7 @@ Plotting utilities are available, but are intentionally **not** imported into th
 
 .. code-block:: python
 
-    from mighti.analysis.plotting import plot_mean_prevalence
+    from mighti.plot_functions import plot_mean_prevalence
 
 **Backwards compatibility**
 
@@ -148,14 +126,6 @@ Some older code may still work with `mi.SomeClass` due to a temporary compatibil
 - Service-use analyzers in `mighti.analyzers.analyzer_serviceuse` (currently stubs)
 - Scripts in the repo root (e.g., `mighti_main.py`) are examples/drivers, not API contracts
 
-
-References
-------------
-
-MIGHTI uses data from:
-	•	Demography: UN WPP 2024
-	•	NCDs: Global Burden of Disease (GBD)
-	•	HIV: DHS, SHIMS
 
 
 Contributing
