@@ -37,6 +37,8 @@ class CalibConfig:
     trials: int
     sampler_seed: int
     keep_db: bool
+    obs_units: str
+    use_stisim_calibration: bool
 
 
 def _resolve_default_paths(region: str, data_dir: Path) -> dict[str, Path]:
@@ -75,8 +77,13 @@ def make_sim(cfg: CalibConfig):
     sexual = sti.StructuredSexual()
     maternal = ss.MaternalNet()
 
+    # Analyzer drives the results we calibrate to
     obs_df = pd.read_csv(cfg.prevalence_hiv_csv)
-    prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(prevalence_data=obs_df, diseases=["HIV"])
+    prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(
+        prevalence_data=obs_df,
+        diseases=["HIV"],
+        label="prevalence_analyzer",  # stable key in sim.results / sim.analyzers
+    )
 
     sim = ss.Sim(
         dt=cfg.dt,
@@ -92,6 +99,21 @@ def make_sim(cfg: CalibConfig):
     )
 
     sim.init()
+
+    # Compatibility aliases for STIsim calibration's dot-path result extraction.
+    # Some workflows/dataframes may use prefixes like "prevalence.*" or
+    # "prevalence_analyzer.*" even though our analyzer key is
+    # "prevalence_analyzer_hiv".
+    try:
+        if hasattr(sim, "results") and "prevalence_analyzer_hiv" in sim.results:
+            base = sim.results["prevalence_analyzer_hiv"]
+            if "prevalence" not in sim.results:
+                sim.results["prevalence"] = base
+            if "prevalence_analyzer" not in sim.results:
+                sim.results["prevalence_analyzer"] = base
+    except Exception:
+        pass
+
     return sim
 
 def build_sim(sim, calib_pars):
@@ -121,6 +143,102 @@ def build_sim(sim, calib_pars):
     return sim
 
 
+def _infer_obs_scale(obs_df, *, units: str) -> float:
+    """
+    Return a multiplier to convert observed HIV prevalence into model units (fractions 0-1).
+
+    Notes on units
+    --------------
+    - If your observed values are in 0–1 (e.g. 0.52 meaning 52%), use `fraction`.
+    - If your observed values are in 0–100 (e.g. 52 meaning 52%), use `percent`.
+    - `auto` assumes:
+        * max > 1  => percent
+        * max <= 1 => fraction
+    """
+    units = str(units).strip().lower()
+    if units not in {"auto", "fraction", "percent"}:
+        raise ValueError(f"Invalid obs units {units!r}; use auto|fraction|percent")
+
+    import pandas as pd
+
+    vals = pd.to_numeric(obs_df[["HIV_male", "HIV_female"]].stack(), errors="coerce")
+    vmax = float(vals.max()) if len(vals) else 0.0
+
+    if units == "fraction":
+        return 1.0
+    if units == "percent":
+        return 0.01
+
+    # auto
+    if vmax > 1.0:
+        return 0.01
+    return 1.0
+
+
+def build_stisim_style_hiv_data(
+    cfg: CalibConfig,
+    *,
+    results_key: str,
+    analyzer_age_bins: list[tuple[float, float]],
+):
+    """
+    Build a DataFrame compatible with `stisim.calibration.Calibration(data=...)`.
+
+    Important: STIsim's `make_df()` does **not** use dot paths; it parses result
+    names by splitting on underscores and treating the first chunk as the key in
+    `sim.results`. Therefore column names here must follow:
+        <results_key>_hiv_prev_male_{i}
+        <results_key>_hiv_prev_female_{i}
+
+    In practice we set `results_key="prevalence"` and provide a compatibility
+    alias `sim.results["prevalence"] = sim.results["prevalence_analyzer_hiv"]`.
+    """
+    import numpy as np
+    import pandas as pd
+
+    obs = pd.read_csv(cfg.prevalence_hiv_csv)
+    obs["Age"] = pd.to_numeric(obs.get("Age"), errors="coerce")
+    obs["Year"] = pd.to_numeric(obs.get("Year"), errors="coerce")
+    obs["HIV_male"] = pd.to_numeric(obs.get("HIV_male"), errors="coerce")
+    obs["HIV_female"] = pd.to_numeric(obs.get("HIV_female"), errors="coerce")
+    obs = obs.dropna(subset=["Age", "Year"])
+    obs["Age"] = obs["Age"].astype(int)
+    obs["Year"] = obs["Year"].astype(int)
+
+    scale = _infer_obs_scale(obs, units=cfg.obs_units)
+    obs["HIV_male"] = obs["HIV_male"] * scale
+    obs["HIV_female"] = obs["HIV_female"] * scale
+
+    years = np.arange(int(cfg.start), int(cfg.stop) + 1, dtype=int)
+    out = pd.DataFrame({"time": years.astype(float)})
+
+    # Map analyzer bins to observed (lower-edge) age values
+    for i, (a0, _a1) in enumerate(analyzer_age_bins):
+        a0i = int(a0)
+        sub = obs[obs["Age"] == a0i]
+        if sub.empty:
+            # keep NaNs
+            out[f"{results_key}_hiv_prev_male_{i}"] = np.nan
+            out[f"{results_key}_hiv_prev_female_{i}"] = np.nan
+            continue
+
+        male_series = sub.set_index("Year")["HIV_male"]
+        fem_series = sub.set_index("Year")["HIV_female"]
+        out[f"{results_key}_hiv_prev_male_{i}"] = out["time"].astype(int).map(male_series)
+        out[f"{results_key}_hiv_prev_female_{i}"] = out["time"].astype(int).map(fem_series)
+
+    # Drop any series that have no observed points in the selected time range
+    keep_cols = ["time"]
+    for c in out.columns:
+        if c == "time":
+            continue
+        if out[c].notna().any():
+            keep_cols.append(c)
+    out = out[keep_cols]
+
+    return out
+
+
 def run_calib(cfg: CalibConfig, calib_pars=None):
     """
     Run the calibration simulation with the given parameters.
@@ -128,27 +246,100 @@ def run_calib(cfg: CalibConfig, calib_pars=None):
     Args:
         calib_pars (dict): Dictionary of calibration parameters.
     """
-    import optuna
-    import pandas as pd
-    import sciris as sc
-    import starsim as ss
-
     sim = make_sim(cfg)
-    data = pd.read_csv(cfg.prevalence_hiv_csv)
-    
-    calib = ss.Calibration(
-        sim=sim,
-        calib_pars=calib_pars,
-        build_fn=build_sim,
-        eval_fn=eval_fn,  
-        eval_kw={'data': data}, 
-        total_trials=int(cfg.trials),
-        n_workers=1,
-        keep_db=bool(cfg.keep_db),
-        die=True,
-        reseed=False,
-        sampler=optuna.samplers.TPESampler(seed=int(cfg.sampler_seed)),
-    )
+    if cfg.use_stisim_calibration:
+        import optuna
+        import stisim.calibration as scali
+        import mighti as mi
+
+        # Use the analyzer's age bins to build matching observed columns
+        prev_analyzer = None
+        analyzers = getattr(sim, "analyzers", None)
+        if isinstance(analyzers, dict):
+            for a in analyzers.values():
+                if isinstance(a, mi.analyzers.PrevalenceAnalyzer_HIV):
+                    prev_analyzer = a
+                    break
+        if prev_analyzer is None and hasattr(analyzers, "__iter__"):
+            for a in analyzers:
+                if isinstance(a, mi.analyzers.PrevalenceAnalyzer_HIV):
+                    prev_analyzer = a
+                    break
+        if prev_analyzer is None:
+            # Fallback: take first analyzer if present
+            try:
+                prev_analyzer = next(iter(analyzers.values())) if isinstance(analyzers, dict) else next(iter(analyzers))
+            except Exception:
+                prev_analyzer = None
+        if prev_analyzer is None:
+            raise RuntimeError("Could not find PrevalenceAnalyzer_HIV on sim; cannot build STIsim-style calibration data.")
+
+        # STIsim calibration extracts results via underscore parsing:
+        #   modname = sres.split('_')[0]
+        # then looks up `sim.results[modname][resname]`.
+        # Therefore, we must use a **modname without underscores**, i.e. "prevalence".
+        if hasattr(sim, "results") and "prevalence" not in sim.results:
+            # Create/repair alias to whatever prevalence analyzer key exists
+            base_key = None
+            if "prevalence_analyzer_hiv" in sim.results:
+                base_key = "prevalence_analyzer_hiv"
+            else:
+                for k in sim.results.keys():
+                    if "prevalence_analyzer" in str(k):
+                        base_key = k
+                        break
+            if base_key is not None:
+                sim.results["prevalence"] = sim.results[base_key]
+        results_key = "prevalence"
+
+        data_df = build_stisim_style_hiv_data(
+            cfg,
+            results_key=str(results_key),
+            analyzer_age_bins=list(getattr(prev_analyzer, "age_bins", [])),
+        )
+        # Quick sanity check: ensure parsed modname exists in sim.results
+        # (STIsim uses modname = sres.split('_')[0])
+        bad_prefixes = sorted({c.split("_")[0] for c in data_df.columns if c != "time"} - set(sim.results.keys()))
+        if bad_prefixes:
+            logger.warning(
+                "Calibration data contains prefixes not in sim.results: %s. sim.results keys=%s",
+                bad_prefixes,
+                list(sim.results.keys()),
+            )
+        logger.info("Using STIsim-style calibration modname: %s", results_key)
+
+        calib = scali.Calibration(
+            sim=sim,
+            calib_pars=calib_pars,
+            build_fn=build_sim,
+            data=data_df,
+            save_results=True,
+            total_trials=int(cfg.trials),
+            n_workers=1,
+            keep_db=bool(cfg.keep_db),
+            die=True,
+            reseed=False,
+            sampler=optuna.samplers.TPESampler(seed=int(cfg.sampler_seed)),
+        )
+    else:
+        import optuna
+        import pandas as pd
+        import starsim as ss
+
+        data = pd.read_csv(cfg.prevalence_hiv_csv)
+        calib = ss.Calibration(
+            sim=sim,
+            calib_pars=calib_pars,
+            build_fn=build_sim,
+            eval_fn=eval_fn,
+            eval_kw={'data': data},
+            total_trials=int(cfg.trials),
+            n_workers=1,
+            keep_db=bool(cfg.keep_db),
+            die=True,
+            reseed=False,
+            sampler=optuna.samplers.TPESampler(seed=int(cfg.sampler_seed)),
+        )
 
     calib.calibrate()
     calib.check_fit()
@@ -254,6 +445,24 @@ def _parse_args(argv: list[str] | None = None) -> CalibConfig:
     parser.add_argument("--trials", type=int, default=100, help="Total Optuna trials.")
     parser.add_argument("--sampler-seed", type=int, default=12345, help="Seed for the Optuna sampler.")
     parser.add_argument("--keep-db", action="store_true", help="Keep calibration DB so you can resume later.")
+    parser.add_argument(
+        "--obs-units",
+        default="auto",
+        choices=["auto", "fraction", "percent"],
+        help="Units of observed HIV prevalence columns. Use 'percent' if values are percents (0-100 or 0-1 meaning percent).",
+    )
+    parser.add_argument(
+        "--use-stisim-calibration",
+        action="store_true",
+        help="Use STIsim's calibration wrapper (compute_gof + eval-from-data). Recommended.",
+    )
+    parser.add_argument(
+        "--no-use-stisim-calibration",
+        dest="use_stisim_calibration",
+        action="store_false",
+        help="Use the legacy custom eval function instead of STIsim calibration.",
+    )
+    parser.set_defaults(use_stisim_calibration=True)
     args = parser.parse_args(argv)
 
     data_dir = Path(args.data_dir).expanduser()
@@ -278,6 +487,8 @@ def _parse_args(argv: list[str] | None = None) -> CalibConfig:
         trials=int(args.trials),
         sampler_seed=int(args.sampler_seed),
         keep_db=bool(args.keep_db),
+        obs_units=str(args.obs_units),
+        use_stisim_calibration=bool(args.use_stisim_calibration),
     )
 
 

@@ -178,9 +178,15 @@ sdoh_modules = mi.sdoh.NeighbourhoodSituation(csv_path=csv_path_sdoh)
 disease_objects = []
 
 # --- HIV ---
+# hiv = sti.HIV(
+#     beta_m2f=0.002824808975498053,
+#     beta_m2c=0.0015347394768786338,
+#     init_prev=0.15,
+# )
+
 hiv = sti.HIV(
-    beta_m2f= 0.041126225026336546,
-    beta_m2c=0.02313161100759324,
+    beta_m2f=0.03362975603278965,
+    beta_m2c=0.008587993382382253,
     init_prev=0.15,
 )
 
