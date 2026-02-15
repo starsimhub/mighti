@@ -167,3 +167,4 @@ mighti/calibration/starsim_calibration.db
 # Local duplicate packaging/scratch under data_prep
 data_prep/data_prep/
 data_prep/mighti/
+data/raw/
