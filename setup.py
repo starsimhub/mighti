@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 # Get version
 cwd = os.path.abspath(os.path.dirname(__file__))
-versionpath = os.path.join(cwd, 'mighti', 'version.py')
+versionpath = os.path.join(cwd, 'mighti', 'util', 'version.py')
 version = runpy.run_path(versionpath)['__version__']
 
 # Get the documentation

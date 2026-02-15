@@ -28,6 +28,35 @@ def _safe_get_result(analyzer, key, sim):
 
 logger = logging.getLogger(__name__)
 
+def _is_interactive_backend() -> bool:
+    """Return True if current Matplotlib backend can show GUI windows."""
+    try:
+        import matplotlib
+        from matplotlib import rcsetup
+
+        backend = str(matplotlib.get_backend()).lower()
+        return backend in {b.lower() for b in rcsetup.interactive_bk}
+    except Exception:
+        return False
+
+
+def _finalize_figure(fig, *, show: bool = True, savepath: str | None = None, dpi: int = 200):
+    """
+    Common end-of-plot behavior:
+    - Save if `savepath` is provided
+    - Only call plt.show() if requested AND backend is interactive
+    """
+    if savepath:
+        try:
+            fig.savefig(savepath, dpi=dpi, bbox_inches="tight")
+        except Exception as e:
+            logger.warning("Failed to save figure to %s: %s", savepath, e)
+
+    if show and _is_interactive_backend():
+        plt.show()
+    return fig
+
+
 def _coerce_sim_years(sim) -> np.ndarray:
     """
     Return a numeric year vector aligned to sim.timevec.
@@ -70,6 +99,7 @@ def plot_hiv_prevalence_vs_observed(
     figsize: tuple[int, int] = (14, 8),
     title: str | None = None,
     show: bool = True,
+    savepath: str | None = None,
 ):
     """
     Plot simulated HIV prevalence vs observed, stratified by age bin and sex.
@@ -202,8 +232,7 @@ def plot_hiv_prevalence_vs_observed(
         fig.legend(handles, labels, loc="upper right", frameon=False)
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    if show:
-        plt.show()
+    _finalize_figure(fig, show=show, savepath=savepath)
     return fig, axes[:n]
 
 def plot_life_expectancy_timeseries(
@@ -275,7 +304,7 @@ def plot_life_expectancy_timeseries(
         plt.show()
     return fig, ax
 
-def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
+def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease, *, show: bool = True, savepath: str | None = None):
     """
     Plot mean prevalence over time for a given disease and both sexes.
     """
@@ -317,10 +346,11 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease):
     ax.set_ylabel(f'{disease} Prevalence (%)', fontsize=16)
     ax.legend()
     ax.grid(True)
-    plt.show()
+    _finalize_figure(fig, show=show, savepath=savepath)
+    return fig, ax
     
     
-def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year):
+def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year, *, show: bool = True, savepath: str | None = None):
     """
     Plot mean prevalence over time for a given disease and both sexes, including observed data points.
     Ensures x-axis uses numeric years, not dates.
@@ -438,7 +468,7 @@ def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, 
     ax.legend(frameon=False, fontsize=12)
     ax.grid(True, alpha=0.4)
     plt.tight_layout()
-    plt.show()
+    _finalize_figure(fig, show=show, savepath=savepath)
 
     logger.info("Observed data restricted to %s–%s (%s rows used).", init_year, min(end_year, most_recent), len(df))
     return total_male_prev, total_female_prev   

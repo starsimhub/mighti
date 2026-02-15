@@ -11,17 +11,33 @@ Key updates for Starsim 3.x:
 - Do not access `sim.diseases[...]` until after sim is constructed.
 """
 
+import os
+from pathlib import Path
+
+# ---------------------------------------------------------------------
+# Environment safety (Numba + Matplotlib) for local/dev runs
+# ---------------------------------------------------------------------
+# `starsim` uses Numba with caching enabled; on some Python installs (notably very
+# new versions) caching can fail at import time with "no locator available".
+# For this *example script* we default to safe settings unless the user overrides.
+_repo_root = Path(__file__).resolve().parent
+os.environ.setdefault("NUMBA_CACHE_DIR", str(_repo_root / ".numba_cache"))
+os.environ.setdefault("NUMBA_DISABLE_CACHING", "1")
+# Avoid matplotlib writing under the user home if unwritable (common in sandboxes).
+os.environ.setdefault("MPLCONFIGDIR", str(_repo_root / ".mplconfig"))
+# Avoid GUI backends in long-running scripts (prevents macOS backend hangs).
+os.environ.setdefault("MPLBACKEND", "Agg")
+
 import logging
 import numpy as np
 import pandas as pd
 
 import mighti as mi
-import prepare_data_for_year
+import data_prep.prepare_data_for_year as prepare_data_for_year
 import starsim as ss
 import stisim as sti
 from mighti.util.plot_style import apply_mighti_style
 from mighti.util.rng import seed_everything
-from pathlib import Path
 
 
 # ---------------------------------------------------------------------
@@ -42,14 +58,14 @@ region = "eswatini"
 # ---------------------------------------------------------------------
 # File paths
 # ---------------------------------------------------------------------
-csv_path_params       = f"mighti/data/{region}_parameters.csv"
-csv_path_interactions = "mighti/data/rel_sus.csv"
-csv_prevalence        = f"mighti/data/{region}_prevalence.csv"
-csv_path_fertility    = f"mighti/data/{region}_asfr.csv"
-csv_path_death        = f"mighti/data/{region}_mortality_rates.csv"
-csv_path_age          = f"mighti/data/{region}_age_distribution_{inityear}.csv"
-csv_path_intervention = f"mighti/data/{region}_intervention.csv"
-csv_path_sdoh         = f'mighti/data/sdoh.csv'
+csv_path_params       = f"data/processed/{region}_parameters.csv"
+csv_path_interactions = "data/processed/rel_sus.csv"
+csv_prevalence        = f"data/processed/{region}_prevalence.csv"
+csv_path_fertility    = f"data/processed/{region}_asfr.csv"
+csv_path_death        = f"data/processed/{region}_mortality_rates.csv"
+csv_path_age          = f"data/processed/{region}_age_distribution_{inityear}.csv"
+csv_path_intervention = f"data/processed/{region}_intervention.csv"
+csv_path_sdoh         = "data/processed/sdoh.csv"
 
 # Optional post-process targets (commented out below)
 mx_path = f"mighti/data/{region}_mx.csv"
@@ -86,7 +102,7 @@ prevalence_data, age_bins = mi.initialize_prevalence_data(
 )
 
 ## HIV prevalence comes from a dedicated wide file (Age/Year/HIV_male/HIV_female)
-hiv_prev_df = pd.read_csv("mighti/data/eswatini_prevalence_hiv.csv")
+hiv_prev_df = pd.read_csv("data/processed/eswatini_prevalence_hiv.csv")
 hiv_prev_data, hiv_age_bins = mi.initialize_prevalence_data(
     diseases=["HIV"],
     prevalence_data=hiv_prev_df,
@@ -299,7 +315,7 @@ if __name__ == "__main__":
     # Prevalence plot: use a disease that is actually in the sim (first non-HIV)
     plot_disease = next((d for d in diseases if str(d).lower() != "hiv"), diseases[0] if diseases else "Type2Diabetes")
     prevalence_check_df = pd.read_csv(
-        f"mighti/data/{region}_postprocess_check_prevalence.csv"
+        f"data/processed/{region}_postprocess_check_prevalence.csv"
     )
 
     from mighti.analysis.plotting import plot_mean_prevalence
@@ -311,11 +327,13 @@ if __name__ == "__main__":
         prevalence_check_df,
         inityear,
         endyear,
+        show=False,
+        savepath=str(out_dir / f"prevalence_{str(plot_disease).lower()}.png"),
     )
 
     from mighti.analysis.plotting import plot_hiv_prevalence_vs_observed
 
-    obs = pd.read_csv("mighti/data/eswatini_prevalence_hiv.csv")
+    obs = pd.read_csv("data/processed/eswatini_prevalence_hiv.csv")
 
     # after you run sim and have access to the prevalence analyzer object
     plot_hiv_prevalence_vs_observed(
@@ -325,7 +343,15 @@ if __name__ == "__main__":
         age_starts=[15, 20, 25, 30, 35, 40, 45],  # pick bins you want
         start_year=1990,
         end_year=2023,
+        show=False,
+        savepath=str(out_dir / "hiv_prevalence_vs_observed.png"),
     )
 
     from mighti.analysis.plotting import plot_mean_prevalence_plhiv
-    plot_mean_prevalence_plhiv(sim, prevalence_analyzer, 'COPD')  
+    plot_mean_prevalence_plhiv(
+        sim,
+        prevalence_analyzer,
+        "COPD",
+        show=False,
+        savepath=str(out_dir / "prevalence_plhiv_copd.png"),
+    )

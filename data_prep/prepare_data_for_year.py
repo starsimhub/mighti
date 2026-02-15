@@ -7,10 +7,12 @@ for use in life table and simulation analyses.
 import logging
 import os
 import pandas as pd
+from pathlib import Path
 
 
 logger = logging.getLogger(__name__)
-script_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = Path(__file__).resolve().parents[1]
+data_dir = repo_root / "data" / "processed"
 
 
 def prepare_data_for_year(region, year):
@@ -24,13 +26,13 @@ def prepare_data_for_year(region, year):
     Outputs:
         - {region}_mortality_rates_{year}.csv
         - {region}_age_distribution_{year}.csv
-        (Both saved in mighti/data/)
+        (Both saved in data/processed/)
     """
     # ------------------------------------------------------------------
     # Extract mortality rates
     # ------------------------------------------------------------------
-    input_mx_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_mx.csv')
-    output_mx_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_mortality_rates_{year}.csv')
+    input_mx_path = str(data_dir / f"{region}_mx.csv")
+    output_mx_path = str(data_dir / f"{region}_mortality_rates_{year}.csv")
 
     df_mx = pd.read_csv(input_mx_path)
     df_mx = df_mx.melt(id_vars=['Age', 'Sex'], var_name='Time', value_name='mx')
@@ -39,14 +41,14 @@ def prepare_data_for_year(region, year):
     df_mx_year = df_mx[df_mx['Time'] == year].dropna(subset=['mx'])
 
     df_mx_year = df_mx_year.rename(columns={'Age': 'AgeGrpStart'})
-    # df_mx_year.to_csv(output_mx_path, index=False)
+    df_mx_year.to_csv(output_mx_path, index=False)
     logger.info(f"Mortality rates for {year} saved to '{output_mx_path}'")
 
     # ------------------------------------------------------------------
     # Extract age distribution
     # ------------------------------------------------------------------
-    input_age_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_age_distribution.csv')
-    output_age_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_age_distribution_{year}.csv')
+    input_age_path = str(data_dir / f"{region}_age_distribution.csv")
+    output_age_path = str(data_dir / f"{region}_age_distribution_{year}.csv")
 
     df_age = pd.read_csv(input_age_path)
     if str(year) not in df_age.columns:
@@ -70,13 +72,13 @@ def prepare_data(region):
     Outputs:
         - {region}_mortality_rates_{year}.csv
         - {region}_age_distribution_{year}.csv
-        (Both saved in mighti/data/)
+        (Both saved in data/processed/)
     """
     # ------------------------------------------------------------------
     # Extract mortality rates
     # ------------------------------------------------------------------
-    input_mx_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_mx.csv')
-    output_mx_path = os.path.join(script_dir, 'mighti', 'data', f'{region}_mortality_rates.csv')
+    input_mx_path = str(data_dir / f"{region}_mx.csv")
+    output_mx_path = str(data_dir / f"{region}_mortality_rates.csv")
 
     df_mx = pd.read_csv(input_mx_path)
     df_mx = df_mx.melt(id_vars=['Age', 'Sex'], var_name='Time', value_name='mx')

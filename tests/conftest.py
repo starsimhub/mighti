@@ -27,7 +27,8 @@ def pytest_configure(config):  # noqa: ARG001
 
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
 
-    # As a belt-and-suspenders fallback, also disable caching if requested.
-    # (Leaving this off by default; setting it to "1" will force-disable caching.)
-    os.environ.setdefault("NUMBA_DISABLE_CACHING", "0")
+    # Numba caching can fail on very new Python versions / some installations with
+    # "no locator available" errors even when the cache directory is writable.
+    # For tests we default to disabling caching to make import-time behavior robust.
+    os.environ.setdefault("NUMBA_DISABLE_CACHING", "1")
 

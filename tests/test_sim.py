@@ -59,6 +59,7 @@ def test_full_mighti_simulation():
 
     # --- Other diseases
     disease_objects = [hiv]
+    active_diseases = ["HIV"]  # keep analyzers in sync with instantiated modules
     for d in healthconditions:
         cls = getattr(mi, d, None)
         if not cls:
@@ -70,6 +71,7 @@ def test_full_mighti_simulation():
             continue
         init_prev = ss.bernoulli(p=get_prev_fn(d))
         disease_objects.append(cls(csv_path=param_path, pars={"init_prev": init_prev}))
+        active_diseases.append(d)
 
     # --- Connectors / interactions
     rel_sus_path = os.path.join(thisdir, "test_data", "rel_sus.csv")
@@ -95,7 +97,7 @@ def test_full_mighti_simulation():
     analyzers = [
         mi.DeathsByAgeSexAnalyzer(),
         mi.SurvivorshipAnalyzer(),
-        mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=diseases),
+        mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=active_diseases),
     ]
 
     # --- Interventions

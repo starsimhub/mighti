@@ -8,6 +8,7 @@ import numpy as np
 import starsim as ss
 import stisim as sti
 import mighti as mi
+from pathlib import Path
 
 
 # ---------------------------------------------------------------------
@@ -29,7 +30,8 @@ def make_minisim(n_agents=500, start=2007, stop=2010, depression_prevalence=0.3)
     hiv.pars.art_efficacy = 0.9
 
     # MajorDepressiveDisorder with fixed prevalence
-    csv_path = "mighti/data/eswatini_parameters.csv"  # valid placeholder
+    thisdir = Path(__file__).resolve().parent
+    csv_path = str(thisdir / "test_data" / "eswatini_parameters.csv")
     dep = mi.MajorDepressiveDisorder(
         csv_path=csv_path,
         pars=dict(init_prev=ss.bernoulli(p=depression_prevalence))
@@ -139,7 +141,8 @@ def test_adherence_improves_with_depressioncare():
     death = ss.Deaths()
     pregnancy = ss.Pregnancy()
 
-    csv_path = "mighti/data/eswatini_parameters.csv"
+    thisdir = Path(__file__).resolve().parent
+    csv_path = str(thisdir / "test_data" / "eswatini_parameters.csv")
     hiv = sti.HIV()
     hiv.pars.include_care = True
     hiv.pars.art_efficacy = 0.9

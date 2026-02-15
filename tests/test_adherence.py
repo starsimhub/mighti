@@ -16,35 +16,22 @@ import pandas as pd
 import starsim as ss
 import stisim as sti
 import mighti as mi
+from pathlib import Path
 
 region = "eswatini"
 n_agents=1000
-csv_prevalence        = f"mighti/data/{region}_prevalence.csv"
-csv_path_params      = f"mighti/data/{region}_parameters.csv"
+thisdir = Path(__file__).resolve().parent
+testdata = thisdir / "test_data"
+csv_path_params = str(testdata / f"{region}_parameters.csv")
 healthcondition = "MajorDepressiveDisorder"
 diseases = ['HIV', healthcondition]
 
-prevalence_data_df = pd.read_csv(csv_prevalence)
-prevalence_data, age_bins = mi.initialize_prevalence_data(
-    diseases=diseases,
-    prevalence_data=prevalence_data_df,
-    inityear=2000,
-)
-
-def get_prevalence_function(disease):
-    def prevalence_func(sim, uids, size=None):
-        return mi.age_sex_dependent_prevalence(
-            disease=disease,
-            prevalence_data=prevalence_data,
-            age_bins=age_bins,
-            sim=sim,
-            uids=uids,
-        )
-    return prevalence_func
-
-def make_init_prev_func(disease):
-    prev_func_local = get_prevalence_function(disease)
-    return lambda sim, uids, size=None: prev_func_local(sim, uids, size)
+#
+# Note: these adherence tests do NOT need real prevalence tables. Using a fixed
+# init_prev makes the tests deterministic and avoids dependency on packaged data
+# paths (which may change during refactors).
+#
+MDD_INIT_PREV = 0.40
 
 
 
@@ -68,7 +55,7 @@ def test_adherence_engine_basic():
     hiv.pars.include_aids_deaths = False   # turn off mortality for faster tests
     hiv.pars.art_efficacy = 0.90
 
-    init_prev = ss.bernoulli(p=make_init_prev_func(healthcondition))
+    init_prev = ss.bernoulli(p=MDD_INIT_PREV)
 
     disease_class = getattr(mi, healthcondition, None)
 
@@ -134,7 +121,7 @@ def test_art_adherence_disruptor():
     disease_class = getattr(mi, healthcondition, None)
     assert disease_class is not None, f"{healthcondition} not found in mighti"
 
-    init_prev_mdd = ss.bernoulli(p=make_init_prev_func(healthcondition))
+    init_prev_mdd = ss.bernoulli(p=MDD_INIT_PREV)
 
     mdd_obj = disease_class(
         csv_path=csv_path_params,
@@ -204,7 +191,7 @@ def test_intervention_adherence_disruptor():
     hiv.pars.art_efficacy = 0.95   # BASELINE
 
     disease_class = getattr(mi, healthcondition)
-    init_prev_mdd = ss.bernoulli(p=make_init_prev_func(healthcondition))
+    init_prev_mdd = ss.bernoulli(p=MDD_INIT_PREV)
     mdd = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev_mdd})
 
     art = mi.ARTwithCASM(
