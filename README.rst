@@ -64,14 +64,14 @@ MIGHTI main is released as a **modeling platform/library** plus small example dr
 To keep releases lightweight and reduce licensing/provenance risk, we follow this convention:
 
 - **Included in releases**:
-  - Curated, minimal example inputs in ``mighti/data/`` (enough to run the example scripts)
+  - Curated, minimal example inputs in ``data/processed/`` (enough to run the example scripts)
   - Small fixtures in ``tests/test_data/`` used by the automated test suite
 - **Not included in stable releases**:
-  - ``raw_data/`` and associated cleaning/pre-processing scripts and raw source files
+  - ``data/raw/`` and associated cleaning/pre-processing scripts and raw source files
 
-If you need to rebuild curated inputs from raw sources, see ``raw_data/README.md`` and related tooling in this repository (development use).
+If you need to rebuild curated inputs from raw sources, see ``data/raw/README.md`` and related tooling in this repository (development use).
 
-Public API and Stability (v2 policy)
+Public API and Stability
 ------------
 
 MIGHTI is still evolving. To make it safe for others to build on, we define a **stable public API surface** and treat everything else as internal/experimental.
@@ -103,18 +103,13 @@ MIGHTI is still evolving. To make it safe for others to build on, we define a **
     # Interventions
     art = mi.interventions.ARTwithCASM(...)
 
-**Stable top-level helpers**
-
-- `mighti.initialize_prevalence_data()`
-- `mighti.age_sex_dependent_prevalence()` (StarSim v3 signature uses `uids`)
-
 **Plotting policy**
 
 Plotting utilities are available, but are intentionally **not** imported into the top-level namespace. Import explicitly when needed:
 
 .. code-block:: python
 
-    from mighti.plot_functions import plot_mean_prevalence
+    from mighti.analysis.plotting import plot_mean_prevalence
 
 **Backwards compatibility**
 
