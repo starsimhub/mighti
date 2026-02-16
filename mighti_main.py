@@ -13,6 +13,9 @@ Key updates for Starsim 3.x:
 
 import os
 from pathlib import Path
+import logging
+import numpy as np
+import pandas as pd
 
 # ---------------------------------------------------------------------
 # Environment safety (Numba + Matplotlib) for local/dev runs
@@ -28,12 +31,8 @@ os.environ.setdefault("MPLCONFIGDIR", str(_repo_root / ".mplconfig"))
 # Avoid GUI backends in long-running scripts (prevents macOS backend hangs).
 os.environ.setdefault("MPLBACKEND", "Agg")
 
-import logging
-import numpy as np
-import pandas as pd
 
 import mighti as mi
-import data_prep.prepare_data_for_year as prepare_data_for_year
 import starsim as ss
 import stisim as sti
 from mighti.util.plot_style import apply_mighti_style
@@ -72,8 +71,16 @@ mx_path = f"mighti/data/{region}_mx.csv"
 ex_path = f"mighti/data/{region}_ex.csv"
 
 # Ensure required demographic files exist
+import data_prep.prepare_data_for_year as prepare_data_for_year
 prepare_data_for_year.prepare_data_for_year(region, inityear)
 prepare_data_for_year.prepare_data(region)
+
+# NOTE:
+# This step normally requires files in `data/raw/`.
+# If raw data is not available locally, data preparation may fail.
+# The exception is the original Eswatini (2007) configuration, which can run
+# using pre-generated data included in the repository.
+
 
 # ---------------------------------------------------------------------
 # Load parameters & define which diseases to include
