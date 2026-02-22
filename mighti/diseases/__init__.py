@@ -46,7 +46,7 @@ from .prostatecancer import *
 from .ptsd import *
 from .roadinjuries import *
 from .selfharm import *
-from .stimulantusedisorder import *
+from .drugusedisorder import *
 from .tb import *
 from .tobaccouse import *
 from .type1diabetes import *

@@ -50,7 +50,7 @@ MIGHTI_CONDITION_METADATA = [
     ("COPD", "chronic", "both"),
     ("AlzheimersDisease", "chronic", "both"),
     ("ParkinsonsDisease", "chronic", "both"),
-    ("StimulantUseDisorder", "remitting", "both"),
+    ("DrugUseDisorder", "remitting", "both"),
     ("OpioidUseDisorder", "remitting", "both"),
     ("AnxietyDisorder", "remitting", "both"),
     ("ChronicPain", "remitting", "both"),

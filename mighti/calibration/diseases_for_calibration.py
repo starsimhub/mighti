@@ -945,12 +945,12 @@ class ChronicPain(RemittingDisease):
         return
     
     
-class StimulantUseDisorder(RemittingDisease):
+class DrugUseDisorder(RemittingDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
-        self.disease_name = 'StimulantUseDisorder'
+        self.disease_name = 'DrugUseDisorder'
         super().__init__(csv_path, pars, **kwargs)
         
-        self.define_pars(label = 'StimulantUseDisorder')
+        self.define_pars(label = 'DrugUseDisorder')
         if not hasattr(self.pars, 'p_acquire'):
             self.pars.p_acquire_multiplier = 1  
         return    
@@ -1088,12 +1088,12 @@ class ParkinsonsDisease(ChronicDisease):
         return
 
 
-class ViralHepatitis(AcuteDisease):
+class AcuteHepatitis(AcuteDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
-        self.disease_name = 'ViralHepatitis'
+        self.disease_name = 'AcuteHepatitis'
         super().__init__(csv_path, pars, **kwargs)
         
-        self.define_pars(label = 'ViralHepatitis')
+        self.define_pars(label = 'AcuteHepatitis')
         if not hasattr(self.pars, 'p_acquire'):
             self.pars.p_acquire_multiplier = 1  
         return

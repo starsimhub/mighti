@@ -25,18 +25,37 @@ init_year = 2007
 end_year = 2023
 total_trials = 100  # Set higher for production runs
 
-BASE_MIGHTI_DIR = Path(__file__).resolve().parents[1]  # .../mighti/
-DATA_DIR = BASE_MIGHTI_DIR / "data"
+REPO_ROOT = Path(__file__).resolve().parents[2]  # .../MIGHTI/
+DATA_DIR = REPO_ROOT / "data" / "processed"
+
+
+def _resolve_data_file(filename: str) -> Path:
+    """
+    Resolve a region input CSV within the repo.
+
+    Preferred location is `data/processed/`. For developer/test workflows, we also
+    allow falling back to `tests/test_data/`.
+    """
+    candidates = [
+        REPO_ROOT / "data" / "processed" / filename,
+        REPO_ROOT / "tests" / "test_data" / filename,
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        f"Could not find {filename!r}. Tried:\n- " + "\n- ".join(str(c) for c in candidates)
+    )
 
 # Paths
-path_prevalence = str(DATA_DIR / f"{region}_prevalence.csv")
-path_parameters = str(DATA_DIR / f"{region}_parameters.csv")
-path_fertility = str(DATA_DIR / f"{region}_asfr.csv")
-path_mortality = str(DATA_DIR / f"{region}_mortality_rates.csv")
+path_prevalence = str(_resolve_data_file(f"{region}_prevalence.csv"))
+path_parameters = str(_resolve_data_file(f"{region}_parameters.csv"))
+path_fertility = str(_resolve_data_file(f"{region}_asfr.csv"))
+path_mortality = str(_resolve_data_file(f"{region}_mortality_rates.csv"))
 
 date_str = datetime.now().strftime("%Y%m%d")
 # Results under package dir so path works from repo root or from mighti/calibration/
-results_dir = BASE_MIGHTI_DIR / "calibration" / "results" / f"calibration_{region}_{date_str}"
+results_dir = REPO_ROOT / "mighti" / "calibration" / "results" / f"calibration_{region}_{date_str}"
 results_dir.mkdir(parents=True, exist_ok=True)
 
 # Load prevalence once for eval
@@ -45,7 +64,7 @@ param_df = pd.read_csv(path_parameters)
 
 # conditions = param_df['condition'].unique().tolist()
 # Conditions to calibrate (or use param_df['condition'].unique().tolist())
-conditions = ["InterpersonalViolence"]
+conditions = ["AcuteHepatitis"]
 
 
 def try_get_condition_class(name):
