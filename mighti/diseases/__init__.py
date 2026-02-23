@@ -30,7 +30,7 @@ from .copd import *
 from .colorectalcancer import *
 from .covid19 import *
 from .dementia import *
-from .flu import *
+from .influenza import *
 from .hpv import *
 from .hyperlipidemia import *
 from .hypertension import *
@@ -51,7 +51,7 @@ from .tb import *
 from .tobaccouse import *
 from .type1diabetes import *
 from .type2diabetes import *
-from .viralhepatitis import *
+from .acutehepatitis import *
 
 
 from .chromosomalabnormalities import *
