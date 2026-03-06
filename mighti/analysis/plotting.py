@@ -28,7 +28,7 @@ def _safe_get_result(analyzer, key, sim):
 
 logger = logging.getLogger(__name__)
 
-def _is_interactive_backend() -> bool:
+def _is_interactive_backend():
     """Return True if current Matplotlib backend can show GUI windows."""
     try:
         import matplotlib
@@ -40,7 +40,7 @@ def _is_interactive_backend() -> bool:
         return False
 
 
-def _finalize_figure(fig, *, show: bool = True, savepath: str | None = None, dpi: int = 200):
+def _finalize_figure(fig, *, show=True, savepath=None, dpi=200):
     """
     Common end-of-plot behavior:
     - Save if `savepath` is provided
@@ -57,7 +57,7 @@ def _finalize_figure(fig, *, show: bool = True, savepath: str | None = None, dpi
     return fig
 
 
-def _coerce_sim_years(sim) -> np.ndarray:
+def _coerce_sim_years(sim):
     """
     Return a numeric year vector aligned to sim.timevec.
     Handles numeric years, datetime-like, or pandas Timestamp.
@@ -90,16 +90,16 @@ def _coerce_sim_years(sim) -> np.ndarray:
 def plot_hiv_prevalence_vs_observed(
     sim,
     prevalence_analyzer,
-    observed_hiv_df: pd.DataFrame,
+    observed_hiv_df,
     *,
-    age_starts: list[int] | None = None,
-    start_year: int | None = None,
-    end_year: int | None = None,
-    ncols: int = 3,
-    figsize: tuple[int, int] = (14, 8),
-    title: str | None = None,
-    show: bool = True,
-    savepath: str | None = None,
+    age_starts=None,
+    start_year=None,
+    end_year=None,
+    ncols=3,
+    figsize=(14, 8),
+    title=None,
+    show=True,
+    savepath=None,
 ):
     """
     Plot simulated HIV prevalence vs observed, stratified by age bin and sex.
@@ -150,7 +150,7 @@ def plot_hiv_prevalence_vs_observed(
     except Exception:
         results_store = None
 
-    def _get_series(key: str) -> np.ndarray:
+    def _get_series(key):
         if isinstance(results_store, dict) and key in results_store:
             return np.asarray(results_store[key], dtype=float)
         return _safe_get_result(prevalence_analyzer, key, sim).astype(float)
@@ -236,16 +236,16 @@ def plot_hiv_prevalence_vs_observed(
     return fig, axes[:n]
 
 def plot_life_expectancy_timeseries(
-    le_df: pd.DataFrame,
+    le_df,
     *,
-    sex: str = "Both",
-    scenarios: list[str] | None = None,
-    highlight_years: list[int] | None = None,
-    title: str | None = None,
-    ylabel: str = "Life expectancy at birth (e₀)",
-    xlabel: str = "Year",
-    figsize: tuple[int, int] = (10, 5),
-    show: bool = True,
+    sex="Both",
+    scenarios=None,
+    highlight_years=None,
+    title=None,
+    ylabel="Life expectancy at birth (e₀)",
+    xlabel="Year",
+    figsize=(10, 5),
+    show=True,
 ):
     """
     Plot a time series of life expectancy at birth (e₀).
@@ -304,7 +304,7 @@ def plot_life_expectancy_timeseries(
         plt.show()
     return fig, ax
 
-def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease, *, show: bool = True, savepath: str | None = None):
+def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease, *, show=True, savepath=None):
     """
     Plot mean prevalence over time for a given disease and both sexes.
     """
@@ -350,7 +350,7 @@ def plot_mean_prevalence_plhiv(sim, prevalence_analyzer, disease, *, show: bool 
     return fig, ax
     
     
-def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year, *, show: bool = True, savepath: str | None = None):
+def plot_mean_prevalence(sim, prevalence_analyzer, disease, prevalence_data_df, init_year, end_year, *, show=True, savepath=None):
     """
     Plot mean prevalence over time for a given disease and both sexes, including observed data points.
     Ensures x-axis uses numeric years, not dates.

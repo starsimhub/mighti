@@ -31,11 +31,11 @@ logging.basicConfig(level=logging.INFO)
 
 def run_eswatini_pipeline(
     *,
-    year_for_parameters: int = 2007,
-    overwrite_outputs: bool = False,
-    overwrite_existing_parameters: bool = False,
-    merge_split_prevalence_exports: bool = False,
-) -> None:
+    year_for_parameters=2007,
+    overwrite_outputs=False,
+    overwrite_existing_parameters=False,
+    merge_split_prevalence_exports=False,
+):
     """Backward-compatible wrapper for Eswatini."""
     return run_pipeline(
         region="eswatini",
@@ -49,13 +49,13 @@ def run_eswatini_pipeline(
 
 def run_pipeline(
     *,
-    region: str,
-    location_name: str,
-    baseline_year: int = 2007,
-    overwrite_outputs: bool = False,
-    overwrite_existing_parameters: bool = False,
-    merge_split_prevalence_exports: bool = False,
-) -> None:
+    region,
+    location_name,
+    baseline_year=2007,
+    overwrite_outputs=False,
+    overwrite_existing_parameters=False,
+    merge_split_prevalence_exports=False,
+):
     data_dir = ensure_data_dir()
 
     print(f"Running GBD/WPP data processing for: {location_name}")

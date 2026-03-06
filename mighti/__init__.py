@@ -51,7 +51,7 @@ from .interventions.adherence import (  # noqa: F401
 # NOTE: plotting is intentionally NOT imported here.
 # Use: `from mighti.analysis.plotting import ...` (or `mi.analysis.plotting...`)
 
-def __getattr__(name: str):
+def __getattr__(name):
     """
     Back-compat attribute resolver.
 

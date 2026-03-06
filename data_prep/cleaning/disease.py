@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # Conditions that are modeled without direct condition-caused mortality.
 # IMPORTANT: Do NOT leave these p_death values blank/NA, because runtime parameter loading
 # falls back to a nonzero default (see `mighti/diseases/base_disease.py:get_disease_parameters`).
-NONMORTAL_P_DEATH_CONDITIONS: set[str] = {
+NONMORTAL_P_DEATH_CONDITIONS = {
     "AnxietyDisorder",
     "BipolarDisorder",
     "ChronicPain",
@@ -100,7 +100,7 @@ MIGHTI_CONDITION_METADATA = [
 ]
 
 
-def create_mighti_parameters_template(output_csv: str, *, overwrite: bool = False) -> pd.DataFrame:
+def create_mighti_parameters_template(output_csv, *, overwrite=False):
     """
     Create a template parameter CSV in the same schema as `mighti/data/eswatini_parameters.csv`.
 
@@ -130,13 +130,13 @@ def create_mighti_parameters_template(output_csv: str, *, overwrite: bool = Fals
 
 
 def ensure_conditions_in_parameters_csv(
-    parameters_csv_path: str,
+    parameters_csv_path,
     *,
-    output_csv_path: str | None = None,
-    overwrite: bool = True,
-    create_if_missing: bool = True,
-    prune_extras: bool = False,
-) -> pd.DataFrame:
+    output_csv_path=None,
+    overwrite=True,
+    create_if_missing=True,
+    prune_extras=False,
+):
     """
     Ensure `parameters_csv_path` contains at least the conditions in `MIGHTI_CONDITION_METADATA`.
 
@@ -196,13 +196,13 @@ def ensure_conditions_in_parameters_csv(
 
 
 def fill_p_death_and_duration_from_allcause_files(
-    parameters_csv_path: str,
+    parameters_csv_path,
     *,
-    allcause_rate_csv_path: str,
-    year: int = 2007,
-    output_csv_path: str | None = None,
-    overwrite_existing: bool = False,
-) -> pd.DataFrame:
+    allcause_rate_csv_path,
+    year=2007,
+    output_csv_path=None,
+    overwrite_existing=False,
+):
     """
     Fill `p_death` and `dur_condition` in a MIGHTI parameters CSV using GBD-style
     all-cause exports.
@@ -232,15 +232,15 @@ def fill_p_death_and_duration_from_allcause_files(
 
 
 def fill_p_death_and_duration_from_gbd_long_files(
-    parameters_csv_path: str,
+    parameters_csv_path,
     *,
-    gbd_long_csv_paths: list[str],
-    year: int = 2007,
-    location: str = "Eswatini",
-    output_csv_path: str | None = None,
-    overwrite_existing: bool = False,
-    acute_duration_years_threshold: float = 1.0,
-) -> pd.DataFrame:
+    gbd_long_csv_paths,
+    year=2007,
+    location="Eswatini",
+    output_csv_path=None,
+    overwrite_existing=False,
+    acute_duration_years_threshold=1.0,
+):
     """
     Fill `p_death` and `dur_condition` using one or more GBD-style long-format exports
     that contain rows with columns like:
@@ -306,7 +306,7 @@ def fill_p_death_and_duration_from_gbd_long_files(
     # Determine which modeled conditions should use CFR for p_death (Deaths/Incidence).
     # We infer this from the parameter table's disease_type column.
     cfr_types = {"acute", "surgical", "genericsis", "genericsir", "sis", "sir"}
-    cfr_conditions: set[str] = set()
+    cfr_conditions = set()
     if "disease_type" in params.columns:
         cfr_conditions = set(
             params.loc[params["disease_type"].astype(str).str.lower().isin(cfr_types), "condition"]
@@ -347,7 +347,7 @@ def fill_p_death_and_duration_from_gbd_long_files(
     )
 
     # For CFR-eligible conditions, overwrite p_death with CFR proxy (deaths/incidence)
-    cfr_applied_conditions: set[str] = set()
+    cfr_applied_conditions = set()
     if cfr_conditions:
         is_cfr = computed.index.to_series().isin(cfr_conditions)
         ok_cfr = (
@@ -393,11 +393,11 @@ def fill_p_death_and_duration_from_gbd_long_files(
 def create_and_fill_prevalence_template_from_long_format(
     raw_csv,
     output_csv,
-    start_year: int | None = 1987,
-    end_year: int | None = 2021,
+    start_year=1987,
+    end_year=2021,
     age_starts=None,
     *,
-    overwrite: bool = False,
+    overwrite=False,
 ):
     """
     Create and fill a prevalence template with numeric Age values (0, 5, 10, 15...).
@@ -482,7 +482,7 @@ def create_and_fill_prevalence_template_from_long_format(
     return grid
 
 
-def merge_gbd_long_csvs(input_csv_paths: list[str], output_csv_path: str, *, required_cols: list[str] | None = None) -> str:
+def merge_gbd_long_csvs(input_csv_paths, output_csv_path, *, required_cols=None):
     """
     Merge one or more GBD-style long-format CSV exports (same schema) into a single CSV.
 
@@ -492,7 +492,7 @@ def merge_gbd_long_csvs(input_csv_paths: list[str], output_csv_path: str, *, req
     if required_cols is None:
         required_cols = ["measure", "location", "sex", "age", "cause", "metric", "year", "val", "upper", "lower"]
 
-    frames: list[pd.DataFrame] = []
+    frames = []
     for p in input_csv_paths:
         df = pd.read_csv(p)
         missing = [c for c in required_cols if c not in df.columns]

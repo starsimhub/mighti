@@ -8,10 +8,7 @@ Preferred usage:
 This initializer keeps imports lightweight by lazily loading submodules/classes.
 """
 
-from __future__ import annotations
-
 import importlib
-from typing import Dict
 
 
 _SUBMODULES = {
@@ -23,7 +20,7 @@ _SUBMODULES = {
     "healthcare_system",
 }
 
-_EXPORTS: Dict[str, str] = {
+_EXPORTS = {
     # Base
     "BaseSDoH": "core",
     # Concrete modules
@@ -37,7 +34,7 @@ _EXPORTS: Dict[str, str] = {
 __all__ = sorted([*_SUBMODULES, *_EXPORTS.keys()])
 
 
-def __getattr__(name: str):
+def __getattr__(name):
     if name in _SUBMODULES:
         return importlib.import_module(f"{__name__}.{name}")
 

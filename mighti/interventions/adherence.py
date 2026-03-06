@@ -8,8 +8,6 @@ Provides a three-component adherence pipeline:
 3. InterventionAdherenceDisruptor (adherence → ART efficacy scaling)
 """
 
-from __future__ import annotations
-
 import numpy as np
 import sciris as sc
 import starsim as ss
@@ -85,14 +83,14 @@ class AdherenceEngine(ss.Module):
 
     def __init__(
         self,
-        casm_rel: dict | None = None,
-        sdoh_rel: dict | None = None,
+        casm_rel=None,
+        sdoh_rel=None,
         *,
         # HRMM-style "odds of non-adherence" model (compat with `adherence_unified.py`)
-        baseline_adherence: float | None = None,
-        casm_nonadherence_or: dict | None = None,
-        use_odds_model: bool = False,
-        label: str = "adherence_engine",
+        baseline_adherence=None,
+        casm_nonadherence_or=None,
+        use_odds_model=False,
+        label="adherence_engine",
     ):
         super().__init__(label=label)
         self.casm_rel = casm_rel or CASM_REL_FACTORS.copy()
@@ -114,12 +112,12 @@ class AdherenceEngine(ss.Module):
                 st["adherence"] = np.ones(len(sim.people), dtype=float)
 
     @staticmethod
-    def _odds(p: float) -> float:
+    def _odds(p):
         p = float(np.clip(p, 1e-12, 1.0 - 1e-12))
         return p / (1.0 - p)
 
     @staticmethod
-    def _p_from_odds(o: np.ndarray) -> np.ndarray:
+    def _p_from_odds(o):
         o = np.asarray(o, dtype=float)
         return o / (1.0 + o)
 
@@ -292,7 +290,7 @@ class ARTAdherenceDisruptor(ss.Connector):
         
         n = len(on_art)
 
-        def _bool_mask(key: str) -> np.ndarray:
+        def _bool_mask(key):
             """Return a boolean mask of length n; missing -> all False."""
             arr = st.get(key, None)
             if arr is None:

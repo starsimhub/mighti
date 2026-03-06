@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 __all__ = ["PrevalenceAnalyzer", "PrevalenceAnalyzer_HIV", "PrevalenceAnalyzer_SDoH", "OnARTByConditionAnalyzer", "OnARTByConditionAndSexAnalyzer"]
 
 
-def _status_attr_for_disease_module(dis, disease_name: str) -> str:
+def _status_attr_for_disease_module(dis, disease_name):
     """
     Decide which boolean state to use for prevalence for a disease module.
 

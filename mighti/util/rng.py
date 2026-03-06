@@ -2,17 +2,14 @@
 Deterministic random number helpers for MIGHTI.
 """
 
-from __future__ import annotations
-
 import hashlib
-from typing import Any
 
 import numpy as np
 
 __all__ = ["get_rng", "seed_everything"]
 
 
-def _mix_seed(base_seed: int, salt: str) -> int:
+def _mix_seed(base_seed, salt):
     """
     Mix a base integer seed with a salt string into a 32-bit seed.
     Uses SHA256 for stability across Python versions/platforms.
@@ -23,7 +20,7 @@ def _mix_seed(base_seed: int, salt: str) -> int:
     return int.from_bytes(digest[:4], byteorder="little", signed=False)
 
 
-def get_rng(sim: Any | None, *, salt: str = "mighti") -> np.random.Generator:
+def get_rng(sim, *, salt="mighti"):
     """
     Return a deterministic NumPy Generator for a given StarSim sim.
 
@@ -53,7 +50,7 @@ def get_rng(sim: Any | None, *, salt: str = "mighti") -> np.random.Generator:
     return rng
 
 
-def seed_everything(seed: int) -> None:
+def seed_everything(seed):
     """
     Best-effort seeding of common RNGs for scripts.
 

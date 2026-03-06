@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]  # .../MIGHTI/
 DATA_DIR = REPO_ROOT / "data" / "processed"
 
 
-def _resolve_data_file(filename: str) -> Path:
+def _resolve_data_file(filename):
     """
     Resolve a region input CSV within the repo.
 

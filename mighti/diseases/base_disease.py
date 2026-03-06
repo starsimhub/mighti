@@ -73,11 +73,11 @@ class _CompetingMortalityMixin:
       deaths attributed to this module.
     """
 
-    def _competing_enabled(self) -> bool:
+    def _competing_enabled(self):
         sim = getattr(self, "sim", None)
         return bool(getattr(sim, "_mighti_competing_mortality", False))
 
-    def _set_death_pressure(self, uids, p) -> None:
+    def _set_death_pressure(self, uids, p):
         self._death_pressure_uids = np.asarray(uids, dtype=int)
         self._death_pressure_p = np.asarray(p, dtype=float)
 
@@ -88,7 +88,7 @@ class _CompetingMortalityMixin:
             return np.array([], dtype=int), np.array([], dtype=float)
         return u, p
 
-    def _attributed_deaths(self, death_uids: np.ndarray) -> np.ndarray:
+    def _attributed_deaths(self, death_uids):
         sim = getattr(self, "sim", None)
         cause_map = getattr(sim, "_mighti_death_cause", None)
         if not isinstance(cause_map, dict) or not len(death_uids):
@@ -1236,7 +1236,7 @@ class NonAcquiredDisease(_CompetingMortalityMixin, ss.Disease):
         n_affected = affected.sum()
         logger.info(f"[INIT] {self.disease_name}: {n_affected}/{n} ({n_affected/n:.3%}) affected at birth")
 
-    def _draw_affected_for_uids(self, uids: np.ndarray, *, rng: np.random.Generator) -> np.ndarray:
+    def _draw_affected_for_uids(self, uids, *, rng):
         """
         Draw boolean affected status for a given uid subset using pars.init_prev.
 
@@ -1282,7 +1282,7 @@ class NonAcquiredDisease(_CompetingMortalityMixin, ss.Disease):
         p = float(np.clip(p, 0.0, 1.0))
         return rng.random(len(uids)) < p
 
-    def _newborn_uids_this_step(self) -> np.ndarray:
+    def _newborn_uids_this_step(self):
         """Return newborn uids for this timestep using MaternalNet edges, if present."""
         sim = self.sim
         maternal = sim.networks.get("maternalnet", None) if hasattr(sim, "networks") else None
@@ -1310,7 +1310,7 @@ class NonAcquiredDisease(_CompetingMortalityMixin, ss.Disease):
         # Deduplicate in case of repeated edges
         return np.unique(babies)
 
-    def _assign_newborn_cases(self) -> None:
+    def _assign_newborn_cases(self):
         """Assign affected status to newborns at the current timestep."""
         babies = self._newborn_uids_this_step()
         if babies.size == 0:

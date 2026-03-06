@@ -19,13 +19,13 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 DATA_DIR = os.path.join(PROJECT_ROOT, "data", "processed")
 
 
-def ensure_data_dir() -> str:
+def ensure_data_dir():
     """Create and return the `data/processed/` output directory."""
     os.makedirs(DATA_DIR, exist_ok=True)
     return DATA_DIR
 
 
-def data_path(filename: str) -> str:
+def data_path(filename):
     """Return full path for a file inside `data/processed/`."""
     ensure_data_dir()
     return os.path.join(DATA_DIR, filename)
@@ -35,7 +35,7 @@ RAW_DATA_DIR = os.path.join(PROJECT_ROOT, "data/raw")
 WPP_DATA = os.path.join(PROJECT_ROOT, "data/raw", "wpp_data")
 
 
-def wpp_path(filename: str) -> str:
+def wpp_path(filename):
     """Return full path for files in `data/raw/wpp_data/`."""
     return os.path.join(WPP_DATA, filename)
 
@@ -43,7 +43,7 @@ def wpp_path(filename: str) -> str:
 DISEASE_DATA_DIR = os.path.join(RAW_DATA_DIR, "disease_data")
 
 
-def disease_data_path(filename: str) -> str:
+def disease_data_path(filename):
     """Return full path for files in `data/raw/disease_data/`."""
     return os.path.join(DISEASE_DATA_DIR, filename)
 

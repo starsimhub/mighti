@@ -2,22 +2,19 @@
 Helpers for reproducible output paths and CLI flags.
 """
 
-from __future__ import annotations
-
 import os
 from pathlib import Path
-from typing import Optional
 
 __all__ = ["repo_root", "resolve_outdir", "add_repro_args"]
 
 
-def repo_root() -> Path:
+def repo_root():
     """Return the repository root (parent of the `mighti/` package directory)."""
 
     return Path(__file__).resolve().parents[2]
 
 
-def resolve_outdir(outdir: Optional[str | os.PathLike] = None, default: str = "outputs") -> Path:
+def resolve_outdir(outdir=None, default="outputs"):
     """
     Resolve the output directory for scripts.
 
@@ -37,7 +34,7 @@ def resolve_outdir(outdir: Optional[str | os.PathLike] = None, default: str = "o
     return outdir_path
 
 
-def add_repro_args(parser, *, default_outdir: str = "outputs"):
+def add_repro_args(parser, *, default_outdir="outputs"):
     """
     Add standard reproduction args to an argparse parser.
 
