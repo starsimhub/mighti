@@ -13,10 +13,7 @@ Design goals
   life-expectancy helpers, without importing plotting/matplotlib eagerly.
 """
 
-from __future__ import annotations
-
 import importlib
-from typing import Dict
 
 
 # Allow direct access to submodules without eager imports
@@ -26,7 +23,7 @@ _SUBMODULES = {"life_expectancy", "plotting"}
 # Convenience re-exports (lazy): name -> module
 # NOTE: keep plotting functions out of this list to avoid importing matplotlib
 # when users only want life expectancy utilities.
-_EXPORTS: Dict[str, str] = {
+_EXPORTS = {
     # life_expectancy.py (pure numpy/pandas)
     "calculate_mortality_rates": "life_expectancy",
     "calculate_life_table_from_mx": "life_expectancy",
@@ -46,7 +43,7 @@ _EXPORTS: Dict[str, str] = {
 __all__ = sorted([*_SUBMODULES, *_EXPORTS.keys()])
 
 
-def __getattr__(name: str):
+def __getattr__(name):
     """Lazy attribute resolver for submodules and convenience exports."""
     if name in _SUBMODULES:
         return importlib.import_module(f"{__name__}.{name}")

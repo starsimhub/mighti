@@ -6,14 +6,11 @@ Public API:
 - Keep imports light by lazily loading submodules/classes on first access.
 """
 
-from __future__ import annotations
-
 import importlib
-from typing import Dict
 
 
 # Map public names -> module that defines them
-_EXPORTS: Dict[str, str] = {
+_EXPORTS = {
     # analyzer_core.py
     "DeathsByAgeSexAnalyzer": "analyzer_core",
     "AgeSexMxAnalyzer": "analyzer_core",
@@ -52,7 +49,7 @@ _SUBMODULES = {
 __all__ = sorted([*_EXPORTS.keys(), *_SUBMODULES])
 
 
-def __getattr__(name: str):
+def __getattr__(name):
     if name in _SUBMODULES:
         return importlib.import_module(f"{__name__}.{name}")
 

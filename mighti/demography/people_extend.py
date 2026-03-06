@@ -19,7 +19,7 @@ class PeopleCustom(ss.People):
     kept here to centralize all People initialization helpers in one module.
     """
 
-    def __init__(self, n_agents, age_data=None, extra_states=None, mock: bool = False):  # noqa: ARG002
+    def __init__(self, n_agents, age_data=None, extra_states=None, mock=False):  # noqa: ARG002
         super().__init__(n_agents=n_agents, age_data=age_data, extra_states=extra_states)
         # Keep the module name 'people' so StarSim internals can plan correctly.
         self.name = "people"
@@ -76,9 +76,9 @@ def fixed_step_die(self):
 # ---------------------------------------------------------------------------
 # 1. Build 5-year age–sex percent table
 # ---------------------------------------------------------------------------
-def build_age_sex_percent(csv_path: str, init_year: int,
-                          out_csv: str | None = None,
-                          *, bin_width: int = 5, top_open: int = 95) -> pd.DataFrame:
+def build_age_sex_percent(csv_path, init_year,
+                          out_csv=None,
+                          *, bin_width=5, top_open=95):
     df = pd.read_csv(csv_path)
     df.columns = df.columns.map(str.strip)
     year_col = str(init_year)
@@ -121,7 +121,7 @@ def build_age_sex_percent(csv_path: str, init_year: int,
 # ---------------------------------------------------------------------------
 # 2. Build Starsim-compatible age distribution
 # ---------------------------------------------------------------------------
-def build_age_distribution_from_percent(age_sex_csv: str, *, bin_width: int = 5, top_open: int = 95) -> pd.DataFrame:
+def build_age_distribution_from_percent(age_sex_csv, *, bin_width=5, top_open=95):
     df = pd.read_csv(age_sex_csv)
     total_by_bin = df["male"] + df["female"]
     df["age"] = df["agestart"] + bin_width / 2
@@ -133,7 +133,7 @@ def build_age_distribution_from_percent(age_sex_csv: str, *, bin_width: int = 5,
 # ---------------------------------------------------------------------------
 # 3. Build p(female) mapping
 # ---------------------------------------------------------------------------
-def build_p_female_map(age_sex_df: pd.DataFrame, *, bin_width: int = 5, top_open: int = 95) -> dict:
+def build_p_female_map(age_sex_df, *, bin_width=5, top_open=95):
     p_map = {}
     for _, row in age_sex_df.iterrows():
         a = int(row["agestart"])
@@ -144,7 +144,7 @@ def build_p_female_map(age_sex_df: pd.DataFrame, *, bin_width: int = 5, top_open
     return p_map
 
 
-def set_p_by_age_factory(p_map: dict, *, bin_width: int = 5, top_open: int = 95):
+def set_p_by_age_factory(p_map, *, bin_width=5, top_open=95):
     bins = list(range(0, top_open + bin_width, bin_width)) + [np.inf]
     labels = [f"{lo}-{lo+bin_width-1}" for lo in range(0, top_open, bin_width)] + [f"{top_open}+"]
 
@@ -160,10 +160,10 @@ def set_p_by_age_factory(p_map: dict, *, bin_width: int = 5, top_open: int = 95)
 # ---------------------------------------------------------------------------
 # 4. Unified builder for Starsim People 
 # ---------------------------------------------------------------------------
-def make_people_with_age_sex(csv_path: str, init_year: int, n_agents: int,
-                             *, out_dir: str | None = None,
+def make_people_with_age_sex(csv_path, init_year, n_agents,
+                             *, out_dir=None,
                              extra_states=None,
-                             bin_width: int = 5, top_open: int = 95) -> ss.People:
+                             bin_width=5, top_open=95):
     """
     Build a Starsim `People` object from demographic inputs.
 

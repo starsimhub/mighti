@@ -11,8 +11,6 @@ This wrapper provides a drop-in replacement that:
 Deaths are then allocated by `mighti.mortality_competing.CompetingRisksDeaths`.
 """
 
-from __future__ import annotations
-
 import numpy as np
 import starsim as ss
 import stisim as sti
@@ -43,17 +41,17 @@ class HIVCompeting(sti.HIV):
         self._death_pressure_p = np.array([], dtype=float)
         return
 
-    def _competing_enabled(self) -> bool:
+    def _competing_enabled(self):
         return bool(getattr(self.sim, "_mighti_competing_mortality", False))
 
-    def _set_death_pressure(self, uids, p) -> None:
+    def _set_death_pressure(self, uids, p):
         self._death_pressure_uids = np.asarray(uids, dtype=int)
         self._death_pressure_p = np.asarray(p, dtype=float)
 
     def get_death_pressure(self):
         return self._death_pressure_uids, self._death_pressure_p
 
-    def _attributed_deaths(self, death_uids: np.ndarray) -> np.ndarray:
+    def _attributed_deaths(self, death_uids):
         cause_map = getattr(self.sim, "_mighti_death_cause", None)
         if not isinstance(cause_map, dict) or not len(death_uids):
             return np.array([], dtype=int)

@@ -5,8 +5,6 @@ Goal: ensure a fixed rand_seed yields identical outcomes across repeated runs.
 This guards against accidental use of NumPy's global RNG inside MIGHTI modules.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import numpy as np
@@ -16,7 +14,7 @@ import starsim as ss
 import mighti as mi
 
 
-def _run_sdoh_once(seed: int) -> np.ndarray:
+def _run_sdoh_once(seed):
     thisdir = Path(__file__).resolve().parent
     data_dir = thisdir / "test_data"
 

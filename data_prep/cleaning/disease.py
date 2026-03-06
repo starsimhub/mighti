@@ -10,6 +10,19 @@ from .paths import cause_map
 
 logger = logging.getLogger(__name__)
 
+# Conditions that are modeled without direct condition-caused mortality.
+# IMPORTANT: Do NOT leave these p_death values blank/NA, because runtime parameter loading
+# falls back to a nonzero default (see `mighti/diseases/base_disease.py:get_disease_parameters`).
+NONMORTAL_P_DEATH_CONDITIONS = {
+    "AnxietyDisorder",
+    "BipolarDisorder",
+    "ChronicPain",
+    "Hyperlipidemia",
+    "Hypertension",
+    "Obesity",
+    "TobaccoUse",
+}
+
 
 MIGHTI_PARAMETERS_COLUMNS = [
     "condition",
@@ -44,14 +57,14 @@ MIGHTI_CONDITION_METADATA = [
     ("PTSD", "chronic", "both"),
     ("MajorDepressiveDisorder", "remitting", "both"),
     ("BipolarDisorder", "remitting", "both"),
-    ("ViralHepatitis", "chronic", "both"),
+    # Model hepatitis as an acute/event-like condition for Eswatini calibration inputs
+    ("AcuteHepatitis", "acute", "both"),
     ("ChronicLiverDisease", "chronic", "both"),
     ("Asthma", "chronic", "both"),
     ("COPD", "chronic", "both"),
     ("AlzheimersDisease", "chronic", "both"),
     ("ParkinsonsDisease", "chronic", "both"),
-    ("StimulantUseDisorder", "remitting", "both"),
-    ("OpioidUseDisorder", "remitting", "both"),
+    ("DrugUseDisorder", "remitting", "both"),
     ("AnxietyDisorder", "remitting", "both"),
     ("ChronicPain", "remitting", "both"),
 
@@ -87,7 +100,7 @@ MIGHTI_CONDITION_METADATA = [
 ]
 
 
-def create_mighti_parameters_template(output_csv: str, *, overwrite: bool = False) -> pd.DataFrame:
+def create_mighti_parameters_template(output_csv, *, overwrite=False):
     """
     Create a template parameter CSV in the same schema as `mighti/data/eswatini_parameters.csv`.
 
@@ -105,6 +118,9 @@ def create_mighti_parameters_template(output_csv: str, *, overwrite: bool = Fals
     for col in ["p_death", "dur_condition", "rel_sus", "remission_rate", "max_disease_duration", "p_acquire"]:
         df[col] = ""
 
+    # Force p_death=0 for conditions modeled without direct mortality
+    df.loc[df["condition"].isin(NONMORTAL_P_DEATH_CONDITIONS), "p_death"] = 0.0
+
     df = df[MIGHTI_PARAMETERS_COLUMNS]
 
     os.makedirs(os.path.dirname(output_csv), exist_ok=True)
@@ -114,18 +130,20 @@ def create_mighti_parameters_template(output_csv: str, *, overwrite: bool = Fals
 
 
 def ensure_conditions_in_parameters_csv(
-    parameters_csv_path: str,
+    parameters_csv_path,
     *,
-    output_csv_path: str | None = None,
-    overwrite: bool = True,
-    create_if_missing: bool = True,
-) -> pd.DataFrame:
+    output_csv_path=None,
+    overwrite=True,
+    create_if_missing=True,
+    prune_extras=False,
+):
     """
     Ensure `parameters_csv_path` contains at least the conditions in `MIGHTI_CONDITION_METADATA`.
 
     - Adds missing columns needed by MIGHTI
     - Appends missing conditions with blank numeric parameters
     - Preserves existing values for existing conditions
+    - Optionally prunes conditions not in `MIGHTI_CONDITION_METADATA`
     """
     out = output_csv_path or parameters_csv_path
 
@@ -154,10 +172,17 @@ def ensure_conditions_in_parameters_csv(
         row["condition"] = condition
         row["disease_type"] = disease_type
         row["affected_sex"] = affected_sex
+        if condition in NONMORTAL_P_DEATH_CONDITIONS:
+            row["p_death"] = 0.0
         rows.append(row)
 
     if rows:
         df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+
+    # Optionally drop conditions that are not modeled
+    if prune_extras:
+        modeled = {c for c, _, _ in MIGHTI_CONDITION_METADATA}
+        df = df[df["condition"].isin(modeled)].copy()
 
     # Reorder and write
     df = df[MIGHTI_PARAMETERS_COLUMNS]
@@ -171,25 +196,23 @@ def ensure_conditions_in_parameters_csv(
 
 
 def fill_p_death_and_duration_from_allcause_files(
-    parameters_csv_path: str,
+    parameters_csv_path,
     *,
-    allcause_percent_csv_path: str,
-    allcause_rate_csv_path: str,
-    year: int = 2007,
-    output_csv_path: str | None = None,
-    overwrite_existing: bool = False,
-) -> pd.DataFrame:
+    allcause_rate_csv_path,
+    year=2007,
+    output_csv_path=None,
+    overwrite_existing=False,
+):
     """
     Fill `p_death` and `dur_condition` in a MIGHTI parameters CSV using GBD-style
     all-cause exports.
 
-    - `allcause_percent_csv_path`: prevalence in "Percent" metric (GBD export);
-      values are typically already in fractional form (e.g. 0.012 = 1.2%).
+
     - `allcause_rate_csv_path`: Deaths/Prevalence/Incidence in "Rate" metric
       (per 100k).
 
     Computations (matching `data_cleaning_rev`):
-      - p_death = deaths_per_100k / 100_000 / prevalence_fraction
+      - p_death = deaths_per_100k / prevalence_rate_per_100k
       - dur_condition = prevalence_rate_per_100k / incidence_rate_per_100k
 
     Notes:
@@ -201,7 +224,7 @@ def fill_p_death_and_duration_from_allcause_files(
     # to avoid drift between multiple versions of the same logic.
     return fill_p_death_and_duration_from_gbd_long_files(
         parameters_csv_path=parameters_csv_path,
-        gbd_long_csv_paths=[allcause_rate_csv_path, allcause_percent_csv_path],
+        gbd_long_csv_paths=[allcause_rate_csv_path],
         year=year,
         output_csv_path=output_csv_path,
         overwrite_existing=overwrite_existing,
@@ -209,15 +232,15 @@ def fill_p_death_and_duration_from_allcause_files(
 
 
 def fill_p_death_and_duration_from_gbd_long_files(
-    parameters_csv_path: str,
+    parameters_csv_path,
     *,
-    gbd_long_csv_paths: list[str],
-    year: int = 2007,
-    location: str = "Eswatini",
-    output_csv_path: str | None = None,
-    overwrite_existing: bool = False,
-    acute_duration_years_threshold: float = 1.0,
-) -> pd.DataFrame:
+    gbd_long_csv_paths,
+    year=2007,
+    location="Eswatini",
+    output_csv_path=None,
+    overwrite_existing=False,
+    acute_duration_years_threshold=1.0,
+):
     """
     Fill `p_death` and `dur_condition` using one or more GBD-style long-format exports
     that contain rows with columns like:
@@ -227,7 +250,6 @@ def fill_p_death_and_duration_from_gbd_long_files(
     Some exports may include extra leading columns like `population_group`; these are ignored.
 
     Requirements for calculations:
-    - Prevalence fraction: measure='Prevalence', metric='Percent' (typically already fractional)
     - Rates per 100k: metric='Rate' for measures Deaths/Prevalence/Incidence
 
     Computations:
@@ -242,7 +264,7 @@ def fill_p_death_and_duration_from_gbd_long_files(
         (and when incidence is available and >0).
 
       - Otherwise (default, prevalence-based proxy):
-          p_death = deaths_rate_per_100k / 100_000 / prevalence_fraction
+          p_death = deaths_rate_per_100k / prevalence_rate_per_100k
 
     Note: `acute_duration_years_threshold` is kept for backward-compatibility/experimentation,
     but the primary switch is now `disease_type`.
@@ -284,7 +306,7 @@ def fill_p_death_and_duration_from_gbd_long_files(
     # Determine which modeled conditions should use CFR for p_death (Deaths/Incidence).
     # We infer this from the parameter table's disease_type column.
     cfr_types = {"acute", "surgical", "genericsis", "genericsir", "sis", "sir"}
-    cfr_conditions: set[str] = set()
+    cfr_conditions = set()
     if "disease_type" in params.columns:
         cfr_conditions = set(
             params.loc[params["disease_type"].astype(str).str.lower().isin(cfr_types), "condition"]
@@ -292,22 +314,15 @@ def fill_p_death_and_duration_from_gbd_long_files(
             .str.strip()
         )
 
-    # Prevalence fraction (Percent metric) and rates (Rate metric) — sum many→one mappings
-    prev_frac = (
-        raw[(raw["measure"] == "Prevalence") & (raw["metric"] == "Percent")]
-        .groupby("condition", as_index=True)["val"]
-        .sum()
-    )
-
+    # Rates (Rate metric) — sum many→one mappings
     rates = raw[raw["metric"] == "Rate"].copy()
     deaths_rate = rates[rates["measure"] == "Deaths"].groupby("condition", as_index=True)["val"].sum()
     prev_rate = rates[rates["measure"] == "Prevalence"].groupby("condition", as_index=True)["val"].sum()
     inc_rate = rates[rates["measure"] == "Incidence"].groupby("condition", as_index=True)["val"].sum()
 
-    idx = sorted(set(prev_frac.index) | set(deaths_rate.index) | set(prev_rate.index) | set(inc_rate.index))
+    idx = sorted(set(deaths_rate.index) | set(prev_rate.index) | set(inc_rate.index))
     computed = pd.DataFrame(index=idx)
     computed.index.name = "condition"
-    computed["prevalence_fraction"] = prev_frac.reindex(idx)
     computed["deaths_per_100k"] = deaths_rate.reindex(idx)
     computed["prevalence_rate_per_100k"] = prev_rate.reindex(idx)
     computed["incidence_rate_per_100k"] = inc_rate.reindex(idx)
@@ -324,15 +339,15 @@ def fill_p_death_and_duration_from_gbd_long_files(
     computed["p_death"] = np.nan
     ok_prev = (
         computed["deaths_per_100k"].notna()
-        & computed["prevalence_fraction"].notna()
-        & (computed["prevalence_fraction"] > 0)
+        & computed["prevalence_rate_per_100k"].notna()
+        & (computed["prevalence_rate_per_100k"] > 0)
     )
     computed.loc[ok_prev, "p_death"] = (
-        computed.loc[ok_prev, "deaths_per_100k"] / 100_000.0 / computed.loc[ok_prev, "prevalence_fraction"]
+        computed.loc[ok_prev, "deaths_per_100k"] / computed.loc[ok_prev, "prevalence_rate_per_100k"]
     )
 
     # For CFR-eligible conditions, overwrite p_death with CFR proxy (deaths/incidence)
-    cfr_applied_conditions: set[str] = set()
+    cfr_applied_conditions = set()
     if cfr_conditions:
         is_cfr = computed.index.to_series().isin(cfr_conditions)
         ok_cfr = (
@@ -365,6 +380,10 @@ def fill_p_death_and_duration_from_gbd_long_files(
             merged.loc[missing, col] = merged.loc[missing, calc]
         merged = merged.drop(columns=[calc])
 
+    # Enforce p_death=0 for non-mortality conditions regardless of computed values
+    if NONMORTAL_P_DEATH_CONDITIONS:
+        merged.loc[merged["condition"].isin(NONMORTAL_P_DEATH_CONDITIONS), "p_death"] = 0.0
+
     os.makedirs(os.path.dirname(out), exist_ok=True)
     merged.to_csv(out, index=False)
     logger.info(f"Filled p_death/dur_condition saved to {out} (year={year})")
@@ -378,7 +397,7 @@ def create_and_fill_prevalence_template_from_long_format(
     end_year=2021,
     age_starts=None,
     *,
-    overwrite: bool = False,
+    overwrite=False,
 ):
     """
     Create and fill a prevalence template with numeric Age values (0, 5, 10, 15...).
@@ -388,16 +407,7 @@ def create_and_fill_prevalence_template_from_long_format(
         # lower bounds for age groups, consistent with GBD
         age_starts = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
 
-    # Step 1 — make the base grid
-    modeled_conditions = list(set(cause_map.values()))
-    expected_cols = [f"{cond}_{sex}" for cond in modeled_conditions for sex in ["male", "female"]]
-    grid = pd.MultiIndex.from_product([age_starts, range(start_year, end_year + 1)], names=["Age", "Year"]).to_frame(
-        index=False
-    )
-    for c in expected_cols:
-        grid[c] = np.nan
-
-    # Step 2 — load raw prevalence file
+    # Step 1 — load raw prevalence file
     df = pd.read_csv(raw_csv).rename(columns={"cause": "condition", "val": "prevalence"})
     df["condition"] = df["condition"].map(cause_map)
     df = df.dropna(subset=["condition"])
@@ -411,6 +421,26 @@ def create_and_fill_prevalence_template_from_long_format(
     # normalize prevalence (% → fraction)
     if df["prevalence"].max() > 1.5:
         df["prevalence"] /= 100.0
+
+    # If year range is not specified, infer from input file
+    years = df["year"].dropna()
+    if years.empty:
+        raise ValueError(f"Could not parse any 4-digit years from: {raw_csv}")
+    if start_year is None:
+        start_year = int(years.min())
+    if end_year is None:
+        end_year = int(years.max())
+    if end_year < start_year:
+        raise ValueError(f"Invalid year range: start_year={start_year}, end_year={end_year}")
+
+    # Step 2 — make the base grid (Age × Year, with one column per condition×sex)
+    modeled_conditions = list(set(cause_map.values()))
+    expected_cols = [f"{cond}_{sex}" for cond in modeled_conditions for sex in ["male", "female"]]
+    grid = pd.MultiIndex.from_product([age_starts, range(start_year, end_year + 1)], names=["Age", "Year"]).to_frame(
+        index=False
+    )
+    for c in expected_cols:
+        grid[c] = np.nan
 
     # Step 3 — map GBD-style age labels to numeric start
     def get_age_start(label):
@@ -452,6 +482,31 @@ def create_and_fill_prevalence_template_from_long_format(
     return grid
 
 
+def merge_gbd_long_csvs(input_csv_paths, output_csv_path, *, required_cols=None):
+    """
+    Merge one or more GBD-style long-format CSV exports (same schema) into a single CSV.
+
+    This is useful when a location's GBD export was downloaded in multiple batches (e.g., by year ranges).
+    We do not attempt to re-compute values here; we simply concatenate and de-duplicate exact rows.
+    """
+    if required_cols is None:
+        required_cols = ["measure", "location", "sex", "age", "cause", "metric", "year", "val", "upper", "lower"]
+
+    frames = []
+    for p in input_csv_paths:
+        df = pd.read_csv(p)
+        missing = [c for c in required_cols if c not in df.columns]
+        if missing:
+            raise ValueError(f"{p} is missing required columns: {missing}")
+        frames.append(df[required_cols].copy())
+
+    merged = pd.concat(frames, ignore_index=True).drop_duplicates()
+    os.makedirs(os.path.dirname(output_csv_path), exist_ok=True)
+    merged.to_csv(output_csv_path, index=False)
+    logger.info(f"Merged {len(input_csv_paths)} GBD exports → {output_csv_path} (rows={len(merged)})")
+    return output_csv_path
+
+
 def create_condition_metadata_table(long_csv_path, output_csv):
     # Load raw data
     raw = pd.read_csv(long_csv_path)
@@ -473,7 +528,9 @@ def create_condition_metadata_table(long_csv_path, output_csv):
             raise ValueError(f"Missing required column: '{col}' in pivoted data.")
 
     # Compute derived parameters
-    pivot["p_death"] = pivot["Deaths"] / 100_000 / (pivot["Prevalence"] / 100)
+    # When inputs are all in Rate metric (per 100k), convert population rates to a conditional probability:
+    #   p_death ≈ (deaths per 100k) / (prevalence per 100k)
+    pivot["p_death"] = pivot["Deaths"] / pivot["Prevalence"]
     pivot["dur_condition"] = pivot["Prevalence"] / pivot["Incidence"]
 
     pivot["condition"] = pivot["cause"].map(cause_map)

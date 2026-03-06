@@ -11,8 +11,6 @@ python mighti_calibration.py --region eswatini --start 1990 --stop 2023 --n-agen
 """
 
 
-from __future__ import annotations
-
 import argparse
 from dataclasses import dataclass
 import logging
@@ -41,7 +39,7 @@ class CalibConfig:
     use_stisim_calibration: bool
 
 
-def _resolve_default_paths(region: str, data_dir: Path) -> dict[str, Path]:
+def _resolve_default_paths(region, data_dir):
     """Resolve default input file paths for a region."""
     return {
         "prevalence_hiv_csv": data_dir / f"{region}_prevalence_hiv.csv",
@@ -50,7 +48,7 @@ def _resolve_default_paths(region: str, data_dir: Path) -> dict[str, Path]:
     }
 
 
-def _require_exists(path: Path, label: str) -> Path:
+def _require_exists(path, label):
     if not path.exists():
         raise FileNotFoundError(
             f"Missing {label}: {path}. "
@@ -59,7 +57,7 @@ def _require_exists(path: Path, label: str) -> Path:
     return path
 
 
-def make_sim(cfg: CalibConfig):
+def make_sim(cfg):
     """Build and initialize a simulation for HIV calibration."""
     import pandas as pd
     import starsim as ss
@@ -143,7 +141,7 @@ def build_sim(sim, calib_pars):
     return sim
 
 
-def _infer_obs_scale(obs_df, *, units: str) -> float:
+def _infer_obs_scale(obs_df, *, units):
     """
     Return a multiplier to convert observed HIV prevalence into model units (fractions 0-1).
 
@@ -176,10 +174,10 @@ def _infer_obs_scale(obs_df, *, units: str) -> float:
 
 
 def build_stisim_style_hiv_data(
-    cfg: CalibConfig,
+    cfg,
     *,
-    results_key: str,
-    analyzer_age_bins: list[tuple[float, float]],
+    results_key,
+    analyzer_age_bins,
 ):
     """
     Build a DataFrame compatible with `stisim.calibration.Calibration(data=...)`.
@@ -239,7 +237,7 @@ def build_stisim_style_hiv_data(
     return out
 
 
-def run_calib(cfg: CalibConfig, calib_pars=None):
+def run_calib(cfg, calib_pars=None):
     """
     Run the calibration simulation with the given parameters.
 
@@ -358,7 +356,7 @@ def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None
     if isinstance(sim, ss.MultiSim):
         sim = sim.sims[0]
 
-    def _find_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
+    def _find_col(df, candidates):
         cols_lower = {c.lower(): c for c in df.columns}
         for cand in candidates:
             if cand in df.columns:
@@ -429,7 +427,7 @@ def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None
     return fit / n_obs
 
 
-def _parse_args(argv: list[str] | None = None) -> CalibConfig:
+def _parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Calibrate HIV transmission betas against observed prevalence.")
     parser.add_argument("--region", default="eswatini", help="Region name (used to build default file names).")
     parser.add_argument("--data-dir", default="mighti/data", help="Directory containing region CSV inputs.")

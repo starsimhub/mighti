@@ -2,8 +2,6 @@
 Tests for additive-hazard mortality engine (background + modeled hazards).
 """
 
-from __future__ import annotations
-
 import numpy as np
 import pandas as pd
 import starsim as ss
@@ -14,7 +12,7 @@ import mighti as mi
 class DummyPressure(ss.Disease):
     """A tiny module that reports constant death pressure for all alive agents."""
 
-    def __init__(self, p: float, name: str = "dummy"):
+    def __init__(self, p, name="dummy"):
         super().__init__()
         self.name = name
         self._p = float(p)
@@ -37,7 +35,7 @@ class DummyPressure(ss.Disease):
         self._pp = np.full(len(auids), self._p, dtype=float)
 
 
-def _simple_bg_rate() -> pd.DataFrame:
+def _simple_bg_rate():
     # Minimal long-format "mx schedule" compatible with mortality modules.
     # Use a constant mx across ages/sexes for one year.
     recs = []
@@ -47,7 +45,7 @@ def _simple_bg_rate() -> pd.DataFrame:
     return pd.DataFrame(recs)
 
 
-def _run_sim(with_pressure: bool) -> float:
+def _run_sim(with_pressure):
     bg = mi.mortality_additive.AdditiveHazardDeaths(
         _simple_bg_rate(),
         rate_units=1,

@@ -29,10 +29,7 @@ This is intentionally pragmatic: it's a bridge that supports
   - forecasting/scenario modeling holding the calibrated background constant.
 """
 
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Dict, List, Mapping
+from typing import Mapping
 
 import numpy as np
 import pandas as pd
@@ -44,14 +41,14 @@ from mighti.util.rng import get_rng
 __all__ = ["AdditiveHazardDeaths"]
 
 
-@dataclass(frozen=True)
 class _DeathPressure:
-    name: str
-    uids: np.ndarray
-    p: np.ndarray  # per-timestep probability-like pressure
+    def __init__(self, name, uids, p):
+        self.name = name
+        self.uids = uids
+        self.p = p  # per-timestep probability-like pressure
 
 
-def _p_to_h(p: np.ndarray) -> np.ndarray:
+def _p_to_h(p):
     """Convert per-step death probability to hazard: h = -log(1-p)."""
     p = np.asarray(p, dtype=float)
     p = np.clip(p, 0.0, 1.0 - 1e-12)
@@ -81,10 +78,10 @@ class AdditiveHazardDeaths(ss.Disease):
         self,
         background_rate,
         *,
-        background_multiplier: float = 1.0,
-        rate_units: float = 1e-3,
-        metadata: Mapping | None = None,
-        background_cause_name: str = "background",
+        background_multiplier=1.0,
+        rate_units=1e-3,
+        metadata=None,
+        background_cause_name="background",
         **kwargs,
     ):
         super().__init__()
@@ -106,7 +103,7 @@ class AdditiveHazardDeaths(ss.Disease):
         )
 
         self.background_rate_data = None
-        self._cause_map: Dict[int, str] = {}  # uid -> cause name, current timestep
+        self._cause_map = {}  # uid -> cause name, current timestep
         return
 
     def init_pre(self, sim):
@@ -133,7 +130,7 @@ class AdditiveHazardDeaths(ss.Disease):
         )
         return
 
-    def _make_p_background(self, uids: np.ndarray) -> np.ndarray:
+    def _make_p_background(self, uids):
         """Per-step background death probability for these uids (before hazard scaling)."""
         sim = self.sim
         brd = self.background_rate_data
@@ -183,8 +180,8 @@ class AdditiveHazardDeaths(ss.Disease):
             p_bg = np.full(uids.shape, float(p_bg[0]), dtype=float)
         return np.clip(p_bg.astype(float), 0.0, 1.0)
 
-    def _collect_death_pressures(self) -> List[_DeathPressure]:
-        pressures: List[_DeathPressure] = []
+    def _collect_death_pressures(self):
+        pressures = []
         for mod in self.sim.diseases():
             if mod is self:
                 continue
@@ -201,7 +198,7 @@ class AdditiveHazardDeaths(ss.Disease):
             pressures.append(_DeathPressure(name=getattr(mod, "name", mod.__class__.__name__), uids=uids, p=p))
         return pressures
 
-    def _categorical_one(self, weights: np.ndarray, rng: np.random.Generator) -> int:
+    def _categorical_one(self, weights, rng):
         tot = float(weights.sum())
         if not np.isfinite(tot) or tot <= 0:
             return int(len(weights) - 1)

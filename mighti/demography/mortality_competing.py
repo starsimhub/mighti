@@ -22,10 +22,7 @@ designed to prevent death double counting while producing explicit cause
 attribution suitable for analyzers.
 """
 
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Dict, Iterable, List, Mapping, Tuple
+from typing import Mapping
 
 import numpy as np
 import pandas as pd
@@ -37,11 +34,11 @@ from mighti.util.rng import get_rng
 __all__ = ["CompetingRisksDeaths"]
 
 
-@dataclass(frozen=True)
 class _DeathPressure:
-    name: str
-    uids: np.ndarray  # int
-    p: np.ndarray  # float, per-timestep probability-like weight
+    def __init__(self, name, uids, p):
+        self.name = name
+        self.uids = uids  # int
+        self.p = p  # float, per-timestep probability-like weight
 
 
 class CompetingRisksDeaths(ss.Disease):
@@ -62,10 +59,10 @@ class CompetingRisksDeaths(ss.Disease):
         self,
         death_rate,
         *,
-        rel_death: float = 1.0,
-        rate_units: float = 1e-3,
-        metadata: Mapping | None = None,
-        residual_cause_name: str = "residual",
+        rel_death=1.0,
+        rate_units=1e-3,
+        metadata=None,
+        residual_cause_name="residual",
         **kwargs,
     ):
         super().__init__()
@@ -88,7 +85,7 @@ class CompetingRisksDeaths(ss.Disease):
         )
 
         self.death_rate_data = None
-        self._cause_map: Dict[int, str] = {}  # uid -> cause name, for *current timestep only*
+        self._cause_map = {}  # uid -> cause name, for *current timestep only*
         return
 
     # ------------------------------------------------------------------
@@ -146,7 +143,7 @@ class CompetingRisksDeaths(ss.Disease):
     # ------------------------------------------------------------------
     # Core mechanics
     # ------------------------------------------------------------------
-    def _make_p_allcause(self, uids: np.ndarray) -> np.ndarray:
+    def _make_p_allcause(self, uids):
         """Probability of death (all-cause) for these uids on this timestep."""
         sim = self.sim
         drd = self.death_rate_data
@@ -201,8 +198,8 @@ class CompetingRisksDeaths(ss.Disease):
         p_all = np.clip(p_all, 0.0, 1.0)
         return p_all.astype(float)
 
-    def _collect_death_pressures(self) -> List[_DeathPressure]:
-        pressures: List[_DeathPressure] = []
+    def _collect_death_pressures(self):
+        pressures = []
         for mod in self.sim.diseases():
             if mod is self:
                 continue
@@ -219,7 +216,7 @@ class CompetingRisksDeaths(ss.Disease):
             pressures.append(_DeathPressure(name=getattr(mod, "name", mod.__class__.__name__), uids=uids, p=p))
         return pressures
 
-    def _categorical_one(self, weights: np.ndarray, rng: np.random.Generator) -> int:
+    def _categorical_one(self, weights, rng):
         """Return index sampled proportional to nonnegative weights."""
         tot = float(weights.sum())
         if not np.isfinite(tot) or tot <= 0:

@@ -2,8 +2,6 @@
 Education situation SDoH module.
 """
 
-from __future__ import annotations
-
 from .core import BaseSDoH
 
 __all__ = ["EducationSituation"]

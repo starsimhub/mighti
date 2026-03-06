@@ -13,39 +13,38 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 #
 # IMPORTANT: We intentionally do NOT import `mighti` here.
 # Importing `mighti` pulls in `starsim` which may trigger heavy numba/matplotlib
-# initialization and can fail in some environments. Instead, we write outputs
-# to the repo-local `mighti/data/` folder.
+# initialization and can fail in some environments. Instead, we write processed
+# outputs to the repo-local `data/processed/` folder.
 # -------------------------------------------------------------------------
-MIGHTI_BASE = os.path.join(PROJECT_ROOT, "mighti")
-DATA_DIR = os.path.join(MIGHTI_BASE, "data")
+DATA_DIR = os.path.join(PROJECT_ROOT, "data", "processed")
 
 
-def ensure_data_dir() -> str:
-    """Create and return the `mighti/data/` output directory."""
+def ensure_data_dir():
+    """Create and return the `data/processed/` output directory."""
     os.makedirs(DATA_DIR, exist_ok=True)
     return DATA_DIR
 
 
-def data_path(filename: str) -> str:
-    """Return full path for a file inside `mighti/data/`."""
+def data_path(filename):
+    """Return full path for a file inside `data/processed/`."""
     ensure_data_dir()
     return os.path.join(DATA_DIR, filename)
 
 
-RAW_DATA_DIR = os.path.join(PROJECT_ROOT, "raw_data")
-WPP_DATA = os.path.join(PROJECT_ROOT, "raw_data", "wpp_data")
+RAW_DATA_DIR = os.path.join(PROJECT_ROOT, "data/raw")
+WPP_DATA = os.path.join(PROJECT_ROOT, "data/raw", "wpp_data")
 
 
-def wpp_path(filename: str) -> str:
-    """Return full path for files in `raw_data/wpp_data/`."""
+def wpp_path(filename):
+    """Return full path for files in `data/raw/wpp_data/`."""
     return os.path.join(WPP_DATA, filename)
 
 
 DISEASE_DATA_DIR = os.path.join(RAW_DATA_DIR, "disease_data")
 
 
-def disease_data_path(filename: str) -> str:
-    """Return full path for files in `raw_data/disease_data/`."""
+def disease_data_path(filename):
+    """Return full path for files in `data/raw/disease_data/`."""
     return os.path.join(DISEASE_DATA_DIR, filename)
 
 
@@ -71,16 +70,28 @@ cause_map = {
     "Major depressive disorder": "MajorDepressiveDisorder",
     "Human papillomavirus infection": "HPV",
     "Influenza and pneumonia": "Flu",
-    "Hepatitis B": "ViralHepatitis",
-    "Hepatitis C": "ViralHepatitis",
+    # Use AcuteHepatitis as the modeled hepatitis condition (collapse hepatitis-related causes)
+    "Acute hepatitis": "AcuteHepatitis",
+    "Hepatitis B": "AcuteHepatitis",
+    "Hepatitis C": "AcuteHepatitis",
     "Interpersonal violence": "InterpersonalViolence",
     "Self-harm": "SelfHarm",
     "Road injuries": "RoadInjuries",
     "Cirrhosis and other chronic liver diseases": "ChronicLiverDisease",
     "Asthma": "Asthma",
     "Chronic obstructive pulmonary disease": "COPD",
+    # IHME exports are inconsistent about curly vs straight apostrophes
     "Alzheimer’s disease and other dementias": "AlzheimersDisease",
+    "Alzheimer's disease and other dementias": "AlzheimersDisease",
     "Parkinson’s disease": "ParkinsonsDisease",
+    "Parkinson's disease": "ParkinsonsDisease",
+    "Anxiety disorders": "AnxietyDisorder",
+    "Drug use disorders": "DrugUseDisorder",
+    # Collapse opioid use disorder into overall drug use disorder for modeled condition
+    "Opioid use disorders": "DrugUseDisorder",
+    # Sub-causes that we collapse into the modeled DrugUseDisorder category
+    "Cocaine use disorders": "DrugUseDisorder",
+    "Amphetamine use disorders": "DrugUseDisorder",
     "Neonatal encephalopathy due to birth asphyxia and trauma": "NeonatalEncephalopathy",
     "Neonatal preterm birth": "NeonatalPretermBirth",
     "Neonatal sepsis and other neonatal infections": "NeonatalSepsis",

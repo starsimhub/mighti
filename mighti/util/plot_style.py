@@ -2,21 +2,17 @@
 Central plotting defaults for MIGHTI.
 """
 
-from __future__ import annotations
-
-from typing import Any, Optional
-
 __all__ = ["apply_mighti_style"]
 
 
 def apply_mighti_style(
     *,
-    context: str = "talk",
-    font_scale: float = 1.6,
-    font_family: str = "sans-serif",
-    sans_serif: Optional[list[str]] = None,
-    **overrides: Any,
-) -> None:
+    context="talk",
+    font_scale=1.6,
+    font_family="sans-serif",
+    sans_serif=None,
+    **overrides,
+):
     """
     Apply a consistent Seaborn/Matplotlib style.
 

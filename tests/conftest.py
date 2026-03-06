@@ -11,8 +11,6 @@ We redirect Numba's cache into the repo (which is writable) before any test
 module imports `starsim`.
 """
 
-from __future__ import annotations
-
 import os
 from pathlib import Path
 

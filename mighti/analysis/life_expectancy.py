@@ -5,7 +5,6 @@ Calculates and analyzes mortality rates and life expectancy from simulation data
 
 import numpy as np
 import pandas as pd
-from typing import Callable, Dict, Tuple
 
 
 import numpy as np
@@ -149,7 +148,7 @@ def calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100):
     return pd.concat([lt_male, lt_female], ignore_index=True)
 
 
-def load_un_mx_from_wide(mx_csv_path: str, year: int, max_age: int = 100) -> pd.DataFrame:
+def load_un_mx_from_wide(mx_csv_path, year, max_age=100):
     """
     Load UN/WPP nMx from wide file with columns: Age, Sex, 1986.0, ..., 2023.0
     Return tidy ['age','sex','mx'] for the requested year and ages 0..max_age.
@@ -189,7 +188,7 @@ def load_un_mx_from_wide(mx_csv_path: str, year: int, max_age: int = 100) -> pd.
     return pd.concat(grids, ignore_index=True)
 
 
-def load_un_ex_from_wide(ex_csv_path: str, year: int, *, age: int = 0) -> pd.DataFrame:
+def load_un_ex_from_wide(ex_csv_path, year, *, age=0):
     """
     Load UN/WPP e(x) (life expectancy) from a wide file with columns:
       Age, Sex, 1986.0, ..., 2023.0
@@ -222,7 +221,7 @@ def load_un_ex_from_wide(ex_csv_path: str, year: int, *, age: int = 0) -> pd.Dat
     return out[["age", "sex", "ex"]].reset_index(drop=True)
 
 
-def observed_e0_from_un_ex(ex_csv_path: str, year: int) -> dict:
+def observed_e0_from_un_ex(ex_csv_path, year):
     """Convenience: return {'Male','Female','Both'} life expectancy at birth from UN ex."""
     df = load_un_ex_from_wide(ex_csv_path, year=year, age=0)
     out = {row["sex"]: float(row["ex"]) for _, row in df.iterrows()}
@@ -280,7 +279,7 @@ def calculate_life_expectancy(sim, year=None, max_age=100, radix=100_000):
     return {'Male': e0_male, 'Female': e0_female, 'Both': e0_both}
 
 
-def calculate_life_table(sim, year=None, max_age=100, radix=100_000) -> pd.DataFrame:
+def calculate_life_table(sim, year=None, max_age=100, radix=100_000):
     """
     Compute a full life table from a completed simulation.
 
@@ -309,11 +308,11 @@ def calculate_life_table(sim, year=None, max_age=100, radix=100_000) -> pd.DataF
 # Reference life expectancy utilities (Stevens-style YLL support)
 # -----------------------------------------------------------------------------
 def life_table_from_mx(
-    mx: np.ndarray,
+    mx,
     *,
-    max_age: int = 100,
-    radix: int = 100_000,
-) -> pd.DataFrame:
+    max_age=100,
+    radix=100_000,
+):
     """
     Construct a standard period life table from age-specific mortality rates m(x).
 
@@ -374,11 +373,11 @@ def life_table_from_mx(
 
 
 def reference_ex_from_mx_df(
-    df_mx: pd.DataFrame,
+    df_mx,
     *,
-    max_age: int = 100,
-    radix: int = 100_000,
-) -> pd.DataFrame:
+    max_age=100,
+    radix=100_000,
+):
     """
     Build an age/sex-specific reference remaining life expectancy table e(x).
 
@@ -415,7 +414,7 @@ def reference_ex_from_mx_df(
     return pd.concat(out, ignore_index=True)
 
 
-def make_ex_lookup(df_ex: pd.DataFrame) -> Callable[[str, float], float]:
+def make_ex_lookup(df_ex):
     """
     Create a fast (sex, age)->remaining life expectancy lookup from a tidy ex table.
 
@@ -435,9 +434,9 @@ def make_ex_lookup(df_ex: pd.DataFrame) -> Callable[[str, float], float]:
     d["ex"] = pd.to_numeric(d["ex"], errors="coerce").fillna(0.0).astype(float)
 
     max_age = int(d["age"].max()) if len(d) else 0
-    table: Dict[Tuple[str, int], float] = {(r.sex, int(r.age)): float(r.ex) for r in d.itertuples(index=False)}
+    table = {(r.sex, int(r.age)): float(r.ex) for r in d.itertuples(index=False)}
 
-    def lookup(sex: str, age: float) -> float:
+    def lookup(sex, age):
         s = str(sex).strip().title()
         a = int(np.floor(float(age)))
         if a < 0:
@@ -450,11 +449,11 @@ def make_ex_lookup(df_ex: pd.DataFrame) -> Callable[[str, float], float]:
 
 
 def calculate_life_expectancy_from_mx_df(
-    df_mx: pd.DataFrame,
+    df_mx,
     *,
-    max_age: int = 100,
-    radix: int = 100_000,
-) -> dict:
+    max_age=100,
+    radix=100_000,
+):
     """
     Compute e0 from a tidy age/sex m(x) table.
 
@@ -478,10 +477,10 @@ def calculate_life_expectancy_from_mx_df(
 def calculate_life_expectancy_from_age_sex_mx_analyzer(
     sim,
     *,
-    year: int | None = None,
-    max_age: int = 100,
-    radix: int = 100_000,
-) -> dict:
+    year=None,
+    max_age=100,
+    radix=100_000,
+):
     """
     Compute e0 using realized m(x) from `AgeSexMxAnalyzer`.
 
