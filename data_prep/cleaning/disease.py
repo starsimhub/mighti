@@ -70,8 +70,8 @@ MIGHTI_CONDITION_METADATA = [
 
     # Infectious / SIS-SIR placeholders used by MIGHTI
     ("HPV", "genericsis", "both"),
-    ("Flu", "genericsir", "both"),
-    ("DiarrhealDisease", "genericsir", "both"),
+    ("Influenza", "genericsir", "both"),
+    ("DiarrhealDiseases", "genericsir", "both"),
 
     # Injuries / violence
     ("InterpersonalViolence", "surgical", "both"),
@@ -98,6 +98,113 @@ MIGHTI_CONDITION_METADATA = [
     ("Tuberculosis", "genericsir", "both"),
     ("MaternalConditions", "acute", "female"),
 ]
+
+
+def apply_rel_sus_from_csv(
+    parameters_csv_path,
+    *,
+    rel_sus_csv_path,
+    output_csv_path=None,
+    overwrite_existing=False,
+):
+    """
+    Fill/overwrite `rel_sus` in parameters table using a 2-column CSV:
+      - condition
+      - rel_sus
+    """
+    out = output_csv_path or parameters_csv_path
+    params = pd.read_csv(parameters_csv_path)
+    rel = pd.read_csv(rel_sus_csv_path)
+
+    if "condition" not in params.columns:
+        raise ValueError(f"Missing 'condition' column in {parameters_csv_path}")
+    if "condition" not in rel.columns or "rel_sus" not in rel.columns:
+        raise ValueError(f"{rel_sus_csv_path} must contain columns: condition, rel_sus")
+
+    params["condition"] = params["condition"].astype(str).str.strip()
+    rel["condition"] = rel["condition"].astype(str).str.strip()
+    rel["rel_sus"] = pd.to_numeric(rel["rel_sus"], errors="coerce")
+
+    rel_map = rel.dropna(subset=["condition"]).drop_duplicates(subset=["condition"], keep="last").set_index("condition")["rel_sus"]
+    params["rel_sus_calc"] = params["condition"].map(rel_map)
+
+    if "rel_sus" not in params.columns:
+        params["rel_sus"] = np.nan
+    params["rel_sus"] = pd.to_numeric(params["rel_sus"], errors="coerce")
+
+    if overwrite_existing:
+        params["rel_sus"] = params["rel_sus_calc"].where(params["rel_sus_calc"].notna(), params["rel_sus"])
+    else:
+        missing = params["rel_sus"].isna()
+        params.loc[missing, "rel_sus"] = params.loc[missing, "rel_sus_calc"]
+
+    n_filled = int(params["rel_sus_calc"].notna().sum())
+    params = params.drop(columns=["rel_sus_calc"])
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    params.to_csv(out, index=False)
+    logger.info("Applied rel_sus from %s -> %s (%s mapped conditions)", rel_sus_csv_path, out, n_filled)
+    return params
+
+
+def apply_parameter_rules(
+    parameters_csv_path,
+    *,
+    output_csv_path=None,
+    overwrite_existing=False,
+    max_duration_rules=None,
+):
+    """
+    Apply rule-based defaults to parameter table:
+      - remission_rate = 0 for non-remitting disease types
+      - fill max_disease_duration by disease_type rule
+    """
+    out = output_csv_path or parameters_csv_path
+    params = pd.read_csv(parameters_csv_path)
+
+    if "condition" not in params.columns:
+        raise ValueError(f"Missing 'condition' column in {parameters_csv_path}")
+    if "disease_type" not in params.columns:
+        raise ValueError(f"Missing 'disease_type' column in {parameters_csv_path}")
+
+    if "remission_rate" not in params.columns:
+        params["remission_rate"] = np.nan
+    if "max_disease_duration" not in params.columns:
+        params["max_disease_duration"] = np.nan
+
+    params["disease_type_norm"] = params["disease_type"].astype(str).str.strip().str.lower()
+    params["remission_rate"] = pd.to_numeric(params["remission_rate"], errors="coerce")
+    params["max_disease_duration"] = pd.to_numeric(params["max_disease_duration"], errors="coerce")
+
+    # User-facing rule: explicitly set non-remitting conditions to 0 remission
+    non_remitting = params["disease_type_norm"] != "remitting"
+    params.loc[non_remitting, "remission_rate"] = 0.0
+
+    default_rules = {
+        "acute": 1.0,
+        "surgical": 1.0,
+        "genericsis": 1.0,
+        "genericsir": 1.0,
+        "sis": 1.0,
+        "sir": 1.0,
+        "remitting": 10.0,
+        "chronic": 100.0,
+        "static": 120.0,
+    }
+    rules = default_rules if max_duration_rules is None else max_duration_rules
+
+    for dtype, max_years in rules.items():
+        m = params["disease_type_norm"] == str(dtype).lower()
+        if overwrite_existing:
+            params.loc[m, "max_disease_duration"] = float(max_years)
+        else:
+            missing = m & params["max_disease_duration"].isna()
+            params.loc[missing, "max_disease_duration"] = float(max_years)
+
+    params = params.drop(columns=["disease_type_norm"])
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    params.to_csv(out, index=False)
+    logger.info("Applied remission/max-duration rules -> %s", out)
+    return params
 
 
 def create_mighti_parameters_template(output_csv, *, overwrite=False):

@@ -30,6 +30,7 @@ from .copd import *
 from .colorectalcancer import *
 from .covid19 import *
 from .dementia import *
+from .diarrhealdiseases import *
 from .influenza import *
 from .hpv import *
 from .hyperlipidemia import *
@@ -58,7 +59,6 @@ from .chromosomalabnormalities import *
 from .congenitalheartanomalies import *
 from .congenitalmusculoskeletal import *
 from .digestivecongenitalanomalies import *
-from .diarrhealdisease import *
 from .downsyndrome import *
 from .neonatalencephalopathy import *
 from .neonataljaundice import *

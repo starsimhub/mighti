@@ -12,6 +12,8 @@ import pandas as pd
 
 from cleaning.paths import data_path, disease_data_path, ensure_data_dir, wpp_path
 from cleaning.disease import (
+    apply_parameter_rules,
+    apply_rel_sus_from_csv,
     create_and_fill_prevalence_template_from_long_format,
     ensure_conditions_in_parameters_csv,
     fill_p_death_and_duration_from_gbd_long_files,
@@ -130,7 +132,16 @@ def run_pipeline(
     # -------------------------------------------------------------
     # 1) Prevalence (GBD long-format by age/sex → MIGHTI prevalence grid)
     # -------------------------------------------------------------
-    prevalence_raw_csv = disease_data_path(f"{region}_disease_prevalence_agesex.csv")
+    # Prefer newer GBD prevalence export naming; fall back to legacy file name.
+    prevalence_candidates = [
+        disease_data_path(f"{region}_prevalence_gbd.csv"),
+        disease_data_path(f"{region}_disease_prevalence_agesex.csv"),
+    ]
+    prevalence_raw_csv = next((p for p in prevalence_candidates if os.path.exists(p)), None)
+    if prevalence_raw_csv is None:
+        raise FileNotFoundError(
+            "No prevalence input found. Tried:\n- " + "\n- ".join(prevalence_candidates)
+        )
     disease_dir = os.path.dirname(prevalence_raw_csv)
     if merge_split_prevalence_exports:
         extra_prevalence_parts = sorted(
@@ -200,6 +211,30 @@ def run_pipeline(
         print(
             f"Filled p_death for {p_death_n} conditions; dur_condition for {dur_n} conditions (year={baseline_year})"
         )
+
+        # Fill rel_sus from region-specific CSV if present
+        rel_sus_csv = disease_data_path(f"{region}_rel_sus.csv")
+        if os.path.exists(rel_sus_csv):
+            filled = apply_rel_sus_from_csv(
+                parameters_csv_path=parameters_csv,
+                rel_sus_csv_path=rel_sus_csv,
+                output_csv_path=parameters_csv,
+                overwrite_existing=overwrite_existing_parameters,
+            )
+            rel_sus_n = pd.to_numeric(filled["rel_sus"], errors="coerce").notna().sum()
+            print(f"Filled rel_sus for {rel_sus_n} conditions from {os.path.basename(rel_sus_csv)}")
+        else:
+            print(f"Skipping rel_sus fill; file not found: {rel_sus_csv}")
+
+        # Apply manual defaults/rules for remission and max disease duration
+        filled = apply_parameter_rules(
+            parameters_csv_path=parameters_csv,
+            output_csv_path=parameters_csv,
+            overwrite_existing=overwrite_existing_parameters,
+        )
+        rem0_n = (pd.to_numeric(filled["remission_rate"], errors="coerce") == 0).sum()
+        maxdur_n = pd.to_numeric(filled["max_disease_duration"], errors="coerce").notna().sum()
+        print(f"Applied remission/max-duration rules: remission_rate=0 rows={rem0_n}, max_disease_duration rows={maxdur_n}")
 
     return
 

@@ -51,7 +51,7 @@ seed_everything(SEED)
 
 n_agents = 100_000
 inityear = 2007
-endyear = 2020
+endyear = 2024
 region = "eswatini"
 
 # ---------------------------------------------------------------------
@@ -88,8 +88,8 @@ prepare_data_for_year.prepare_data(region)
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
-healthconditions = ['COPD']
-# healthconditions = [condition for condition in df.condition if condition != "HIV"]
+# healthconditions = ['AnxietyDisorder']
+healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [
 #     condition
 #     for condition in df.condition
@@ -319,46 +319,75 @@ if __name__ == "__main__":
     # Run simulation
     sim.run()
 
-    # Prevalence plot: use a disease that is actually in the sim (first non-HIV)
-    plot_disease = next((d for d in diseases if str(d).lower() != "hiv"), diseases[0] if diseases else "Type2Diabetes")
+    # # Prevalence plot: use a disease that is actually in the sim (first non-HIV)
+    # plot_disease = next((d for d in diseases if str(d).lower() != "hiv"), diseases[0] if diseases else "Type2Diabetes")
+    # prevalence_check_df = pd.read_csv(
+    #     f"data/processed/{region}_postprocess_check_prevalence.csv"
+    # )
+
+    # from mighti.analysis.plotting import plot_mean_prevalence
+
+    # plot_mean_prevalence(
+    #     sim,
+    #     prevalence_analyzer,
+    #     plot_disease,
+    #     prevalence_check_df,
+    #     inityear,
+    #     endyear,
+    #     show=False,
+    #     savepath=str(out_dir / f"prevalence_{str(plot_disease).lower()}.png"),
+    # )
+
+    # Plot prevalence for all non-HIV diseases in this run
+    plot_diseases = [d for d in diseases if str(d).lower() != "hiv"]
+
     prevalence_check_df = pd.read_csv(
         f"data/processed/{region}_postprocess_check_prevalence.csv"
     )
 
     from mighti.analysis.plotting import plot_mean_prevalence
 
-    plot_mean_prevalence(
-        sim,
-        prevalence_analyzer,
-        plot_disease,
-        prevalence_check_df,
-        inityear,
-        endyear,
-        show=False,
-        savepath=str(out_dir / f"prevalence_{str(plot_disease).lower()}.png"),
-    )
+    # Normalize observed-data columns once (plot_mean_prevalence lowercases internally too)
+    obs_cols = {c.strip().lower() for c in prevalence_check_df.columns}
 
-    from mighti.analysis.plotting import plot_hiv_prevalence_vs_observed
+    for d in plot_diseases:
+        dcol = str(d).lower()
+        if dcol not in obs_cols:
+            logger.warning("Skipping prevalence plot for %s: not in observed file", d)
+            continue
 
-    obs = pd.read_csv("data/processed/eswatini_prevalence_hiv.csv")
+        plot_mean_prevalence(
+            sim,
+            prevalence_analyzer,
+            d,
+            prevalence_check_df,
+            inityear,
+            endyear,
+            show=False,
+            savepath=str(out_dir / f"prevalence_{dcol}.png"),
+        )
 
-    # after you run sim and have access to the prevalence analyzer object
-    plot_hiv_prevalence_vs_observed(
-        sim,
-        prevalence_analyzer,
-        obs,
-        age_starts=[15, 20, 25, 30, 35, 40, 45],  # pick bins you want
-        start_year=1990,
-        end_year=2023,
-        show=False,
-        savepath=str(out_dir / "hiv_prevalence_vs_observed.png"),
-    )
+    # from mighti.analysis.plotting import plot_hiv_prevalence_vs_observed
 
-    from mighti.analysis.plotting import plot_mean_prevalence_plhiv
-    plot_mean_prevalence_plhiv(
-        sim,
-        prevalence_analyzer,
-        "COPD",
-        show=False,
-        savepath=str(out_dir / "prevalence_plhiv_copd.png"),
-    )
+    # obs = pd.read_csv("data/processed/eswatini_prevalence_hiv.csv")
+
+    # # after you run sim and have access to the prevalence analyzer object
+    # plot_hiv_prevalence_vs_observed(
+    #     sim,
+    #     prevalence_analyzer,
+    #     obs,
+    #     age_starts=[15, 20, 25, 30, 35, 40, 45],  # pick bins you want
+    #     start_year=1990,
+    #     end_year=2023,
+    #     show=False,
+    #     savepath=str(out_dir / "hiv_prevalence_vs_observed.png"),
+    # )
+
+    # from mighti.analysis.plotting import plot_mean_prevalence_plhiv
+    # plot_mean_prevalence_plhiv(
+    #     sim,
+    #     prevalence_analyzer,
+    #     "COPD",
+    #     show=False,
+    #     savepath=str(out_dir / "prevalence_plhiv_copd.png"),
+    # )

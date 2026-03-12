@@ -1009,18 +1009,7 @@ class MajorDepressiveDisorder(RemittingDisease):
         if not hasattr(self.pars, 'p_acquire'):
             self.pars.p_acquire_multiplier = 1  
         return
-
-
-class DomesticViolence(AcuteDisease):
-    def __init__(self, csv_path, pars=None, **kwargs):
-        self.disease_name = 'DomesticViolence'
-        super().__init__(csv_path, pars, **kwargs)
         
-        self.define_pars(label = 'DomesticViolence')
-        if not hasattr(self.pars, 'p_acquire'):
-            self.pars.p_acquire_multiplier = 1  
-        return
-
 
 class RoadInjuries(AcuteDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
@@ -1154,12 +1143,12 @@ class MaternalConditions(AcuteDisease):
         return
 
 
-class DiarrhealDisease(AcuteDisease):
+class DiarrhealDiseases(AcuteDisease):
     def __init__(self, csv_path, pars=None, **kwargs):
-        self.disease_name = 'DiarrhealDisease'
+        self.disease_name = 'DiarrhealDiseases'
         super().__init__(csv_path, pars, **kwargs)
         
-        self.define_pars(label = 'DiarrhealDisease')
+        self.define_pars(label = 'DiarrhealDiseases')
         if not hasattr(self.pars, 'p_acquire'):
             self.pars.p_acquire_multiplier = 1  
         return

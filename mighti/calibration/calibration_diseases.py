@@ -62,9 +62,33 @@ results_dir.mkdir(parents=True, exist_ok=True)
 prev_df = pd.read_csv(path_prevalence)
 param_df = pd.read_csv(path_parameters)
 
-# conditions = param_df['condition'].unique().tolist()
 # Conditions to calibrate (or use param_df['condition'].unique().tolist())
-conditions = ["AcuteHepatitis"]
+# conditions = ["ChromosomalAbnormalities","CongenitalHeartAnomalies","CongenitalMusculoskeletal","DiarrhealDiseases","DigestiveCongenitalAnomalies"]
+all_conditions = param_df["condition"].dropna().unique().tolist()
+conditions = all_conditions[30:50]
+
+def has_observed_prevalence_data(disease_name, data):
+    """
+    Fast guard to skip calibration when observed prevalence is not usable.
+    """
+    female_col = f"{disease_name}_female"
+    male_col = f"{disease_name}_male"
+
+    missing_cols = [c for c in [female_col, male_col] if c not in data.columns]
+    if missing_cols:
+        logger.warning("Skipping %s: missing prevalence column(s): %s", disease_name, ", ".join(missing_cols))
+        return False
+
+    obs = data[[female_col, male_col]].apply(pd.to_numeric, errors="coerce")
+    if not obs.notna().any().any():
+        logger.warning("Skipping %s: prevalence columns are all missing/NaN", disease_name)
+        return False
+
+    if not (obs.fillna(0.0).to_numpy() > 0).any():
+        logger.warning("Skipping %s: prevalence is all zero (no calibration signal)", disease_name)
+        return False
+
+    return True
 
 
 def try_get_condition_class(name):
@@ -209,7 +233,7 @@ def run_calibration(disease_name, DiseaseClass):
         return float(fit)
 
     sim = make_sim(orig_disease_name, DiseaseClass)
-    calib_pars = {"hc_p_acquire_multiplier": dict(low=0.0001, high=0.10, guess=0.011)}
+    calib_pars = {"hc_p_acquire_multiplier": dict(low=0.00001, high=0.10, guess=0.011)}
     calib = ss.Calibration(
         sim=sim,
         calib_pars=calib_pars,
@@ -243,6 +267,8 @@ def run_calibration(disease_name, DiseaseClass):
 # Main
 if __name__ == "__main__":
     for disease_name in conditions:
+        if not has_observed_prevalence_data(disease_name, prev_df):
+            continue
         DiseaseClass = try_get_condition_class(disease_name)
         if DiseaseClass is None:
             continue

@@ -5,10 +5,10 @@ Module defining diarrheal disease as a GenericSIR (infectious) model.
 from mighti.diseases.base_disease import GenericSIR
 
 
-class DiarrhealDisease(GenericSIR):
+class DiarrhealDiseases(GenericSIR):
     def __init__(self, csv_path, pars=None, **kwargs):
-        self.disease_name = 'DiarrhealDisease'
+        self.disease_name = 'DiarrhealDiseases'
         super().__init__(csv_path, pars, **kwargs)
-        self.define_pars(label='DiarrhealDisease')
+        self.define_pars(label='DiarrhealDiseases')
         return
     
