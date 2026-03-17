@@ -3,7 +3,7 @@ name: Run tests and build docs
 
 on:
   push:
-    branches: [main, upgrade_starsim322-stisim150]
+    branches: [main, upgrade-starsim322-stisim150]
   pull_request:
 
 jobs:
