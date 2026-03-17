@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mighti"
+description = "MIGHTI: Model of Inter-Generational Health, Transmission, and Interventions"
+readme = "README.rst"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "MIGHTI Team (NYU and collaborators)" }
+]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dynamic = ["version"]
+
+dependencies = [
+  "numpy>=2.0.0",
+  "starsim>=3.0.3",
+  "stisim>=1.4.0",
+  "scipy",
+  "pandas>=2.0.0",
+  "sciris>=3.0.0",
+  "matplotlib",
+  "seaborn",
+]
+
+[project.optional-dependencies]
+calibration = [
+  "optuna>=4.4.0",
+]
+docs = [
+  "Sphinx>=8.2.3",
+  "sphinx-rtd-theme>=3.0.2",
+  "numpydoc>=1.9.0",
+]
+dev = [
+  "pytest>=8.4.1",
+  "openpyxl>=3.1.5",
+  "PyYAML>=6.0.2",
+  "requests>=2.32.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/starsimhub/mighti"
+Repository = "https://github.com/starsimhub/mighti"
+Issues = "https://github.com/starsimhub/mighti/issues"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = { attr = "mighti.util.version.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["mighti*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
