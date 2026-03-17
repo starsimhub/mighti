@@ -12,6 +12,7 @@ Contents
    :maxdepth: 2
    :caption: Modules
 
+   supported_api
    api/index
 
 Indices and tables

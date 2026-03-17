@@ -18,6 +18,7 @@ import stisim as sti
 from importlib import import_module
 from datetime import datetime
 import logging
+from mighti.util.paths import get_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ end_year = 2023
 total_trials = 100  # Set higher for production runs
 
 REPO_ROOT = Path(__file__).resolve().parents[2]  # .../MIGHTI/
-DATA_DIR = REPO_ROOT / "data" / "processed"
+DATA_DIR = get_data_dir()
 
 
 def _resolve_data_file(filename):
@@ -39,7 +40,7 @@ def _resolve_data_file(filename):
     allow falling back to `tests/test_data/`.
     """
     candidates = [
-        REPO_ROOT / "data" / "processed" / filename,
+        DATA_DIR / filename,
         REPO_ROOT / "tests" / "test_data" / filename,
     ]
     for p in candidates:
