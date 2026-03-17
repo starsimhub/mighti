@@ -37,7 +37,6 @@ def test_reduce_mortality_tx_runs():
         pars={
             'init_prev': ss.bernoulli(0.9),
             'p_death': ss.bernoulli(0.1),
-            'dur_condition': ss.normal(5, 0.01),
             'max_disease_duration': 10,
         }
     )

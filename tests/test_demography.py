@@ -19,6 +19,14 @@ do_plot = False
 sc.options(interactive=do_plot)
 
 
+def _build_people():
+    """Create a People object from test age/sex data for reuse across tests."""
+    thisdir = os.path.dirname(__file__)
+    csv_path = os.path.join(thisdir, "test_data", "eswatini_age_distribution.csv")
+    assert os.path.exists(csv_path), f"Missing test data: {csv_path}"
+    return mi.make_people_with_age_sex(csv_path=csv_path, init_year=inityear, n_agents=n_agents)
+
+
 def test_people_extend_basic():
     """
     Verify that make_people_with_age_sex() correctly
@@ -26,18 +34,13 @@ def test_people_extend_basic():
     """
     sc.heading("Testing people_extend initialization")
 
-    thisdir = os.path.dirname(__file__)
-    csv_path = os.path.join(thisdir, "test_data", "eswatini_age_distribution.csv")
-    assert os.path.exists(csv_path), f"Missing test data: {csv_path}"
-
-    ppl = mi.make_people_with_age_sex(csv_path=csv_path, init_year=inityear, n_agents=n_agents)
+    ppl = _build_people()
 
     assert isinstance(ppl, ss.People)
     assert len(ppl) == n_agents, f"Expected {n_agents}, got {len(ppl)}"
     assert hasattr(ppl.female, "default"), "Missing female default probability mapping"
 
     print(f"[✓] Created People with {n_agents} agents using people_extend.py")
-    return ppl
 
 
 def test_people_extend_with_demography():
@@ -47,7 +50,7 @@ def test_people_extend_with_demography():
     """
     sc.heading("Testing people_extend compatibility with Demography")
 
-    ppl = test_people_extend_basic()
+    ppl = _build_people()
 
     thisdir = os.path.dirname(__file__)
     death_csv = os.path.join(thisdir, "test_data", "eswatini_mortality_rates.csv")
