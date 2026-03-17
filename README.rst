@@ -44,8 +44,16 @@ is too old. Fix with:
 Running an Example
 ------------
 
+By default, MIGHTI reads processed inputs from ``data/processed/``.
+If your processed inputs are elsewhere, set ``MIGHTI_DATA_DIR`` before running.
+
 .. code-block:: bash
 
+    # Default (uses repo-local data/processed)
+    python mighti_main.py
+
+    # Optional: custom processed-data location
+    export MIGHTI_DATA_DIR=/path/to/data/processed
     python mighti_main.py
 
 This will run a sample simulation that includes demography, HIV, and NCD modules.
