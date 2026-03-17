@@ -3,7 +3,7 @@ name: Run tests and build docs
 
 on:
   push:
-    branches: [ main, le_nao_feb2026 ]
+    branches: [main, upgrade_starsim322-stisim150]
   pull_request:
 
 jobs:
@@ -22,9 +22,18 @@ jobs:
     - name: Install dependencies
       run: |
         pip install -r docs/requirements.txt
-        pip install .
         # --- Ensure correct Starsim/STIsim versions (override cache) ---
         pip install --force-reinstall starsim==3.0.3 STIsim==1.4.0
+
+    - name: Build package artifacts
+      run: |
+        pip install build
+        python -m build
+
+    - name: Install from built wheel
+      run: |
+        pip install --force-reinstall dist/*.whl
+        python -c "import mighti; print(mighti.__version__)"
 
     - name: Run tests
       run: |

@@ -16,7 +16,11 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 # initialization and can fail in some environments. Instead, we write processed
 # outputs to the repo-local `data/processed/` folder.
 # -------------------------------------------------------------------------
-DATA_DIR = os.path.join(PROJECT_ROOT, "data", "processed")
+_ENV_DATA_DIR = os.environ.get("MIGHTI_DATA_DIR")
+if _ENV_DATA_DIR:
+    DATA_DIR = os.path.abspath(os.path.expanduser(_ENV_DATA_DIR))
+else:
+    DATA_DIR = os.path.join(PROJECT_ROOT, "data", "processed")
 
 
 def ensure_data_dir():
