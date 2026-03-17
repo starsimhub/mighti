@@ -14,7 +14,7 @@ with open(os.path.join(cwd, 'README.rst'), "r") as f:
 CLASSIFIERS = [
     "Environment :: Console",
     "Intended Audience :: Science/Research",
-    "License :: Other/Proprietary License",
+    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -28,6 +28,7 @@ setup(
     name="mighti",
     version=version,
     author="Authorship TBC",
+    license="MIT",
     description="MIGHTI: Model of Inter-Generational Health, Transmission, and Interventions",
     long_description=long_description,
     long_description_content_type="text/x-rst",

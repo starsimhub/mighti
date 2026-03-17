@@ -32,6 +32,8 @@ MIGHTI_PARAMETERS_COLUMNS = [
     "remission_rate",
     "max_disease_duration",
     "p_acquire",
+    "p_acquire_female",
+    "p_acquire_male",
     "disease_type",
     "affected_sex",
 ]
@@ -222,7 +224,16 @@ def create_mighti_parameters_template(output_csv, *, overwrite=False):
     df = pd.DataFrame(MIGHTI_CONDITION_METADATA, columns=["condition", "disease_type", "affected_sex"])
 
     # Fill required columns (leave numeric ones blank)
-    for col in ["p_death", "dur_condition", "rel_sus", "remission_rate", "max_disease_duration", "p_acquire"]:
+    for col in [
+        "p_death",
+        "dur_condition",
+        "rel_sus",
+        "remission_rate",
+        "max_disease_duration",
+        "p_acquire",
+        "p_acquire_female",
+        "p_acquire_male",
+    ]:
         df[col] = ""
 
     # Force p_death=0 for conditions modeled without direct mortality
@@ -654,6 +665,8 @@ def create_condition_metadata_table(long_csv_path, output_csv):
     merged["remission_rate"] = ""
     merged["max_disease_duration"] = ""
     merged["p_acquire"] = ""
+    merged["p_acquire_female"] = ""
+    merged["p_acquire_male"] = ""
 
     # Reorder columns
     merged = merged[MIGHTI_PARAMETERS_COLUMNS]

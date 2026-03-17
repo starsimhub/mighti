@@ -443,7 +443,17 @@ class ChronicDisease(ss.NCD):
         rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
         susceptible = self.at_risk.uids
 
-        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
+        default_mult = float(getattr(self.pars, "p_acquire_multiplier", 1.0))
+        male_mult = float(getattr(self.pars, "p_acquire_multiplier_male", default_mult))
+        female_mult = float(getattr(self.pars, "p_acquire_multiplier_female", default_mult))
+        p_acq = np.full(len(susceptible), default_mult * self.pars.p_acquire)
+        try:
+            male_mask = np.asarray(self.sim.people.male[susceptible], dtype=bool)
+            female_mask = np.asarray(self.sim.people.female[susceptible], dtype=bool)
+            p_acq[male_mask] = male_mult * self.pars.p_acquire
+            p_acq[female_mask] = female_mult * self.pars.p_acquire
+        except Exception:
+            pass
             
         if self.pars.affected_sex == "female":
             p_acq[self.sim.people.male[susceptible]] = 0
@@ -716,7 +726,17 @@ class GenericSIR(ss.SIR):
         ti = self.ti
         rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
         susceptible = self.at_risk.uids
-        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
+        default_mult = float(getattr(self.pars, "p_acquire_multiplier", 1.0))
+        male_mult = float(getattr(self.pars, "p_acquire_multiplier_male", default_mult))
+        female_mult = float(getattr(self.pars, "p_acquire_multiplier_female", default_mult))
+        p_acq = np.full(len(susceptible), default_mult * self.pars.p_acquire)
+        try:
+            male_mask = np.asarray(self.sim.people.male[susceptible], dtype=bool)
+            female_mask = np.asarray(self.sim.people.female[susceptible], dtype=bool)
+            p_acq[male_mask] = male_mult * self.pars.p_acquire
+            p_acq[female_mask] = female_mult * self.pars.p_acquire
+        except Exception:
+            pass
 
         if self.pars.affected_sex == "female":
             p_acq[self.sim.people.male[susceptible]] = 0
@@ -754,18 +774,34 @@ class GenericSIR(ss.SIR):
 
 def calculate_p_acquire_generic(disease, sim, uids):
     """Calculate acquisition probability for a disease with optional sex filtering and HIV interaction."""
-    p_base = np.full(len(uids), disease.pars.p_acquire_multiplier)
-    
-    if disease.pars.affected_sex == "female":
-        try:
-            p_base[sim.people.male[uids]] = 0
-        except Exception:
-            pass
-    elif disease.pars.affected_sex == "male":
-        try:
-            p_base[sim.people.female[uids]] = 0
-        except Exception:
-            pass
+    default_mult = float(getattr(disease.pars, "p_acquire_multiplier", 1.0))
+    male_mult = float(getattr(disease.pars, "p_acquire_multiplier_male", default_mult))
+    female_mult = float(getattr(disease.pars, "p_acquire_multiplier_female", default_mult))
+    p_base = np.full(len(uids), default_mult, dtype=float)
+
+    try:
+        male_mask = np.asarray(sim.people.male[uids], dtype=bool)
+        female_mask = np.asarray(sim.people.female[uids], dtype=bool)
+    except Exception:
+        male_mask = None
+        female_mask = None
+
+    affected = str(getattr(disease.pars, "affected_sex", "both")).strip().lower()
+    if affected == "female":
+        if female_mask is not None:
+            p_base[female_mask] = female_mult
+        if male_mask is not None:
+            p_base[male_mask] = 0.0
+    elif affected == "male":
+        if male_mask is not None:
+            p_base[male_mask] = male_mult
+        if female_mask is not None:
+            p_base[female_mask] = 0.0
+    else:
+        if male_mask is not None:
+            p_base[male_mask] = male_mult
+        if female_mask is not None:
+            p_base[female_mask] = female_mult
 
     try:
         if hasattr(sim.people, 'hiv'):
