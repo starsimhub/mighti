@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [0.0.3] - 2026-03-03
+## [0.1.0] - 2026-03-17
 
 ### Changed
 - Aligned package metadata and version wiring:
@@ -21,3 +21,14 @@ All notable changes to this project are documented in this file.
 - Updated test behavior for Starsim 3.2.x compatibility:
   - made `test_sim` population assertions robust to population growth (births)
   - marked `test_reference_life_expectancy` as non-blocking during active analyzer compatibility work.
+
+## [0.0.3] - 2026-03-03
+
+### Changed
+- Initial library hardening baseline:
+  - aligned metadata/version wiring across packaging and docs
+  - introduced `pyproject.toml` and retained `setup.py` as compatibility shim
+  - added processed-data path contract groundwork for runtime scripts.
+
+### Fixed
+- Stabilized tests and runtime compatibility with current Starsim/STIsim usage.
