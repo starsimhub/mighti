@@ -57,7 +57,9 @@ def get_disease_parameters(csv_path, disease_name):
         "remission_rate": get_value_safe("remission_rate", 0.0),
         "max_disease_duration": get_value_safe("max_disease_duration", 30),
         "affected_sex": get_value_safe("affected_sex", "both"),
-        "p_acquire": get_value_safe("p_acquire", 0.01),   
+        "p_acquire": get_value_safe("p_acquire", 0.01),
+        "p_acquire_male": get_value_safe("p_acquire_male", get_value_safe("p_acquire", 0.01)),
+        "p_acquire_female": get_value_safe("p_acquire_female", get_value_safe("p_acquire", 0.01)),
     }
 
 
@@ -140,7 +142,11 @@ class RemittingDisease(_CompetingMortalityMixin, ss.NCD):
             rel_sus_hiv=disease_params["rel_sus_hiv"],  
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
+            p_acquire_multiplier_male=1.0,
+            p_acquire_multiplier_female=1.0,
             p_acquire=disease_params["p_acquire"],
+            p_acquire_male=disease_params["p_acquire_male"],
+            p_acquire_female=disease_params["p_acquire_female"],
             # Avoid changing distribution types by setting None (Starsim restriction).
             init_prev=ss.bernoulli(0.0),
         )
@@ -224,20 +230,7 @@ class RemittingDisease(_CompetingMortalityMixin, ss.NCD):
         ti = self.ti
 
         susceptible = (~self.affected).uids
-        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
-
-        if self.pars.affected_sex == "female":
-            p_acq[self.sim.people.male[susceptible]] = 0
-        elif self.pars.affected_sex == "male":
-            p_acq[self.sim.people.female[susceptible]] = 0
-
-        try:
-            p_acq *= self.rel_sus[susceptible]
-            if hasattr(self.sim.people, 'hiv'):
-                hiv_pos = self.sim.people.hiv[susceptible]
-                p_acq[hiv_pos] *= self.pars.rel_sus_hiv
-        except Exception:
-            pass
+        p_acq = calculate_p_acquire_generic(self, self.sim, susceptible)
 
         rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
         draws = rng.random(len(susceptible))
@@ -318,7 +311,11 @@ class AcuteDisease(_CompetingMortalityMixin, ss.NCD):
             rel_sus_hiv=disease_params["rel_sus_hiv"],
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
+            p_acquire_multiplier_male=1.0,
+            p_acquire_multiplier_female=1.0,
             p_acquire=disease_params["p_acquire"],
+            p_acquire_male=disease_params["p_acquire_male"],
+            p_acquire_female=disease_params["p_acquire_female"],
             # Avoid Starsim "update dist to NoneType" errors.
             init_prev=ss.bernoulli(0.0),
         )
@@ -381,20 +378,7 @@ class AcuteDisease(_CompetingMortalityMixin, ss.NCD):
     def step(self):
         ti = self.ti
         susceptible = self.at_risk.uids
-        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
-
-        if self.pars.affected_sex == "female":
-            p_acq[self.sim.people.male[susceptible]] = 0
-        elif self.pars.affected_sex == "male":
-            p_acq[self.sim.people.female[susceptible]] = 0
-
-        try:
-            p_acq *= self.rel_sus[susceptible]
-            if hasattr(self.sim.people, 'hiv'):
-                hiv_pos = self.sim.people.hiv[susceptible]
-                p_acq[hiv_pos] *= self.pars.rel_sus_hiv
-        except Exception:
-            pass
+        p_acq = calculate_p_acquire_generic(self, self.sim, susceptible)
 
         rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
         new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
@@ -480,7 +464,11 @@ class AcuteSurgicalDisease(_CompetingMortalityMixin, ss.NCD):
             rel_sus_hiv=disease_params.get("rel_sus_hiv", 1.0),
             affected_sex=disease_params.get("affected_sex", "both"),
             p_acquire_multiplier=1.0,
+            p_acquire_multiplier_male=1.0,
+            p_acquire_multiplier_female=1.0,
             p_acquire=disease_params["p_acquire"],
+            p_acquire_male=disease_params["p_acquire_male"],
+            p_acquire_female=disease_params["p_acquire_female"],
             p_surgery=disease_params.get("p_surgery", 0.3),
             rel_mortality_treated=disease_params.get("rel_mortality_treated", 0.5),
             rel_mortality_untreated=disease_params.get("rel_mortality_untreated", 2.0),
@@ -553,20 +541,7 @@ class AcuteSurgicalDisease(_CompetingMortalityMixin, ss.NCD):
 
         # --- Acquisition ---
         susceptible = self.at_risk.uids
-        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
-
-        if self.pars.affected_sex == "female":
-            p_acq[sim.people.male[susceptible]] = 0
-        elif self.pars.affected_sex == "male":
-            p_acq[sim.people.female[susceptible]] = 0
-
-        try:
-            p_acq *= self.rel_sus[susceptible]
-            if hasattr(sim.people, "hiv"):
-                hiv_pos = sim.people.hiv[susceptible]
-                p_acq[hiv_pos] *= self.pars.rel_sus_hiv
-        except Exception:
-            pass
+        p_acq = calculate_p_acquire_generic(self, sim, susceptible)
 
         new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
         self.affected[new_cases] = True
@@ -638,7 +613,11 @@ class ChronicDisease(_CompetingMortalityMixin, ss.NCD):
             rel_sus_hiv=disease_params["rel_sus_hiv"],
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
+            p_acquire_multiplier_male=1.0,
+            p_acquire_multiplier_female=1.0,
             p_acquire=disease_params["p_acquire"],
+            p_acquire_male=disease_params["p_acquire_male"],
+            p_acquire_female=disease_params["p_acquire_female"],
             init_prev=ss.bernoulli(0.0),
         )
 
@@ -700,20 +679,7 @@ class ChronicDisease(_CompetingMortalityMixin, ss.NCD):
     def step(self):
         ti = self.ti
         susceptible = self.at_risk.uids
-        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
-
-        if self.pars.affected_sex == "female":
-            p_acq[self.sim.people.male[susceptible]] = 0
-        elif self.pars.affected_sex == "male":
-            p_acq[self.sim.people.female[susceptible]] = 0
-
-        try:
-            p_acq *= self.rel_sus[susceptible]
-            if hasattr(self.sim.people, 'hiv'):
-                hiv_pos = self.sim.people.hiv[susceptible]
-                p_acq[hiv_pos] *= self.pars.rel_sus_hiv
-        except Exception:
-            pass
+        p_acq = calculate_p_acquire_generic(self, self.sim, susceptible)
 
         rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
         new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
@@ -784,7 +750,11 @@ class GenericSIS(_CompetingMortalityMixin, ss.SIS):
             rel_sus_hiv=disease_params["rel_sus_hiv"],
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
+            p_acquire_multiplier_male=1.0,
+            p_acquire_multiplier_female=1.0,
             p_acquire=disease_params["p_acquire"],
+            p_acquire_male=disease_params["p_acquire_male"],
+            p_acquire_female=disease_params["p_acquire_female"],
             init_prev=pars.get("init_prev", ss.bernoulli(0)) if pars else ss.bernoulli(0),
         )
 
@@ -911,20 +881,7 @@ class GenericSIS(_CompetingMortalityMixin, ss.SIS):
     def step(self):
         ti = self.ti
         susceptible = self.at_risk.uids & self.susceptible.uids
-        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
-
-        if self.pars.affected_sex == "female":
-            p_acq[self.sim.people.male[susceptible]] = 0
-        elif self.pars.affected_sex == "male":
-            p_acq[self.sim.people.female[susceptible]] = 0
-
-        try:
-            p_acq *= self.rel_sus[susceptible]
-            if hasattr(self.sim.people, 'hiv'):
-                hiv_pos = self.sim.people.hiv[susceptible]
-                p_acq[hiv_pos] *= self.pars.rel_sus_hiv
-        except Exception:
-            pass
+        p_acq = calculate_p_acquire_generic(self, self.sim, susceptible)
 
         rng = get_rng(self.sim, salt=f"{self.__class__.__name__}:step")
         new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
@@ -996,7 +953,11 @@ class GenericSIR(_CompetingMortalityMixin, ss.SIR):
             rel_sus_hiv=disease_params["rel_sus_hiv"],
             affected_sex=disease_params["affected_sex"],
             p_acquire_multiplier=1.0,
+            p_acquire_multiplier_male=1.0,
+            p_acquire_multiplier_female=1.0,
             p_acquire=disease_params["p_acquire"],             # force of infection term
+            p_acquire_male=disease_params["p_acquire_male"],
+            p_acquire_female=disease_params["p_acquire_female"],
             init_prev=pars.get("init_prev", ss.bernoulli(0)) if pars else ss.bernoulli(0),
         )
 
@@ -1086,22 +1047,7 @@ class GenericSIR(_CompetingMortalityMixin, ss.SIR):
 
         # --- Acquire infection (S → I) ---
         susceptible = self.at_risk.uids & self.susceptible.uids  # ensure truly in S
-        p_acq = np.full(len(susceptible), self.pars.p_acquire_multiplier * self.pars.p_acquire)
-
-        # Sex filtering
-        if self.pars.affected_sex == "female":
-            p_acq[sim.people.male[susceptible]] = 0
-        elif self.pars.affected_sex == "male":
-            p_acq[sim.people.female[susceptible]] = 0
-
-        # Modifiers
-        try:
-            p_acq *= self.rel_sus[susceptible]
-            if hasattr(sim.people, 'hiv'):
-                hiv_pos = sim.people.hiv[susceptible]
-                p_acq[hiv_pos] *= self.pars.rel_sus_hiv
-        except Exception:
-            pass
+        p_acq = calculate_p_acquire_generic(self, sim, susceptible)
 
         new_cases = susceptible[rng.random(len(susceptible)) < p_acq]
         if len(new_cases):
@@ -1498,18 +1444,37 @@ class StaticCondition(NonAcquiredDisease):
 
 def calculate_p_acquire_generic(disease, sim, uids):
     """Calculate acquisition probability for a disease with optional sex filtering and HIV interaction."""
-    p_base = np.full(len(uids), disease.pars.p_acquire_multiplier * disease.pars.p_acquire)
-    
-    if disease.pars.affected_sex == "female":
-        try:
-            p_base[sim.people.male[uids]] = 0
-        except Exception:
-            pass
-    elif disease.pars.affected_sex == "male":
-        try:
-            p_base[sim.people.female[uids]] = 0
-        except Exception:
-            pass
+    p_acquire = float(getattr(disease.pars, "p_acquire", 1.0))
+    p_acquire_male = float(getattr(disease.pars, "p_acquire_male", p_acquire))
+    p_acquire_female = float(getattr(disease.pars, "p_acquire_female", p_acquire))
+    default_mult = float(getattr(disease.pars, "p_acquire_multiplier", 1.0))
+    male_mult = float(getattr(disease.pars, "p_acquire_multiplier_male", default_mult))
+    female_mult = float(getattr(disease.pars, "p_acquire_multiplier_female", default_mult))
+    p_base = np.full(len(uids), default_mult * p_acquire, dtype=float)
+
+    try:
+        male_mask = np.asarray(sim.people.male[uids], dtype=bool)
+        female_mask = np.asarray(sim.people.female[uids], dtype=bool)
+    except Exception:
+        male_mask = None
+        female_mask = None
+
+    affected = str(getattr(disease.pars, "affected_sex", "both")).strip().lower()
+    if affected == "female":
+        if female_mask is not None:
+            p_base[female_mask] = female_mult * p_acquire_female
+        if male_mask is not None:
+            p_base[male_mask] = 0.0
+    elif affected == "male":
+        if male_mask is not None:
+            p_base[male_mask] = male_mult * p_acquire_male
+        if female_mask is not None:
+            p_base[female_mask] = 0.0
+    else:
+        if male_mask is not None:
+            p_base[male_mask] = male_mult * p_acquire_male
+        if female_mask is not None:
+            p_base[female_mask] = female_mult * p_acquire_female
 
     try:
         if hasattr(sim.people, 'hiv'):

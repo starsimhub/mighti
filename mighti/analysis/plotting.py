@@ -40,7 +40,7 @@ def _is_interactive_backend():
         return False
 
 
-def _finalize_figure(fig, *, show=True, savepath=None, dpi=200):
+def _finalize_figure(fig, *, show=True, savepath=None, dpi=200, close=True):
     """
     Common end-of-plot behavior:
     - Save if `savepath` is provided
@@ -54,6 +54,10 @@ def _finalize_figure(fig, *, show=True, savepath=None, dpi=200):
 
     if show and _is_interactive_backend():
         plt.show()
+
+    if close:
+        plt.close(fig)
+
     return fig
 
 

@@ -95,16 +95,16 @@ cause_map = {
     "Neonatal encephalopathy due to birth asphyxia and trauma": "NeonatalEncephalopathy",
     "Neonatal preterm birth": "NeonatalPretermBirth",
     "Neonatal sepsis and other neonatal infections": "NeonatalSepsis",
+    "Hemolytic disease and other neonatal jaundice": "NeonatalJaundice",
     "Neural tube defects": "NeuralTubeDefects",
     "Congenital heart anomalies": "CongenitalHeartAnomalies",
     "Congenital musculoskeletal and limb anomalies": "CongenitalMusculoskeletal",
     "Digestive congenital anomalies": "DigestiveCongenitalAnomalies",
     "Down syndrome": "DownSyndrome",
     "Other chromosomal abnormalities": "ChromosomalAbnormalities",
-    "Diarrheal disease": "DiarrhealDisease",
+    "Diarrheal diseases": "DiarrhealDiseases",
     "Esophageal cancer": "EsophagealCancer",
     "Protein-energy malnutrition": "ProteinEnergyMalnutrition",
-
     # -------------------------------------------------------------
     # Additions for Eswatini COD + prevalence alignment (2026-02)
     # -------------------------------------------------------------

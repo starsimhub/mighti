@@ -3,6 +3,7 @@
 import os
 import sys
 import datetime
+import runpy
 
 # -- Path setup ---------------------------------------------------------------
 sys.path.insert(0, os.path.abspath('..'))  # Add the project root to sys.path
@@ -11,7 +12,8 @@ sys.path.insert(0, os.path.abspath('..'))  # Add the project root to sys.path
 project = 'MIGHTI'
 author = 'Your Name or Team Name'
 copyright = f'{datetime.datetime.now().year}, {author}'
-release = '0.1.0'  # or import mighti.__version__
+versionpath = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'mighti', 'util', 'version.py'))
+release = runpy.run_path(versionpath)['__version__']
 
 # -- General configuration ----------------------------------------------------
 extensions = [
