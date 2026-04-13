@@ -9,6 +9,7 @@ import starsim as ss
 from scipy.stats import lognorm
 
 from mighti.util.rng import get_rng
+from mighti.util.utils import birth_mother_baby_pairs, convert_condition_parameters_to_dt
 
 
 __all__ = ['RemittingDisease', 'AcuteDisease', 'AcuteSurgicalDisease', 'ChronicDisease',
@@ -40,6 +41,17 @@ def get_disease_parameters(csv_path, disease_name):
     if row.empty:
         raise ValueError(f"Disease '{disease_name}' not found in parameter file: {csv_path}")
 
+    numeric_fields = {
+        "p_death",
+        "dur_condition",
+        "rel_sus",
+        "remission_rate",
+        "max_disease_duration",
+        "p_acquire",
+        "p_acquire_male",
+        "p_acquire_female",
+    }
+
     def get_value_safe(field, default):
         if field not in row.columns:
             logger.warning(f"Column '{field}' missing for {disease_name}, using default: {default}")
@@ -48,6 +60,12 @@ def get_disease_parameters(csv_path, disease_name):
         if pd.isna(val):
             logger.warning(f"Missing value for '{field}' in {disease_name}, using default: {default}")
             return default
+        if field in numeric_fields:
+            parsed = pd.to_numeric(pd.Series([val]), errors="coerce").iloc[0]
+            if pd.isna(parsed):
+                logger.warning(f"Non-numeric value for '{field}' in {disease_name}: {val!r}; using default: {default}")
+                return default
+            return float(parsed)
         return val
 
     return {
@@ -61,6 +79,28 @@ def get_disease_parameters(csv_path, disease_name):
         "p_acquire_male": get_value_safe("p_acquire_male", get_value_safe("p_acquire", 0.01)),
         "p_acquire_female": get_value_safe("p_acquire_female", get_value_safe("p_acquire", 0.01)),
     }
+
+
+def _apply_dt_parameter_conversion(module):
+    """
+    Convert annual probability-like condition parameters to the module timestep.
+
+    Durations are intentionally left unchanged here because the disease code
+    already interprets them in year units or handles timestep arithmetic itself.
+    """
+    annual = getattr(module, "_annual_disease_params", None)
+    if not annual:
+        return
+
+    converted = convert_condition_parameters_to_dt(annual, module.t.dt)
+    module._dt_disease_params = converted
+
+    for field in ("p_acquire", "p_acquire_male", "p_acquire_female", "remission_rate"):
+        if hasattr(module.pars, field) and field in converted:
+            setattr(module.pars, field, converted[field])
+    if hasattr(module.pars, "p_death") and "p_death" in converted:
+        module.pars.p_death.set(p=converted["p_death"])
+    return
 
 
 class _CompetingMortalityMixin:
@@ -126,7 +166,8 @@ class RemittingDisease(_CompetingMortalityMixin, ss.NCD):
     def __init__(self, csv_path, pars=None, **kwargs):
         super().__init__()
         self.csv_path = csv_path    
-        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)        
+        disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        self._annual_disease_params = dict(disease_params)
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
 
         # Calculate the mean in log-space (mu)
@@ -169,6 +210,11 @@ class RemittingDisease(_CompetingMortalityMixin, ss.NCD):
             ss.FloatArr('rel_death', default=1.0),  
             reset=True,
         )
+
+    def init_pre(self, sim):
+        out = super().init_pre(sim)
+        _apply_dt_parameter_conversion(self)
+        return out
 
     def init_post(self):
 
@@ -298,6 +344,7 @@ class AcuteDisease(_CompetingMortalityMixin, ss.NCD):
         super().__init__()
         self.csv_path = csv_path
         disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        self._annual_disease_params = dict(disease_params)
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
 
         # Calculate mean in log-space (mu)
@@ -334,6 +381,11 @@ class AcuteDisease(_CompetingMortalityMixin, ss.NCD):
             ss.FloatArr('rel_death', default=1.0),
             reset=True,
         )
+
+    def init_pre(self, sim):
+        out = super().init_pre(sim)
+        _apply_dt_parameter_conversion(self)
+        return out
 
     def init_post(self):
         
@@ -452,6 +504,7 @@ class AcuteSurgicalDisease(_CompetingMortalityMixin, ss.NCD):
         super().__init__()
         self.csv_path = csv_path
         disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        self._annual_disease_params = dict(disease_params)
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
 
         sigma = 0.5
@@ -495,6 +548,11 @@ class AcuteSurgicalDisease(_CompetingMortalityMixin, ss.NCD):
             ss.FloatArr("rel_death", default=1.0),
             reset=True,
         )
+
+    def init_pre(self, sim):
+        out = super().init_pre(sim)
+        _apply_dt_parameter_conversion(self)
+        return out
 
     def init_post(self):
         super().init_post()
@@ -601,6 +659,7 @@ class ChronicDisease(_CompetingMortalityMixin, ss.NCD):
         super().__init__()
         self.csv_path = csv_path
         disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        self._annual_disease_params = dict(disease_params)
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
 
         sigma = 0.5
@@ -635,6 +694,11 @@ class ChronicDisease(_CompetingMortalityMixin, ss.NCD):
             ss.FloatArr('rel_death', default=1.0),
             reset=True,
         )
+
+    def init_pre(self, sim):
+        out = super().init_pre(sim)
+        _apply_dt_parameter_conversion(self)
+        return out
 
     def init_post(self):
  
@@ -737,6 +801,7 @@ class GenericSIS(_CompetingMortalityMixin, ss.SIS):
         super().__init__()
         self.csv_path = csv_path
         disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        self._annual_disease_params = dict(disease_params)
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
 
         sigma = 0.5
@@ -777,6 +842,11 @@ class GenericSIS(_CompetingMortalityMixin, ss.SIS):
             ss.FloatArr('rel_death', default=1.0),
             reset=True,
         )
+
+    def init_pre(self, sim):
+        out = super().init_pre(sim)
+        _apply_dt_parameter_conversion(self)
+        return out
 
     def step_state(self):
         """
@@ -940,6 +1010,7 @@ class GenericSIR(_CompetingMortalityMixin, ss.SIR):
         super().__init__()
         self.csv_path = csv_path
         disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        self._annual_disease_params = dict(disease_params)
         self.disease_name = getattr(self, "disease_name", self.__class__.__name__)
         
         sigma = 0.5
@@ -981,6 +1052,11 @@ class GenericSIR(_CompetingMortalityMixin, ss.SIR):
             ss.FloatArr('rel_death', default=1.0),
             reset=True,
         )
+
+    def init_pre(self, sim):
+        out = super().init_pre(sim)
+        _apply_dt_parameter_conversion(self)
+        return out
 
     def init_post(self):
         """
@@ -1127,6 +1203,7 @@ class NonAcquiredDisease(_CompetingMortalityMixin, ss.Disease):
 
         # Load parameters
         disease_params = get_disease_parameters(csv_path=self.csv_path, disease_name=self.disease_name)
+        self._annual_disease_params = dict(disease_params)
 
         # Define parameters (no acquisition or remission)
         self.define_pars(
@@ -1153,8 +1230,9 @@ class NonAcquiredDisease(_CompetingMortalityMixin, ss.Disease):
     # Initialization lifecycle
     # ---------------------------------------------------------------------
     def init_pre(self, sim):
-        super().init_pre(sim)
-        return
+        out = super().init_pre(sim)
+        _apply_dt_parameter_conversion(self)
+        return out
 
     def init_post(self):
         """Initialize congenital/neonatal prevalence at birth."""
@@ -1229,31 +1307,14 @@ class NonAcquiredDisease(_CompetingMortalityMixin, ss.Disease):
         return rng.random(len(uids)) < p
 
     def _newborn_uids_this_step(self):
-        """Return newborn uids for this timestep using MaternalNet edges, if present."""
+        """Return newborn uids for this timestep (Pregnancy-based; legacy edges.start optional)."""
         sim = self.sim
-        maternal = sim.networks.get("maternalnet", None) if hasattr(sim, "networks") else None
-        if maternal is None or not hasattr(maternal, "edges"):
-            return np.array([], dtype=int)
-
-        edges = maternal.edges
-        if not hasattr(edges, "start") or not hasattr(edges, "p2"):
-            return np.array([], dtype=int)
-
-        try:
-            birth_inds = np.where(np.asarray(edges.start) == sim.ti)[0]
-        except Exception:
-            return np.array([], dtype=int)
-
-        if birth_inds.size == 0:
-            return np.array([], dtype=int)
-
-        babies = np.asarray(edges.p2)[birth_inds]
-        babies = babies[np.isfinite(babies)].astype(int, copy=False)
+        _, babies = birth_mother_baby_pairs(sim)
+        babies = np.asarray(babies, dtype=int)
+        babies = babies[np.isfinite(babies)]
         babies = babies[(babies >= 0) & (babies < len(sim.people))]
         if babies.size == 0:
             return np.array([], dtype=int)
-
-        # Deduplicate in case of repeated edges
         return np.unique(babies)
 
     def _assign_newborn_cases(self):

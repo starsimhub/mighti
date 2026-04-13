@@ -4,6 +4,7 @@ import starsim as ss
 import logging
 
 from mighti.util.rng import get_rng
+from mighti.util.utils import birth_mother_baby_pairs
 
 __all__ = [
     "NeighbourhoodSituation",
@@ -118,21 +119,16 @@ class BaseSDoH(ss.Module):
         inherited_now = 0
         total_births = 0
 
-        maternal = sim.networks.get("maternalnet", None)
-        if maternal is not None and hasattr(maternal, "edges"):
-            edges = maternal.edges
-            new_birth_inds = np.where(edges.start == sim.ti)[0]
-            if len(new_birth_inds):
-                mothers = edges.p1[new_birth_inds]
-                babies = edges.p2[new_birth_inds]
-                n = len(babies)
-                total_births = n
-                inherit_mask = rng.random(n) < self.inherit_prob
-                inherited_now = inherit_mask.sum()
-                if inherited_now:
-                    self.state[babies[inherit_mask]] = self.state[mothers[inherit_mask]]
-                if n - inherited_now > 0:
-                    self.state[babies[~inherit_mask]] = rng.random(n - inherited_now) < self.p_stable
+        mothers, babies = birth_mother_baby_pairs(sim)
+        if len(babies):
+            n = len(babies)
+            total_births = n
+            inherit_mask = rng.random(n) < self.inherit_prob
+            inherited_now = inherit_mask.sum()
+            if inherited_now:
+                self.state[babies[inherit_mask]] = self.state[mothers[inherit_mask]]
+            if n - inherited_now > 0:
+                self.state[babies[~inherit_mask]] = rng.random(n - inherited_now) < self.p_stable
 
         # -------------------------------
         # 2. Stochastic transitions
