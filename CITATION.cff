@@ -3,6 +3,8 @@ message: "If you use MIGHTI, please cite it using the metadata below."
 title: "MIGHTI: Model of Inter-Generational Health, Transmission, and Interventions"
 version: 1.0.0
 authors:
+  - family-names: Yamamoto
+    given-names: Nao
   - family-names: Assefa
     given-names: Frey
   - family-names: Bershteyn
@@ -27,8 +29,6 @@ authors:
     given-names: Ingrida
   - family-names: Stuart
     given-names: Robyn
-  - family-names: Yamamoto
-    given-names: Nao
     orcid: https://orcid.org/0000-0003-3131-2368
 date-released: 2025-08-01
 identifiers:
