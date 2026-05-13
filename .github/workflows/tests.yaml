@@ -12,10 +12,10 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v5
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v6
       with:
         python-version: '3.12'
 
@@ -27,7 +27,11 @@ jobs:
         pip install --force-reinstall starsim==3.0.3 STIsim==1.4.0
 
     - name: Run tests
+      env:
+        NUMBA_CACHE_DIR: ${{ github.workspace }}/.numba_cache
+        NUMBA_CACHE_LOCATOR_CLASSES: UserWideCacheLocator,IPythonCacheLocator
       run: |
+        mkdir -p "$NUMBA_CACHE_DIR"
         pytest tests/
 
     - name: Build documentation

@@ -7,26 +7,32 @@ Why this exists:
   Numba cannot create cache files alongside the installed package, which can
   cause import-time errors during test collection.
 
-We redirect Numba's cache into the repo (which is writable) before any test
-module imports `starsim`.
+Numba reads ``NUMBA_CACHE_DIR`` and locator settings when it is first imported.
+That happens while pytest collects test modules, so we configure the
+environment at **import time** (below), not only inside ``pytest_configure``.
 """
 
 import os
 from pathlib import Path
 
 
-def pytest_configure(config):  # noqa: ARG001
-    # Only set if not already defined by the user/CI.
+def _ensure_numba_cache_env() -> None:
+    """Set Numba cache env before any test module imports starsim/numba."""
+    repo_root = Path(__file__).resolve().parents[1]
     cache_dir = os.environ.get("NUMBA_CACHE_DIR")
     if not cache_dir:
-        repo_root = Path(__file__).resolve().parents[1]
         cache_dir = str(repo_root / ".numba_cache")
         os.environ["NUMBA_CACHE_DIR"] = cache_dir
-
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
+    # Skip InTreeCacheLocator for code under site-packages (no writable locator).
+    os.environ.setdefault(
+        "NUMBA_CACHE_LOCATOR_CLASSES",
+        "UserWideCacheLocator,IPythonCacheLocator",
+    )
 
-    # Numba caching can fail on very new Python versions / some installations with
-    # "no locator available" errors even when the cache directory is writable.
-    # For tests we default to disabling caching to make import-time behavior robust.
-    os.environ.setdefault("NUMBA_DISABLE_CACHING", "1")
 
+_ensure_numba_cache_env()
+
+
+def pytest_configure(config):  # noqa: ARG001
+    _ensure_numba_cache_env()

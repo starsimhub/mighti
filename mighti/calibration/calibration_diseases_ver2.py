@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 region = "eswatini"
 init_year = 2007
 end_year = 2023
-total_trials = 100  # Set higher for production runs
+total_trials = 300  # Set higher for production runs
 HIV_BETA_M2F = 0.01688952663716571
 HIV_BETA_M2C = 0.0444149203530297
 
@@ -60,7 +60,7 @@ path_mortality = str(_resolve_data_file(f"{region}_mortality_rates.csv"))
 
 date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 # Results under package dir so path works from repo root or from mighti/calibration/
-results_dir = REPO_ROOT / "mighti" / "calibration" / "results" / f"calibration_{region}_{date_str}"
+results_dir = REPO_ROOT / "mighti" / "calibration" / "results" / "calibration_ver2_eswatini_20260508_070406"
 results_dir.mkdir(parents=True, exist_ok=True)
 
 # Load prevalence once for eval
@@ -75,18 +75,39 @@ else:
 # Conditions to calibrate (or use param_df['condition'].unique().tolist())
 # conditions = ["ChromosomalAbnormalities","CongenitalHeartAnomalies","CongenitalMusculoskeletal","DiarrhealDiseases","DigestiveCongenitalAnomalies"]
 all_conditions = param_df["condition"].dropna().unique().tolist()
-# conditions = [
-#     "AlzheimersDisease",
-#     "BreastCancer",
-#     "CardiovascularDiseases",
-#     "CervicalCancer",
-#     "ChronicKidneyDisease",
-#     "ChronicLiverDisease",
-#     "COPD",
-#     "COVID19",
-#     "DiarrhealDiseases",
-# ]
-conditions = all_conditions
+conditions = [
+    # "DiarrhealDiseases",
+    # "DigestiveCongenitalAnomalies",
+    # "DownSyndrome",
+    # "DrugUseDisorder",
+    # "EsophagealCancer",
+    # "Influenza",
+    # "HPV",
+    # "Hyperlipidemia",
+    # "Hypertension",
+    # "InterpersonalViolence",
+    # "LowerRespiratoryInfections",
+    # "LungCancer",
+    # "MajorDepressiveDisorder",
+    # "MaternalConditions",
+    # "NeonatalEncephalopathy",
+    # "NeonatalJaundice",
+    # "NeonatalPretermBirth",
+    # "NeonatalSepsis",
+    # "NeuralTubeDefects",
+    # "Obesity",
+    # "ParkinsonsDisease",
+    # "ProstateCancer",
+    # "ProteinEnergyMalnutrition",
+    # "PTSD",
+    # "RoadInjuries",
+    # "SelfHarm",
+    # "TobaccoUse",
+    # "Tuberculosis",
+    # "Type1Diabetes",
+    "Type2Diabetes",
+]
+
 
 OPTUNA_DIAGNOSTIC_METHODS = [
     "plot_optimization_history",
@@ -581,13 +602,13 @@ def run_calibration(disease_name, DiseaseClass):
 
     sim = make_sim(orig_disease_name, DiseaseClass)
     if affected_sex == "female":
-        calib_pars = {"hc_p_acquire_multiplier_female": dict(low=0.00001, high=0.10, guess=0.011)}
+        calib_pars = {"hc_p_acquire_multiplier_female": dict(low=1e-6, high=0.1, guess=0.001, log=True)}
     elif affected_sex == "male":
-        calib_pars = {"hc_p_acquire_multiplier_male": dict(low=0.00001, high=0.10, guess=0.011)}
+        calib_pars = {"hc_p_acquire_multiplier_male": dict(low=1e-6, high=0.1, guess=0.001, log=True)}
     else:
         calib_pars = {
-            "hc_p_acquire_multiplier_female": dict(low=0.00001, high=0.10, guess=0.011),
-            "hc_p_acquire_multiplier_male": dict(low=0.00001, high=0.10, guess=0.011),
+            "hc_p_acquire_multiplier_female": dict(low=1e-6, high=0.1, guess=0.001, log=True),
+            "hc_p_acquire_multiplier_male": dict(low=1e-6, high=0.1, guess=0.001, log=True),
         }
     calib = ss.Calibration(
         sim=sim,
