@@ -15,17 +15,30 @@ __all__ = [
     "CauseOfDeathYLLAnalyzer",
 ]
 
+def _raw_view(arr: "ss.Arr", n_used: int, dtype) -> np.ndarray:
+    """
+    Return a uid-indexed numpy view of the raw values for `[0, n_used)`.
+
+    Starsim's `np.asarray(Arr)` returns ``raw[auids]`` (a positional slice over
+    *currently-active* uids). For across-step comparisons (e.g. detecting who
+    newly died) and for indexing other uid-keyed arrays, we need the *raw* uid-
+    indexed underlying buffer, truncated to the number of uids ever allocated.
+    """
+    return np.asarray(arr.raw[:n_used], dtype=dtype)
+
+
 class DeathsByAgeSexAnalyzer(ss.Analyzer):
     """Tracks infant deaths and deaths by age/sex, Starsim-3.0.3 compatible."""
 
     def __init__(self, max_age=100, **kwargs):
         super().__init__(**kwargs)
         self.max_age = max_age
-        self._dead_prev = None  # snapshot of who was dead in previous step
+        self._dead_prev = None  # uid-indexed snapshot of who was dead in previous step
 
     def init_pre(self, sim):
         super().init_pre(sim)
-        self._dead_prev = np.zeros(len(sim.people), dtype=bool)
+        n = int(sim.people.uid.len_used)
+        self._dead_prev = np.zeros(n, dtype=bool)
 
     def init_results(self):
         super().init_results()
@@ -35,35 +48,44 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
             ss.Result("female_deaths_by_age", label="Female deaths by age", dtype=int, shape=self.max_age + 1),
         )
 
-    def _ensure_size(self):
-        """Resize internal arrays if population size changes (future-proof)."""
-        n_now = len(self.sim.people)
+    def _ensure_size(self, n_used: int):
+        """Grow `_dead_prev` to cover `n_used` uids (monotonically increasing)."""
         if self._dead_prev is None:
-            self._dead_prev = np.zeros(n_now, dtype=bool)
-        elif self._dead_prev.size != n_now:
-            new = np.zeros(n_now, dtype=bool)
-            n_copy = min(self._dead_prev.size, n_now)
-            new[:n_copy] = self._dead_prev[:n_copy]
+            self._dead_prev = np.zeros(n_used, dtype=bool)
+        elif self._dead_prev.size < n_used:
+            new = np.zeros(n_used, dtype=bool)
+            new[: self._dead_prev.size] = self._dead_prev
             self._dead_prev = new
 
     def step(self):
         ppl = self.sim.people
         ti = self.sim.ti
-        self._ensure_size()
+        n_used = int(ppl.uid.len_used)
+        self._ensure_size(n_used)
 
-        # New deaths this step
-        # Avoid BoolArr & np.ndarray due to Starsim 3.0.3 bug (UnboundLocalError: other_raw)
-        dead_now = np.asarray(ppl.dead, dtype=bool)
-        new_deaths = np.where(dead_now & ~self._dead_prev)[0]
+        # Use raw, uid-indexed views so that positional indexing into auids cannot
+        # mis-map a "position" to the wrong uid after deaths / new embryos.
+        alive_raw = _raw_view(ppl.alive, n_used, bool)
+        ages_raw = _raw_view(ppl.age, n_used, float)
+        fem_raw = _raw_view(ppl.female, n_used, bool)
+        dead_raw = ~alive_raw
 
-        # Cumulative infant deaths
-        self.results.infant_deaths[ti] = int(np.count_nonzero(ppl.dead[ppl.age < 1]))
+        # Cumulative infant deaths: any uid currently dead with age in [0, 1).
+        # This is a per-step snapshot (overwrite), matching how the analyzer is
+        # consumed downstream.
+        self.results.infant_deaths[ti] = int(
+            np.count_nonzero(dead_raw & (ages_raw >= 0.0) & (ages_raw < 1.0))
+        )
 
-        # Tally new deaths by age/sex
-        if len(new_deaths):
-            ages = np.clip(np.floor(ppl.age[new_deaths]).astype(int), 0, self.max_age)
-            fem = ppl.female[new_deaths]
-
+        # New deaths this step: dead now but not at the prior snapshot. These
+        # indices ARE uids (raw arrays are uid-indexed).
+        new_dead_uids = np.where(dead_raw & ~self._dead_prev[:n_used])[0]
+        if len(new_dead_uids):
+            born = ages_raw[new_dead_uids] >= 0.0
+            new_dead_uids = new_dead_uids[born]
+        if len(new_dead_uids):
+            ages = np.clip(np.floor(ages_raw[new_dead_uids]).astype(int), 0, self.max_age)
+            fem = fem_raw[new_dead_uids]
             if np.any(fem):
                 idx, cnt = np.unique(ages[fem], return_counts=True)
                 self.results.female_deaths_by_age[idx] += cnt
@@ -72,7 +94,7 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
                 self.results.male_deaths_by_age[idx] += cnt
 
         # Update snapshot
-        self._dead_prev = dead_now.copy()
+        self._dead_prev[:n_used] = dead_raw
 
     def finalize(self):
         super().finalize() 
@@ -113,11 +135,12 @@ class AgeSexMxAnalyzer(ss.Analyzer):
         # Stable key for `sim.analyzers.age_sex_mx_analyzer`
         self.name = "age_sex_mx_analyzer"
         self.max_age = max_age
-        self._dead_prev = None
+        self._dead_prev = None  # uid-indexed snapshot of dead state
 
     def init_pre(self, sim):
         super().init_pre(sim)
-        self._dead_prev = np.zeros(len(sim.people), dtype=bool)
+        n = int(sim.people.uid.len_used)
+        self._dead_prev = np.zeros(n, dtype=bool)
 
     def init_results(self):
         super().init_results()
@@ -130,14 +153,13 @@ class AgeSexMxAnalyzer(ss.Analyzer):
             ss.Result("deaths_female", dtype=int, shape=shape, label="Deaths (female) by age"),
         )
 
-    def _ensure_size(self):
-        n_now = len(self.sim.people)
+    def _ensure_size(self, n_used: int):
+        """Grow `_dead_prev` to cover `n_used` uids (monotonically increasing)."""
         if self._dead_prev is None:
-            self._dead_prev = np.zeros(n_now, dtype=bool)
-        elif self._dead_prev.size != n_now:
-            new = np.zeros(n_now, dtype=bool)
-            n_copy = min(self._dead_prev.size, n_now)
-            new[:n_copy] = self._dead_prev[:n_copy]
+            self._dead_prev = np.zeros(n_used, dtype=bool)
+        elif self._dead_prev.size < n_used:
+            new = np.zeros(n_used, dtype=bool)
+            new[: self._dead_prev.size] = self._dead_prev
             self._dead_prev = new
 
     def start_step(self):
@@ -145,9 +167,19 @@ class AgeSexMxAnalyzer(ss.Analyzer):
         super().start_step()
         ppl = self.sim.people
         ti = self.sim.ti
-        self._ensure_size()
+        n_used = int(ppl.uid.len_used)
+        self._ensure_size(n_used)
 
         auids = np.asarray(ppl.auids, dtype=int)
+        if len(auids) == 0:
+            return
+
+        # Exclude unborn agents (negative age == in-utero embryos from ss.Pregnancy).
+        # Without this, embryos collapse into the age-0 bin via floor(-x)→-1 and the
+        # subsequent clip(..., 0, max_age), inflating the denominator of m(0).
+        ages_f = np.asarray(ppl.age[auids], dtype=float)
+        born = ages_f >= 0.0
+        auids = auids[born]
         if len(auids) == 0:
             return
 
@@ -167,13 +199,25 @@ class AgeSexMxAnalyzer(ss.Analyzer):
         """Count new deaths this step by age/sex."""
         ppl = self.sim.people
         ti = self.sim.ti
-        self._ensure_size()
+        n_used = int(ppl.uid.len_used)
+        self._ensure_size(n_used)
 
-        dead_now = np.asarray(ppl.dead, dtype=bool)
-        new_deaths = np.where(dead_now & ~self._dead_prev)[0]
-        if len(new_deaths):
-            ages = np.clip(np.floor(ppl.age[new_deaths]).astype(int), 0, self.max_age)
-            fem = np.asarray(ppl.female[new_deaths], dtype=bool)
+        # Use raw, uid-indexed views: positional indexing into auids becomes
+        # mis-aligned with uids after agents die (remove_dead compacts auids)
+        # or new embryos appear. Raw arrays are always uid-indexed.
+        alive_raw = _raw_view(ppl.alive, n_used, bool)
+        ages_raw = _raw_view(ppl.age, n_used, float)
+        fem_raw = _raw_view(ppl.female, n_used, bool)
+        dead_raw = ~alive_raw
+
+        new_dead_uids = np.where(dead_raw & ~self._dead_prev[:n_used])[0]
+        if len(new_dead_uids):
+            # Exclude in-utero losses (negative age at death) from period m(x) tally.
+            born = ages_raw[new_dead_uids] >= 0.0
+            new_dead_uids = new_dead_uids[born]
+        if len(new_dead_uids):
+            ages = np.clip(np.floor(ages_raw[new_dead_uids]).astype(int), 0, self.max_age)
+            fem = fem_raw[new_dead_uids]
             if np.any(fem):
                 idx, cnt = np.unique(ages[fem], return_counts=True)
                 self.results.deaths_female[ti, idx] = cnt
@@ -181,7 +225,7 @@ class AgeSexMxAnalyzer(ss.Analyzer):
                 idx, cnt = np.unique(ages[~fem], return_counts=True)
                 self.results.deaths_male[ti, idx] = cnt
 
-        self._dead_prev = dead_now.copy()
+        self._dead_prev[:n_used] = dead_raw
         return
 
     def to_mx_df(self, *, year=None):
@@ -443,12 +487,14 @@ class CauseOfDeathYLLAnalyzer(ss.Analyzer):
         self.max_age = int(max_age)
         self.reference_ex = reference_ex
         self._ex_lookup = None
+        # uid-indexed snapshot of who was dead at the previous step
         self._dead_prev = None
         self.records = []
 
     def init_pre(self, sim):
         super().init_pre(sim)
-        self._dead_prev = np.zeros(len(sim.people), dtype=bool)
+        n = int(sim.people.uid.len_used)
+        self._dead_prev = np.zeros(n, dtype=bool)
         ex = self.reference_ex
         if callable(ex):
             self._ex_lookup = ex
@@ -457,40 +503,51 @@ class CauseOfDeathYLLAnalyzer(ss.Analyzer):
         else:
             raise ValueError("reference_ex must be a callable or a DataFrame with columns: age, sex, ex")
 
-    def _ensure_size(self):
-        n_now = len(self.sim.people)
+    def _ensure_size(self, n_used: int):
+        """Grow `_dead_prev` to cover `n_used` uids (monotonically increasing)."""
         if self._dead_prev is None:
-            self._dead_prev = np.zeros(n_now, dtype=bool)
-        elif self._dead_prev.size != n_now:
-            new = np.zeros(n_now, dtype=bool)
-            n_copy = min(self._dead_prev.size, n_now)
-            new[:n_copy] = self._dead_prev[:n_copy]
+            self._dead_prev = np.zeros(n_used, dtype=bool)
+        elif self._dead_prev.size < n_used:
+            new = np.zeros(n_used, dtype=bool)
+            new[: self._dead_prev.size] = self._dead_prev
             self._dead_prev = new
 
     def step(self):
         ppl = self.sim.people
         ti = self.sim.ti
         year = float(self.sim.t.yearvec[ti])
-        self._ensure_size()
+        n_used = int(ppl.uid.len_used)
+        self._ensure_size(n_used)
 
-        dead_now = np.asarray(ppl.dead, dtype=bool)
-        new_deaths = np.where(dead_now & ~self._dead_prev)[0]
-        if len(new_deaths) == 0:
-            self._dead_prev = dead_now.copy()
-            return
+        # Use raw, uid-indexed views. Without this, np.asarray(ppl.dead) returns
+        # a positional slice over auids, np.where(...) returns positions, and the
+        # subsequent cause_map[int(uid)] / ppl.age[uid] / ppl.female[uid] lookups
+        # mis-map almost every newly-dead agent to cause="unknown".
+        alive_raw = _raw_view(ppl.alive, n_used, bool)
+        ages_raw = _raw_view(ppl.age, n_used, float)
+        fem_raw = _raw_view(ppl.female, n_used, bool)
+        dead_raw = ~alive_raw
 
-        cause_map = getattr(self.sim, "_mighti_death_cause", {}) or {}
+        new_dead_uids = np.where(dead_raw & ~self._dead_prev[:n_used])[0]
+        if len(new_dead_uids):
+            # Exclude in-utero losses (negative age at death) so that cause
+            # attribution and YLL match the m(x) / deaths analyzers' scope.
+            born = ages_raw[new_dead_uids] >= 0.0
+            new_dead_uids = new_dead_uids[born]
 
-        for uid in new_deaths:
-            age = float(ppl.age[uid])
-            sex = "Female" if ppl.female[uid] else "Male"
-            yll = max(0.0, float(self._ex_lookup(sex, age))) if self._ex_lookup is not None else 0.0
-            cause = str(cause_map.get(int(uid), "unknown"))
-            self.records.append(
-                dict(uid=int(uid), year=year, age=age, sex=sex, cause=cause, yll=yll)
-            )
+        if len(new_dead_uids):
+            cause_map = getattr(self.sim, "_mighti_death_cause", {}) or {}
+            ages_dead = ages_raw[new_dead_uids]
+            fem_dead = fem_raw[new_dead_uids]
+            for uid, age, is_female in zip(new_dead_uids, ages_dead, fem_dead):
+                sex = "Female" if bool(is_female) else "Male"
+                yll = max(0.0, float(self._ex_lookup(sex, float(age)))) if self._ex_lookup is not None else 0.0
+                cause = str(cause_map.get(int(uid), "unknown"))
+                self.records.append(
+                    dict(uid=int(uid), year=year, age=float(age), sex=sex, cause=cause, yll=yll)
+                )
 
-        self._dead_prev = dead_now.copy()
+        self._dead_prev[:n_used] = dead_raw
 
     def to_df(self):
         return pd.DataFrame(self.records)

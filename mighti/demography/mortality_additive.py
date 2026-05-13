@@ -68,6 +68,14 @@ class AdditiveHazardDeaths(ss.Disease):
         with a chosen set of disease modules enabled.
     background_multiplier:
         Scalar applied to the background hazard component (not the probability).
+        See `multiplier_min_age` for piecewise scoping.
+    multiplier_min_age:
+        Minimum age (in years) at which `background_multiplier` is applied. For
+        agents with ``age < multiplier_min_age``, the background hazard uses
+        the *unscaled* schedule (multiplier = 1.0). This lets you assert the
+        WPP all-cause schedule at the steep infant/early-childhood ages while
+        still calibrating a single global multiplier for the rest of the life
+        course. Default is 0.0 (multiplier applies at all ages).
     metadata:
         Column mapping + sex key mapping for the dataframe format.
     background_cause_name:
@@ -79,6 +87,7 @@ class AdditiveHazardDeaths(ss.Disease):
         background_rate,
         *,
         background_multiplier=1.0,
+        multiplier_min_age=0.0,
         rate_units=1e-3,
         metadata=None,
         background_cause_name="background",
@@ -88,6 +97,7 @@ class AdditiveHazardDeaths(ss.Disease):
         self.define_pars(
             background_rate=background_rate,
             background_multiplier=float(background_multiplier),
+            multiplier_min_age=float(multiplier_min_age),
             rate_units=float(rate_units),
             background_cause_name=str(background_cause_name),
         )
@@ -158,18 +168,23 @@ class AdditiveHazardDeaths(ss.Disease):
                 female_mask = np.asarray(ppl.female[uids], dtype=bool)
                 fu = uids[female_mask]
                 if len(fu):
-                    b = np.digitize(ppl.age[fu], s.index) - 1
+                    # Clamp negative ages (in-utero embryos from ss.Pregnancy) to 0
+                    # for the age-bin lookup; their final hazard is zeroed below.
+                    ages_f = np.maximum(np.asarray(ppl.age[fu], dtype=float), 0.0)
+                    b = np.clip(np.digitize(ages_f, s.index) - 1, 0, len(s.values) - 1)
                     rate[female_mask] = s.values[b]
 
                 s = brd.loc[nearest_year, "m"]
                 male_mask = np.asarray(ppl.male[uids], dtype=bool)
                 mu = uids[male_mask]
                 if len(mu):
-                    b = np.digitize(ppl.age[mu], s.index) - 1
+                    ages_m = np.maximum(np.asarray(ppl.age[mu], dtype=float), 0.0)
+                    b = np.clip(np.digitize(ages_m, s.index) - 1, 0, len(s.values) - 1)
                     rate[male_mask] = s.values[b]
             else:
                 s = brd.loc[nearest_year]
-                b = np.digitize(ppl.age[uids], s.index) - 1
+                ages_all = np.maximum(np.asarray(ppl.age[uids], dtype=float), 0.0)
+                b = np.clip(np.digitize(ages_all, s.index) - 1, 0, len(s.values) - 1)
                 rate[:] = s.values[b]
 
             rate *= p.rate_units
@@ -178,7 +193,15 @@ class AdditiveHazardDeaths(ss.Disease):
         p_bg = rate.to_prob(self.t.dt)
         if sc.isnumber(brd) or isinstance(brd, ss.Rate):
             p_bg = np.full(uids.shape, float(p_bg[0]), dtype=float)
-        return np.clip(p_bg.astype(float), 0.0, 1.0)
+        p_bg = np.asarray(p_bg, dtype=float).copy()
+        # Background mortality should not act on unborn (in-utero) agents: their
+        # "age" is negative until delivery (`ss.Pregnancy.make_embryos`).
+        try:
+            ages_q = np.asarray(sim.people.age[uids], dtype=float)
+            p_bg[ages_q < 0.0] = 0.0
+        except Exception:
+            pass
+        return np.clip(p_bg, 0.0, 1.0)
 
     def _collect_death_pressures(self):
         pressures = []
@@ -224,9 +247,20 @@ class AdditiveHazardDeaths(ss.Disease):
             self.results.new_deaths[ti] = 0
             return 0
 
-        # Background hazard
+        # Background hazard. The multiplier is applied piecewise by age so that
+        # the WPP all-cause schedule can be asserted at full strength at the
+        # steep infant cliff while a single global multiplier scales the rest of
+        # the life course (calibrated to match observed e0).
         p_bg = self._make_p_background(auids)
-        h_bg = _p_to_h(p_bg) * float(self.pars.background_multiplier)
+        h_bg_raw = _p_to_h(p_bg)
+        mult_full = float(self.pars.background_multiplier)
+        min_age = float(self.pars.multiplier_min_age)
+        if min_age > 0.0:
+            ages_q = np.asarray(ppl.age[auids], dtype=float)
+            mult_arr = np.where(ages_q < min_age, 1.0, mult_full)
+            h_bg = h_bg_raw * mult_arr
+        else:
+            h_bg = h_bg_raw * mult_full
 
         # Modeled hazards (dense arrays for attribution)
         pressures = self._collect_death_pressures()

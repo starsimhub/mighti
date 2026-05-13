@@ -4,6 +4,7 @@ import starsim as ss
 import logging
 
 from mighti.util.rng import get_rng
+from mighti.util.utils import birth_mother_baby_pairs
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -110,65 +111,16 @@ class BaseSDoH(ss.Module):
         inherited_now = 0
         total_births = 0
 
-        maternal = sim.networks.get("maternalnet", None)
-        if maternal is not None and hasattr(maternal, "edges"):
-            edges = maternal.edges
-            # Starsim edge containers vary by version:
-            # - Some provide `edges.start` (timestep when the edge was created)
-            # - Others only provide `p1/p2` (mother/baby) and no timing info
-            def _to_numpy(x):
-                if hasattr(x, "to_numpy"):
-                    return x.to_numpy()
-                return np.asarray(x)
-
-            try:
-                p1 = _to_numpy(edges.p1)
-                p2 = _to_numpy(edges.p2)
-            except Exception:
-                p1 = None
-                p2 = None
-
-            if p1 is not None and p2 is not None and len(p1) and len(p2):
-                p1 = np.asarray(p1, dtype=float)
-                p2 = np.asarray(p2, dtype=float)
-                valid = np.isfinite(p1) & np.isfinite(p2)
-                if np.any(valid):
-                    mothers_all = p1[valid].astype(int, copy=False)
-                    babies_all = p2[valid].astype(int, copy=False)
-
-                    # Keep only in-range ids
-                    in_range = (mothers_all >= 0) & (mothers_all < len(ppl)) & (babies_all >= 0) & (babies_all < len(ppl))
-                    mothers_all = mothers_all[in_range]
-                    babies_all = babies_all[in_range]
-
-                    # Identify "newborn edges" for this timestep
-                    newborn_mask = None
-                    if hasattr(edges, "start"):
-                        try:
-                            start = _to_numpy(edges.start)
-                            start = np.asarray(start, dtype=float)[valid][in_range]
-                            newborn_mask = (start == sim.ti)
-                        except Exception:
-                            newborn_mask = None
-
-                    # Fallback when no edge timing exists: treat babies with age < dt as newborns
-                    if newborn_mask is None:
-                        dt = float(getattr(sim, "dt", 1.0))
-                        ages = _to_numpy(getattr(ppl, "age_years", ppl.age))
-                        ages = np.asarray(ages, dtype=float)
-                        newborn_mask = ages[babies_all] < (dt + 1e-9)
-
-                    if np.any(newborn_mask):
-                        mothers = mothers_all[newborn_mask]
-                        babies = babies_all[newborn_mask]
-                        n = len(babies)
-                        total_births = n
-                        inherit_mask = rng.random(n) < self.inherit_prob
-                        inherited_now = int(inherit_mask.sum())
-                        if inherited_now:
-                            self.state[babies[inherit_mask]] = self.state[mothers[inherit_mask]]
-                        if n - inherited_now > 0:
-                            self.state[babies[~inherit_mask]] = rng.random(n - inherited_now) < self.p_stable
+        mothers, babies = birth_mother_baby_pairs(sim)
+        if len(babies):
+            n = len(babies)
+            total_births = n
+            inherit_mask = rng.random(n) < self.inherit_prob
+            inherited_now = inherit_mask.sum()
+            if inherited_now:
+                self.state[babies[inherit_mask]] = self.state[mothers[inherit_mask]]
+            if n - inherited_now > 0:
+                self.state[babies[~inherit_mask]] = rng.random(n - inherited_now) < self.p_stable
 
         # -------------------------------
         # 2. Stochastic transitions

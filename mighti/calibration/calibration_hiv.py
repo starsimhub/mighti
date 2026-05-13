@@ -209,7 +209,11 @@ def build_stisim_style_hiv_data(
     obs["HIV_female"] = obs["HIV_female"] * scale
 
     years = np.arange(int(cfg.start), int(cfg.stop) + 1, dtype=int)
-    out = pd.DataFrame({"time": years.astype(float)})
+    # STIsim's calibration.make_df() returns timestep indices as `time` for
+    # analyzer results, so keep observed data on the same 0-based axis while
+    # still using calendar years to look up observed values.
+    out = pd.DataFrame({"time": np.arange(len(years), dtype=float)})
+    out_year = pd.Series(years, index=out.index)
 
     # Map analyzer bins to observed (lower-edge) age values
     for i, (a0, _a1) in enumerate(analyzer_age_bins):
@@ -223,8 +227,8 @@ def build_stisim_style_hiv_data(
 
         male_series = sub.set_index("Year")["HIV_male"]
         fem_series = sub.set_index("Year")["HIV_female"]
-        out[f"{results_key}_hiv_prev_male_{i}"] = out["time"].astype(int).map(male_series)
-        out[f"{results_key}_hiv_prev_female_{i}"] = out["time"].astype(int).map(fem_series)
+        out[f"{results_key}_hiv_prev_male_{i}"] = out_year.map(male_series)
+        out[f"{results_key}_hiv_prev_female_{i}"] = out_year.map(fem_series)
 
     # Drop any series that have no observed points in the selected time range
     keep_cols = ["time"]
@@ -236,6 +240,48 @@ def build_stisim_style_hiv_data(
     out = out[keep_cols]
 
     return out
+
+
+def safe_stisim_eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None):
+    """
+    STIsim-style evaluator that tolerates empty observed/model overlaps.
+
+    Some age-sex HIV prevalence bins can have observed data but no simulated
+    denominator after dropping NaNs, especially in sparse older age bins.
+    STIsim's default evaluator passes those empty arrays to compute_gof(), which
+    raises on max(empty). We skip those series and score the usable overlaps.
+    """
+    import pandas as pd
+    import stisim.calibration as scali
+
+    df_res = scali.make_df(sim, df_res_list=df_res_list)
+    sim.df_res = df_res
+
+    fit = 0.0
+    n_scored = 0
+    skipped = []
+    for skey in sim_result_list:
+        data_df = data[skey].reset_index()
+        model_df = df_res[["time", skey]]
+        combined = pd.merge(data_df, model_df, how="left", on="time").dropna(subset=[f"{skey}_x", f"{skey}_y"])
+        if combined.empty:
+            skipped.append(skey)
+            continue
+
+        losses = scali.compute_gof(combined[f"{skey}_x"], combined[f"{skey}_y"])
+        if weights and (skey in weights.keys()) and (weights[skey] != 1):
+            losses *= weights[skey]
+        fit += losses.sum()
+        n_scored += 1
+
+    if n_scored == 0:
+        raise ValueError(
+            "No HIV calibration series had overlapping non-null observed and simulated values. "
+            f"Available data columns: {list(sim_result_list or [])}"
+        )
+    if skipped:
+        logger.debug("Skipped %d empty HIV calibration series: %s", len(skipped), skipped)
+    return float(fit)
 
 
 def run_calib(cfg, calib_pars=None):
@@ -319,6 +365,14 @@ def run_calib(cfg, calib_pars=None):
             die=True,
             reseed=False,
             sampler=optuna.samplers.TPESampler(seed=int(cfg.sampler_seed)),
+        )
+        result_cols = [c for c in data_df.columns if c != "time"]
+        calib.eval_fn = safe_stisim_eval_fn
+        calib.eval_kw = dict(
+            data=calib.data,
+            sim_result_list=result_cols,
+            weights=None,
+            df_res_list=result_cols,
         )
     else:
         import optuna

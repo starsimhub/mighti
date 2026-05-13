@@ -54,6 +54,7 @@ n_agents = 100_000
 inityear = 2007
 endyear = 2024
 region = "eswatini"
+dt_years = float(os.environ.get("MIGHTI_DT_YEARS", str(1 / 12)))
 
 # ---------------------------------------------------------------------
 # File paths
@@ -90,7 +91,7 @@ prepare_data_for_year.prepare_data(region)
 df = pd.read_csv(csv_path_params)
 df.columns = df.columns.str.strip()
 
-healthconditions = ['AcuteHepatitis']
+healthconditions = ['Type2Diabetes']
 # healthconditions = [condition for condition in df.condition if condition != "HIV"]
 # healthconditions = [
 #     condition
@@ -247,6 +248,8 @@ connectors = [ncd_hiv_connector]
 
 ncd_interactions = mi.interactions.read_interactions(csv_path_interactions)
 connectors.extend(mi.interactions.create_connectors(ncd_interactions))
+# SDoH must run after demographics (Pregnancy) so births exist; use connectors, not custom modules.
+connectors.append(sdoh_modules)
 
 
 # ---------------------------------------------------------------------
@@ -298,20 +301,20 @@ if __name__ == "__main__":
     out_dir.mkdir(parents=True, exist_ok=True)
     apply_mighti_style()
 
-    # dt=1: one timestep per year. Disease p_acquire is per-timestep (no scaling), so dt=1
-    # keeps prevalence from being inflated by multiple draws per year.
+    # Use monthly timesteps by default. MIGHTI disease modules convert annual
+    # probability-like parameters to the chosen dt during init_pre().
     sim = ss.Sim(
         rand_seed=SEED,
         n_agents=n_agents,
         start=inityear,
         stop=endyear,
-        dt=1,
+        dt=dt_years,
         people=ppl,
         networks=networks,
         demographics=[pregnancy, death],
         diseases=disease_objects,
         connectors=connectors,
-        modules=[adherence_engine, art_disruptor, intervention_disruptor, sdoh_modules],
+        modules=[adherence_engine, art_disruptor, intervention_disruptor],
         interventions=interventions_hiv,  # HIV test + ARTwithCASM
         analyzers=[prevalence_analyzer],  # must be a list
         copy_inputs=False,
