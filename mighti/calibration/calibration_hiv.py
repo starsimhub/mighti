@@ -15,6 +15,7 @@ import argparse
 from dataclasses import dataclass
 import logging
 from pathlib import Path
+from mighti.util.paths import get_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -484,7 +485,11 @@ def eval_fn(sim, data=None, sim_result_list=None, weights=None, df_res_list=None
 def _parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Calibrate HIV transmission betas against observed prevalence.")
     parser.add_argument("--region", default="eswatini", help="Region name (used to build default file names).")
-    parser.add_argument("--data-dir", default=str(Path(__file__).resolve().parents[2] / "data" / "processed"), help="Directory containing region CSV inputs.")
+    parser.add_argument(
+        "--data-dir",
+        default=None,
+        help="Directory containing region CSV inputs (defaults to MIGHTI_DATA_DIR or repo data/processed).",
+    )
     parser.add_argument("--prevalence-hiv-csv", default=None, help="Observed HIV prevalence CSV (Age/Year/HIV_female/HIV_male).")
     parser.add_argument("--asfr-csv", default=None, help="ASFR CSV for pregnancy module.")
     parser.add_argument("--mortality-csv", default=None, help="Mortality rates CSV for deaths module.")
@@ -517,7 +522,7 @@ def _parse_args(argv=None):
     parser.set_defaults(use_stisim_calibration=True)
     args = parser.parse_args(argv)
 
-    data_dir = Path(args.data_dir).expanduser()
+    data_dir = Path(get_data_dir(args.data_dir))
     defaults = _resolve_default_paths(args.region, data_dir)
 
     prevalence_hiv_csv = Path(args.prevalence_hiv_csv).expanduser() if args.prevalence_hiv_csv else defaults["prevalence_hiv_csv"]

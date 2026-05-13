@@ -1,10 +1,11 @@
 import numpy as np
 import pandas as pd
+from .paths import data_path
 
 REGION = "eswatini"
-prev_path = f"data/processed/{REGION}_prevalence.csv"
-age_path = f"data/processed/{REGION}_age_distribution.csv"
-out_path = f"data/processed/{REGION}_postprocess_check_prevalence.csv"
+prev_path = data_path(f"{REGION}_prevalence.csv")
+age_path = data_path(f"{REGION}_age_distribution.csv")
+out_path = data_path(f"{REGION}_postprocess_check_prevalence.csv")
 
 prev = pd.read_csv(prev_path)
 age = pd.read_csv(age_path)

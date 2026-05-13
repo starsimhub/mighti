@@ -6,14 +6,6 @@ import logging
 from mighti.util.rng import get_rng
 from mighti.util.utils import birth_mother_baby_pairs
 
-__all__ = [
-    "NeighbourhoodSituation",
-    "SocialContext",
-    "EducationSituation",
-    "EconomicSituation",
-    "HealthCareSystem",
-]
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
