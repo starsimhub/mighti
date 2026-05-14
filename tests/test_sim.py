@@ -100,11 +100,11 @@ def test_full_mighti_simulation():
         mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=active_diseases),
     ]
 
-    # --- Interventions
+    # ART / VMMC: use coverage_data (pars dict alone is rejected for some STIsim builds).
     interventions = [
         sti.HIVTest(test_prob_data=[0.6, 0.7, 0.95], years=[2000, 2007, 2016]),
-        sti.ART(pars={"future_coverage": {"year": 2005, "prop": 0.95}}),
-        sti.VMMC(pars={"future_coverage": {"year": 2015, "prop": 0.30}}),
+        sti.ART(coverage_data=pd.DataFrame({"p_art": [0.95]}, index=[2000])),
+        sti.VMMC(coverage_data=pd.DataFrame({"p_vmmc": [0.30]}, index=[2000])),
         sti.Prep(pars={"coverage": [0, 0.05, 0.25], "years": [2007, 2015, 2020]}),
     ]
 
