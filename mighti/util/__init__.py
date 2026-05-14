@@ -6,6 +6,7 @@ __all__ = [
     "rng",
     "plot_style",
     "figpaths",
+    "paths",
     "version",
     "utils",
 ]

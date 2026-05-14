@@ -55,7 +55,7 @@ def test_hiv_basic(n_agents=5000, start=2000, stop=2020, do_plot=False):
     print(f"[✓] {int(total_deaths):,} cumulative AIDS-related deaths recorded.")
 
     if do_plot:
-        pl.figure()
+        fig = pl.figure()
         pl.plot(hiv_res.timevec, hiv_res.prevalence, label="Prevalence")
         pl.plot(hiv_res.timevec, hiv_res.cum_deaths / n_agents, label="Cumulative deaths (per capita)")
         pl.xlabel("Year")
@@ -63,9 +63,9 @@ def test_hiv_basic(n_agents=5000, start=2000, stop=2020, do_plot=False):
         pl.legend()
         pl.title("HIV Dynamics with AIDS Mortality")
         pl.tight_layout()
+        pl.savefig("outputs/test_hiv_basic.png", dpi=150)
         pl.show(block=True)
-
-    return sim
+        pl.close(fig)
 
 
 if __name__ == "__main__":

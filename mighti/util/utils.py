@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 import numpy as np
+from pathlib import Path
+from .paths import get_processed_path
 
 import starsim as ss
 
@@ -164,12 +166,27 @@ def convert_condition_parameters_to_dt(
     return _convert_mapping(data)
 
 
+def _load_condition_prognoses():
+    """Load condition prognoses from processed data, with legacy fallback."""
+    candidates = [
+        get_processed_path("condition_prognoses.csv"),
+        Path(__file__).resolve().parents[1] / "data" / "condition_prognoses.csv",  # legacy
+    ]
+    for path in candidates:
+        if path.exists():
+            return pd.read_csv(path)
+    raise FileNotFoundError(
+        "condition_prognoses.csv not found. "
+        "Set MIGHTI_DATA_DIR to your processed data directory or provide the legacy file."
+    )
+
+
 def make_p_death_fn(name=None, sim=None, uids=None):
     """Read in condition prognoses and return probability of instantaneous death."""
 
     ppl = sim.people  # Shorten
     death_prob = pd.Series(0.0, index=uids)  # placeholder for storing probabilities by age
-    raw_progs = pd.read_csv("../mighti/data/condition_prognoses.csv")  # Read in the data
+    raw_progs = _load_condition_prognoses()
     df = raw_progs.loc[raw_progs.condition == name]
     abins = np.append(df.age.unique(), 120)  # Add 120 as the upper age bin limit
     for sex in ["male", "female"]:
@@ -186,7 +203,7 @@ def make_dur_inf_fn(name=None, sim=None, uids=None):
     ppl = sim.people  # Shorten
     mean = pd.Series(0.0, index=uids)  # placeholder for storing mean durations
     scale = pd.Series(0.0, index=uids)  # placeholder for storing scale
-    raw_progs = pd.read_csv("../mighti/data/condition_prognoses.csv")  # Read in the data
+    raw_progs = _load_condition_prognoses()
     df = raw_progs.loc[raw_progs.condition == name]
     abins = np.append(df.age.unique(), 120)  # Add 120 as the upper age bin limit
     for sex in ["male", "female"]:

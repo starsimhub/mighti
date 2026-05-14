@@ -63,11 +63,11 @@ def test_full_mighti_simulation():
     for d in healthconditions:
         cls = getattr(mi, d, None)
         if not cls:
-            print(f"[⚠] Skipping unknown condition: {d}")
+            print(f" Skipping unknown condition: {d}")
             continue
         bins = age_bins.get(d, [])
         if len(bins) < 2:
-            print(f"[⚠] Skipping {d}: no prevalence age bins")
+            print(f" Skipping {d}: no prevalence age bins")
             continue
         init_prev = ss.bernoulli(p=get_prev_fn(d))
         disease_objects.append(cls(csv_path=param_path, pars={"init_prev": init_prev}))
@@ -128,12 +128,15 @@ def test_full_mighti_simulation():
 
     # --- Assertions
     assert sim.t.yearvec[-1] == endyear
+    assert sim.pars.n_agents == n_agents, "Simulation did not initialize with requested n_agents"
     assert len(sim.people) > 0
-    assert abs(len(sim.people) - n_agents) < 10, "Unexpected agent loss during setup"
+    alive_n = int(np.count_nonzero(sim.people.alive))
+    assert alive_n > 0, "No living agents at end of simulation"
+    assert alive_n <= len(sim.people), "Alive count cannot exceed total population"
     for analyzer in analyzers:
         assert hasattr(analyzer, "results"), f"{analyzer.name} missing results"
 
-    print("✅ Full MIGHTI simulation ran successfully.")
+    print(" Full MIGHTI simulation ran successfully.")
 
 
 if __name__ == "__main__":

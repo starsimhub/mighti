@@ -5,14 +5,12 @@ for use in life table and simulation analyses.
 
 
 import logging
-import os
 import pandas as pd
-from pathlib import Path
+from data_prep.cleaning.paths import data_path, ensure_data_dir
 
 
 logger = logging.getLogger(__name__)
-repo_root = Path(__file__).resolve().parents[1]
-data_dir = repo_root / "data" / "processed"
+ensure_data_dir()
 
 
 def prepare_data_for_year(region, year):
@@ -31,8 +29,8 @@ def prepare_data_for_year(region, year):
     # ------------------------------------------------------------------
     # Extract mortality rates
     # ------------------------------------------------------------------
-    input_mx_path = str(data_dir / f"{region}_mx.csv")
-    output_mx_path = str(data_dir / f"{region}_mortality_rates_{year}.csv")
+    input_mx_path = data_path(f"{region}_mx.csv")
+    output_mx_path = data_path(f"{region}_mortality_rates_{year}.csv")
 
     df_mx = pd.read_csv(input_mx_path)
     df_mx = df_mx.melt(id_vars=['Age', 'Sex'], var_name='Time', value_name='mx')
@@ -47,8 +45,8 @@ def prepare_data_for_year(region, year):
     # ------------------------------------------------------------------
     # Extract age distribution
     # ------------------------------------------------------------------
-    input_age_path = str(data_dir / f"{region}_age_distribution.csv")
-    output_age_path = str(data_dir / f"{region}_age_distribution_{year}.csv")
+    input_age_path = data_path(f"{region}_age_distribution.csv")
+    output_age_path = data_path(f"{region}_age_distribution_{year}.csv")
 
     df_age = pd.read_csv(input_age_path)
     if str(year) not in df_age.columns:
@@ -77,8 +75,8 @@ def prepare_data(region):
     # ------------------------------------------------------------------
     # Extract mortality rates
     # ------------------------------------------------------------------
-    input_mx_path = str(data_dir / f"{region}_mx.csv")
-    output_mx_path = str(data_dir / f"{region}_mortality_rates.csv")
+    input_mx_path = data_path(f"{region}_mx.csv")
+    output_mx_path = data_path(f"{region}_mortality_rates.csv")
 
     df_mx = pd.read_csv(input_mx_path)
     df_mx = df_mx.melt(id_vars=['Age', 'Sex'], var_name='Time', value_name='mx')

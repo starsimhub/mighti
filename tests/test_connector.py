@@ -115,8 +115,9 @@ def test_hiv_aud_connector_msim():
 
     msg = f"AUD prevalence should be ≥ baseline with connector: {prev_base:.3f} → {prev_conn:.3f}"
     assert prev_conn >= prev_base - 0.01, msg
+    assert len(msim.sims) == 2, "Expected two simulations in MultiSim"
+    assert hasattr(msim.sims[1].results, "alcoholusedisorder"), "Missing AUD results in connector sim"
     print(f"[✓] {msg}")
-    return msim
 
 
 # ---------------------------------------------------------------------
