@@ -23,7 +23,7 @@ jobs:
       run: |
         pip install -r docs/requirements.txt
         # --- Ensure correct Starsim/STIsim versions (override cache) ---
-        pip install --force-reinstall starsim==3.0.3 STIsim==1.4.0
+        pip install --force-reinstall starsim==3.0.3 "STIsim>=1.5.0,<2"
 
     - name: Build package artifacts
       run: |
@@ -33,6 +33,7 @@ jobs:
     - name: Install from built wheel
       run: |
         pip install --force-reinstall dist/*.whl
+        pip install --force-reinstall starsim==3.0.3 "STIsim>=1.5.0,<2"
         python -c "import mighti; print(mighti.__version__)"
 
     - name: Run tests

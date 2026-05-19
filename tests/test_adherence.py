@@ -194,9 +194,7 @@ def test_intervention_adherence_disruptor():
     init_prev_mdd = ss.bernoulli(p=MDD_INIT_PREV)
     mdd = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev_mdd})
 
-    art = mi.ARTwithCASM(
-        coverage_data=pd.DataFrame({"p_art": [1.0]}, index=[2000])
-    )
+    art = mi.ARTwithCASM(coverage=pd.DataFrame({"p_art": [1.0]}, index=[2000]))
     art.casm_sensitivity = "pharma"
 
     adherence_engine = mi.AdherenceEngine(casm_rel=mi.CASM_REL_FACTORS)

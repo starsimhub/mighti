@@ -121,5 +121,7 @@ cause_map = {
     "Maternal obstructed labor and uterine rupture": "MaternalConditions",
     "Maternal abortion and miscarriage": "MaternalConditions",
     "Maternal disorders": "MaternalConditions",
+    "HIV/AIDS": "HIV",
+    "Neonatal disorders": "NeonatalEncephalopathy",
 }
 

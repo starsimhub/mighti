@@ -25,6 +25,7 @@ _EXPORTS = {
     "PrevalenceAnalyzer": "analyzer_prevalence",
     "PrevalenceAnalyzer_HIV": "analyzer_prevalence",
     "PrevalenceAnalyzer_SDoH": "analyzer_prevalence",
+    "CauseDeathRateAnalyzer": "analyzer_prevalence",
     "OnARTByConditionAnalyzer": "analyzer_prevalence",
     "OnARTByConditionAndSexAnalyzer": "analyzer_prevalence",
     # analyzer_intervention.py

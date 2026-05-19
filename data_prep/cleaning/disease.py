@@ -600,6 +600,216 @@ def create_and_fill_prevalence_template_from_long_format(
     return grid
 
 
+def gbd_age_label_to_start(label):
+    """Map a GBD age label to the numeric lower bound used in MIGHTI grids."""
+    if isinstance(label, str):
+        label = label.strip()
+        if re.match(r"^<\s*5", label):
+            return 0
+        m = re.match(r"^(\d+)", label)
+        if m:
+            return int(m.group(1))
+    return np.nan
+
+
+def create_death_rate_grid_from_gbd_long(
+    raw_csv,
+    output_csv,
+    *,
+    location="Eswatini",
+    start_year=None,
+    end_year=None,
+    age_starts=None,
+    overwrite=False,
+):
+    """
+    Build a wide death-rate grid (per 100k) with columns Age, Year, {Condition}_male/female.
+
+    Input must be GBD long format with measure=Deaths and metric=Rate.
+    """
+    if age_starts is None:
+        age_starts = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80]
+
+    df = pd.read_csv(raw_csv)
+    needed = ["measure", "location", "sex", "age", "cause", "metric", "year", "val"]
+    missing = [c for c in needed if c not in df.columns]
+    if missing:
+        raise ValueError(f"{raw_csv} is missing required columns: {missing}")
+
+    df = df[
+        (df["measure"] == "Deaths")
+        & (df["metric"] == "Rate")
+        & (df["location"] == location)
+    ].copy()
+    if df.empty:
+        raise ValueError(f"No Deaths/Rate rows for location={location!r} in {raw_csv}")
+
+    df = df.rename(columns={"cause": "condition", "val": "death_rate"})
+    df["condition"] = df["condition"].map(cause_map)
+    df = df.dropna(subset=["condition"])
+    df["sex"] = df["sex"].str.lower().map({"male": "male", "m": "male", "female": "female", "f": "female"})
+    df["year"] = df["year"].astype(str).str.extract(r"(\d{4})").astype(float).astype("Int64")
+    df["Age"] = df["age"].apply(gbd_age_label_to_start)
+    df = df.dropna(subset=["Age"])
+    df["Age"] = df["Age"].astype(int)
+
+    years = df["year"].dropna()
+    if years.empty:
+        raise ValueError(f"Could not parse any 4-digit years from: {raw_csv}")
+    if start_year is None:
+        start_year = int(years.min())
+    if end_year is None:
+        end_year = int(years.max())
+
+    modeled_conditions = sorted(df["condition"].unique())
+    expected_cols = [f"{cond}_{sex}" for cond in modeled_conditions for sex in ["male", "female"]]
+    grid = pd.MultiIndex.from_product([age_starts, range(start_year, end_year + 1)], names=["Age", "Year"]).to_frame(
+        index=False
+    )
+    for c in expected_cols:
+        grid[c] = np.nan
+
+    df = df.groupby(["condition", "sex", "Age", "year"], as_index=False)["death_rate"].sum()
+
+    for (cond, sex), group in df.groupby(["condition", "sex"]):
+        col = f"{cond}_{sex}"
+        if col not in grid.columns:
+            continue
+        for _, r in group.iterrows():
+            mask = (grid["Age"] == r["Age"]) & (grid["Year"] == r["year"])
+            grid.loc[mask, col] = r["death_rate"]
+
+    if (not overwrite) and os.path.exists(output_csv):
+        logger.info(f"Death-rate file already exists; keeping existing file: {output_csv}")
+        return grid
+
+    os.makedirs(os.path.dirname(output_csv), exist_ok=True)
+    grid.to_csv(output_csv, index=False)
+    logger.info(f"Death-rate grid saved to {output_csv}")
+    return grid
+
+
+def _population_weights_for_gbd_ages(age_dist_csv, year, location=None):
+    """
+    Build population weights for (age_start, sex) cells using WPP single-age counts.
+
+    For a GBD age label with lower bound `a0`, weight = sum of population ages [a0, a0+5)
+    (or to 100 for open-ended 80+).
+    """
+    df = pd.read_csv(age_dist_csv)
+    ycol = str(year)
+    if ycol not in df.columns:
+        raise ValueError(f"Year {year} not found in age distribution file: {age_dist_csv}")
+
+    weights = []
+    for _, row in df.iterrows():
+        age = int(row["age"])
+        sex = str(row["sex"]).strip()
+        pop = float(row[ycol])
+        if pop <= 0:
+            continue
+        weights.append({"age": age, "sex": sex, "pop": pop})
+
+    pop_df = pd.DataFrame(weights)
+    if pop_df.empty:
+        raise ValueError(f"No population weights parsed from {age_dist_csv}")
+
+    def weight_for_cell(age_start, sex_label):
+        sex_key = "Male" if str(sex_label).lower().startswith("m") else "Female"
+        if age_start >= 80:
+            sub = pop_df[(pop_df["sex"] == sex_key) & (pop_df["age"] >= 80)]
+        else:
+            sub = pop_df[(pop_df["sex"] == sex_key) & (pop_df["age"] >= age_start) & (pop_df["age"] < age_start + 5)]
+        return float(sub["pop"].sum()) if not sub.empty else 0.0
+
+    return weight_for_cell
+
+
+def aggregate_gbd_deaths_to_both_all_ages(
+    death_long_csv,
+    *,
+    year,
+    location="Eswatini",
+    age_dist_csv=None,
+):
+    """
+    Aggregate age/sex-stratified GBD death rates to Both / All ages for parameter fill.
+
+  Population-weighted mean across age-sex cells. Prefer a direct IHME Both/All ages export
+    when available; this is an approximation when only fine-stratified exports exist.
+    """
+    df = pd.read_csv(death_long_csv)
+    needed = ["measure", "location", "sex", "age", "cause", "metric", "year", "val"]
+    missing = [c for c in needed if c not in df.columns]
+    if missing:
+        raise ValueError(f"{death_long_csv} is missing required columns: {missing}")
+
+    df = df[
+        (df["measure"] == "Deaths")
+        & (df["metric"] == "Rate")
+        & (df["location"] == location)
+        & (pd.to_numeric(df["year"], errors="coerce") == year)
+    ].copy()
+    if df.empty:
+        raise ValueError(f"No Deaths rows for {location} year={year} in {death_long_csv}")
+
+    if age_dist_csv and os.path.exists(age_dist_csv):
+        weight_fn = _population_weights_for_gbd_ages(age_dist_csv, year)
+        df["w"] = df.apply(
+            lambda r: weight_fn(gbd_age_label_to_start(r["age"]), r["sex"]),
+            axis=1,
+        )
+    else:
+        logger.warning("No age distribution for weights; using uniform weights for death aggregation")
+        df["w"] = 1.0
+
+    df = df[df["w"] > 0].copy()
+    rows = []
+    for cause, g in df.groupby("cause"):
+        val = np.average(g["val"].astype(float), weights=g["w"].astype(float))
+        rows.append(
+            {
+                "measure": "Deaths",
+                "location": location,
+                "sex": "Both",
+                "age": "All ages",
+                "cause": cause,
+                "metric": "Rate",
+                "year": year,
+                "val": val,
+                "upper": np.nan,
+                "lower": np.nan,
+            }
+        )
+    out = pd.DataFrame(rows)
+    logger.info(
+        "Aggregated %d causes to Both/All ages for year=%s (from %s)",
+        len(out),
+        year,
+        death_long_csv,
+    )
+    return out
+
+
+def merge_deaths_into_allcause_rate(allcause_csv_path, aggregated_deaths_df, output_csv_path=None):
+    """
+    Replace Deaths rows in allcause_rate.csv for causes present in aggregated_deaths_df.
+    """
+    out = output_csv_path or allcause_csv_path
+    base = pd.read_csv(allcause_csv_path)
+    causes_to_update = set(aggregated_deaths_df["cause"].astype(str))
+    keep = ~((base["measure"] == "Deaths") & (base["cause"].isin(causes_to_update)))
+    merged = pd.concat([base.loc[keep], aggregated_deaths_df], ignore_index=True)
+    merged.to_csv(out, index=False)
+    logger.info(
+        "Merged %d updated Deaths rows into %s (causes: %d)",
+        len(aggregated_deaths_df),
+        out,
+        len(causes_to_update),
+    )
+    return merged
+
+
 def merge_gbd_long_csvs(input_csv_paths, output_csv_path, *, required_cols=None):
     """
     Merge one or more GBD-style long-format CSV exports (same schema) into a single CSV.

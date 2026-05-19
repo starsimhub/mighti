@@ -12,11 +12,14 @@ import pandas as pd
 
 from cleaning.paths import data_path, disease_data_path, ensure_data_dir, wpp_path
 from cleaning.disease import (
+    aggregate_gbd_deaths_to_both_all_ages,
     apply_parameter_rules,
     apply_rel_sus_from_csv,
     create_and_fill_prevalence_template_from_long_format,
+    create_death_rate_grid_from_gbd_long,
     ensure_conditions_in_parameters_csv,
     fill_p_death_and_duration_from_gbd_long_files,
+    merge_deaths_into_allcause_rate,
     merge_gbd_long_csvs,
 )
 from cleaning.demography import (
@@ -185,6 +188,31 @@ def run_pipeline(
         )
 
     # -------------------------------------------------------------
+    # 1b) Cause-specific death rates (GBD long → calibration targets)
+    # -------------------------------------------------------------
+    death_raw_candidates = [
+        disease_data_path(f"{region}_death_gbd.csv"),
+        disease_data_path("GBD_eswatini_death.csv"),
+    ]
+    death_raw_csv = next((p for p in death_raw_candidates if os.path.exists(p)), None)
+    death_output_csv = data_path(f"{region}_death_rates.csv")
+    if death_raw_csv is not None:
+        if overwrite_outputs or (not os.path.exists(death_output_csv)):
+            create_death_rate_grid_from_gbd_long(
+                death_raw_csv,
+                death_output_csv,
+                location=location_name,
+                start_year=None,
+                end_year=None,
+                overwrite=True,
+            )
+    else:
+        print(
+            "Skipping death-rate grid; no GBD death export found. Tried:\n- "
+            + "\n- ".join(death_raw_candidates)
+        )
+
+    # -------------------------------------------------------------
     # 2) Disease parameter table (p_death, dur_condition) from all-cause exports
     # -------------------------------------------------------------
     parameters_csv = data_path(f"{region}_parameters.csv")
@@ -195,6 +223,14 @@ def run_pipeline(
 
         # Fill p_death and dur_condition for any causes present in these all-cause exports
         allcause_rate = disease_data_path("allcause_rate.csv")
+        if death_raw_csv is not None:
+            agg_deaths = aggregate_gbd_deaths_to_both_all_ages(
+                death_raw_csv,
+                year=baseline_year,
+                location=location_name,
+                age_dist_csv=age_dist_csv,
+            )
+            merge_deaths_into_allcause_rate(allcause_rate, agg_deaths, output_csv_path=allcause_rate)
 
         filled = fill_p_death_and_duration_from_gbd_long_files(
             parameters_csv_path=parameters_csv,
