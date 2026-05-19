@@ -22,7 +22,14 @@ from mighti.diseases.base_disease import GenericSIS, GenericSIR
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["PrevalenceAnalyzer", "PrevalenceAnalyzer_HIV", "PrevalenceAnalyzer_SDoH", "OnARTByConditionAnalyzer", "OnARTByConditionAndSexAnalyzer"]
+__all__ = [
+    "PrevalenceAnalyzer",
+    "PrevalenceAnalyzer_HIV",
+    "PrevalenceAnalyzer_SDoH",
+    "CauseDeathRateAnalyzer",
+    "OnARTByConditionAnalyzer",
+    "OnARTByConditionAndSexAnalyzer",
+]
 
 
 def _status_attr_for_disease_module(dis, disease_name):
@@ -163,6 +170,91 @@ def _add_summary_results(analyzer, disease, existing, new_results, suffixes):
             new_results.append(ss.Result(key, dtype=dtype, scale=False))
             existing.add(key)
     return existing, new_results
+
+
+# ---------------------------------------------------------------------
+# Cause-specific death rate analyzer (calibration)
+# ---------------------------------------------------------------------
+class CauseDeathRateAnalyzer(ss.Analyzer):
+    """
+    Track condition-attributed deaths and exposure by age-sex bin for calibration.
+
+    Death rates per 100k for a calendar year are computed downstream as:
+        sum_t deaths[t] / sum_t exposure[t] * 1e5
+    with dt=1 (annual steps) in the calibration sim.
+    """
+
+    def __init__(self, diseases=None, age_bins=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.name = "cause_death_rate_analyzer"
+        self.diseases = [d.lower() for d in (diseases or [])]
+        self.age_bins = age_bins or [
+            (0, 15), (15, 20), (20, 25), (25, 30), (30, 35), (35, 40),
+            (40, 45), (45, 50), (50, 55), (55, 60), (60, 65),
+            (65, 70), (70, 75), (75, 80), (80, float("inf")),
+        ]
+        self.results_defined = False
+
+    def init_results(self):
+        super().init_results()
+        if not hasattr(self, "results"):
+            self.results = sc.odict()
+        if self.results_defined:
+            return
+
+        existing = set(self.results.keys())
+        new_results = []
+        for disease in self.diseases:
+            for i, _ in enumerate(self.age_bins):
+                for sex in ["male", "female"]:
+                    for suffix, dtype in [("deaths", int), ("expo", float)]:
+                        key = f"{disease}_{suffix}_{sex}_{i}"
+                        if key not in existing:
+                            new_results.append(ss.Result(key, dtype=dtype, scale=False))
+                            existing.add(key)
+
+        if new_results:
+            self.define_results(*new_results)
+        self.results_defined = True
+
+    def step(self):
+        """Count exposure and new condition-attributed deaths in each age-sex bin."""
+        sim = self.sim
+        ti = self.ti
+        ppl = sim.people
+        for disease in self.diseases:
+            dis = getattr(sim.diseases, disease, None)
+            if dis is None:
+                continue
+            for i, (a0, a1) in enumerate(self.age_bins):
+                age_group = (ppl.age >= a0) & (ppl.age < a1)
+                for sex, mask_sex in zip(["male", "female"], [ppl.male, ppl.female]):
+                    mask = age_group & mask_sex
+                    self.results[f"{disease}_expo_{sex}_{i}"][ti] += float(np.sum(mask))
+        for disease in self.diseases:
+            dis = getattr(sim.diseases, disease, None)
+            if dis is None or not hasattr(dis, "ti_dead"):
+                continue
+            ti_dead = dis.ti_dead
+            try:
+                dead_mask = (ti_dead[:] == ti)
+            except Exception:
+                dead_mask = np.asarray(ti_dead, dtype=float) == float(ti)
+            if not np.any(dead_mask):
+                continue
+            auids = dead_mask.uids if hasattr(dead_mask, "uids") else np.where(dead_mask)[0]
+            if len(auids) == 0:
+                continue
+            ages = np.asarray(ppl.age[auids], dtype=float)
+            fem = np.asarray(ppl.female[auids], dtype=bool)
+            for i, (a0, a1) in enumerate(self.age_bins):
+                in_bin = (ages >= a0) & (ages < a1)
+                if not np.any(in_bin):
+                    continue
+                if np.any(~fem[in_bin]):
+                    self.results[f"{disease}_deaths_male_{i}"][ti] += int(np.sum(~fem[in_bin]))
+                if np.any(fem[in_bin]):
+                    self.results[f"{disease}_deaths_female_{i}"][ti] += int(np.sum(fem[in_bin]))
 
 
 # ---------------------------------------------------------------------

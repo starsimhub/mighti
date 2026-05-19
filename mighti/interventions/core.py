@@ -3,6 +3,8 @@ Defines interventions.
 """
 
 
+import inspect
+import pandas as pd
 import starsim as ss
 import stisim as sti
 import numpy as np
@@ -11,6 +13,67 @@ import logging
 from mighti.util.rng import get_rng
 
 logger = logging.getLogger(__name__)
+
+
+def _stisim_art_accepts_coverage_kw():
+    """True when installed STIsim ART uses ``coverage=`` (STIsim >= 1.5)."""
+    return "coverage" in inspect.signature(sti.ART.__init__).parameters
+
+
+def _coverage_to_legacy_dataframe(coverage, value_col="p_art", default_year=2000):
+    """Convert scalar/dict coverage targets to the DataFrame STIsim <1.5 expects."""
+    if coverage is None:
+        return None
+    if isinstance(coverage, pd.DataFrame):
+        return coverage
+    if isinstance(coverage, (int, float)):
+        return pd.DataFrame({value_col: [float(coverage)]}, index=[default_year])
+    if isinstance(coverage, dict) and "year" in coverage and "value" in coverage:
+        return pd.DataFrame({value_col: coverage["value"]}, index=coverage["year"])
+    return coverage
+
+
+def _prepare_art_init(pars=None, coverage=None, coverage_data=None, **kwargs):
+    """Map legacy ART constructor names to the installed STIsim API."""
+    pars = dict(pars) if pars else {}
+    kwargs = dict(kwargs)
+
+    if coverage_data is not None and coverage is None:
+        coverage = coverage_data
+
+    if _stisim_art_accepts_coverage_kw():
+        if "init_prob" in pars:
+            pars["art_initiation"] = pars.pop("init_prob")
+        if "future_coverage" in pars and coverage is None:
+            fc = pars.pop("future_coverage")
+            coverage = {"year": [fc["year"]], "value": [fc["prop"]]}
+        return {"pars": pars, "coverage": coverage, "kwargs": kwargs}
+
+    if coverage is not None:
+        coverage_data = _coverage_to_legacy_dataframe(coverage)
+    elif coverage_data is not None and not isinstance(coverage_data, pd.DataFrame):
+        coverage_data = _coverage_to_legacy_dataframe(coverage_data)
+    if "art_initiation" in pars:
+        pars["init_prob"] = pars.pop("art_initiation")
+    return {"pars": pars, "coverage_data": coverage_data, "kwargs": kwargs}
+
+
+def _call_stisim_art_init(self, pars=None, coverage=None, coverage_data=None, **kwargs):
+    prepared = _prepare_art_init(pars, coverage, coverage_data, **kwargs)
+    if _stisim_art_accepts_coverage_kw():
+        sti.ART.__init__(self, pars=prepared["pars"], coverage=prepared.get("coverage"), **prepared["kwargs"])
+    else:
+        sti.ART.__init__(
+            self,
+            pars=prepared["pars"],
+            coverage_data=prepared.get("coverage_data"),
+            **prepared["kwargs"],
+        )
+    raw = getattr(self, "_raw_coverage", None)
+    if raw is None:
+        raw = getattr(self, "coverage_data", None)
+    if raw is not None:
+        self.coverage_data = raw
 
 __all__ = [
     "ART",
@@ -30,6 +93,9 @@ class ART(sti.ART):
     ART intervention.
     """
 
+    def __init__(self, pars=None, coverage=None, coverage_data=None, **kwargs):
+        _call_stisim_art_init(self, pars=pars, coverage=coverage, coverage_data=coverage_data, **kwargs)
+
     def init_pre(self, sim):
         super().init_pre(sim)
 
@@ -37,8 +103,8 @@ class ART(sti.ART):
 
 
 class ARTwithCASM(sti.ART):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, pars=None, coverage=None, coverage_data=None, **kwargs):
+        _call_stisim_art_init(self, pars=pars, coverage=coverage, coverage_data=coverage_data, **kwargs)
         self.casm_sensitivity = "pharma"
 
 
@@ -54,8 +120,8 @@ class ARTNoAutoAdjust(sti.ART):
     individuals instead of diagnosed individuals.
     """
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, pars=None, coverage=None, coverage_data=None, **kwargs):
+        _call_stisim_art_init(self, pars=pars, coverage=coverage, coverage_data=coverage_data, **kwargs)
         self._debug_coverage_calls = []
         self._debug_apply_calls = []
         # Track if art_coverage_correction was called

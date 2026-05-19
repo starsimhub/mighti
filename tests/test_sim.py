@@ -7,12 +7,32 @@ This test verifies that a full MIGHTI simulation runs end-to-end without error:
 - Produces valid mortality and prevalence outputs
 """
 
+import inspect
 import os
 import numpy as np
 import pandas as pd
 import starsim as ss
 import stisim as sti
 import mighti as mi
+from mighti.interventions.core import _stisim_art_accepts_coverage_kw
+
+
+def _sti_art(coverage_prop, year=2000):
+    if _stisim_art_accepts_coverage_kw():
+        return sti.ART(coverage=coverage_prop)
+    return sti.ART(coverage_data=pd.DataFrame({"p_art": [coverage_prop]}, index=[year]))
+
+
+def _sti_vmmc(coverage_prop, year=2000):
+    if "coverage" in inspect.signature(sti.VMMC.__init__).parameters:
+        return sti.VMMC(coverage=coverage_prop)
+    return sti.VMMC(coverage_data=pd.DataFrame({"p_vmmc": [coverage_prop]}, index=[year]))
+
+
+def _sti_prep():
+    if "coverage" in inspect.signature(sti.Prep.__init__).parameters:
+        return sti.Prep(coverage={"year": [2007, 2015, 2020], "value": [0, 0.05, 0.25]})
+    return sti.Prep(pars={"coverage": [0, 0.05, 0.25], "years": [2007, 2015, 2020]})
 
 
 def test_full_mighti_simulation():
@@ -100,12 +120,11 @@ def test_full_mighti_simulation():
         mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=active_diseases),
     ]
 
-    # --- Interventions
     interventions = [
         sti.HIVTest(test_prob_data=[0.6, 0.7, 0.95], years=[2000, 2007, 2016]),
-        sti.ART(pars={"future_coverage": {"year": 2005, "prop": 0.95}}),
-        sti.VMMC(pars={"future_coverage": {"year": 2015, "prop": 0.30}}),
-        sti.Prep(pars={"coverage": [0, 0.05, 0.25], "years": [2007, 2015, 2020]}),
+        _sti_art(0.95, year=inityear),
+        _sti_vmmc(0.30, year=inityear),
+        _sti_prep(),
     ]
 
     # --- Simulation

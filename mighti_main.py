@@ -265,7 +265,7 @@ hiv_test = sti.HIVTest(
     years=[2003, 2005, 2007, 2010, 2014, 2016, 2050],
 )
 
-art = mi.interventions.ARTwithCASM(coverage_data=art_coverage_data)
+art = mi.interventions.ARTwithCASM(coverage=art_coverage_data)
 art.casm_sensitivity = "pharma"  # interpreted by CASMAdherenceConnector
 art.rel_effect = 1.0             # baseline; adherence scales this
 
