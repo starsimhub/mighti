@@ -9,7 +9,7 @@ requests==2.32.4
 seaborn==0.13.2
 PyYAML==6.0.2
 openpyxl==3.1.5
-pytest==8.4.1
+pytest==9.0.3
 Sphinx==8.2.3
 sphinx-rtd-theme==3.0.2
 numpydoc==1.9.0
