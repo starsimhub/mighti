@@ -1101,6 +1101,16 @@ def _parse_args():
         default=None,
         help="Multiplier for p_death bounds around the seed (default 10x).",
     )
+    parser.add_argument(
+        "--results-dir",
+        type=str,
+        default=None,
+        help=(
+            "Output directory for this run (created if missing). "
+            "Reuse the same path across batch invocations to accumulate all conditions "
+            "into one calibrated_p_acquire.csv."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1119,8 +1129,13 @@ if __name__ == "__main__":
         FIT_PDEATH = bool(args.fit_pdeath)
     if args.pdeath_bound_mult is not None:
         P_DEATH_BOUND_MULT = float(args.pdeath_bound_mult)
+    if args.results_dir is not None:
+        results_dir = Path(args.results_dir).expanduser()
+        if not results_dir.is_absolute():
+            results_dir = REPO_ROOT / results_dir
 
     results_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("Results directory: %s", results_dir)
     run_conditions = args.conditions if args.conditions else conditions
 
     for disease_name in run_conditions:
