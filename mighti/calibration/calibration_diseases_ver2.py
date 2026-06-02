@@ -98,41 +98,11 @@ if "affected_sex" in param_df.columns:
 else:
     param_df["affected_sex"] = "both"
 
-# Conditions to calibrate (or use param_df['condition'].unique().tolist())
-# conditions = ["ChromosomalAbnormalities","CongenitalHeartAnomalies","CongenitalMusculoskeletal","DiarrhealDiseases","DigestiveCongenitalAnomalies"]
+# Default conditions to calibrate when --conditions is not supplied:
+# all conditions listed in region parameters. Downstream guards will skip
+# conditions without usable prevalence data or missing disease classes.
 all_conditions = param_df["condition"].dropna().unique().tolist()
-conditions = [
-    # "DiarrhealDiseases",
-    # "DigestiveCongenitalAnomalies",
-    # "DownSyndrome",
-    # "DrugUseDisorder",
-    # "EsophagealCancer",
-    # "Influenza",
-    # "HPV",
-    # "Hyperlipidemia",
-    # "Hypertension",
-    # "InterpersonalViolence",
-    # "LowerRespiratoryInfections",
-    # "LungCancer",
-    # "MajorDepressiveDisorder",
-    # "MaternalConditions",
-    # "NeonatalEncephalopathy",
-    # "NeonatalJaundice",
-    # "NeonatalPretermBirth",
-    # "NeonatalSepsis",
-    # "NeuralTubeDefects",
-    # "Obesity",
-    # "ParkinsonsDisease",
-    # "ProstateCancer",
-    # "ProteinEnergyMalnutrition",
-    # "PTSD",
-    # "RoadInjuries",
-    # "SelfHarm",
-    # "TobaccoUse",
-    # "Tuberculosis",
-    # "Type1Diabetes",
-    "Type2Diabetes",
-]
+conditions = all_conditions
 
 
 OPTUNA_DIAGNOSTIC_METHODS = [
