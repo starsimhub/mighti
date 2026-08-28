@@ -19,6 +19,46 @@ __all__ = ['RemittingDisease', 'AcuteDisease', 'AcuteSurgicalDisease', 'ChronicD
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARNING)
 
+
+def _sim_dt_year(sim) -> float:
+    """Timestep length in years (starsim 3.2: ``t.dt_year``; fallback 1.0)."""
+    t = sim.t
+    if hasattr(t, "dt_year") and t.dt_year is not None:
+        try:
+            return float(t.dt_year)
+        except Exception:
+            pass
+    dt = getattr(t, "dt", 1.0)
+    try:
+        return float(getattr(dt, "years", dt))
+    except Exception:
+        return 1.0
+
+
+def _years_since_onset(sim, ti_onset, uids) -> np.ndarray:
+    """
+    Years from onset timestep to now for ``uids`` (same length as ``uids``).
+
+    Onset before the simulation start (negative ``ti``) is treated as time 0 so
+    duration equals time since sim start. Compatible with starsim 3.x where
+    ``sim.t.years`` no longer exists.
+    """
+    uids = np.asarray(uids, dtype=int)
+    out = np.zeros(uids.size, dtype=float)
+    if uids.size == 0:
+        return out
+    onset = np.asarray(getattr(ti_onset, "raw", ti_onset), dtype=float).reshape(-1)
+    valid = (uids >= 0) & (uids < onset.size)
+    if not np.any(valid):
+        return out
+    ti_now = int(sim.ti)
+    dt = _sim_dt_year(sim)
+    onset_i = np.clip(onset[uids[valid]], 0.0, float(ti_now))
+    onset_i[~np.isfinite(onset_i)] = 0.0
+    out[valid] = np.maximum(0.0, (ti_now - onset_i) * dt)
+    return out
+
+
 def get_disease_parameters(csv_path, disease_name):
     """
     Load disease-specific parameters from a CSV file, returning a dictionary
@@ -319,20 +359,11 @@ class RemittingDisease(_CompetingMortalityMixin, ss.NCD):
         if not hasattr(self, 'ti_affected') or not hasattr(self, 'affected'):
             raise AttributeError("This disease does not support duration")
 
-        n = len(self.sim.people)
+        n = int(getattr(self.sim.people.uid, "len_used", len(self.sim.people)))
         dur = np.zeros(n)
-        ti_now = self.ti
-
-        # Defensive copy and clean any nan or invalid times
-        ti_aff = np.asarray(self.ti_affected, dtype=float)
-        ti_aff[~np.isfinite(ti_aff)] = 0.0
-
-        # active indices that exist within current population size
         active = self.affected.uids[self.affected.uids < n]
         if len(active):
-            dur[active] = np.maximum(0, ti_now - ti_aff[active])
-
-        # Replace any remaining NaN with 0
+            dur[active] = _years_since_onset(self.sim, self.ti_affected, active)
         dur[~np.isfinite(dur)] = 0.0
         return dur
 
@@ -467,18 +498,18 @@ class AcuteDisease(_CompetingMortalityMixin, ss.NCD):
         n = len(self.sim.people)
         dur = np.zeros(n)
 
-        # Handle different onset attributes
+        # Handle different onset attributes (starsim 3.x: no sim.t.years)
         if hasattr(self, 'affected') and hasattr(self, 'ti_affected'):
             affected_uids = self.affected.uids
             if len(affected_uids):
-                dur[affected_uids] = self.sim.t.years - self.ti_affected[affected_uids]
+                dur[affected_uids] = _years_since_onset(self.sim, self.ti_affected, affected_uids)
         elif hasattr(self, 'infected') and hasattr(self, 'ti_infected'):
             infected_uids = self.infected.uids
             if len(infected_uids):
-                dur[infected_uids] = self.sim.t.years - self.ti_infected[infected_uids]
+                dur[infected_uids] = _years_since_onset(self.sim, self.ti_infected, infected_uids)
 
-        # Clip negatives (e.g. from pre-sim infections)
         dur = np.clip(dur, 0, None)
+        dur[~np.isfinite(dur)] = 0.0
         return dur
     
 
@@ -642,13 +673,15 @@ class AcuteSurgicalDisease(_CompetingMortalityMixin, ss.NCD):
     @property
     def duration(self):
         """Duration (in years) since onset of disease."""
-        n = len(self.sim.people)
+        n = int(getattr(self.sim.people.uid, "len_used", len(self.sim.people)))
         dur = np.zeros(n)
         if hasattr(self, "affected") and hasattr(self, "ti_affected"):
             affected_uids = self.affected.uids
+            affected_uids = affected_uids[affected_uids < n]
             if len(affected_uids):
-                dur[affected_uids] = self.sim.t.years - self.ti_affected[affected_uids]
+                dur[affected_uids] = _years_since_onset(self.sim, self.ti_affected, affected_uids)
         dur = np.clip(dur, 0, None)
+        dur[~np.isfinite(dur)] = 0.0
         return dur
     
 
@@ -776,23 +809,25 @@ class ChronicDisease(_CompetingMortalityMixin, ss.NCD):
         Duration (in years) since onset of disease, 0 if not affected.
         This allows YLD calculations in MicrocostingAnalyzer.
         """
-        n = len(self.sim.people)
+        n = int(getattr(self.sim.people.uid, "len_used", len(self.sim.people)))
         dur = np.zeros(n)
 
-        # Handle different onset attributes
+        # Handle different onset attributes (starsim 3.x: no sim.t.years)
         if hasattr(self, 'affected') and hasattr(self, 'ti_affected'):
             affected_uids = self.affected.uids
+            affected_uids = affected_uids[affected_uids < n]
             if len(affected_uids):
-                dur[affected_uids] = self.sim.t.years - self.ti_affected[affected_uids]
+                dur[affected_uids] = _years_since_onset(self.sim, self.ti_affected, affected_uids)
         elif hasattr(self, 'infected') and hasattr(self, 'ti_infected'):
             infected_uids = self.infected.uids
+            infected_uids = infected_uids[infected_uids < n]
             if len(infected_uids):
-                dur[infected_uids] = self.sim.t.years - self.ti_infected[infected_uids]
+                dur[infected_uids] = _years_since_onset(self.sim, self.ti_infected, infected_uids)
 
-        # Clip negatives (e.g. from pre-sim infections)
         dur = np.clip(dur, 0, None)
+        dur[~np.isfinite(dur)] = 0.0
         return dur
-    
+
 
 class GenericSIS(_CompetingMortalityMixin, ss.SIS):
     """Base class for communicable diseases (SIS model)."""
@@ -988,18 +1023,13 @@ class GenericSIS(_CompetingMortalityMixin, ss.SIS):
         n = len(self.sim.people)
         dur = np.zeros(n)
 
-        # Handle different onset attributes
         if hasattr(self, 'infected') and hasattr(self, 'ti_infected'):
-            affected_uids = self.infected.uids
-            if len(affected_uids):
-                dur[affected_uids] = self.sim.t.years - self.ti_infected[affected_uids]
-        elif hasattr(self, 'infected') and hasattr(self, 'ti_infected'):
             infected_uids = self.infected.uids
             if len(infected_uids):
-                dur[infected_uids] = self.sim.t.years - self.ti_infected[infected_uids]
+                dur[infected_uids] = _years_since_onset(self.sim, self.ti_infected, infected_uids)
 
-        # Clip negatives (e.g. from pre-sim infections)
         dur = np.clip(dur, 0, None)
+        dur[~np.isfinite(dur)] = 0.0
         return dur
 
 
@@ -1172,8 +1202,9 @@ class GenericSIR(_CompetingMortalityMixin, ss.SIR):
         if hasattr(self, 'infected') and hasattr(self, 'ti_infected'):
             iu = self.infected.uids
             if len(iu):
-                dur[iu] = self.sim.t.years - self.ti_infected[iu]
+                dur[iu] = _years_since_onset(self.sim, self.ti_infected, iu)
         dur = np.clip(dur, 0, None)
+        dur[~np.isfinite(dur)] = 0.0
         return dur
     
     

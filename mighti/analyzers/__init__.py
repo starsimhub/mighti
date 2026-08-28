@@ -21,6 +21,26 @@ _EXPORTS = {
     "MicrocostingAnalyzer": "analyzer_cost",
     "HRHAnalyzer": "analyzer_cost",
     "summarize_microcosting_results": "analyzer_cost",
+    # disability_weights.py
+    "DEFAULT_GBD_DISABILITY_WEIGHTS": "disability_weights",
+    "DW_METADATA": "disability_weights",
+    "CORE_CEA_CONDITIONS": "disability_weights",
+    "MULTIMORBIDITY_RULES": "disability_weights",
+    "DEFAULT_MULTIMORBIDITY_RULE": "disability_weights",
+    "SENSITIVITY_MULTIMORBIDITY_RULE": "disability_weights",
+    "HIV_YLD_MODES": "disability_weights",
+    "DEFAULT_HIV_YLD_MODE": "disability_weights",
+    "HIV_STAGE_DISABILITY_WEIGHTS": "disability_weights",
+    "HIV_STAGE_METADATA": "disability_weights",
+    "get_default_disability_weights": "disability_weights",
+    "resolve_disability_weights": "disability_weights",
+    "resolve_disease_module": "disability_weights",
+    "canonical_dw_key": "disability_weights",
+    "classify_hiv_stage": "disability_weights",
+    "hiv_stage_disability_weight": "disability_weights",
+    "combine_disability_weights": "disability_weights",
+    "multimorbidity_scale": "disability_weights",
+    "adjust_total_yld_for_multimorbidity": "disability_weights",
     # analyzer_prevalence.py
     "PrevalenceAnalyzer": "analyzer_prevalence",
     "PrevalenceAnalyzer_HIV": "analyzer_prevalence",
@@ -45,6 +65,7 @@ _SUBMODULES = {
     "analyzer_prevalence",
     "analyzer_intervention",
     "analyzer_serviceuse",
+    "disability_weights",
 }
 
 __all__ = sorted([*_EXPORTS.keys(), *_SUBMODULES])
