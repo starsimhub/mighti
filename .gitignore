@@ -159,7 +159,16 @@ outputs/
 results/
 
 # Calibration artifacts (generated)
-mighti/calibration/results/
+# Keep only the frozen Eswatini handoff run visible in git.
+mighti/calibration/results/*
+!mighti/
+!mighti/calibration/
+!mighti/calibration/results/
+!mighti/calibration/results/calibration_ver2_eswatini_all_w1_d30x/
+# Inside the frozen folder, keep only the handoff table + manifest.
+mighti/calibration/results/calibration_ver2_eswatini_all_w1_d30x/*
+!mighti/calibration/results/calibration_ver2_eswatini_all_w1_d30x/calibrated_p_acquire_aligned.csv
+!mighti/calibration/results/calibration_ver2_eswatini_all_w1_d30x/FREEZE_MANIFEST.txt
 starsim_calibration.db
 mighti/calibration/starsim_calibration.db
 *.db

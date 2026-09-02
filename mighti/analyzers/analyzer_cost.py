@@ -3,6 +3,18 @@ import numpy as np
 import pandas as pd
 import logging
 
+from mighti.analyzers.disability_weights import (
+    DEFAULT_HIV_YLD_MODE,
+    DEFAULT_MULTIMORBIDITY_RULE,
+    HIV_YLD_MODES,
+    MULTIMORBIDITY_RULES,
+    adjust_total_yld_for_multimorbidity,
+    classify_hiv_stage,
+    hiv_stage_disability_weight,
+    resolve_disability_weights,
+    resolve_disease_module,
+)
+
 logger = logging.getLogger(__name__)
 
 __all__ = ['MicrocostingAnalyzer', 'HRHAnalyzer', 'summarize_microcosting_results']
@@ -11,32 +23,138 @@ class MicrocostingAnalyzer(ss.Analyzer):
     def __init__(self, unit_costs=None, disability_weights=None,
                  discount_rate=None,
                  discount_rate_costs=0.03, discount_rate_outcomes=0.03,
+                 use_default_disability_weights=True,
+                 multimorbidity_rule=DEFAULT_MULTIMORBIDITY_RULE,
+                 hiv_yld_mode=DEFAULT_HIV_YLD_MODE,
                  **kwargs):
 
         if discount_rate is not None:
             discount_rate_costs = discount_rate_outcomes = discount_rate
 
         self.unit_costs = unit_costs or {}
-        self.disability_weights = disability_weights or {}
+        # None → core GBD defaults (HIV + cardiometabolic). Explicit dict replaces defaults.
+        self.disability_weights = resolve_disability_weights(
+            disability_weights,
+            use_defaults=use_default_disability_weights,
+        )
+        rule = (multimorbidity_rule or DEFAULT_MULTIMORBIDITY_RULE).lower()
+        if rule not in MULTIMORBIDITY_RULES:
+            raise ValueError(
+                f"Unknown multimorbidity_rule={multimorbidity_rule!r}; "
+                f"choose from {MULTIMORBIDITY_RULES}"
+            )
+        self.multimorbidity_rule = rule
+        mode = (hiv_yld_mode or DEFAULT_HIV_YLD_MODE).lower()
+        if mode not in HIV_YLD_MODES:
+            raise ValueError(
+                f"Unknown hiv_yld_mode={hiv_yld_mode!r}; choose from {HIV_YLD_MODES}"
+            )
+        self.hiv_yld_mode = mode
         self.discount_rate_costs = discount_rate_costs
         self.discount_rate_outcomes = discount_rate_outcomes
 
         # Remove these to prevent warnings from Starsim
-        for k in ['discount_rate', 'discount_rate_costs', 'discount_rate_outcomes']:
+        for k in [
+            'discount_rate',
+            'discount_rate_costs',
+            'discount_rate_outcomes',
+            'multimorbidity_rule',
+            'use_default_disability_weights',
+            'hiv_yld_mode',
+        ]:
             kwargs.pop(k, None)
 
         super().__init__(**kwargs)
         self.name = 'microcostinganalyzer'
         self.detailed_outputs = None
+        self._hiv_yld_stage_acc = None  # undiscounted person-years × stage DW
+        self._hiv_stage_py = None  # optional person-years by stage (for Methods tables)
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        if self.hiv_yld_mode == "stage":
+            n = int(sim.people.uid.len_used)
+            self._hiv_yld_stage_acc = np.zeros(max(n, 1), dtype=float)
+            self._hiv_stage_py = {
+                "art": 0.0,
+                "aids": 0.0,
+                "symptomatic": 0.0,
+                "early": 0.0,
+            }
 
     def init_results(self):
-        super().init_results() 
-        self.results = ss.Results(self)  
+        super().init_results()
+        # starsim ≥3.2 locks ``results``; keep the parent Results container.
         return
 
+    def _ensure_hiv_acc(self, n_used: int):
+        if self._hiv_yld_stage_acc is None:
+            self._hiv_yld_stage_acc = np.zeros(n_used, dtype=float)
+        elif self._hiv_yld_stage_acc.size < n_used:
+            new = np.zeros(n_used, dtype=float)
+            new[: self._hiv_yld_stage_acc.size] = self._hiv_yld_stage_acc
+            self._hiv_yld_stage_acc = new
+
+    @staticmethod
+    def _sim_dt_year(sim) -> float:
+        t = sim.t
+        if hasattr(t, "dt_year") and t.dt_year is not None:
+            try:
+                return float(t.dt_year)
+            except Exception:
+                pass
+        dt = getattr(t, "dt", 1.0)
+        try:
+            return float(getattr(dt, "years", dt))
+        except Exception:
+            return 1.0
+
     def step(self):
-        """Dummy step to silence Starsim warnings."""
-        pass
+        """Accrue HIV stage YLD when ``hiv_yld_mode='stage'``; otherwise no-op."""
+        if self.hiv_yld_mode != "stage":
+            return
+        sim = self.sim
+        hiv = getattr(sim.diseases, "hiv", None)
+        if hiv is None:
+            return
+        n_used = int(sim.people.uid.len_used)
+        self._ensure_hiv_acc(n_used)
+        dt = self._sim_dt_year(sim)
+
+        def _bool(name):
+            arr = getattr(hiv, name, None)
+            if arr is None:
+                return np.zeros(n_used, dtype=bool)
+            raw = getattr(arr, "raw", None)
+            if raw is not None:
+                return np.asarray(raw[:n_used], dtype=bool)
+            return np.asarray(arr[:n_used], dtype=bool)
+
+        def _float(name):
+            arr = getattr(hiv, name, None)
+            if arr is None:
+                return np.full(n_used, np.nan)
+            raw = getattr(arr, "raw", None)
+            if raw is not None:
+                return np.asarray(raw[:n_used], dtype=float)
+            return np.asarray(arr[:n_used], dtype=float)
+
+        infected = _bool("infected")
+        if not infected.any():
+            return
+        stages = classify_hiv_stage(
+            infected=infected,
+            on_art=_bool("on_art"),
+            cd4=_float("cd4"),
+            acute=_bool("acute"),
+            latent=_bool("latent"),
+            falling=_bool("falling"),
+        )
+        dws = hiv_stage_disability_weight(stages)
+        self._hiv_yld_stage_acc[:n_used] += dws * dt
+        if self._hiv_stage_py is not None:
+            for key in self._hiv_stage_py:
+                self._hiv_stage_py[key] += float((stages == key).sum()) * dt
 
     def finalize(self):
         super().finalize()
@@ -88,42 +206,90 @@ class MicrocostingAnalyzer(ss.Analyzer):
 
         for cond, weight in self.disability_weights.items():
 
-            # Special logic for HIV (ti_infected-based)
-            if cond == 'hiv' and hasattr(ppl, 'hiv') and hasattr(ppl.hiv, 'ti_infected'):
-                logger.debug("  Calculating HIV YLDs dynamically from ti_infected")
-
-                ti_infected_arr = np.full(n_total, np.nan)
-                ti_infected_arr[:len(ppl.hiv.ti_infected)] = ppl.hiv.ti_infected[:]  # Fill full-length array
-
-                infected_mask = ~np.isnan(ti_infected_arr)
-                ti_infected_clipped = np.clip(ti_infected_arr[infected_mask], 0, len(self.sim.t.yearvec) - 1).astype(int)
-                start_years = self.sim.t.yearvec[ti_infected_clipped]
-                end_year = self.sim.t.yearvec[-1]
-                dur_years = end_year - start_years
-
+            # HIV YLD: stage time-in-state (Option A) or average duration × DW
+            if cond == 'hiv' and hasattr(self.sim.diseases, 'hiv'):
+                disc = (1 + self.discount_rate_outcomes) ** (n_years - 1)
                 yld = np.zeros(n_total)
-                yld[infected_mask] = dur_years * weight / ((1 + self.discount_rate_outcomes) ** (n_years - 1))
-                yld_details[f'{cond}_yld'] = yld
-                total_yld += yld
-                logger.info("  - %s: %0.2f", cond, float(yld.sum()))
+                yld_avg = np.zeros(n_total)
+
+                # Average (single-DW) path — always computed for sensitivity columns
+                hiv_mod = self.sim.diseases.hiv
+                if hasattr(hiv_mod, 'ti_infected'):
+                    ti_raw = getattr(hiv_mod.ti_infected, 'raw', hiv_mod.ti_infected)
+                    ti_infected_arr = np.full(n_total, np.nan)
+                    n_ti = min(len(ti_raw), n_total)
+                    ti_infected_arr[:n_ti] = np.asarray(ti_raw[:n_ti], dtype=float)
+                    infected_mask = np.isfinite(ti_infected_arr)
+                    if infected_mask.any():
+                        ti_clipped = np.clip(
+                            ti_infected_arr[infected_mask], 0, len(self.sim.t.yearvec) - 1
+                        ).astype(int)
+                        start_years = self.sim.t.yearvec[ti_clipped]
+                        end_year = self.sim.t.yearvec[-1]
+                        dur_years = end_year - start_years
+                        yld_avg[infected_mask] = dur_years * weight / disc
+
+                if self.hiv_yld_mode == 'stage' and self._hiv_yld_stage_acc is not None:
+                    acc = self._hiv_yld_stage_acc
+                    n_acc = min(len(acc), n_total)
+                    yld[:n_acc] = acc[:n_acc] / disc
+                    logger.info(
+                        "  - hiv (stage): %0.2f  [average sensitivity: %0.2f]",
+                        float(yld.sum()),
+                        float(yld_avg.sum()),
+                    )
+                    yld_details['hiv_yld'] = yld
+                    yld_details['hiv_yld_average'] = yld_avg
+                    total_yld += yld
+                else:
+                    yld[:] = yld_avg
+                    yld_details['hiv_yld'] = yld
+                    total_yld += yld
+                    logger.info("  - hiv (average): %0.2f", float(yld.sum()))
                 continue
 
-            # New: dynamic condition duration lookup
-            elif hasattr(self.sim.diseases, cond) and hasattr(self.sim.diseases[cond], 'duration'):
-                logger.debug("  Calculating %s YLDs from disease.duration", cond)
-                disease = self.sim.diseases[cond]
+            # Duration-based YLD for named conditions (alias-tolerant lookup)
+            disease, resolved = resolve_disease_module(self.sim.diseases, cond)
+            if disease is None:
+                logger.debug("  Missing: %s module not found", cond)
+                continue
+            try:
                 durations = disease.duration
-                yld = durations * weight / ((1 + self.discount_rate_outcomes) ** (n_years - 1))
-                if len(yld) < n_total:
-                    yld = np.pad(yld, (0, n_total - len(yld)))
-                total_yld += yld
-                yld_details[f'{cond}_yld'] = yld
-                logger.info("  - %s: %0.2f", cond, float(yld.sum()))
+            except AttributeError:
+                logger.debug("  Missing: %s duration attribute not found", cond)
+                continue
+            logger.debug(
+                "  Calculating %s YLDs from disease.duration (resolved=%s)",
+                cond,
+                resolved,
+            )
+            yld = durations * weight / ((1 + self.discount_rate_outcomes) ** (n_years - 1))
+            if len(yld) < n_total:
+                yld = np.pad(yld, (0, n_total - len(yld)))
+            total_yld += yld
+            yld_details[f'{cond}_yld'] = yld
+            logger.info("  - %s: %0.2f", cond, float(yld.sum()))
 
-            else:
-                logger.debug("  Missing: %s or duration attribute not found", cond)
-        
-        
+        # Multimorbidity: keep per-condition YLD columns additive for attribution;
+        # recombine totals under the chosen rule (default: multiplicative).
+        # Exclude sensitivity-only columns (e.g. hiv_yld_average).
+        if yld_details:
+            yld_for_mm = {
+                k[: -len("_yld")]: v
+                for k, v in yld_details.items()
+                if k.endswith("_yld") and "average" not in k
+            }
+            total_yld = adjust_total_yld_for_multimorbidity(
+                yld_for_mm,
+                self.disability_weights,
+                rule=self.multimorbidity_rule,
+            )
+            logger.info(
+                "Multimorbidity rule=%s → total YLD %s",
+                self.multimorbidity_rule,
+                f"{total_yld.sum():,.2f}",
+            )
+
         # ---------------------------------------------------------------------
         # YLLs
         # ---------------------------------------------------------------------
@@ -152,12 +318,16 @@ class MicrocostingAnalyzer(ss.Analyzer):
             raise ValueError("MicrocostingAnalyzer requires 'intervention_analyzer' in sim.analyzers.")
         if 'art' in self.unit_costs:
             art_df = intervention_analyzer.to_df()
-            art_counts = (
-                art_df[art_df['received_art']]
-                .groupby('uid').size()
-                .reindex(uids_all, fill_value=0)
-                .to_numpy()
-            )
+            if art_df is None or len(art_df) == 0 or 'uid' not in art_df.columns:
+                art_counts = np.zeros(n_total, dtype=float)
+            else:
+                received = art_df['received_art'] if 'received_art' in art_df.columns else True
+                art_counts = (
+                    art_df.loc[received]
+                    .groupby('uid').size()
+                    .reindex(uids_all, fill_value=0)
+                    .to_numpy()
+                )
             art_cost = art_counts * self.unit_costs['art'] / ((1 + self.discount_rate_costs) ** (n_years - 1))
             total_cost += art_cost
             cost_details['art_cost'] = art_cost
@@ -189,16 +359,20 @@ class MicrocostingAnalyzer(ss.Analyzer):
         logger.info("  -> Total YLL: %s", f"{total_yll.sum():,.2f}")
         logger.info("  -> Total DALY: %s", f"{df['total_daly'].sum():,.2f}")
 
-        # ---------------------------------------------------------------------
-        # Store summary results for programmatic access
-        # ---------------------------------------------------------------------
-        self.results['total_cost'] = total_cost.sum()
-        self.results['total_yld'] = total_yld.sum()
-        self.results['total_yll'] = total_yll.sum()
-        self.results['total_daly'] = (total_yld + total_yll).sum()
-
-        # Optionally store the detailed dataframe too
-        self.results['detailed_outputs'] = self.detailed_outputs
+        # Store summary results for programmatic access (mutate container; do not replace it)
+        try:
+            self.results["total_cost"] = total_cost.sum()
+            self.results["total_yld"] = total_yld.sum()
+            self.results["total_yll"] = total_yll.sum()
+            self.results["total_daly"] = (total_yld + total_yll).sum()
+            self.results["detailed_outputs"] = self.detailed_outputs
+        except Exception:
+            self._summary = {
+                "total_cost": float(total_cost.sum()),
+                "total_yld": float(total_yld.sum()),
+                "total_yll": float(total_yll.sum()),
+                "total_daly": float((total_yld + total_yll).sum()),
+            }
 
         return
 

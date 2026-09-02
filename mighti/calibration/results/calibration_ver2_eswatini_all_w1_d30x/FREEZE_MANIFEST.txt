@@ -1,0 +1,17 @@
+Frozen handoff artifact for downstream (MIGHTI_Eswatini_LifeExpectancy)
+
+Freeze timestamp (local): 2026-06-02
+Run folder: mighti/calibration/results/calibration_ver2_eswatini_all_w1_d30x
+Primary handoff table: calibrated_p_acquire_aligned.csv
+
+SHA256 (calibrated_p_acquire_aligned.csv):
+21904f15ae42b89dee6131bdc2d59f29f803e440f7390718de39cf5aefd8ea58
+
+Shape check:
+rows: 49
+cols: 4
+
+Notes:
+- This file is intended as a provenance checkpoint so downstream analyses
+  can verify they are using exactly the frozen artifact.
+- If this CSV is regenerated, update this manifest and checksum.

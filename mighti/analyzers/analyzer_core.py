@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 import starsim as ss
 
+from mighti.analyzers.disability_weights import resolve_disease_module
+
 
 __all__ = [
     "DeathsByAgeSexAnalyzer",
@@ -372,11 +374,20 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
     def init_results(self):
         """Initialize analyzer results."""
         super().init_results()
-        self.results = dict()
-        self.results['n_deaths'] = 0
-        self.results['by_cause'] = {}
-        self.results['by_sex'] = {}
-        self.results['by_age'] = {}
+        # starsim ≥3.2 locks ``results``; do not replace the container.
+        # Primary output is ``self.records`` / ``to_df()``.
+        try:
+            self.results["n_deaths"] = 0
+            self.results["by_cause"] = {}
+            self.results["by_sex"] = {}
+            self.results["by_age"] = {}
+        except Exception:
+            self._death_summary = {
+                "n_deaths": 0,
+                "by_cause": {},
+                "by_sex": {},
+                "by_age": {},
+            }
 
     def _had_condition(self, disease, uid):
         """Return True if agent had this condition at death."""
@@ -432,19 +443,28 @@ class ConditionAtDeathAnalyzer(ss.Analyzer):
 
             rec = dict(uid=int(uid), year=year, age=age, sex=sex, yll=yll)
 
-            # Record presence and cause flags for each disease
+            # Record presence and cause flags for each disease.
+            # Resolve via alias-tolerant lookup (labels may be PascalCase).
             for cond in self.conditions:
-                disease = getattr(self.sim.diseases, cond, None)
+                disease, _resolved = resolve_disease_module(self.sim.diseases, cond)
                 rec[f"died_{cond}"] = self._had_condition(disease, uid)
                 rec[f"cause_{cond}"] = self._died_of_condition(disease, uid, ti)
 
             # Record HIV infection status (not death cause)
             rec["hiv_positive"] = False
-            if hiv_mod is not None and hasattr(hiv_mod, "infected"):
+            if hiv_mod is not None:
                 try:
-                    rec["hiv_positive"] = bool(hiv_mod.infected[uid])
+                    if hasattr(hiv_mod, "infected"):
+                        rec["hiv_positive"] = bool(hiv_mod.infected[uid])
                 except Exception:
                     pass
+                if not rec["hiv_positive"] and hasattr(hiv_mod, "ti_infected"):
+                    try:
+                        raw = getattr(hiv_mod.ti_infected, "raw", None)
+                        ti_val = float(raw[uid]) if raw is not None else float(hiv_mod.ti_infected[uid])
+                        rec["hiv_positive"] = bool(np.isfinite(ti_val))
+                    except Exception:
+                        pass
 
             # Determine primary cause (non-HIV only)
             causes = [c for c in self.conditions if rec.get(f"cause_{c}", False)]
