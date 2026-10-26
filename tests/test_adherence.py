@@ -51,13 +51,12 @@ def test_adherence_engine_basic():
     )
 
     # enable full cascade
-    hiv.pars.include_care = True
     hiv.pars.include_aids_deaths = False   # turn off mortality for faster tests
-    hiv.pars.art_efficacy = 0.90
+    hiv.pars.effective_art_efficacy = 0.90
 
     init_prev = ss.bernoulli(p=MDD_INIT_PREV)
 
-    disease_class = getattr(mi, healthcondition, None)
+    disease_class = getattr(mi.diseases, healthcondition, None)
 
     # Instantiate the disease
     condition_obj = disease_class(
@@ -84,7 +83,7 @@ def test_adherence_engine_basic():
 
     sim.run()
 
-    adher = sim.people.states["adherence"]
+    adher = sim.people.adherence
     print(adher.mean())
     assert adher.mean() < 1.0, "Adherence should be reduced for CASM-affected agents"
 
@@ -108,17 +107,14 @@ def test_art_adherence_disruptor():
         beta_m2c=0.01,
         init_prev=0.20,
     )
-    hiv.pars.include_care = True
     hiv.pars.include_aids_deaths = False
-    hiv.pars.art_efficacy = 0.90
-    # Everyone who is HIV-positive starts ART at t=0
-    hiv.pars.init_art = ss.bernoulli(p=1.0)
+    hiv.pars.effective_art_efficacy = 0.90
 
     # --------------------------
     # MajorDepressiveDisorder (CASM condition)
     # Use the same pattern as TEST 1
     # --------------------------
-    disease_class = getattr(mi, healthcondition, None)
+    disease_class = getattr(mi.diseases, healthcondition, None)
     assert disease_class is not None, f"{healthcondition} not found in mighti"
 
     init_prev_mdd = ss.bernoulli(p=MDD_INIT_PREV)
@@ -152,10 +148,9 @@ def test_art_adherence_disruptor():
 
     sim.run()
 
-    st = sim.people.states
-    adher = st["adherence"]
-    on_art = st["hiv.on_art"]
-    hiv_infected= sim.diseases.hiv.infected  # HIV-positive
+    adher = sim.people.adherence
+    on_art = sim.diseases.hiv.on_art
+    hiv_infected = sim.diseases.hiv.infected  # HIV-positive
 
     # Check that adherence actually dropped on average
     print("Mean adherence after run (TEST 2):", adher.mean())
@@ -186,15 +181,14 @@ def test_intervention_adherence_disruptor():
         beta_m2c=0.01,
         init_prev=0.10,
     )
-    hiv.pars.include_care = True
     hiv.pars.include_aids_deaths = False
-    hiv.pars.art_efficacy = 0.95   # BASELINE
+    hiv.pars.effective_art_efficacy = 0.95   # BASELINE
 
-    disease_class = getattr(mi, healthcondition)
+    disease_class = getattr(mi.diseases, healthcondition)
     init_prev_mdd = ss.bernoulli(p=MDD_INIT_PREV)
     mdd = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev_mdd})
 
-    art = mi.ARTwithCASM(coverage=pd.DataFrame({"p_art": [1.0]}, index=[2000]))
+    art = mi.interventions.ARTwithCASM(coverage=pd.DataFrame({"p_art": [1.0]}, index=[2000]))
     art.casm_sensitivity = "pharma"
 
     adherence_engine = mi.AdherenceEngine(casm_rel=mi.CASM_REL_FACTORS)
@@ -211,17 +205,16 @@ def test_intervention_adherence_disruptor():
         interventions=[art],
         connectors=[],
         label="test_intv_disruptor",
-        copy_inputs=False,
     )
 
     sim.run()
 
-    # Correct assertion for Starsim 3
-    assert hiv.pars.art_efficacy < 0.95, (
-        f"Expected HIV ART efficacy < 0.95 after adherence scaling, got {hiv.pars.art_efficacy}"
+    hiv = sim.diseases.hiv
+    assert hiv.pars.effective_art_efficacy < 0.95, (
+        f"Expected HIV ART efficacy < 0.95 after adherence scaling, got {hiv.pars.effective_art_efficacy}"
     )
 
-    print(f"TEST 3 PASSED: ART efficacy scaled to {hiv.pars.art_efficacy:.3f}")
+    print(f"TEST 3 PASSED: ART efficacy scaled to {hiv.pars.effective_art_efficacy:.3f}")
 
 
 # ---------------------------------------------------------------------

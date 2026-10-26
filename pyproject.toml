@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "mighti"
 description = "MIGHTI: Model of Inter-Generational Health, Transmission, and Interventions"
 readme = "README.rst"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
   { name = "MIGHTI Team (NYU and collaborators)" }
@@ -17,17 +17,17 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dynamic = ["version"]
 
 dependencies = [
   "numpy>=2.0.0",
-  "starsim>=3.0.3",
-  "stisim>=1.5.0,<2",
+  "starsim>=4.0.0",
+  "stisim>=1.7.1",
   "scipy",
   "pandas>=2.0.0",
   "sciris>=3.0.0",

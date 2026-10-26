@@ -1,9 +1,9 @@
 """
-Test suite for MIGHTI SDoH modules under Starsim 3.x
+Test suite for MIGHTI SDoH modules
 
 Covers:
 - Initialization of NeighbourhoodSituation
-- Inheritance via MaternalNet
+- Inheritance from the mother at birth
 - Coexistence of multiple SDoH modules
 - Edge case: step() when no births occur
 """
@@ -27,7 +27,7 @@ def test_neighbourhood_situation_inheritance():
     extra_states = [ss.BoolArr('neighbourhood_situation')]
     people = ss.People(n_agents=1000, age_data=pd.read_csv(age_path), extra_states=extra_states)
     maternal = ss.MaternalNet()
-    ns = mi.NeighbourhoodSituation(csv_path=param_path)
+    ns = mi.sdoh.NeighbourhoodSituation(csv_path=param_path)
 
     sim = ss.Sim(
         rand_seed=42,
@@ -38,7 +38,6 @@ def test_neighbourhood_situation_inheritance():
         networks=maternal,
         demographics=[pregnancy],
         connectors=[ns],
-        copy_inputs=False,
     )
 
     sim.run()
@@ -48,12 +47,10 @@ def test_neighbourhood_situation_inheritance():
     print(f"NeighbourhoodSituation Init:\n  True: {n_true:,}\n  False: {n_false:,}")
     assert 0 < n_true < len(sim.people), "Expected a mix of True and False in initialized values."
 
-    maternal_edges = sim.networks['maternalnet'].edges
-    mothers = maternal_edges.p1.to_numpy()
-    babies = maternal_edges.p2.to_numpy()
-    valid = (~np.isnan(mothers)) & (~np.isnan(babies))
-    mothers, babies = mothers[valid].astype(int), babies[valid].astype(int)
-    sdoh = sim.people.neighbourhood_situation
+    ppl = sim.people
+    babies = ppl.auids[ppl.parent[ppl.auids] >= 0] # Born in the sim, to a mother
+    mothers = ppl.parent[babies].astype(int)
+    sdoh = ppl.neighbourhood_situation.raw
     matches = sdoh[babies] == sdoh[mothers]
     n_matches = matches.sum()
     print(f"Inherited housing: {n_matches}/{len(matches)} match ({100*n_matches/len(matches):.1f}%)")
@@ -64,17 +61,17 @@ def test_neighbourhood_situation_inheritance():
 def test_multiple_sdoh_modules():
     """Ensure multiple SDoH modules register distinct boolean arrays without conflict."""
     modules = [
-        mi.NeighbourhoodSituation(),
-        mi.EconomicSituation(),
-        mi.EducationSituation(),
-        mi.SocialContext(),
+        mi.sdoh.NeighbourhoodSituation(),
+        mi.sdoh.EconomicSituation(),
+        mi.sdoh.EducationSituation(),
+        mi.sdoh.SocialContext(),
     ]
 
     sim = ss.Sim(n_agents=200, start=2000, stop=2001, connectors=modules)
     sim.init()
 
     ppl = sim.people
-    existing_fields = list(ppl.states.keys())  # ✅ StarSim 3.x: use .states.keys()
+    existing_fields = list(ppl.states.keys())
 
     # Define expected keyword fragments
     expected_keywords = ['neighbourhood', 'economic', 'education', 'social']

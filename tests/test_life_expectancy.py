@@ -14,26 +14,6 @@ n_agents = 500
 do_plot = False
 sc.options(interactive=do_plot)
 
-def get_deaths_module(sim):
-    """
-    Retrieve the DeathsByAgeSexAnalyzer from a Starsim 3.x simulation.
-    Works whether analyzers are stored in sim.analyzers, sim.results, or sim.modules.
-    """
-    if hasattr(sim, "analyzers") and isinstance(sim.analyzers, dict):
-        for a in sim.analyzers.values():
-            if isinstance(a, mi.DeathsByAgeSexAnalyzer):
-                return a
-    raise ValueError(
-        "Deaths analyzer not found. Available keys: "
-        f"{list(sim.results.keys()) if hasattr(sim, 'results') else 'None'}"
-    )
-
-
-def get_pregnancy_module(sim):
-    for module in sim.modules:
-        if isinstance(module, ss.Pregnancy):
-            return module
-    raise ValueError("Pregnancy module not found in the simulation.")
 
 
 def test_life_expectancy():
@@ -50,8 +30,8 @@ def test_life_expectancy():
     pregnancy = ss.Pregnancy(pars=fertility_rate)
 
     # Initialize the PrevalenceAnalyzer
-    survivorship_analyzer = mi.SurvivorshipAnalyzer()
-    deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
+    survivorship_analyzer = mi.analyzers.SurvivorshipAnalyzer()
+    deaths_analyzer = mi.analyzers.DeathsByAgeSexAnalyzer()
     
     sim = ss.Sim(
         n_agents=n_agents,
@@ -62,11 +42,11 @@ def test_life_expectancy():
     )
     sim.run()
 
-    deaths_module = get_deaths_module(sim)
+    deaths_module = sim.get_module(mi.analyzers.DeathsByAgeSexAnalyzer)
     
     
     # Calculate mortality rates using `calculate_mortality_rates
-    df_mx = mi.calculate_mortality_rates(sim, deaths_module, year=2008, max_age=100, radix=n_agents)
+    df_mx = mi.life_expectancy.calculate_mortality_rates(sim, deaths_module, year=2008, max_age=100, radix=n_agents)
 
     # Basic checks
     assert not df_mx.empty
@@ -76,7 +56,7 @@ def test_life_expectancy():
     df_mx_male = df_mx[df_mx['sex'] == 'Male']
     df_mx_female = df_mx[df_mx['sex'] == 'Female']
 
-    life_table = mi.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
+    life_table = mi.life_expectancy.calculate_life_table_from_mx(sim, df_mx_male, df_mx_female, max_age=100)
 
     assert set(['Age', 'l(x)', 'd(x)', 'q(x)', 'm(x)', 'L(x)', 'T(x)', 'e(x)', 'sex']).issubset(life_table.columns)    
     assert len(life_table) == 2 * (100 + 1)  # 0–100 for Male and Female

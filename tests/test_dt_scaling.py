@@ -1,79 +1,37 @@
 """
-Test automatic annual-to-timestep parameter conversion in upstream MIGHTI diseases.
+Test that annual probabilities give the same yearly risk whatever the timestep.
+
+MIGHTI's parameter files give annual probabilities (of acquiring, remitting, and dying of a condition),
+which Starsim converts to each timestep (`ss.probperyear`): at monthly steps, an annual probability p
+is 1 - (1 - p)^(1/12) per step.
 """
-
-from __future__ import annotations
-
-import math
 
 import numpy as np
 import pandas as pd
 import starsim as ss
 
 import mighti as mi
-from mighti.util.utils import annual_probability_to_timestep
+
+
+def test_annual_probability_conversion():
+    """ An annual probability p is 1 - (1 - p)^(1/12) per month """
+    p = 0.024
+    assert np.isclose(ss.probperyear(p).to_prob(ss.months(1)), 1 - (1 - p)**(1/12))
 
 
 def test_main_disease_auto_converts_annual_probabilities_for_monthly_dt(tmp_path):
+    """ The share who acquire a condition in 5 years, with no remission or death, is 1 - (1 - p)^5 at yearly and monthly steps """
     param_path = tmp_path / "params.csv"
-    pd.DataFrame(
-        [
-            {
-                "condition": "Type2Diabetes",
-                "p_death": 0.025,
-                "dur_condition": 12.24,
-                "rel_sus": 1.61,
-                "remission_rate": 0.024,
-                "max_disease_duration": 24.48,
-                "p_acquire": 0.002681646,
-                "p_acquire_male": 0.0030,
-                "p_acquire_female": 0.0022,
-                "affected_sex": "both",
-            }
-        ]
-    ).to_csv(param_path, index=False)
+    p_f, p_m = 0.2, 0.1
+    pd.DataFrame([dict(condition="Type2Diabetes", p_death=0.0, remission_rate=0.0, p_acquire_female=p_f, p_acquire_male=p_m, affected_sex="both")]).to_csv(param_path, index=False)
 
-    ppl = ss.People(10)
-    ppl.hiv = np.zeros(10, dtype=bool)
-    disease = mi.Type2Diabetes(csv_path=str(param_path), pars={"init_prev": ss.bernoulli(0.0)})
-
-    sim = ss.Sim(
-        people=ppl,
-        diseases=[disease],
-        start=2020,
-        stop=2021,
-        dt=1 / 12,
-        copy_inputs=False,
-    )
-    sim.init()
-
-    assert math.isclose(
-        disease.pars.p_acquire,
-        annual_probability_to_timestep(0.002681646, 1 / 12),
-        rel_tol=0,
-        abs_tol=1e-12,
-    )
-    assert math.isclose(
-        disease.pars.p_acquire_male,
-        annual_probability_to_timestep(0.0030, 1 / 12),
-        rel_tol=0,
-        abs_tol=1e-12,
-    )
-    assert math.isclose(
-        disease.pars.p_acquire_female,
-        annual_probability_to_timestep(0.0022, 1 / 12),
-        rel_tol=0,
-        abs_tol=1e-12,
-    )
-    assert math.isclose(
-        disease.pars.remission_rate,
-        annual_probability_to_timestep(0.024, 1 / 12),
-        rel_tol=0,
-        abs_tol=1e-12,
-    )
-    assert math.isclose(
-        disease.pars.p_death.pars["p"],
-        annual_probability_to_timestep(0.025, 1 / 12),
-        rel_tol=0,
-        abs_tol=1e-12,
-    )
+    for dt in [ss.years(1), ss.months(1)]:
+        t2d = mi.diseases.Type2Diabetes(csv_path=str(param_path), pars={"init_prev": 0.0})
+        sim = ss.Sim(n_agents=20_000, diseases=t2d, start=2020, stop=2025, dt=dt, use_aging=False)
+        sim.run(verbose=0)
+        dis = sim.diseases.type2diabetes
+        female = sim.people.female
+        for sex, p in [(female, p_f), (~female, p_m)]:
+            share = dis.affected[sex.uids].mean()
+            expected = 1 - (1 - p)**5
+            assert abs(share - expected) < 0.015, f'At dt={dt}, {share=:.3f} acquired, but {expected=:.3f}'

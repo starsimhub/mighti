@@ -1,5 +1,5 @@
 """
-Full integration test for MIGHTI (Starsim 3.x compatible)
+Full integration test for MIGHTI
 
 This test verifies that a full MIGHTI simulation runs end-to-end without error:
 - Initializes modules (people, networks, diseases, connectors)
@@ -7,32 +7,12 @@ This test verifies that a full MIGHTI simulation runs end-to-end without error:
 - Produces valid mortality and prevalence outputs
 """
 
-import inspect
 import os
 import numpy as np
 import pandas as pd
 import starsim as ss
 import stisim as sti
 import mighti as mi
-from mighti.interventions.core import _stisim_art_accepts_coverage_kw
-
-
-def _sti_art(coverage_prop, year=2000):
-    if _stisim_art_accepts_coverage_kw():
-        return sti.ART(coverage=coverage_prop)
-    return sti.ART(coverage_data=pd.DataFrame({"p_art": [coverage_prop]}, index=[year]))
-
-
-def _sti_vmmc(coverage_prop, year=2000):
-    if "coverage" in inspect.signature(sti.VMMC.__init__).parameters:
-        return sti.VMMC(coverage=coverage_prop)
-    return sti.VMMC(coverage_data=pd.DataFrame({"p_vmmc": [coverage_prop]}, index=[year]))
-
-
-def _sti_prep():
-    if "coverage" in inspect.signature(sti.Prep.__init__).parameters:
-        return sti.Prep(coverage={"year": [2007, 2015, 2020], "value": [0, 0.05, 0.25]})
-    return sti.Prep(pars={"coverage": [0, 0.05, 0.25], "years": [2007, 2015, 2020]})
 
 
 def test_full_mighti_simulation():
@@ -58,9 +38,9 @@ def test_full_mighti_simulation():
 
     def get_prev_fn(disease):
         """
-        Return a Starsim-3.x compatible callable for init_prev: func(sim, uids, size=None) -> probs
+        Return a callable for init_prev: func(sim, uids) -> probs
         """
-        def prevalence_func(sim, uids, size=None):
+        def prevalence_func(sim, uids):
             return mi.age_sex_dependent_prevalence(
                 disease=disease,
                 prevalence_data=prevalence_data,
@@ -73,7 +53,7 @@ def test_full_mighti_simulation():
     # --- HIV module
     hiv = sti.HIV(
         init_prev=ss.bernoulli(p=get_prev_fn("HIV")),
-        beta={"structuredsexual": [0.01, 0.01], "maternal": [0.01, 0.01]},
+        beta={"structuredsexual": ss.peract(m2f=0.01, f2m=0.01), "maternalnet": 0.01},
         include_aids_deaths=True,
     )
 
@@ -81,7 +61,7 @@ def test_full_mighti_simulation():
     disease_objects = [hiv]
     active_diseases = ["HIV"]  # keep analyzers in sync with instantiated modules
     for d in healthconditions:
-        cls = getattr(mi, d, None)
+        cls = getattr(mi.diseases, d, None)
         if not cls:
             print(f" Skipping unknown condition: {d}")
             continue
@@ -101,7 +81,7 @@ def test_full_mighti_simulation():
         .set_index("condition")["rel_sus"]
         .to_dict()
     )
-    interactions = [mi.NCDHIVConnector(rel_sus_dict)]
+    interactions = mi.interactions.NCDHIVConnector(rel_sus_dict, diseases=active_diseases)
 
     # --- Demographics & networks
     death_path = os.path.join(thisdir, "test_data", "eswatini_mortality_rates.csv")
@@ -115,16 +95,16 @@ def test_full_mighti_simulation():
 
     # --- Analyzers
     analyzers = [
-        mi.DeathsByAgeSexAnalyzer(),
-        mi.SurvivorshipAnalyzer(),
-        mi.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=active_diseases),
+        mi.analyzers.DeathsByAgeSexAnalyzer(),
+        mi.analyzers.SurvivorshipAnalyzer(),
+        mi.analyzers.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=active_diseases),
     ]
 
     interventions = [
         sti.HIVTest(test_prob_data=[0.6, 0.7, 0.95], years=[2000, 2007, 2016]),
-        _sti_art(0.95, year=inityear),
-        _sti_vmmc(0.30, year=inityear),
-        _sti_prep(),
+        sti.ART(coverage=0.95),
+        sti.VMMC(coverage=0.30),
+        sti.Prep(coverage={"year": [2007, 2015, 2020], "value": [0, 0.05, 0.25]}),
     ]
 
     # --- Simulation
@@ -132,6 +112,7 @@ def test_full_mighti_simulation():
         n_agents=n_agents,
         start=inityear,
         stop=endyear,
+        dt=ss.years(1),
         people=ppl,
         demographics=[pregnancy, deaths],
         networks=networks,
@@ -139,7 +120,6 @@ def test_full_mighti_simulation():
         connectors=interactions,
         analyzers=analyzers,
         interventions=interventions,
-        copy_inputs=False,
         label="FullSimTest",
     )
 
@@ -152,7 +132,7 @@ def test_full_mighti_simulation():
     alive_n = int(np.count_nonzero(sim.people.alive))
     assert alive_n > 0, "No living agents at end of simulation"
     assert alive_n <= len(sim.people), "Alive count cannot exceed total population"
-    for analyzer in analyzers:
+    for analyzer in sim.analyzers():
         assert hasattr(analyzer, "results"), f"{analyzer.name} missing results"
 
     print(" Full MIGHTI simulation ran successfully.")

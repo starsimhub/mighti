@@ -20,7 +20,7 @@ def test_hpv_increases_hiv_rel_sus():
 
     # HIV needs a sexual network module available; we don't run transmission here,
     # but include the network for safe initialization.
-    hiv = sti.HIV(init_prev=0.0, beta={"structuredsexual": [0.0, 0.0]})
+    hiv = sti.HIV(init_prev=0.0, beta={"structuredsexual": ss.peract(m2f=0.0, f2m=0.0)})
     hpv = mi.diseases.HPV(
         csv_path=param_path,
         pars={"init_prev": ss.bernoulli(p=0.5)},
@@ -37,22 +37,16 @@ def test_hpv_increases_hiv_rel_sus():
         networks=[sti.StructuredSexual()],
         diseases=[hiv, hpv],
         connectors=[conn],
-        copy_inputs=False,
         label="hpv->hiv-rr-test",
     )
 
     sim.init()
 
-    # Ensure baseline is 1.0 before applying connector logic
-    sim.diseases.hiv.rel_sus[:] = 1.0
-
     hpv_inf = sim.diseases.hpv.infected.uids
     assert len(hpv_inf) > 0, "HPV should initialize with some infected agents"
 
-    # Apply connector once
-    conn.step()
-
-    rel_sus = np.asarray(sim.diseases.hiv.rel_sus, dtype=float)
+    # The modifier multiplies HIV's base rel_sus (1.0) where HPV holds
+    rel_sus = np.asarray(sim.diseases.hiv.rel_sus.effective, dtype=float)
     assert np.allclose(rel_sus[hpv_inf], rr), "HIV rel_sus not increased for HPV-infected agents"
 
     not_hpv = np.setdiff1d(np.arange(n_agents), np.asarray(hpv_inf, dtype=int))

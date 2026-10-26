@@ -19,7 +19,6 @@ def test_dynamic_connector_applies_rel_sus_to_affected_uids():
     param_path = os.path.join(thisdir, "test_data", "eswatini_parameters.csv")
 
     n_agents = 200
-    ppl = ss.People(n_agents=n_agents)
 
     # Use two NCD-style diseases that expose `.affected` and `.rel_sus`
     source = mi.diseases.Type2Diabetes(
@@ -38,12 +37,10 @@ def test_dynamic_connector_applies_rel_sus_to_affected_uids():
         n_agents=n_agents,
         start=2000,
         stop=2001,
-        people=ppl,
         diseases=[source, target],
         connectors=[conn],
         demographics=[],
         networks=[],
-        copy_inputs=False,
         label="dynamic-connector-test",
     )
 
@@ -53,10 +50,8 @@ def test_dynamic_connector_applies_rel_sus_to_affected_uids():
     src_uids = sim.diseases.type2diabetes.affected.uids
     assert len(src_uids) > 0, "Source disease has no affected uids; test is not meaningful"
 
-    # Run a single connector step (no need to run the full sim)
-    conn.step()
-
-    rel_sus = np.asarray(sim.diseases.alcoholusedisorder.rel_sus, dtype=float)
+    # The modifier multiplies the target's base rel_sus (1.0) where the source holds
+    rel_sus = np.asarray(sim.diseases.alcoholusedisorder.rel_sus.effective, dtype=float)
     assert np.allclose(rel_sus[src_uids], rel_sus_val), "Target rel_sus not applied to affected uids"
 
     # Unaffected uids should remain at baseline (default=1.0)

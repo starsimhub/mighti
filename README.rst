@@ -10,10 +10,10 @@ MIGHTI is an agent-based modeling framework designed to simulate the dynamics of
 Requirements
 ------------
 
-- Python 3.9–3.13 (CI runs on Python 3.12)
-- NumPy >= 2.0 (required by STIsim 1.4.0+; older NumPy may crash on ``argsort(..., stable=True)``)
-- Starsim 3.0.x (tested with ``starsim==3.0.3``)
-- STIsim 1.4.0 (tested with ``STIsim==1.4.0``)
+- Python 3.11–3.13
+- NumPy >= 2.0
+- Starsim 4 (``starsim>=4.0.0``)
+- STIsim 1.7.1 or later, on Starsim 4
 
 Installation
 ------------
@@ -94,8 +94,8 @@ MIGHTI is still evolving. To make it safe for others to build on, we define a **
     # Analyzers
     prev = mi.analyzers.PrevalenceAnalyzer_HIV(...)
 
-    # Connectors / interactions
-    conn = mi.interactions.NCDHIVConnector(...)
+    # Interactions: each is an ss.modify() of a condition's rel_sus, passed as connectors
+    conns = mi.interactions.NCDHIVConnector({'Type2Diabetes': 1.61})
 
     # Social determinants of health (SDoH)
     housing = mi.sdoh.NeighbourhoodSituation(...)
@@ -110,10 +110,6 @@ Plotting utilities are available, but are intentionally **not** imported into th
 .. code-block:: python
 
     from mighti.analysis.plotting import plot_mean_prevalence
-
-**Backwards compatibility**
-
-Some older code may still work with `mi.SomeClass` due to a temporary compatibility shim. New code should prefer the namespace style above.
 
 **Internal/experimental (may change without notice)**
 
