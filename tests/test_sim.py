@@ -53,8 +53,10 @@ def test_full_mighti_simulation():
     # --- HIV module
     hiv = sti.HIV(
         init_prev=ss.bernoulli(p=get_prev_fn("HIV")),
-        beta={"structuredsexual": ss.peract(m2f=0.01, f2m=0.01), "maternalnet": 0.01},
-        include_aids_deaths=True,
+        beta_m2f=0.01,
+        rel_beta_f2m=1.0,
+        beta_m2c=0.01,
+        p_aids_death=1.0,
     )
 
     # --- Other diseases

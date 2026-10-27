@@ -622,7 +622,7 @@ def make_sim(disease_name, DiseaseClass, fit_pdeath=False):
         beta_m2f=HIV_BETA_M2F,
         beta_m2c=HIV_BETA_M2C,
         init_prev=ss.bernoulli(p=get_prevalence_function("HIV")),
-        include_aids_deaths=True,
+        p_aids_death=1.0,
         effective_art_efficacy=0.9,
     )
 

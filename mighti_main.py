@@ -191,16 +191,10 @@ disease_objects = []
 hiv = sti.HIV(
     beta_m2f=0.03362975603278965,
     beta_m2c=0.008587993382382253,
-    init_prev=0.15,
+    init_prev=ss.bernoulli(p=get_prevalence_function("HIV")), # Age–sex dependent
+    p_aids_death=1.0,
+    effective_art_efficacy=0.9,
 )
-
-# Assign prevalence as age–sex dependent
-prev_func = get_prevalence_function("HIV")
-hiv.pars.init_prev = ss.bernoulli(p=prev_func)
-
-# AIDS mortality and care
-hiv.pars.include_aids_deaths = True
-hiv.pars.effective_art_efficacy = 0.9
 
 disease_objects.append(hiv)
 
@@ -269,8 +263,8 @@ if __name__ == "__main__":
         networks=networks,
         demographics=[pregnancy, death],
         diseases=disease_objects,
-        connectors=connectors,
-        modules=[adherence_engine, art_disruptor, intervention_disruptor],
+        connectors=connectors + [art_disruptor, intervention_disruptor], # Modifiers of HIV's ART dropout and efficacy
+        modules=[adherence_engine],
         interventions=interventions_hiv,  # HIV test + ARTwithCASM
         analyzers=[prevalence_analyzer],
         label="With Interventions",

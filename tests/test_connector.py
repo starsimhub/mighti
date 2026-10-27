@@ -56,12 +56,14 @@ def get_prev_func(disease):
 # ---------------------------------------------------------------------
 # Build disease modules
 # ---------------------------------------------------------------------
-hiv = sti.HIV()
 hiv_prev = get_prev_func("HIV")
-hiv.pars.init_prev = ss.bernoulli(p=lambda sim, uids: hiv_prev(sim, uids))
-hiv.pars.beta = {"structuredsexual": ss.peract(m2f=0.03, f2m=0.03)}
-hiv.pars.include_aids_deaths = True
-hiv.pars.effective_art_efficacy = 0.0
+hiv = sti.HIV(
+    init_prev=ss.bernoulli(p=lambda sim, uids: hiv_prev(sim, uids)),
+    beta_m2f=0.03,
+    rel_beta_f2m=1.0,
+    p_aids_death=1.0,
+    effective_art_efficacy=0.0,
+)
 
 aud = mi.diseases.AlcoholUseDisorder(csv_path=param_path, init_prev=ss.bernoulli(p=0.10))
 

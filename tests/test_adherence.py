@@ -48,11 +48,9 @@ def test_adherence_engine_basic():
         beta_m2f=0.2,
         beta_m2c=0.01,
         init_prev=0.20,
+        p_aids_death=0.0, # No AIDS deaths, for faster tests
+        effective_art_efficacy=0.90,
     )
-
-    # enable full cascade
-    hiv.pars.include_aids_deaths = False   # turn off mortality for faster tests
-    hiv.pars.effective_art_efficacy = 0.90
 
     init_prev = ss.bernoulli(p=MDD_INIT_PREV)
 
@@ -106,9 +104,9 @@ def test_art_adherence_disruptor():
         beta_m2f=0.2,
         beta_m2c=0.01,
         init_prev=0.20,
+        p_aids_death=0.0, # No AIDS deaths, for faster tests
+        effective_art_efficacy=0.90,
     )
-    hiv.pars.include_aids_deaths = False
-    hiv.pars.effective_art_efficacy = 0.90
 
     # --------------------------
     # MajorDepressiveDisorder (CASM condition)
@@ -140,9 +138,9 @@ def test_art_adherence_disruptor():
         stop=2001,
         people=ppl,
         diseases=disease_objects,
-        modules=[adherence_engine, art_disruptor],
+        modules=[adherence_engine],
         interventions=[],
-        connectors=[],
+        connectors=[art_disruptor],
         label="test_art_disruptor",
     )
 
@@ -180,9 +178,9 @@ def test_intervention_adherence_disruptor():
         beta_m2f=0.2,
         beta_m2c=0.01,
         init_prev=0.10,
+        p_aids_death=0.0, # No AIDS deaths, for faster tests
+        effective_art_efficacy=0.95,
     )
-    hiv.pars.include_aids_deaths = False
-    hiv.pars.effective_art_efficacy = 0.95   # BASELINE
 
     disease_class = getattr(mi.diseases, healthcondition)
     init_prev_mdd = ss.bernoulli(p=MDD_INIT_PREV)
@@ -201,20 +199,18 @@ def test_intervention_adherence_disruptor():
         people=ppl,
         demographics=[ss.Pregnancy(), ss.Deaths()],
         diseases=[hiv, mdd],
-        modules=[adherence_engine, intv_disruptor],
+        modules=[adherence_engine],
         interventions=[art],
-        connectors=[],
+        connectors=[intv_disruptor],
         label="test_intv_disruptor",
     )
 
     sim.run()
 
-    hiv = sim.diseases.hiv
-    assert hiv.pars.effective_art_efficacy < 0.95, (
-        f"Expected HIV ART efficacy < 0.95 after adherence scaling, got {hiv.pars.effective_art_efficacy}"
-    )
+    efficacy = sim.diseases.hiv.value('effective_art_efficacy') # With the modifiers on it
+    assert efficacy < 0.95, f"Expected HIV ART efficacy < 0.95 after adherence scaling, got {efficacy}"
 
-    print(f"TEST 3 PASSED: ART efficacy scaled to {hiv.pars.effective_art_efficacy:.3f}")
+    print(f"TEST 3 PASSED: ART efficacy scaled to {efficacy:.3f}")
 
 
 # ---------------------------------------------------------------------

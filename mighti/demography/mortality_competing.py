@@ -7,33 +7,37 @@ the rest of the all-cause hazard: the all-cause hazard less that of each modeled
 the total is the observed all-cause mortality while the modeled causes are below it. Each death has one
 cause (`people.cause_of_death`): a modeled cause, or this module's name ('residual').
 
-The hazard of each modeled cause is that of the conditions of `mighti.diseases` (their `death_hazard()`)
-and of STIsim's HIV (`hiv_death_hazard()`).
+The hazard of each modeled cause is that of the conditions of `mighti.diseases` (their `death_hazard()`), and
+for a declared disease (e.g. STIsim's HIV), the rates of its transitions to death (see `death_hazard()`).
 """
 
 import numpy as np
 import sciris as sc
 import starsim as ss
 
-__all__ = ['CompetingRisksDeaths', 'hiv_death_hazard']
+__all__ = ['CompetingRisksDeaths', 'death_hazard']
 
 
-def hiv_death_hazard(hiv, uids):
-    """ The annual hazard of death from HIV of each agent (STIsim's `sti.HIV`): off ART by CD4, on ART, and certain death at a CD4 count of zero """
+def death_hazard(disease, uids):
+    """
+    The annual hazard of death from a disease of each agent: its own `death_hazard()` (MIGHTI's conditions), or for a
+    declared disease, the rates of its transitions to death (e.g. HIV's `hiv_death` and `art_death`), for those in their
+    source states. A death at a set time (e.g. HIV's `aids_death`, at the end of a stage) has no hazard to count.
+    """
     uids = ss.uids(uids)
-    dt = hiv.t.dt_year
-    p = np.zeros(len(uids))
-    infected = hiv.infected[uids]
-    on_art = hiv.on_art[uids]
-    off = infected & ~on_art
-    if off.any():
-        p[off] = hiv.make_p_hiv_death(uids=uids[off])
-    on = infected & on_art
-    if on.any():
-        p[on] = hiv.get_art_mortality_hazard(uids[on])
-    if hiv.pars.include_aids_deaths:
-        p[np.asarray(hiv.ti_zero[uids] <= hiv.ti)] = 1.0
-    return -np.log1p(-np.clip(p, 0, 1 - 1e-12))/dt
+    if hasattr(disease, 'death_hazard'):
+        return disease.death_hazard(uids)
+    h = np.zeros(len(uids))
+    graph = getattr(disease, 'graph', None)
+    if graph is None: # A disease written as code with no death_hazard(): none modeled
+        return h
+    for tr in graph.transitions.values():
+        if (tr.outflow or tr.dies) and tr.rate is not None:
+            inside = np.zeros(len(uids), dtype=bool)
+            for state in tr.src:
+                inside |= np.asarray(disease[state.name][uids], dtype=bool)
+            h[inside] += tr.hazard(uids[inside])
+    return h/disease.sim.unit_base.years # Per unit of the sim's time, to per year
 
 
 class CompetingRisksDeaths(ss.Deaths):
@@ -59,10 +63,7 @@ class CompetingRisksDeaths(ss.Deaths):
         """ The total annual hazard of death of the modeled causes for each agent """
         h = np.zeros(len(uids))
         for dis in self.sim.diseases():
-            if hasattr(dis, 'death_hazard'):
-                h += dis.death_hazard(uids)
-            elif hasattr(dis, 'make_p_hiv_death'): # STIsim's HIV
-                h += hiv_death_hazard(dis, uids)
+            h += death_hazard(dis, uids)
         return h
 
     def make_p_death(self):

@@ -14,12 +14,12 @@ def test_hiv_basic(n_agents=5000, start=2000, stop=2020, do_plot=False):
 
     # --- Initialize HIV disease properly ---
     hiv = sti.HIV(
-        init_prev=ss.bernoulli(p=0.05),  # FIXED: must be a Starsim distribution
-        beta={"structuredsexual": ss.peract(m2f=0.02, f2m=0.02)},
+        init_prev=0.05,
+        beta_m2f=0.02,
+        rel_beta_f2m=1.0,
+        p_aids_death=1.0,
+        effective_art_efficacy=0.0,
     )
-
-    hiv.pars.include_aids_deaths = True
-    hiv.pars.effective_art_efficacy = 0.0
 
     net = sti.StructuredSexual()
 

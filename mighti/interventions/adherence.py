@@ -2,8 +2,8 @@
 Adherence to ART, as affected by co-occurring conditions (CASM) and social determinants of health (SDoH)
 
 1. `AdherenceEngine`: each person's adherence (`people.adherence`), from their conditions and SDoH
-2. `ARTAdherenceDisruptor`: people with low adherence stop ART
-3. `InterventionAdherenceDisruptor`: ART is less effective when mean adherence is low
+2. `ARTAdherenceDisruptor`: people with low adherence stop ART (a modifier of HIV's `rate_art_dropout`)
+3. `InterventionAdherenceDisruptor`: ART is less effective when mean adherence is low (a modifier of HIV's `effective_art_efficacy`)
 """
 
 import numpy as np
@@ -109,13 +109,14 @@ class AdherenceEngine(ss.Module):
         return
 
 
-class ARTAdherenceDisruptor(ss.Connector):
+class ARTAdherenceDisruptor(ss.modify):
     """
     People on ART stop it at a monthly probability that rises as their adherence falls
 
         p_i = base_dropout*(1 - adherence_i) for people with alcohol use disorder, and base_dropout_noaud*(1 - adherence_i) for others
 
-    Only people who have been on ART for at least `min_time_on_art` stop; STIsim's ART then takes them off it.
+    Only people who have been on ART for at least `min_time_on_art` stop. It sets HIV's rate of stopping ART early
+    (`rate_art_dropout`, the transition `art_dropout`) for each of them.
 
     Args:
         base_dropout (float): the monthly probability of stopping for people with alcohol use disorder and no adherence
@@ -123,63 +124,51 @@ class ARTAdherenceDisruptor(ss.Connector):
         min_time_on_art (dur): the time on ART before people can stop
     """
     def __init__(self, base_dropout=0.10, base_dropout_noaud=0.001, min_time_on_art=ss.months(6), name='adherence_art_dropout', **kwargs):
-        super().__init__(name=name, **kwargs)
+        super().__init__('hiv.pars.rate_art_dropout', set=self.dropout_rate, where=self.eligible, name=name, **kwargs)
         self.define_pars(
             base_dropout = float(base_dropout),
             base_dropout_noaud = float(base_dropout_noaud),
             min_time_on_art = min_time_on_art,
-            p_drop = ss.bernoulli(p=0), # Set each step
         )
         return
 
-    def step(self):
-        sim = self.sim
-        hiv = sim.diseases.get('hiv')
-        if hiv is None:
-            return
-        uids = hiv.on_art.uids
-        uids = uids[(hiv.ti - hiv.ti_art[uids])*hiv.t.dt_year >= self.pars.min_time_on_art.years]
-        if not len(uids):
-            return
+    def eligible(self, sim):
+        """ Those who have been on ART for at least min_time_on_art """
+        hiv = sim.diseases.hiv
+        return hiv.on_art & ((hiv.ti - hiv.ti_art)*hiv.t.dt_year >= self.pars.min_time_on_art.years)
+
+    def dropout_rate(self, sim):
+        """ The probability of stopping ART of each person, per month """
         aud = sim.diseases.get('alcoholusedisorder')
-        aud = aud.affected[uids] if aud is not None else np.zeros(len(uids), dtype=bool)
+        aud = aud.affected.values if aud is not None else np.zeros(len(sim.people), dtype=bool)
         base = np.where(aud, self.pars.base_dropout, self.pars.base_dropout_noaud)
-        p = np.clip(base*(1 - sim.people.adherence[uids]), 0, 1)
-        self.pars.p_drop.set(p=ss.probpermonth(p))
-        stopping = self.pars.p_drop.filter(uids)
-        hiv.ti_stop_art[stopping] = hiv.ti # STIsim's ART stops them
+        return ss.probpermonth(np.clip(base*(1 - sim.people.adherence.values), 0, 1))
+
+
+class InterventionAdherenceDisruptor(ss.modify):
+    """
+    ART is less effective when adherence is low: HIV's `effective_art_efficacy` (the efficacy of suppressive ART against
+    transmission) is multiplied by the mean adherence, and the `rel_effect` of any intervention that has one is its value
+    at the start times adherence (the mean, for a scalar)
+    """
+    def __init__(self, name='intervention_adherence_disruptor', **kwargs):
+        super().__init__('hiv.pars.effective_art_efficacy', multiply=self.mean_adherence, name=name, **kwargs)
         return
 
-
-class InterventionAdherenceDisruptor(ss.Module):
-    """
-    ART is less effective when adherence is low: HIV's `effective_art_efficacy` (STIsim's efficacy of suppressive ART against
-    transmission) is its value at the start times the mean adherence, and the `rel_effect` of any intervention that has one
-    is its value at the start times adherence (the mean, for a scalar)
-
-    Args:
-        scale_art_efficacy (bool): whether to scale HIV's `effective_art_efficacy`
-    """
-    def __init__(self, scale_art_efficacy=True, name='intervention_adherence_disruptor', **kwargs):
-        super().__init__(name=name, **kwargs)
-        self.scale_art_efficacy = scale_art_efficacy
-        return
+    def mean_adherence(self, sim):
+        return float(sim.people.adherence.values.mean())
 
     def init_post(self):
         """ The values at the start """
         super().init_post()
-        hiv = self.sim.diseases.get('hiv')
-        self.baseline_art_efficacy = float(hiv.pars.effective_art_efficacy) if self.scale_art_efficacy and hiv is not None else None
         self.baseline_rel_effects = {intv.name: np.array(intv.rel_effect, dtype=float) for intv in self.sim.interventions() if hasattr(intv, 'rel_effect')}
         return
 
     def step(self):
-        sim = self.sim
-        adherence = sim.people.adherence.values
+        super().step()
+        adherence = self.sim.people.adherence.values
         scale = float(adherence.mean())
-        if self.baseline_art_efficacy is not None:
-            sim.diseases.hiv.pars.effective_art_efficacy = self.baseline_art_efficacy*scale
-        for intv in sim.interventions():
+        for intv in self.sim.interventions():
             baseline = self.baseline_rel_effects.get(intv.name)
             if baseline is not None:
                 intv.rel_effect = baseline*scale if baseline.ndim == 0 else baseline*adherence
