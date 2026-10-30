@@ -72,6 +72,7 @@ def test_adherence_engine_basic():
         start=2000,
         stop=2001,
         people=ss.People(n_agents=n_agents, extra_states=extra_states),
+        networks=sti.StructuredSexual(),
         diseases=disease_objects,
         modules=[adherence_engine],
         interventions=[],
@@ -137,6 +138,7 @@ def test_art_adherence_disruptor():
         start=2000,
         stop=2001,
         people=ppl,
+        networks=sti.StructuredSexual(),
         diseases=disease_objects,
         modules=[adherence_engine],
         interventions=[],
@@ -197,6 +199,7 @@ def test_intervention_adherence_disruptor():
         start=2000,
         stop=2001,
         people=ppl,
+        networks=sti.StructuredSexual(),
         demographics=[ss.Pregnancy(), ss.Deaths()],
         diseases=[hiv, mdd],
         modules=[adherence_engine],
@@ -207,7 +210,7 @@ def test_intervention_adherence_disruptor():
 
     sim.run()
 
-    efficacy = sim.diseases.hiv.value('effective_art_efficacy') # With the modifiers on it
+    efficacy = sim.diseases.hiv.current_value('effective_art_efficacy')
     assert efficacy < 0.95, f"Expected HIV ART efficacy < 0.95 after adherence scaling, got {efficacy}"
 
     print(f"TEST 3 PASSED: ART efficacy scaled to {efficacy:.3f}")

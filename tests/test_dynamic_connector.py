@@ -51,7 +51,7 @@ def test_dynamic_connector_applies_rel_sus_to_affected_uids():
     assert len(src_uids) > 0, "Source disease has no affected uids; test is not meaningful"
 
     # The modifier multiplies the target's base rel_sus (1.0) where the source holds
-    rel_sus = np.asarray(sim.diseases.alcoholusedisorder.effective("rel_sus"), dtype=float)
+    rel_sus = np.asarray(sim.diseases.alcoholusedisorder.current_value("rel_sus"), dtype=float)
     assert np.allclose(rel_sus[src_uids], rel_sus_val), "Target rel_sus not applied to affected uids"
 
     # Unaffected uids should remain at baseline (default=1.0)
