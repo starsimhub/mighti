@@ -46,7 +46,7 @@ def test_hpv_increases_hiv_rel_sus():
     assert len(hpv_inf) > 0, "HPV should initialize with some infected agents"
 
     # The modifier multiplies HIV's base rel_sus (1.0) where HPV holds
-    rel_sus = np.asarray(sim.diseases.hiv.rel_sus.effective, dtype=float)
+    rel_sus = np.asarray(sim.diseases.hiv.effective("rel_sus"), dtype=float)
     assert np.allclose(rel_sus[hpv_inf], rr), "HIV rel_sus not increased for HPV-infected agents"
 
     not_hpv = np.setdiff1d(np.arange(n_agents), np.asarray(hpv_inf, dtype=int))
