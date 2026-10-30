@@ -29,12 +29,16 @@ class ResourcePool:
         Log of all resource usage events.
     """
 
-    def __init__(self, budget_usd, hrh_minutes=None, rollover=True):
+    def __init__(self, budget_usd, hrh_minutes=None, rollover=True,
+                 rollover_budget=None, rollover_hrh=None):
         self.total_budget = float(budget_usd or 0)
         self.remaining_budget = float(budget_usd or 0)
         self.hrh_minutes = copy.deepcopy(hrh_minutes or {})
         self.remaining_hrh = copy.deepcopy(hrh_minutes or {})
         self.rollover = bool(rollover)
+        # Per-stock rollover: staff time usually must not carry over; money may.
+        self.rollover_budget = self.rollover if rollover_budget is None else bool(rollover_budget)
+        self.rollover_hrh = self.rollover if rollover_hrh is None else bool(rollover_hrh)
         self.used_budget = 0.0
         self.log = []
 
@@ -87,10 +91,14 @@ class ResourcePool:
     def reset_rollover(self):
         """
         Apply rollover at the end of a timestep.
-        If rollover=False, reset remaining resources to initial totals.
+
+        Unused staff time is lost unless ``rollover_hrh`` is True. Money may
+        persist when ``rollover_budget`` is True. The legacy ``rollover`` flag
+        still sets both when the per-stock arguments are omitted.
         """
-        if not self.rollover:
+        if not self.rollover_budget:
             self.remaining_budget = self.total_budget
+        if not self.rollover_hrh:
             self.remaining_hrh = copy.deepcopy(self.hrh_minutes)
 
     # -------------------------------------------------------------------------

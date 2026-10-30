@@ -9,6 +9,7 @@ from mighti.analyzers.disability_weights import (
     HIV_YLD_MODES,
     MULTIMORBIDITY_RULES,
     adjust_total_yld_for_multimorbidity,
+    canonical_dw_key,
     classify_hiv_stage,
     hiv_stage_disability_weight,
     resolve_disability_weights,
@@ -26,6 +27,8 @@ class MicrocostingAnalyzer(ss.Analyzer):
                  use_default_disability_weights=True,
                  multimorbidity_rule=DEFAULT_MULTIMORBIDITY_RULE,
                  hiv_yld_mode=DEFAULT_HIV_YLD_MODE,
+                 treated_disability_weights=None,
+                 treatment_cost_keys=None,
                  **kwargs):
 
         if discount_rate is not None:
@@ -52,6 +55,14 @@ class MicrocostingAnalyzer(ss.Analyzer):
         self.hiv_yld_mode = mode
         self.discount_rate_costs = discount_rate_costs
         self.discount_rate_outcomes = discount_rate_outcomes
+        treated = treated_disability_weights or {}
+        self.treated_disability_weights = {
+            canonical_dw_key(k): float(v) for k, v in treated.items()
+        }
+        self.treatment_cost_keys = {
+            canonical_dw_key(condition): str(cost_key)
+            for condition, cost_key in (treatment_cost_keys or {}).items()
+        }
 
         # Remove these to prevent warnings from Starsim
         for k in [
@@ -61,6 +72,8 @@ class MicrocostingAnalyzer(ss.Analyzer):
             'multimorbidity_rule',
             'use_default_disability_weights',
             'hiv_yld_mode',
+            'treated_disability_weights',
+            'treatment_cost_keys',
         ]:
             kwargs.pop(k, None)
 
@@ -69,18 +82,30 @@ class MicrocostingAnalyzer(ss.Analyzer):
         self.detailed_outputs = None
         self._hiv_yld_stage_acc = None  # undiscounted person-years × stage DW
         self._hiv_stage_py = None  # optional person-years by stage (for Methods tables)
+        self._treated_yld_acc = None  # cond → per-agent undiscounted YLD
+        self._treatment_py_acc = None  # cost_key → per-agent person-years on treatment
 
     def init_pre(self, sim):
         super().init_pre(sim)
+        n = max(int(sim.people.uid.len_used), 1)
         if self.hiv_yld_mode == "stage":
-            n = int(sim.people.uid.len_used)
-            self._hiv_yld_stage_acc = np.zeros(max(n, 1), dtype=float)
+            self._hiv_yld_stage_acc = np.zeros(n, dtype=float)
             self._hiv_stage_py = {
                 "art": 0.0,
                 "aids": 0.0,
                 "symptomatic": 0.0,
                 "early": 0.0,
             }
+        if self.treated_disability_weights or any(
+            k in self.unit_costs for k in self.treatment_cost_keys.values()
+        ):
+            self._treated_yld_acc = {}
+            self._treatment_py_acc = {}
+            for cond in set(self.treated_disability_weights) | set(self.treatment_cost_keys):
+                self._treated_yld_acc[cond] = np.zeros(n, dtype=float)
+                cost_key = self.treatment_cost_keys.get(cond)
+                if cost_key and cost_key in self.unit_costs:
+                    self._treatment_py_acc[cost_key] = np.zeros(n, dtype=float)
 
     def init_results(self):
         super().init_results()
@@ -109,8 +134,62 @@ class MicrocostingAnalyzer(ss.Analyzer):
         except Exception:
             return 1.0
 
+    def _ensure_treated_acc(self, n_used: int):
+        if not self._treated_yld_acc:
+            return
+        for key, acc in list(self._treated_yld_acc.items()):
+            if acc.size < n_used:
+                new = np.zeros(n_used, dtype=float)
+                new[: acc.size] = acc
+                self._treated_yld_acc[key] = new
+        if self._treatment_py_acc:
+            for key, acc in list(self._treatment_py_acc.items()):
+                if acc.size < n_used:
+                    new = np.zeros(n_used, dtype=float)
+                    new[: acc.size] = acc
+                    self._treatment_py_acc[key] = new
+
+    def _accrue_treated_yld_and_tx_py(self):
+        if self._treated_yld_acc is None and self._treatment_py_acc is None:
+            return
+        sim = self.sim
+        n_used = int(sim.people.uid.len_used)
+        self._ensure_treated_acc(n_used)
+        dt = self._sim_dt_year(sim)
+        conds = set(self._treated_yld_acc or {}) | {
+            k for k, ck in self.treatment_cost_keys.items()
+            if ck in (self._treatment_py_acc or {})
+        }
+        for cond in conds:
+            disease, _ = resolve_disease_module(sim.diseases, cond)
+            if disease is None or not hasattr(disease, "affected"):
+                continue
+            affected = np.zeros(n_used, dtype=bool)
+            raw_aff = getattr(disease.affected, "raw", None)
+            src = raw_aff if raw_aff is not None else disease.affected
+            n = min(len(np.asarray(src)), n_used)
+            affected[:n] = np.asarray(src[:n], dtype=bool)
+            on_tx = np.zeros(n_used, dtype=bool)
+            if hasattr(disease, "on_treatment"):
+                raw_tx = getattr(disease.on_treatment, "raw", None)
+                src_tx = raw_tx if raw_tx is not None else disease.on_treatment
+                n_tx = min(len(np.asarray(src_tx)), n_used)
+                on_tx[:n_tx] = np.asarray(src_tx[:n_tx], dtype=bool)
+
+            untreated_w = float(self.disability_weights.get(cond, 0.0))
+            treated_w = float(self.treated_disability_weights.get(cond, untreated_w))
+            if self._treated_yld_acc is not None and cond in self._treated_yld_acc:
+                acc = self._treated_yld_acc[cond]
+                acc[:n_used] += np.where(affected & on_tx, treated_w, 0.0) * dt
+                acc[:n_used] += np.where(affected & ~on_tx, untreated_w, 0.0) * dt
+
+            cost_key = self.treatment_cost_keys.get(cond)
+            if cost_key and self._treatment_py_acc is not None and cost_key in self._treatment_py_acc:
+                self._treatment_py_acc[cost_key][:n_used] += on_tx * dt
+
     def step(self):
-        """Accrue HIV stage YLD when ``hiv_yld_mode='stage'``; otherwise no-op."""
+        """Accrue HIV stage YLD and (if configured) treated NCD YLD / treatment person-years."""
+        self._accrue_treated_yld_and_tx_py()
         if self.hiv_yld_mode != "stage":
             return
         sim = self.sim
@@ -183,8 +262,9 @@ class MicrocostingAnalyzer(ss.Analyzer):
         # Event-based costs
         # ---------------------------------------------------------------------
         logger.info("Event-based costs:")
+        ncd_tx_keys = set(self.treatment_cost_keys.values())
         for event, unit_cost in self.unit_costs.items():
-            if event == 'art':
+            if event == 'art' or event in ncd_tx_keys:
                 continue
             if hasattr(ppl, f'{event}_count'):
                 counts = getattr(ppl, f'{event}_count')
@@ -246,6 +326,18 @@ class MicrocostingAnalyzer(ss.Analyzer):
                     yld_details['hiv_yld'] = yld
                     total_yld += yld
                     logger.info("  - hiv (average): %0.2f", float(yld.sum()))
+                continue
+
+            # Treated/untreated time-in-state YLD (Paper 2) when accrued
+            if self._treated_yld_acc is not None and cond in self._treated_yld_acc:
+                disc = (1 + self.discount_rate_outcomes) ** (n_years - 1)
+                acc = self._treated_yld_acc[cond]
+                yld = np.zeros(n_total)
+                n_acc = min(len(acc), n_total)
+                yld[:n_acc] = acc[:n_acc] / disc
+                total_yld += yld
+                yld_details[f'{cond}_yld'] = yld
+                logger.info("  - %s (treated/untreated time): %0.2f", cond, float(yld.sum()))
                 continue
 
             # Duration-based YLD for named conditions (alias-tolerant lookup)
@@ -336,6 +428,27 @@ class MicrocostingAnalyzer(ss.Analyzer):
                 f"{art_cost.sum():,.2f}",
                 f"{int(art_counts.sum()):,}",
             )
+
+        # ---------------------------------------------------------------------
+        # NCD treatment person-year costs (Paper 2)
+        # ---------------------------------------------------------------------
+        if self._treatment_py_acc:
+            disc_c = (1 + self.discount_rate_costs) ** (n_years - 1)
+            for cost_key, py in self._treatment_py_acc.items():
+                if cost_key not in self.unit_costs:
+                    continue
+                arr = np.zeros(n_total)
+                n_py = min(len(py), n_total)
+                arr[:n_py] = py[:n_py]
+                cost = arr * float(self.unit_costs[cost_key]) / disc_c
+                total_cost += cost
+                cost_details[f"{cost_key}_cost"] = cost
+                logger.info(
+                    "  - %s: %s for %s person-years",
+                    cost_key,
+                    f"{cost.sum():,.2f}",
+                    f"{float(arr.sum()):,.2f}",
+                )
 
         # ---------------------------------------------------------------------
         # Final DataFrame

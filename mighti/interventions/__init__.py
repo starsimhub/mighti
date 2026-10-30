@@ -14,6 +14,7 @@ import importlib
 _SUBMODULES = {
     "core",
     "adherence",
+    "ncd_treatment",
 }
 
 _EXPORTS = {
@@ -34,6 +35,12 @@ _EXPORTS = {
     "SDOH_REL_FACTORS": "adherence",
     "BASELINE_ADHERENCE_PHARMACOTHERAPY": "adherence",
     "CASM_NONADHERENCE_OR": "adherence",
+    # interventions/ncd_treatment.py
+    "ChronicCareTx": "ncd_treatment",
+    "ReduceMortalityTx": "ncd_treatment",
+    "make_ncd_treatment": "ncd_treatment",
+    "chronic_care_eligible_mask": "ncd_treatment",
+    "ELIGIBILITY_MODES": "ncd_treatment",
 }
 
 __all__ = sorted([*_SUBMODULES, *_EXPORTS.keys()])

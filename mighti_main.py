@@ -50,7 +50,7 @@ logger.setLevel(logging.INFO)
 SEED = 12345
 seed_everything(SEED)
 
-n_agents = 100_000
+n_agents = 10_000
 inityear = 2007
 endyear = 2024
 region = "eswatini"

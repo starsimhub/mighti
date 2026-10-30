@@ -8,3 +8,4 @@ This subpackage is intentionally not imported into the core `mighti` namespace.
 # re-exported by default for the non-economic evaluation package build.
 from .resource_accounting import *
 from .utils import *
+from .clinic_queue import ClinicQueue, QUEUE_RULES, ClaimRecipe

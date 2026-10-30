@@ -5,7 +5,7 @@ Module defining the Type 2 Diabetes remitting disease model.
 
 import starsim as ss
 from mighti.diseases.base_disease import RemittingDisease
-from starsim.interventions import treat_num
+from mighti.interventions.ncd_treatment import ReduceMortalityTx
 
 
 class Type2Diabetes(RemittingDisease):
@@ -13,38 +13,16 @@ class Type2Diabetes(RemittingDisease):
         self.disease_name = 'Type2Diabetes'
         super().__init__(csv_path, pars, **kwargs)
 
-        self.define_pars(label='type2diabetes')  
+        self.define_pars(label='type2diabetes')
         return
 
-   
-class T2D_ReduceMortalityTx(treat_num):
-    def __init__(self, *args, product=None, prob=1.0, rel_death_reduction=0.5, eligibility=None, **kwargs):
-        super().__init__(*args, product=product, prob=prob, eligibility=eligibility, **kwargs)
-        self.rel_death_reduction = rel_death_reduction
-        self.disease = 'type2diabetes'  
 
-    def initialize(self, sim):
-        super().initialize(sim)
+class T2D_ReduceMortalityTx(ReduceMortalityTx):
+    """Back-compat wrapper; Paper 2 uses ``ReduceMortalityTx(disease='type2diabetes')``."""
 
-        if self.eligibility is None:
-            if not hasattr(sim.diseases, self.disease):
-                raise ValueError(f"[{self.label}] Disease '{self.disease}' not found in sim.diseases.")
-            self.eligibility = lambda sim: sim.diseases[self.disease].affected.uids
-    
-    def init_pre(self, sim):
-        super().init_pre(sim)
-
-    def apply(self, sim):
-        super().apply(sim)  # normal intervention behavior
-        # NOTE: economic/budget hooks intentionally removed
-
-    def step(self):
-        self.add_to_queue()
-        treat_inds = super().step()
-
-        if len(treat_inds):
-            successful = self.outcomes['successful']
-            if len(successful):
-                self.sim.diseases[self.disease].rel_death[ss.uids(successful)] *= self.rel_death_reduction
-        return treat_inds
-    
+    def __init__(self, *args, product=None, rel_death_reduction=0.5, eligibility=None, **kwargs):
+        kwargs.setdefault("disease", "type2diabetes")
+        kwargs.setdefault("rel_death_reduction", rel_death_reduction)
+        if eligibility is not None and "eligibility_mode" not in kwargs:
+            kwargs["eligibility_mode"] = "affected"
+        super().__init__(*args, product=product, **kwargs)

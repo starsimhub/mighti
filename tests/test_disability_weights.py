@@ -100,6 +100,19 @@ def test_microcosting_analyzer_defaults_without_manual_dict():
     assert an.hiv_yld_mode == "average"
 
 
+def test_microcosting_treatment_cost_mapping_is_caller_configured():
+    from mighti.analyzers.analyzer_cost import MicrocostingAnalyzer
+
+    default = MicrocostingAnalyzer(unit_costs={"custom_tx": 12.0})
+    configured = MicrocostingAnalyzer(
+        unit_costs={"custom_tx": 12.0},
+        treatment_cost_keys={"Hypertension": "custom_tx"},
+    )
+
+    assert default.treatment_cost_keys == {}
+    assert configured.treatment_cost_keys == {"hypertension": "custom_tx"}
+
+
 def test_classify_hiv_stage_priority():
     infected = np.array([True, True, True, True, False])
     on_art = np.array([True, False, False, False, False])
