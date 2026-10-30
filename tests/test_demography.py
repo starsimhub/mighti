@@ -1,7 +1,7 @@
 """
 Test MIGHTI demography setup with people_extend.py
 Ensures that extended population attributes (age, sex, etc.)
-are correctly initialized and compatible with Starsim 3.x.
+are correctly initialized.
 """
 
 import starsim as ss
@@ -24,7 +24,7 @@ def _build_people():
     thisdir = os.path.dirname(__file__)
     csv_path = os.path.join(thisdir, "test_data", "eswatini_age_distribution.csv")
     assert os.path.exists(csv_path), f"Missing test data: {csv_path}"
-    return mi.make_people_with_age_sex(csv_path=csv_path, init_year=inityear, n_agents=n_agents)
+    return mi.people_extend.make_people_with_age_sex(csv_path=csv_path, init_year=inityear, n_agents=n_agents)
 
 
 def test_people_extend_basic():
@@ -67,7 +67,6 @@ def test_people_extend_with_demography():
         start=2007,
         stop=2009,
         n_agents=n_agents,
-        copy_inputs=False,
         label="DemographyTest",
     )
     sim.run()

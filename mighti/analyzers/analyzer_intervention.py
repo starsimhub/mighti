@@ -33,7 +33,7 @@ class InterventionAnalyzer(ss.Analyzer):
         ti = sim.ti
         year = sim.t.yearvec[ti]
 
-        for uid in ppl.uid:
+        for uid in ppl.auids:
             record = {
                 'uid': uid,
                 'year': year,
@@ -61,40 +61,32 @@ class InterventionAnalyzer(ss.Analyzer):
 
 
 class AdherenceAnalyzer(ss.Analyzer):
-    def __init__(self, condition_key, intervention_key, label=None):
-        """
-        condition_key: str — e.g., "majordepressivedisorder.affected"
-        intervention_key: str — e.g., "hiv.on_art"
-        """
-        super().__init__()
+    """
+    The share of people with HIV on a treatment, with and without a condition
+
+    Args:
+        condition_key (str): the state of the condition, as a key of `people.states`, e.g. "majordepressivedisorder.affected"
+        intervention_key (str): the state of being on the treatment, e.g. "hiv.on_art"
+    """
+    def __init__(self, condition_key, intervention_key, label=None, **kwargs):
+        super().__init__(label=label or f"on_{intervention_key}_by_{condition_key}", **kwargs)
         self.condition_key = condition_key
         self.intervention_key = intervention_key
-        self.label = label or f"on_{intervention_key}_by_{condition_key}"
+        return
 
-    def initialize(self, sim):
-        self.results = {
-            "time": [],
-            "on_with_condition": [],
-            "on_without_condition": [],
-        }
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result("on_with_condition", dtype=float, scale=False, label="On treatment, with the condition"),
+            ss.Result("on_without_condition", dtype=float, scale=False, label="On treatment, without the condition"),
+        )
+        return
 
-    def apply(self, sim):
-        st = sim.people.states
-        cond = st.get(self.condition_key, np.zeros(sim.n_agents, dtype=bool))
-        on_tx = st.get(self.intervention_key, np.zeros(sim.n_agents, dtype=bool))
-
-        is_alive = st.get("alive", np.ones(sim.n_agents, dtype=bool))
-        eligible = is_alive & st.get("hiv.infected", np.ones(sim.n_agents, dtype=bool))  # modify if needed
-
-        cond_alive = eligible & cond
-        notcond_alive = eligible & ~cond
-
-        def safe_mean(arr1, arr2):
-            return np.nan if arr2.sum() == 0 else arr1[arr2].mean()
-
-        self.results["time"].append(sim.t)
-        self.results["on_with_condition"].append(safe_mean(on_tx, cond_alive))
-        self.results["on_without_condition"].append(safe_mean(on_tx, notcond_alive))
-
-    def finalize(self, sim):
-        sim.results[self.label] = self.results
+    def step(self):
+        st = self.sim.people.states
+        cond = np.asarray(st[self.condition_key].values, dtype=bool)
+        on_tx = np.asarray(st[self.intervention_key].values, dtype=bool)
+        hiv = np.asarray(st["hiv.infected"].values, dtype=bool) if "hiv.infected" in st else np.ones(len(cond), dtype=bool)
+        for key, mask in [("on_with_condition", hiv & cond), ("on_without_condition", hiv & ~cond)]:
+            self.results[key][self.ti] = on_tx[mask].mean() if mask.any() else np.nan
+        return

@@ -1,9 +1,9 @@
 """
-HIV–AUD Connector Test using MIGHTI and StarSim 3.x MultiSim
+HIV–AUD connector test using MIGHTI and a Starsim MultiSim
 
 Compares two simulations:
 Baseline: HIV + AlcoholUseDisorder, no connector.
-Connector: HIV + AlcoholUseDisorder + NCDHIVConnector.
+Connector: HIV + AlcoholUseDisorder + NCDHIVConnector (an ss.modify() of AUD's rel_sus among people with HIV).
 
 The connector should increase or maintain AlcoholUseDisorder prevalence.
 """
@@ -42,7 +42,7 @@ prevalence_data, age_bins = mi.initialize_prevalence_data(
 )
 
 def get_prev_func(disease):
-    """Return StarSim 3.x-compatible prevalence callable."""
+    """Return a prevalence callable of the sim and the agents."""
     def func(sim, uids):
         return mi.age_sex_dependent_prevalence(
             disease=disease,
@@ -56,16 +56,17 @@ def get_prev_func(disease):
 # ---------------------------------------------------------------------
 # Build disease modules
 # ---------------------------------------------------------------------
-hiv = sti.HIV()
 hiv_prev = get_prev_func("HIV")
-hiv.pars.init_prev = ss.bernoulli(p=lambda sim, uids: hiv_prev(sim, uids))
-hiv.pars.beta = {"structuredsexual": [0.03, 0.03]}
-hiv.pars.include_aids_deaths = True
-hiv.pars.include_care = False
-hiv.pars.art_efficacy = 0.0
-hiv.pars.p_hiv_death = ss.bernoulli(p=0.00015)
+hiv = sti.HIV(
+    init_prev=ss.bernoulli(p=lambda sim, uids: hiv_prev(sim, uids)),
+    beta_m2f=0.03,
+    rel_beta_f2m=1.0,
+    p_aids_death=1.0,
+    effective_art_efficacy=0.0,
+)
 
 aud = mi.diseases.AlcoholUseDisorder(csv_path=param_path, init_prev=ss.bernoulli(p=0.10))
+
 
 # ---------------------------------------------------------------------
 # Networks, demographics, connectors
@@ -97,7 +98,7 @@ sim_conn = ss.Sim(
     people=ppl,
     networks=networks,
     diseases=[hiv, aud],
-    connectors=[connector],
+    connectors=connector,
     label="With HIV–AUD connector",
 )
 

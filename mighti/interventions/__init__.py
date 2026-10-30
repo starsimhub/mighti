@@ -3,7 +3,7 @@ MIGHTI interventions package.
 
 Preferred usage:
     - `import mighti as mi`
-    - `intv = mi.interventions.ART(...)`
+    - `art = mi.interventions.ARTwithCASM(...)`
 
 This initializer keeps imports lightweight by lazily loading submodules/classes.
 """
@@ -18,10 +18,8 @@ _SUBMODULES = {
 
 _EXPORTS = {
     # interventions/core.py
-    "ART": "core",
     "ARTwithCASM": "core",
-    "ARTNoAutoAdjust": "core",
-    "ImproveHospitalDischarge": "core",
+    "HousingSupport": "core",
     "GiveHousingToDepressed": "core",
     "GiveHousingSupport": "core",
     "HousingSupportForAUD": "core",
@@ -29,7 +27,6 @@ _EXPORTS = {
     "AdherenceEngine": "adherence",
     "ARTAdherenceDisruptor": "adherence",
     "InterventionAdherenceDisruptor": "adherence",
-    "AdherenceFromDepression": "adherence",
     "CASM_REL_FACTORS": "adherence",
     "SDOH_REL_FACTORS": "adherence",
     "BASELINE_ADHERENCE_PHARMACOTHERAPY": "adherence",

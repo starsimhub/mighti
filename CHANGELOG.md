@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased (Starsim 4)
+
+### Changed
+- STIsim's HIV is now declared (states and transitions), and MIGHTI reads and changes it only through those: competing-risks mortality (`CompetingRisksDeaths`) subtracts the hazards of each declared disease's transitions to death (`mi.mortality_competing.death_hazard()`, which replaces `hiv_death_hazard()`), rather than calling HIV's methods; `ARTAdherenceDisruptor` is a modifier (`ss.modify`) of HIV's rate of stopping ART early (`rate_art_dropout`, the transition `art_dropout`), rather than writing `ti_stop_art`; and `InterventionAdherenceDisruptor` is a modifier of `effective_art_efficacy`, rather than overwriting the parameter (its `scale_art_efficacy` argument is gone). Both are passed as `connectors=`.
+- HIV's parameters are given when it is made (e.g. `sti.HIV(p_aids_death=1.0, effective_art_efficacy=0.9)`): `include_aids_deaths` is `p_aids_death`, and `beta={...}` dicts are `beta_m2f`/`rel_beta_f2m`/`beta_m2c`.
+- Regression information: the residual hazard no longer drops to zero for someone due to die of AIDS in the step (a death at a set time has no hazard to subtract).
+
 ## [0.1.0] - 2026-03-17
 
 ### Changed

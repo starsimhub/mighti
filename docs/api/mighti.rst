@@ -20,8 +20,8 @@ mighti.analyzers module
    :undoc-members:
    :show-inheritance:
 
-mighti.disease\_definitions module
-----------------------------------
+mighti.initialization.prevalence module
+---------------------------------------
 
 .. automodule:: mighti.initialization.prevalence
    :members:
@@ -76,10 +76,34 @@ mighti.analyzers.analyzer\_core module
    :undoc-members:
    :show-inheritance:
 
-mighti.util.utils module
-------------------------
+mighti.demography.mortality\_additive module
+--------------------------------------------
 
-.. automodule:: mighti.util.utils
+.. automodule:: mighti.demography.mortality_additive
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+mighti.demography.mortality\_competing module
+---------------------------------------------
+
+.. automodule:: mighti.demography.mortality_competing
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+mighti.sdoh.core module
+-----------------------
+
+.. automodule:: mighti.sdoh.core
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+mighti.interventions.adherence module
+-------------------------------------
+
+.. automodule:: mighti.interventions.adherence
    :members:
    :undoc-members:
    :show-inheritance:

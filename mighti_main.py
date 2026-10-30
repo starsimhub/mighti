@@ -5,10 +5,9 @@ This script initializes and runs an agent-based simulation using the MIGHTI fram
 (built on StarSim and STI-Sim) to analyze the interplay between HIV and
 other health conditions (HCs) in a selected country.
 
-Key updates for Starsim 3.x:
-- Callable distributions now use signature (sim, uids) (no `size`).
-- Module parameters are set on module instances BEFORE passing to ss.Sim.
-- Do not access `sim.diseases[...]` until after sim is constructed.
+Notes:
+- Callable distributions use the signature (sim, uids).
+- The sim runs copies of the modules it is given: read them, and their results, from the sim (e.g. `sim.analyzers.prevalence_analyzer_hiv`).
 """
 
 import os
@@ -37,7 +36,6 @@ import starsim as ss
 import stisim as sti
 from mighti.util.paths import get_data_dir, get_processed_path
 from mighti.util.plot_style import apply_mighti_style
-from mighti.util.rng import seed_everything
 
 
 # ---------------------------------------------------------------------
@@ -48,7 +46,6 @@ logger.setLevel(logging.INFO)
 
 # Reproducibility (example script)
 SEED = 12345
-seed_everything(SEED)
 
 n_agents = 100_000
 inityear = 2007
@@ -66,7 +63,6 @@ csv_prevalence = str(get_processed_path(f"{region}_prevalence.csv", DATA_DIR))
 csv_path_fertility = str(get_processed_path(f"{region}_asfr.csv", DATA_DIR))
 csv_path_death = str(get_processed_path(f"{region}_mortality_rates.csv", DATA_DIR))
 csv_path_age = str(get_processed_path(f"{region}_age_distribution_{inityear}.csv", DATA_DIR))
-csv_path_intervention = str(get_processed_path(f"{region}_intervention.csv", DATA_DIR))
 csv_path_sdoh = str(get_processed_path("sdoh.csv", DATA_DIR))
 
 # Optional post-process targets (commented out below), kept in processed data dir.
@@ -120,7 +116,7 @@ hiv_prev_data, hiv_age_bins = mi.initialize_prevalence_data(
 )
 
 def get_prevalence_function(disease):
-    def prevalence_func(sim, uids, size=None):
+    def prevalence_func(sim, uids):
         # Use the dedicated HIV prevalence table so we don't need to mix HIV columns
         # into `eswatini_prevalence.csv`.
         if str(disease).lower() == "hiv":
@@ -148,9 +144,9 @@ prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(
     prevalence_data=prevalence_data,  # ok for non-HIV diseases; HIV plotting uses sim results
     diseases=diseases,
 )
-# survivorship_analyzer = mi.SurvivorshipAnalyzer()
-# deaths_analyzer = mi.DeathsByAgeSexAnalyzer()
-# death_cause_analyzer = mi.ConditionAtDeathAnalyzer(conditions=healthconditions)
+# survivorship_analyzer = mi.analyzers.SurvivorshipAnalyzer()
+# deaths_analyzer = mi.analyzers.DeathsByAgeSexAnalyzer()
+# death_cause_analyzer = mi.analyzers.ConditionAtDeathAnalyzer(conditions=healthconditions)
 # analyzers = [deaths_analyzer, survivorship_analyzer, prevalence_analyzer, death_cause_analyzer]
 
 
@@ -163,23 +159,13 @@ death = ss.Deaths(death_rates)
 fertility_rate = {"fertility_rate": pd.read_csv(csv_path_fertility)}
 pregnancy = ss.Pregnancy(pars=fertility_rate)
 
-# People with adherence state
-extra_states = [
-    ss.FloatArr("adherence", default=1.0),
-    ss.BoolArr("neighbourhood_situation"),
-    # ss.BoolArr("social_context"),
-    # ss.BoolArr("education_situation"),
-    # ss.BoolArr("economic_situation"),
-    # ss.BoolArr("healthcare_system"),
-]
-
-# Build People from the empirical age–sex distribution (no file outputs)
+# Build People from the empirical age–sex distribution (no file outputs); the
+# adherence and SDoH modules add people.adherence and people.neighbourhood_situation
 ppl = mi.people_extend.make_people_with_age_sex(
     csv_path=csv_path_age,
     init_year=inityear,
     n_agents=n_agents,
     out_dir=None,
-    extra_states=extra_states,
 )
 
 maternal = ss.MaternalNet()
@@ -205,33 +191,19 @@ disease_objects = []
 hiv = sti.HIV(
     beta_m2f=0.03362975603278965,
     beta_m2c=0.008587993382382253,
-    init_prev=0.15,
+    init_prev=ss.bernoulli(p=get_prevalence_function("HIV")), # Age–sex dependent
+    p_aids_death=1.0,
+    effective_art_efficacy=0.9,
 )
-
-# Assign prevalence as age–sex dependent
-prev_func = get_prevalence_function("HIV")
-hiv.pars.init_prev = ss.bernoulli(
-    p=lambda sim, uids, size=None: prev_func(sim, uids, size)
-)
-
-# AIDS mortality and care
-hiv.pars.include_aids_deaths = True
-hiv.pars.p_hiv_death = ss.bernoulli(p=0.00015)
-hiv.pars.include_care = True
-hiv.pars.art_efficacy = 0.9
 
 disease_objects.append(hiv)
 
 # Other diseases from CSV
-def make_init_prev_func(disease):
-    prev_func_local = get_prevalence_function(disease)
-    return lambda sim, uids, size=None: prev_func_local(sim, uids, size)
-
 for disease in healthconditions:
     disease_class = getattr(mi.diseases, disease, None)
     if disease_class is None:
         continue
-    init_prev = ss.bernoulli(p=make_init_prev_func(disease))
+    init_prev = ss.bernoulli(p=get_prevalence_function(disease))
     disease_obj = disease_class(
         csv_path=csv_path_params,
         pars={"init_prev": init_prev},
@@ -242,13 +214,12 @@ for disease in healthconditions:
 # ---------------------------------------------------------------------
 # Connectors (HIV ↔ NCD, plus other NCD interactions)
 # ---------------------------------------------------------------------
+# Each interaction is an ss.modify() of a condition's rel_sus, for the conditions in the sim
 ncd_hiv_rel_sus = df.set_index("condition")["rel_sus"].to_dict()
-ncd_hiv_connector = mi.interactions.NCDHIVConnector(ncd_hiv_rel_sus)
-connectors = [ncd_hiv_connector]
+connectors = mi.interactions.NCDHIVConnector(ncd_hiv_rel_sus, diseases=diseases)
 
 ncd_interactions = mi.interactions.read_interactions(csv_path_interactions)
-connectors.extend(mi.interactions.create_connectors(ncd_interactions))
-# SDoH must run after demographics (Pregnancy) so births exist; use connectors, not custom modules.
+connectors += mi.interactions.create_connectors(ncd_interactions, diseases=diseases)
 connectors.append(sdoh_modules)
 
 
@@ -269,28 +240,7 @@ art = mi.interventions.ARTwithCASM(coverage=art_coverage_data)
 art.casm_sensitivity = "pharma"  # interpreted by CASMAdherenceConnector
 art.rel_effect = 1.0             # baseline; adherence scales this
 
-# Example of other intervention products (not used in interventions_hiv yet)
-intervention_df = pd.read_csv(csv_path_intervention)
-unified_product = ss.Tx(df=intervention_df, label="UnifiedTx")
-
 interventions_hiv = [hiv_test, art]
-
-
-# ---------------------------------------------------------------------
-# Optional helper for mortality analyzers (kept for future use)
-# ---------------------------------------------------------------------
-def get_deaths_module(sim):
-    """
-    Return the DeathsByAgeSexAnalyzer or any analyzer with 'death' in its name.
-    Works with dict-style sim.analyzers (MIGHTI default).
-    """
-    if hasattr(sim, "analyzers") and isinstance(sim.analyzers, dict):
-        for a in sim.analyzers.values():
-            if isinstance(a, mi.DeathsByAgeSexAnalyzer) or "death" in a.label.lower():
-                return a
-    raise ValueError(
-        f"Deaths analyzer not found. Available analyzers: {list(sim.analyzers.keys())}"
-    )
 
 
 # ---------------------------------------------------------------------
@@ -308,21 +258,21 @@ if __name__ == "__main__":
         n_agents=n_agents,
         start=inityear,
         stop=endyear,
-        dt=dt_years,
+        dt=ss.years(dt_years),
         people=ppl,
         networks=networks,
         demographics=[pregnancy, death],
         diseases=disease_objects,
-        connectors=connectors,
-        modules=[adherence_engine, art_disruptor, intervention_disruptor],
+        connectors=connectors + [art_disruptor, intervention_disruptor], # Modifiers of HIV's ART dropout and efficacy
+        modules=[adherence_engine],
         interventions=interventions_hiv,  # HIV test + ARTwithCASM
-        analyzers=[prevalence_analyzer],  # must be a list
-        copy_inputs=False,
+        analyzers=[prevalence_analyzer],
         label="With Interventions",
     )
 
     # Run simulation
     sim.run()
+    prevalence_analyzer = sim.analyzers.prevalence_analyzer_hiv # The sim's own copy, which has the results
 
     # # Prevalence plot: use a disease that is actually in the sim (first non-HIV)
     # plot_disease = next((d for d in diseases if str(d).lower() != "hiv"), diseases[0] if diseases else "Type2Diabetes")
@@ -374,7 +324,7 @@ if __name__ == "__main__":
 
     from mighti.analysis.plotting import plot_hiv_prevalence_vs_observed
 
-    obs = pd.read_csv("data/processed/eswatini_prevalence_hiv.csv")
+    obs = pd.read_csv(get_processed_path(f"{region}_prevalence_hiv.csv", DATA_DIR))
 
     # after you run sim and have access to the prevalence analyzer object
     plot_hiv_prevalence_vs_observed(
@@ -389,10 +339,11 @@ if __name__ == "__main__":
     )
 
     from mighti.analysis.plotting import plot_mean_prevalence_plhiv
-    plot_mean_prevalence_plhiv(
-        sim,
-        prevalence_analyzer,
-        "AcuteHepatitis",
-        show=False,
-        savepath=str(out_dir / "prevalence_plhiv_acutehepatitis2.png"),
-    )
+    for d in plot_diseases: # By HIV status
+        plot_mean_prevalence_plhiv(
+            sim,
+            prevalence_analyzer,
+            d,
+            show=False,
+            savepath=str(out_dir / f"prevalence_plhiv_{str(d).lower()}.png"),
+        )

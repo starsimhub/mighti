@@ -18,7 +18,6 @@ import numpy as np
 import sciris as sc
 import logging
 
-from mighti.diseases.base_disease import GenericSIS, GenericSIR
 
 logger = logging.getLogger(__name__)
 
@@ -33,31 +32,8 @@ __all__ = [
 
 
 def _status_attr_for_disease_module(dis, disease_name):
-    """
-    Decide which boolean state to use for prevalence for a disease module.
-
-    - SIS/SIR communicable diseases: `infected`
-    - NCD-like conditions: `affected`
-
-    HIV is special-cased because it may come from external packages (e.g. STIsim) but
-    should always be treated as an infectious process for prevalence.
-    """
-    name = (disease_name or "").lower()
-    if name == "hiv":
-        return "infected"
-
-    # Prefer type-based detection
-    if isinstance(dis, (GenericSIS, GenericSIR, ss.SIS, ss.SIR)):
-        return "infected"
-
-    # Fallback: attribute-based detection for external/legacy disease modules
-    if hasattr(dis, "infected"):
-        return "infected"
-    if hasattr(dis, "affected"):
-        return "affected"
-
-    # Last resort: default to affected
-    return "affected"
+    """ The state that counts as having a disease: `infected` for HIV and the generic infections, else `affected` """
+    return "infected" if hasattr(dis, "infected") else "affected"
 
 
 # ---------------------------------------------------------------------
@@ -233,28 +209,17 @@ class CauseDeathRateAnalyzer(ss.Analyzer):
                     self.results[f"{disease}_expo_{sex}_{i}"][ti] += float(np.sum(mask))
         for disease in self.diseases:
             dis = getattr(sim.diseases, disease, None)
-            if dis is None or not hasattr(dis, "ti_dead"):
+            if dis is None:
                 continue
-            ti_dead = dis.ti_dead
-            try:
-                dead_mask = (ti_dead[:] == ti)
-            except Exception:
-                dead_mask = np.asarray(ti_dead, dtype=float) == float(ti)
-            if not np.any(dead_mask):
+            dead = ppl.died_of(dis) # Each death has one cause
+            if not len(dead):
                 continue
-            auids = dead_mask.uids if hasattr(dead_mask, "uids") else np.where(dead_mask)[0]
-            if len(auids) == 0:
-                continue
-            ages = np.asarray(ppl.age[auids], dtype=float)
-            fem = np.asarray(ppl.female[auids], dtype=bool)
+            ages = np.asarray(ppl.age[dead], dtype=float)
+            fem = np.asarray(ppl.female[dead], dtype=bool)
             for i, (a0, a1) in enumerate(self.age_bins):
                 in_bin = (ages >= a0) & (ages < a1)
-                if not np.any(in_bin):
-                    continue
-                if np.any(~fem[in_bin]):
-                    self.results[f"{disease}_deaths_male_{i}"][ti] += int(np.sum(~fem[in_bin]))
-                if np.any(fem[in_bin]):
-                    self.results[f"{disease}_deaths_female_{i}"][ti] += int(np.sum(fem[in_bin]))
+                self.results[f"{disease}_deaths_male_{i}"][ti] += int(np.sum(~fem[in_bin]))
+                self.results[f"{disease}_deaths_female_{i}"][ti] += int(np.sum(fem[in_bin]))
 
 
 # ---------------------------------------------------------------------
@@ -431,6 +396,35 @@ class PrevalenceAnalyzer_SDoH(ss.Analyzer):
             self.define_results(*new_results)
         self.results_defined = True
 
+    def step(self):
+        sim = self.sim
+        ti = self.ti
+        ppl = sim.people
+        if self.sdoh_attr not in ppl.states:
+            return
+        has_sdoh = ppl.states[self.sdoh_attr]
+        no_sdoh = ~has_sdoh
+        adults = ppl.age >= 15
+        self.results["sdoh_prop_adults"][ti] = self.cond_prob_bool(has_sdoh, adults)
+        for disease in self.diseases:
+            dis = getattr(sim.diseases, disease)
+            has_disease = getattr(dis, _status_attr_for_disease_module(dis, disease))
+            for i, (a0, a1) in enumerate(self.age_bins):
+                age_group = (ppl.age >= a0) & (ppl.age < a1)
+                for sex, mask_sex in zip(["male", "female"], [ppl.male, ppl.female]):
+                    mask = age_group & mask_sex
+                    for status, status_mask in [("", None), ("with_SDoH_", has_sdoh), ("without_SDoH_", no_sdoh)]:
+                        submask = mask if status_mask is None else mask & status_mask
+                        num, den = np.sum(submask & has_disease), np.sum(submask)
+                        self.results[f"{disease}_num_{status}{sex}_{i}"][ti] = num
+                        self.results[f"{disease}_den_{status}{sex}_{i}"][ti] = max(den, 1)
+                        self.results[f"{disease}_prev_{status}{sex}_{i}"][ti] = sc.safedivide(num, den)
+            for suffix, num, den in [("no_sdoh", has_disease, no_sdoh), ("has_sdoh", has_disease, has_sdoh),
+                                     ("no_sdoh_f", has_disease & ppl.female, no_sdoh & ppl.female), ("has_sdoh_f", has_disease & ppl.female, has_sdoh & ppl.female),
+                                     ("no_sdoh_m", has_disease & ppl.male, no_sdoh & ppl.male), ("has_sdoh_m", has_disease & ppl.male, has_sdoh & ppl.male)]:
+                self.results[f"{disease}_prev_{suffix}"][ti] = self.cond_prob_bool(num, den)
+            self.results[f"{disease}_num_total"][ti] = np.sum(has_disease)
+            self.results[f"{disease}_den_total"][ti] = max(len(ppl), 1)
 
 
 class OnARTByConditionAnalyzer(ss.Analyzer):

@@ -95,20 +95,6 @@ class MicrocostingAnalyzer(ss.Analyzer):
             new[: self._hiv_yld_stage_acc.size] = self._hiv_yld_stage_acc
             self._hiv_yld_stage_acc = new
 
-    @staticmethod
-    def _sim_dt_year(sim) -> float:
-        t = sim.t
-        if hasattr(t, "dt_year") and t.dt_year is not None:
-            try:
-                return float(t.dt_year)
-            except Exception:
-                pass
-        dt = getattr(t, "dt", 1.0)
-        try:
-            return float(getattr(dt, "years", dt))
-        except Exception:
-            return 1.0
-
     def step(self):
         """Accrue HIV stage YLD when ``hiv_yld_mode='stage'``; otherwise no-op."""
         if self.hiv_yld_mode != "stage":
@@ -119,7 +105,7 @@ class MicrocostingAnalyzer(ss.Analyzer):
             return
         n_used = int(sim.people.uid.len_used)
         self._ensure_hiv_acc(n_used)
-        dt = self._sim_dt_year(sim)
+        dt = sim.t.dt_year
 
         def _bool(name):
             arr = getattr(hiv, name, None)

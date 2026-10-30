@@ -13,7 +13,7 @@ Contents
    :caption: Modules
 
    supported_api
-   api/index
+   api/modules
 
 Indices and tables
 ==================

@@ -1,347 +1,86 @@
 """
-Defines interdependencies and risk modifiers between diseases and conditions.
+Interactions between conditions: having one condition changes the risk of acquiring another
+
+Each interaction is an `ss.modify()` of the susceptibility (`rel_sus`) of the condition acquired, where
+the other condition holds. Modifiers multiply a base that is never overwritten, so several interactions
+on one condition combine, and stop when the condition that causes them ends (e.g. at remission).
 """
 
-
+from collections import defaultdict
 import pandas as pd
 import starsim as ss
-import sciris as sc
-from collections import defaultdict
-import numpy as np
+
+__all__ = ['NCDHIVConnector', 'read_interactions', 'create_connectors', 'create_dynamic_connector']
 
 
-def _ensure_interaction_reset_store(sim):
-    """Per-timestep store for resetting destination susceptibilities once."""
-    ti = sim.ti
-    store = getattr(sim, "_interaction_reset", None)
-    if store is None or store.get("ti") != ti:
-        store = {"ti": ti, "done": set()}
-        setattr(sim, "_interaction_reset", store)
-    return store
+def key(condition):
+    """ The name of a condition in the sim, e.g. 'type2diabetes' for 'Type2Diabetes' """
+    return str(condition).strip().lower()
 
 
-def _ensure_base_rel_sus_store(sim):
-    """Persistent store of baseline rel_sus arrays (captured at init)."""
-    base = getattr(sim, "_interaction_base_rel_sus", None)
-    if base is None:
-        base = {}
-        setattr(sim, "_interaction_base_rel_sus", base)
-    return base
+def in_sim(condition, diseases):
+    """ Whether a condition is among the diseases of the sim (by name), or no list of them was given """
+    return diseases is None or key(condition) in {key(d) for d in diseases}
 
 
-def _register_base_rel_sus(sim, dest_key, dest_mod):
+def NCDHIVConnector(rel_sus, diseases=None):
     """
-    Capture baseline rel_sus for a destination module once (at init).
-    For most modules this is all ones.
+    Raise the susceptibility to conditions among people with HIV
+
+    Args:
+        rel_sus (dict): for each condition (by name, e.g. 'Type2Diabetes'), the relative susceptibility of people with HIV (e.g. the `rel_sus` column of the parameter file)
+        diseases (list): the names of the conditions in the sim, if `rel_sus` has others (a modifier of a condition that is not in the sim is an error)
+
+    Returns:
+        A list of `ss.modify()`, one per condition, to pass as `connectors`
     """
-    dest_key = str(dest_key).strip().lower()
-    base = _ensure_base_rel_sus_store(sim)
-    if dest_key in base:
-        return
-    try:
-        arr = np.asarray(dest_mod.rel_sus).copy()
-        base[dest_key] = arr
-    except Exception:
-        # Fallback: reset will use ones if needed
-        base[dest_key] = None
-
-
-def _reset_rel_sus_to_base(sim, dest_key, dest_mod):
-    """Reset dest_mod.rel_sus to baseline, once per timestep per dest_key."""
-    dest_key = str(dest_key).strip().lower()
-    store = _ensure_interaction_reset_store(sim)
-    if dest_key in store["done"]:
-        return
-
-    base = _ensure_base_rel_sus_store(sim).get(dest_key, None)
-    try:
-        if base is None:
-            dest_mod.rel_sus[:] = 1.0
-        else:
-            dest_mod.rel_sus[:] = base
-    except Exception:
-        pass
-
-    store["done"].add(dest_key)
-
-
-class NCDHIVConnector(ss.Connector):
-    """
-    Connector to model interaction between HIV and NCDs by adjusting susceptibility.
-
-    This connector increases the susceptibility to specified NCDs among HIV-infected agents
-    by a user-specified relative susceptibility factor. It also tracks and optionally plots
-    the dynamics of NCD prevalence, HIV prevalence, and susceptibility over time.
-
-    Attributes:
-        rel_sus_dict (dict): Dictionary mapping NCD names (str) to relative susceptibility values (float).
-        time (sc.autolist): List of simulation times for plotting.
-        rel_sus (defaultdict): Time-series of mean relative susceptibility for each NCD.
-        ncd_prev (defaultdict): Time-series of NCD prevalence values.
-        hiv_prev (sc.autolist): Time-series of HIV prevalence values.
-    """
-
-    def __init__(self, rel_sus_dict, pars=None, **kwargs):
-
-        super().__init__(label='NCD-HIV')
-        self.rel_sus_dict = rel_sus_dict
-        self.update_pars(pars, **kwargs)
-        
-        self.time = sc.autolist()
-        self.rel_sus = defaultdict(sc.autolist)
-        self.ncd_prev = defaultdict(sc.autolist)
-        self.hiv_prev = sc.autolist()
-
-    def initialize(self, sim):
-        """Capture baseline rel_sus arrays for destination NCDs."""
-        try:
-            super().initialize(sim)
-        except Exception:
-            self.sim = sim
-
-        for ncd in self.rel_sus_dict.keys():
-            ncd_obj = sim.diseases.get(str(ncd).strip().lower(), None)
-            if ncd_obj is not None and hasattr(ncd_obj, "rel_sus"):
-                _register_base_rel_sus(sim, str(ncd).strip().lower(), ncd_obj)
-        
-    def step(self):
-
-        hiv = self.sim.diseases.hiv
-        
-        for ncd, rel_sus_val in self.rel_sus_dict.items():
-            ncd_obj = self.sim.diseases.get(ncd.lower(), None)
-            if ncd_obj is not None:
-                dest_key = str(ncd).strip().lower()
-                _reset_rel_sus_to_base(self.sim, dest_key, ncd_obj)
-
-                # Historical behavior: assignment for HIV → NCD (not multiplicative)
-                try:
-                    ncd_obj.rel_sus[hiv.infected.uids] = float(rel_sus_val)
-                except Exception:
-                    pass
-
-                self.rel_sus[ncd].append(ncd_obj.rel_sus.mean())
-                self.ncd_prev[ncd].append(ncd_obj.results.prevalence[self.sim.ti])
-                
-        self.time.append(self.sim.t)
-        self.hiv_prev.append(hiv.results.prevalence[self.sim.ti])
-        return
-    
-    def plot(self):
-
-        # Local import to avoid pulling matplotlib on `import mighti`
-        import matplotlib.pyplot as plt
-
-        sc.options(dpi=200)
-        fig, ax = plt.subplots(len(self.rel_sus_dict), 1, figsize=(10, 8))
-        
-        if len(self.rel_sus_dict) == 1:
-            ax = [ax]
-        
-        for i, ncd in enumerate(self.rel_sus_dict.keys()):
-            ax[i].plot(self.time, self.rel_sus[ncd], label=f'{ncd} rel_sus')
-            ax[i].plot(self.time, self.ncd_prev[ncd], label=f'{ncd} prevalence')
-            ax[i].plot(self.time, self.hiv_prev, label='HIV prevalence')
-            ax[i].legend()
-            ax[i].set_title(f'{self.sim.label} - {ncd}')
-        
-        plt.tight_layout()
-        plt.show()
-        return fig
+    return [ss.modify(f'{key(cond)}.rel_sus', multiply=float(rr), where=ss.state('hiv.infected'), name=f'ncd_hiv_{key(cond)}')
+            for cond, rr in rel_sus.items() if key(cond) != 'hiv' and pd.notna(rr) and in_sim(cond, diseases)]
 
 
 def read_interactions(datafile=None):
     """
-    Reads interaction data from a CSV file.
-    Automatically creates the Connectors based on relative risk.
+    Read the relative susceptibilities between conditions from a CSV file: a row per condition that raises the
+    risk, and a column per condition whose risk it raises (blank for none)
+
+    Returns:
+        dict: for each condition, a dict of the relative susceptibility to each other condition
     """
-    if datafile is None:
-        datafile = 'rel_sus.csv'
-    df = pd.read_csv(datafile, index_col=0)
-
+    df = pd.read_csv(datafile or 'rel_sus.csv', index_col=0)
     rel_sus = defaultdict(dict)
-
     for condition1 in df.index:
         for condition2 in df.columns:
-            if condition1 != condition2:
-                value = df.at[condition1, condition2]
-                if not pd.isna(value):
-                    rel_sus[condition1][condition2] = value
-
+            value = df.at[condition1, condition2]
+            if condition1 != condition2 and not pd.isna(value):
+                rel_sus[condition1][condition2] = value
     return rel_sus
 
 
-def create_connectors(rel_sus):
-    connectors = []
-    for condition1, interactions in rel_sus.items():
-        for condition2, rel_sus_val in interactions.items():
-            connector = create_dynamic_connector(condition1, condition2, rel_sus_val)
-            connectors.append(connector)
-    return connectors
+def create_connectors(rel_sus, diseases=None):
+    """ An interaction for each pair of conditions in `rel_sus` (see `read_interactions()`), of those among `diseases` (by name) if given """
+    return [create_dynamic_connector(c1, c2, rr) for c1, others in rel_sus.items() for c2, rr in others.items() if in_sim(c1, diseases) and in_sim(c2, diseases)]
 
 
-def create_dynamic_connector(condition1, condition2, rel_sus_val):
+def create_dynamic_connector(condition1, condition2, rel_sus, state1='affected'):
     """
-    Create a Connector implementing condition1 → condition2 susceptibility effects.
+    People with `condition1` have `rel_sus` times the susceptibility to `condition2`
 
-    - For non-HIV condition2, modifies condition2.rel_sus among those at risk for condition2.
-    - For condition2 == HIV, modifies hiv.rel_sus among HIV-susceptible individuals.
+    Args:
+        condition1 (str): the condition that raises the risk, by name (e.g. 'Type2Diabetes', or 'HIV')
+        condition2 (str): the condition whose risk it raises
+        rel_sus (float): the relative susceptibility
+        state1 (str): the state of `condition1` that raises the risk: `affected`, or `infected` for HIV and the generic infections (found automatically for 'HIV' and the classes `GenericSIS` and `GenericSIR`)
 
-    Notes
-    -----
-    Multiple connectors can target the same destination condition. To ensure effects do not
-    "stick" after remission and to allow multiplicative stacking, each destination rel_sus
-    array is reset to baseline once per timestep (per destination) before applying multipliers.
+    Returns:
+        An `ss.modify()`, to pass as one of the `connectors`
     """
-    condition1_key = str(condition1).strip().lower()
-    condition2_key = str(condition2).strip().lower()
-    label = f"{condition1}-{condition2}"
-
-    class DynamicConnector(ss.Connector):
-        def __init__(self, pars=None, **kwargs):
-            super().__init__(label=label)
-            self.condition1 = condition1_key
-            self.condition2 = condition2_key
-            self.define_pars(rel_sus=float(rel_sus_val))
-            self.update_pars(pars, **kwargs)
-
-            # optional tracking (used only if caller wants to plot)
-            self.time = sc.autolist()
-            self.rel_sus = sc.autolist()
-            self.condition1_prev = sc.autolist()
-            self.condition2_prev = sc.autolist()
-
-        def initialize(self, sim):
-            """Capture baseline rel_sus for the destination module once."""
-            try:
-                super().initialize(sim)
-            except Exception:
-                self.sim = sim
-
-            dst_is_hiv = (self.condition2 == "hiv")
-            dst = getattr(sim.diseases, "hiv", None) if dst_is_hiv else sim.diseases.get(self.condition2, None)
-            if dst is not None and hasattr(dst, "rel_sus"):
-                _register_base_rel_sus(sim, self.condition2, dst)
-
-        def _get_active_uids(self, mod):
-            """Return UIDs for the active state of a module (infected or affected)."""
-            if mod is None:
-                return ss.uids([])
-            if hasattr(mod, "infected"):
-                try:
-                    return mod.infected.uids
-                except Exception:
-                    pass
-            if hasattr(mod, "affected"):
-                try:
-                    return mod.affected.uids
-                except Exception:
-                    pass
-            return ss.uids([])
-
-        def _get_at_risk_uids(self, mod, *, is_hiv=False):
-            """Return UIDs at risk of acquiring condition2."""
-            if mod is None:
-                return ss.uids([])
-            if is_hiv:
-                # For HIV, at-risk is "susceptible" (not infected)
-                if hasattr(mod, "susceptible"):
-                    try:
-                        return mod.susceptible.uids
-                    except Exception:
-                        pass
-                if hasattr(mod, "infected"):
-                    try:
-                        return (~mod.infected).uids
-                    except Exception:
-                        pass
-                return ss.uids([])
-
-            # For non-HIV modules, prefer explicit susceptible, else those not affected/infected
-            if hasattr(mod, "susceptible"):
-                try:
-                    return mod.susceptible.uids
-                except Exception:
-                    pass
-            if hasattr(mod, "affected"):
-                try:
-                    return (~mod.affected).uids
-                except Exception:
-                    pass
-            if hasattr(mod, "infected"):
-                try:
-                    return (~mod.infected).uids
-                except Exception:
-                    pass
-            return ss.uids([])
-
-        def step(self):
-            sim = self.sim
-
-            src = sim.diseases.get(self.condition1, None)
-            dst_is_hiv = (self.condition2 == "hiv")
-            dst = getattr(sim.diseases, "hiv", None) if dst_is_hiv else sim.diseases.get(self.condition2, None)
-
-            if src is None or dst is None:
-                return
-
-            # Reset destination susceptibility to baseline once per timestep
-            _reset_rel_sus_to_base(sim, self.condition2, dst)
-
-            src_active = self._get_active_uids(src)
-            dst_at_risk = self._get_at_risk_uids(dst, is_hiv=dst_is_hiv)
-            if len(src_active) == 0 or len(dst_at_risk) == 0:
-                return
-
-            # Apply multiplier to intersection: active in condition1 and at-risk for condition2
-            inter = np.intersect1d(
-                np.asarray(src_active, dtype=int),
-                np.asarray(dst_at_risk, dtype=int),
-                assume_unique=False,
-            )
-            if inter.size == 0:
-                return
-
-            factor = float(getattr(self.pars, "rel_sus", rel_sus_val))
-            if hasattr(dst, "rel_sus"):
-                dst.rel_sus[ss.uids(inter)] *= factor
-                self.rel_sus.append(float(np.mean(dst.rel_sus[ss.uids(inter)])))
-
-            # Optional tracking for plots
-            self.time.append(sim.t)
-            try:
-                if hasattr(src, "results") and hasattr(src.results, "prevalence"):
-                    self.condition1_prev.append(src.results.prevalence[sim.ti])
-            except Exception:
-                pass
-            try:
-                if hasattr(dst, "results") and hasattr(dst.results, "prevalence"):
-                    self.condition2_prev.append(dst.results.prevalence[sim.ti])
-            except Exception:
-                pass
-
-        def plot(self):
-            return plot_function(self)
-
-    DynamicConnector.__name__ = f"{condition1}_{condition2}_Connector"
-    return DynamicConnector()
+    c1, c2 = key(condition1), key(condition2)
+    where = ss.state(f'{c1}.infected' if c1 == 'hiv' or is_infection(condition1) else f'{c1}.{state1}')
+    return ss.modify(f'{c2}.rel_sus', multiply=float(rel_sus), where=where, name=f'{c1}_{c2}')
 
 
-def step_function(self, condition1, condition2, rel_sus_val):
-    """
-    Deprecated legacy helper (kept for backward compatibility).
-    Prefer the class-based dynamic connector created by `create_dynamic_connector()`.
-    """
-    return
-
-
-def plot_function(self):
-    sc.options(dpi=200)
-    import matplotlib.pyplot as plt
-    fig = plt.figure()
-    for key in ['rel_sus', 'condition1_prev', 'condition2_prev']:
-        plt.plot(self.time, self[key], label=key)
-    plt.legend()
-    plt.title(self.sim.label)
-    plt.show()
-    return fig
+def is_infection(condition):
+    """ Whether a condition, by name, is one of MIGHTI's generic infections, whose state is `infected` """
+    import mighti as mi
+    cls = getattr(mi.diseases, str(condition).strip(), None)
+    return isinstance(cls, type) and issubclass(cls, (mi.diseases.GenericSIS, mi.diseases.GenericSIR))

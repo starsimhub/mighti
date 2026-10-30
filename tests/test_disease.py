@@ -30,14 +30,12 @@ print(ncd_names)
 
 def run_test_ncd_state(disease_name, n_agents=100):
     sc.heading(f'Testing {disease_name}')
-    ppl = ss.People(n_agents)
-    ppl.hiv = np.zeros(n_agents, dtype=bool)
-    disease_class = getattr(mi, disease_name, None)
-    
+    disease_class = getattr(mi.diseases, disease_name, None)
     assert disease_class is not None, f"{disease_name} class not found in MIGHTI"
     disease = disease_class(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.1)})
-    sim = ss.Sim(people=ppl, diseases=[disease], start=2020, stop=2025, dt=1, copy_inputs=False)
+    sim = ss.Sim(n_agents=n_agents, diseases=[disease], start=2020, stop=2025, dt=1)
     sim.run()
+    disease = sim.diseases[disease_name.lower()]
     assert isinstance(disease.affected.sum(), (int, float, np.integer, np.floating))
     assert np.all((disease.affected | ~disease.affected))
     
@@ -48,13 +46,12 @@ def run_test_ncd_state(disease_name, n_agents=100):
 
 def run_test_id_state(disease_name, n_agents=100):
     sc.heading(f'Testing {disease_name}')
-    ppl = ss.People(n_agents)
-    ppl.hiv = np.zeros(n_agents, dtype=bool)
-    disease_class = getattr(mi, disease_name, None)
+    disease_class = getattr(mi.diseases, disease_name, None)
     assert disease_class is not None, f"{disease_name} class not found in MIGHTI"
     disease = disease_class(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.1)})
-    sim = ss.Sim(people=ppl, diseases=[disease], start=2020, stop=2025, dt=1, copy_inputs=False)
+    sim = ss.Sim(n_agents=n_agents, diseases=[disease], start=2020, stop=2025, dt=1)
     sim.run()
+    disease = sim.diseases[disease_name.lower()]
     assert isinstance(disease.infected.sum(), (int, float, np.integer, np.floating))
     assert np.all((disease.infected | ~disease.infected))
     
@@ -83,17 +80,13 @@ def test_all_diseases():
 def test_multidisease(n_agents=100):
     sc.heading('Testing multi-disease simulation with MIGHTI diseases')
 
-    # Initialize population
-    ppl = ss.People(n_agents)
-    ppl.hiv = np.zeros(n_agents, dtype=bool)  # ensure no HIV dependency issues
-
     # Load diseases from MIGHTI
     disease_names = ['Type2Diabetes','AlcoholUseDisorder']
-    diseases = [getattr(mi, name)(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.1)}) for name in disease_names]
+    diseases = [getattr(mi.diseases, name)(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.1)}) for name in disease_names]
 
     # Create and run the simulation
     sim = ss.Sim(
-        people=ppl,
+        n_agents=n_agents,
         diseases=diseases,
         start=2020,
         stop=2025
@@ -105,10 +98,10 @@ def test_multidisease(n_agents=100):
         d_key = disease.lower()
         assert hasattr(sim.diseases[d_key], 'results'), f"{disease} missing results"
         r = sim.diseases[d_key].results
-        if hasattr(r, 'n_affected'):
-            assert np.any(r.n_affected), f"{disease} did not affect any agents"
-        elif hasattr(r, 'n_infected'):
-            assert np.any(r.n_infected), f"{disease} did not infect any agents"
+        if hasattr(r, 'affected'):
+            assert np.any(r.affected), f"{disease} did not affect any agents"
+        elif hasattr(r, 'infected'):
+            assert np.any(r.infected), f"{disease} did not infect any agents"
         else:
             raise AssertionError(f"{disease} has no recognized results")
 
@@ -127,28 +120,22 @@ def plot_disease_trajectory(sim, disease_name):
 
     time = sim.timevec
     r = disease.results
-    death = sim.results.new_deaths.cumsum() if hasattr(sim.results, 'new_deaths') else np.zeros_like(time)
+    death = r.death.cum
 
     # NCD-style plot
-    if all(hasattr(r, attr) for attr in ['n_affected', 'n_at_risk', 'n_not_at_risk']):
+    if hasattr(r, 'affected'):
         pl.figure()
-        pl.stackplot(
-            time,
-            r.n_not_at_risk,
-            r.n_at_risk - r.n_affected,
-            r.n_affected,
-            death,
-        )
-        pl.legend(['Not at risk', 'At risk', 'Affected', 'Dead'])
+        pl.stackplot(time, r.susceptible, r.affected, death)
+        pl.legend(['Susceptible', 'Affected', 'Dead'])
 
     # Infectious disease-style plot
-    elif all(hasattr(r, attr) for attr in ['n_infected', 'n_susceptible']):
-        recovered = getattr(r, 'n_recovered', np.zeros_like(time))  # optional
+    elif hasattr(r, 'infected'):
+        recovered = getattr(r, 'recovered', np.zeros_like(time))  # optional
         pl.figure()
         pl.stackplot(
             time,
             r.n_susceptible,
-            r.n_infected,
+            r.infected,
             recovered,
             death,
         )
