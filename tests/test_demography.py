@@ -87,7 +87,7 @@ def test_people_extend_with_demography():
     # Check basic mortality tracking
     total_deaths = len(sim.people.dead)
     assert total_deaths >= 0
-    assert hasattr(sim.results, "new_deaths")
+    assert hasattr(sim.results, "died")
     print(f"[✓] Simulation completed; total deaths recorded: {total_deaths}")
     print("[✓] people_extend integration test passed.")
 
