@@ -23,11 +23,11 @@ def test_dynamic_connector_applies_rel_sus_to_affected_uids():
     # Use two NCD-style diseases that expose `.affected` and `.rel_sus`
     source = mi.diseases.Type2Diabetes(
         csv_path=param_path,
-        pars={"init_prev": ss.bernoulli(p=0.8)},
+        pars={"init_prev": 0.8},
     )
     target = mi.diseases.AlcoholUseDisorder(
         csv_path=param_path,
-        pars={"init_prev": ss.bernoulli(p=0.0)},
+        pars={"init_prev": 0.0},
     )
 
     rel_sus_val = 3.0

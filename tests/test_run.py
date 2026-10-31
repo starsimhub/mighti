@@ -34,9 +34,7 @@ def test_basic_mighti_run():
 
     # --- Define a simple disease ---
     csv_path = os.path.join(os.path.dirname(__file__), 'test_data', 'eswatini_parameters.csv')
-    init_prev = ss.bernoulli(p=lambda sim, uids: 0.1)
-
-    disease = mi.diseases.AlcoholUseDisorder(csv_path=csv_path, pars={'init_prev': init_prev})
+    disease = mi.diseases.AlcoholUseDisorder(csv_path=csv_path, pars={'init_prev': 0.1})
 
     # --- Define analyzers ---
     prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer(prevalence_data={}, diseases=['AlcoholUseDisorder'])

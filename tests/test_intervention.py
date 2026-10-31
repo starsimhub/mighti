@@ -26,7 +26,7 @@ param_path = os.path.join(thisdir, 'test_data', 'eswatini_parameters.csv')
 def test_reduce_mortality_tx_runs():
 
     def make_sim(treat=False):
-        t2d = mi.diseases.Type2Diabetes(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.9), 'p_death': 0.1})
+        t2d = mi.diseases.Type2Diabetes(csv_path=param_path, pars={'init_prev': 0.9, 'p_death': 0.1})
         interventions = []
         if treat: # Everyone with T2D is treated, which halves their mortality from it while they hold the treatment
             tx = ss.Treatment(efficacy=dict(death=0.5), name='t2d_tx')

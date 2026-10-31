@@ -87,13 +87,13 @@ class Condition(ss.Disease):
     A condition acquired over life, with its parameters read from a CSV file (see `get_disease_parameters()`)
 
     The name of the condition in the file is the class's name (e.g. `Type2Diabetes`), or `disease_name`.
-    Parameters given in `pars` or as keywords override the file's; `init_prev` (a share, or an `ss.bernoulli`
-    whose `p` may be a function of the sim and the agents, e.g. `mi.age_sex_dependent_prevalence`) is the
-    share of people affected at the start, and `affected_sex` ('both', 'female', or 'male') says who acquires it.
+    Parameters given in `pars` or as keywords override the file's; `init_prev` (a share, or a function of the
+    sim and the agents, e.g. one calling `mi.age_sex_dependent_prevalence`) is the share of people affected at
+    the start, and `affected_sex` ('both', 'female', or 'male') says who acquires it.
 
     Args:
         csv_path (str): path to the parameter CSV file
-        pars (dict): parameters, e.g. `dict(init_prev=ss.bernoulli(0.1), p_death=0.02)`
+        pars (dict): parameters, e.g. `dict(init_prev=0.1, p_death=0.02)`
         kwargs (dict): parameters, as for `pars`, or `name`/`label`
     """
     disease_name = None # The condition's name in the CSV file, if not the class's name

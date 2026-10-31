@@ -58,14 +58,14 @@ def get_prev_func(disease):
 # ---------------------------------------------------------------------
 hiv_prev = get_prev_func("HIV")
 hiv = sti.HIV(
-    init_prev=ss.bernoulli(p=lambda sim, uids: hiv_prev(sim, uids)),
+    init_prev=ss.bernoulli(p=hiv_prev),
     beta_m2f=0.03,
     rel_beta_f2m=1.0,
     p_aids_death=1.0,
     effective_art_efficacy=0.0,
 )
 
-aud = mi.diseases.AlcoholUseDisorder(csv_path=param_path, init_prev=ss.bernoulli(p=0.10))
+aud = mi.diseases.AlcoholUseDisorder(csv_path=param_path, init_prev=0.10)
 
 
 # ---------------------------------------------------------------------

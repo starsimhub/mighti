@@ -52,14 +52,13 @@ def test_adherence_engine_basic():
         effective_art_efficacy=0.90,
     )
 
-    init_prev = ss.bernoulli(p=MDD_INIT_PREV)
 
     disease_class = getattr(mi.diseases, healthcondition, None)
 
     # Instantiate the disease
     condition_obj = disease_class(
         csv_path=csv_path_params,
-        pars={"init_prev": init_prev},
+        pars={"init_prev": MDD_INIT_PREV},
     )
 
     # Add to the disease list
@@ -116,11 +115,10 @@ def test_art_adherence_disruptor():
     disease_class = getattr(mi.diseases, healthcondition, None)
     assert disease_class is not None, f"{healthcondition} not found in mighti"
 
-    init_prev_mdd = ss.bernoulli(p=MDD_INIT_PREV)
 
     mdd_obj = disease_class(
         csv_path=csv_path_params,
-        pars={"init_prev": init_prev_mdd},
+        pars={"init_prev": MDD_INIT_PREV},
     )
 
     disease_objects = [hiv, mdd_obj]
@@ -185,8 +183,7 @@ def test_intervention_adherence_disruptor():
     )
 
     disease_class = getattr(mi.diseases, healthcondition)
-    init_prev_mdd = ss.bernoulli(p=MDD_INIT_PREV)
-    mdd = disease_class(csv_path=csv_path_params, pars={"init_prev": init_prev_mdd})
+    mdd = disease_class(csv_path=csv_path_params, pars={"init_prev": MDD_INIT_PREV})
 
     art = mi.interventions.ARTwithCASM(coverage=pd.DataFrame({"p_art": [1.0]}, index=[2000]))
     art.casm_sensitivity = "pharma"

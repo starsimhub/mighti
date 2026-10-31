@@ -23,7 +23,7 @@ def test_hpv_increases_hiv_rel_sus():
     hiv = sti.HIV(init_prev=0.0, beta_m2f=0.0)
     hpv = mi.diseases.HPV(
         csv_path=param_path,
-        pars={"init_prev": ss.bernoulli(p=0.5)},
+        pars={"init_prev": 0.5},
     )
 
     rr = 2.5

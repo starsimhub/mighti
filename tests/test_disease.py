@@ -32,7 +32,7 @@ def run_test_ncd_state(disease_name, n_agents=100):
     sc.heading(f'Testing {disease_name}')
     disease_class = getattr(mi.diseases, disease_name, None)
     assert disease_class is not None, f"{disease_name} class not found in MIGHTI"
-    disease = disease_class(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.1)})
+    disease = disease_class(csv_path=param_path, pars={'init_prev': 0.1})
     sim = ss.Sim(n_agents=n_agents, diseases=[disease], start=2020, stop=2025, dt=1)
     sim.run()
     disease = sim.diseases[disease_name.lower()]
@@ -48,7 +48,7 @@ def run_test_id_state(disease_name, n_agents=100):
     sc.heading(f'Testing {disease_name}')
     disease_class = getattr(mi.diseases, disease_name, None)
     assert disease_class is not None, f"{disease_name} class not found in MIGHTI"
-    disease = disease_class(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.1)})
+    disease = disease_class(csv_path=param_path, pars={'init_prev': 0.1})
     sim = ss.Sim(n_agents=n_agents, diseases=[disease], start=2020, stop=2025, dt=1)
     sim.run()
     disease = sim.diseases[disease_name.lower()]
@@ -82,7 +82,7 @@ def test_multidisease(n_agents=100):
 
     # Load diseases from MIGHTI
     disease_names = ['Type2Diabetes','AlcoholUseDisorder']
-    diseases = [getattr(mi.diseases, name)(csv_path=param_path, pars={'init_prev': ss.bernoulli(0.1)}) for name in disease_names]
+    diseases = [getattr(mi.diseases, name)(csv_path=param_path, pars={'init_prev': 0.1}) for name in disease_names]
 
     # Create and run the simulation
     sim = ss.Sim(

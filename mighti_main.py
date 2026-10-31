@@ -203,7 +203,7 @@ for disease in healthconditions:
     disease_class = getattr(mi.diseases, disease, None)
     if disease_class is None:
         continue
-    init_prev = ss.bernoulli(p=get_prevalence_function(disease))
+    init_prev = get_prevalence_function(disease)
     disease_obj = disease_class(
         csv_path=csv_path_params,
         pars={"init_prev": init_prev},

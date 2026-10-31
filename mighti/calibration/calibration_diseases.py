@@ -627,7 +627,7 @@ def make_sim(disease_name, DiseaseClass, fit_pdeath=False):
     )
 
     # The condition under calibration, with bounds on the parameters to fit
-    pars = dict(init_prev=ss.bernoulli(p=get_prevalence_function(disease_name)))
+    pars = dict(init_prev=get_prevalence_function(disease_name))
     for sex in ["female", "male"]:
         if affected_sex in {sex, "both"}:
             pars[f"p_acquire_{sex}"] = ss.par(ss.probperyear(0.001), bounds=[1e-6, 0.1])
