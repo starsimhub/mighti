@@ -26,7 +26,7 @@ dynamic = ["version"]
 
 dependencies = [
   "numpy>=2.0.0",
-  "starsim>=4.0.0",
+  "starsim>=4.0.0rc1",
   "stisim>=1.7.1",
   "scipy",
   "pandas>=2.0.0",

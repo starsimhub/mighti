@@ -1,4 +1,4 @@
-starsim>=4.0.0
+starsim>=4.0.0rc1
 stisim>=1.7.1
 pandas==2.3.1
 numpy==2.2.6
