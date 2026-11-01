@@ -1,119 +1,34 @@
 """
-MIGHTI package top-level.
+MIGHTI: Model of Inter-Generational Health, Transmission, and Interventions
 
-Public API policy (v2):
-- Prefer *namespaces* (e.g. `mighti.diseases`, `mighti.analyzers`) over exporting
-  every class/function into the top-level `mighti` namespace.
-- Keep plotting utilities behind explicit imports (do not import matplotlib on
-  `import mighti`).
+Use the namespaces, e.g. `mi.diseases.Type2Diabetes`, `mi.analyzers.PrevalenceAnalyzer_HIV`,
+`mi.interactions.NCDHIVConnector`, `mi.sdoh.NeighbourhoodSituation`, `mi.interventions.ARTwithCASM`.
+Plotting is not imported with MIGHTI: `from mighti.analysis.plotting import plot_mean_prevalence`.
 """
 
 from .util.version import __version__, __versiondate__, __license__
 
-# Expose common namespaces (preferred usage: `mi.diseases.Foo`, `mi.analyzers.Bar`)
-from . import diseases  # noqa: F401
-from . import analyzers  # noqa: F401
-from . import analysis  # noqa: F401
-from . import demography  # noqa: F401
-from . import interventions  # noqa: F401
-from . import interactions  # noqa: F401
-from . import sdoh  # noqa: F401
-from . import economics  # noqa: F401
-from . import calibration  # noqa: F401
-from . import initialization  # noqa: F401
+from . import diseases
+from . import analyzers
+from . import analysis
+from . import demography
+from . import interventions
+from . import interactions
+from . import sdoh
+from . import economics
+from . import initialization
 
-# Back-compat module aliases (historical locations at top-level `mighti.*`)
-from .demography import people_extend  # noqa: F401
-from .analysis import life_expectancy  # noqa: F401
-from .demography import mortality_competing  # noqa: F401
-from .demography import mortality_additive  # noqa: F401
-from .demography import stisim_competing  # noqa: F401
+from .demography import people_extend, mortality_competing, mortality_additive
+from .analysis import life_expectancy
+from .util import figpaths, plot_style
 
-from .util import figpaths  # noqa: F401
-from .util import plot_style  # noqa: F401
-
-# Keep a small set of core utilities convenient at top-level
-from .initialization.prevalence import (  # noqa: F401
-    initialize_prevalence_data,
-    age_sex_dependent_prevalence,
-)
-
-# Keep adherence primitives convenient (used broadly)
-from .interventions.adherence import (  # noqa: F401
+# Used by most scripts
+from .initialization.prevalence import initialize_prevalence_data, age_sex_dependent_prevalence
+from .demography.people_extend import make_people_with_age_sex
+from .interventions.adherence import (
     AdherenceEngine,
     ARTAdherenceDisruptor,
     InterventionAdherenceDisruptor,
-    AdherenceFromDepression,
     CASM_REL_FACTORS,
     SDOH_REL_FACTORS,
 )
-
-# NOTE: plotting is intentionally NOT imported here.
-# Use: `from mighti.analysis.plotting import ...` (or `mi.analysis.plotting...`)
-
-def __getattr__(name):
-    """
-    Back-compat attribute resolver.
-
-    This allows older code to keep working with `mi.Type2Diabetes`,
-    `mi.SurvivorshipAnalyzer`, etc., while the preferred v2 style is:
-      - `mi.diseases.Type2Diabetes`
-      - `mi.analyzers.SurvivorshipAnalyzer`
-      - `mi.interactions.NCDHIVConnector`
-      - `mi.sdoh.NeighbourhoodSituation`
-    """
-    for mod in (
-        diseases,
-        analyzers,
-        analysis,
-        interventions,
-        interactions,
-        sdoh,
-        demography,
-        initialization,
-        people_extend,
-        life_expectancy,
-        figpaths,
-        plot_style,
-        mortality_competing,
-        mortality_additive,
-        stisim_competing,
-    ):
-        if hasattr(mod, name):
-            return getattr(mod, name)
-    raise AttributeError(f"module 'mighti' has no attribute {name!r}")
-
-
-__all__ = [
-    "__version__",
-    "__versiondate__",
-    "__license__",
-    # namespaces
-    "diseases",
-    "analyzers",
-    "analysis",
-    "demography",
-    "interventions",
-    "interactions",
-    "sdoh",
-    "economics",
-    "calibration",
-    "initialization",
-    "people_extend",
-    "life_expectancy",
-    "figpaths",
-    "plot_style",
-    "mortality_competing",
-    "mortality_additive",
-    "stisim_competing",
-    # core utilities
-    "initialize_prevalence_data",
-    "age_sex_dependent_prevalence",
-    # adherence
-    "AdherenceEngine",
-    "ARTAdherenceDisruptor",
-    "InterventionAdherenceDisruptor",
-    "AdherenceFromDepression",
-    "CASM_REL_FACTORS",
-    "SDOH_REL_FACTORS",
-]

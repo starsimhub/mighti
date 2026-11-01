@@ -1,5 +1,5 @@
 """
-people_extend.py — Age–sex dependent initialization helpers for Starsim v3+
+people_extend.py — Age–sex dependent initialization of the people
 """
 
 import os
@@ -10,68 +10,6 @@ import starsim as ss
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
-class PeopleCustom(ss.People):
-    """
-    Starsim People with a custom overall female probability.
-
-    This used to live in `mighti.init_people_sex` (legacy compatibility). It is
-    kept here to centralize all People initialization helpers in one module.
-    """
-
-    def __init__(self, n_agents, age_data=None, extra_states=None, mock=False):  # noqa: ARG002
-        super().__init__(n_agents=n_agents, age_data=age_data, extra_states=extra_states)
-        # Keep the module name 'people' so StarSim internals can plan correctly.
-        self.name = "people"
-
-        # Override the default sampler used when .init_vals() runs
-        self.female.default = ss.bernoulli(name="female", p=0.522)
-
-
-def fixed_step_die(self):
-    """
-    Robust MIGHTI-compatible replacement for StarSim.People.step_die().
-
-    - Ensures alive/dead flags are synchronized.
-    - Preserves ti_dead/ti_removed semantics.
-    - Notifies every disease module once per step.
-    - Compatible with DeathsExtended, NonAcquiredDisease, and all base diseases.
-    """
-    ti = self.sim.ti
-    ti_dead_raw = self.ti_dead.raw
-    ti_removed_raw = self.ti_removed.raw
-
-    # Determine who should die this step
-    death_mask   = np.isfinite(ti_dead_raw)   & (ti_dead_raw   <= ti)
-    removal_mask = np.isfinite(ti_removed_raw) & (ti_removed_raw <= ti)
-    death_uids = np.where(death_mask | removal_mask)[0]
-
-    if len(death_uids) == 0:
-        return np.array([], dtype=int)
-
-    # --- 1. Update state arrays (mirrors Starsim finalize_deaths) ---
-    self.alive.raw[death_uids] = False
-    self.dead.raw[death_uids] = True
-    self.ti_dead.raw[death_uids] = np.minimum(
-        np.where(np.isfinite(ti_dead_raw[death_uids]), ti_dead_raw[death_uids], ti),
-        ti
-    )
-    # maintain parity between ti_dead and ti_removed
-    self.ti_removed.raw[death_uids] = self.ti_dead.raw[death_uids]
-
-    # --- 2. Notify all diseases and mortality-linked modules ---
-    for module in self.sim.module_list:
-        if hasattr(module, "record_deaths"):
-            module.record_deaths(death_uids)
-        elif hasattr(module, "step_die"):
-            module.step_die(death_uids)
-
-    # logger.debug(f"[MIGHTI step_die] committed {len(death_uids)} deaths at ti={ti}")
-    return death_uids
-
-# NOTE: We intentionally do NOT monkeypatch `ss.People.step_die` at import time.
-# If you need this alternative implementation for a specific workflow, call
-# `fixed_step_die(ppl)` directly or wrap it in your own People subclass/module.
 
 # ---------------------------------------------------------------------------
 # 1. Build 5-year age–sex percent table
@@ -230,33 +168,8 @@ def make_people_with_age_sex(csv_path, init_year, n_agents,
     # Step 3: Build p(female)
     p_map = build_p_female_map(age_sex_df, bin_width=bin_width, top_open=top_open)
 
-    # Step 4: Create People object (Starsim v3 automatically handles age sampling)
+    # Step 4: Create People object (Starsim samples the ages)
     ppl = ss.People(n_agents=n_agents, age_data=age_df, extra_states=extra_states)
     ppl.female.default.pars.p = set_p_by_age_factory(p_map, bin_width=bin_width, top_open=top_open)
 
     return ppl
-
-
-# # ---------------------------------------------------------------------------
-# # 5. Extended Deaths class — ensures death requests are committed each step
-# # ---------------------------------------------------------------------------
-# class DeathsExtended(ss.Module):
-#     """A demographic module that finalizes any requested deaths each step."""
-
-#     def __init__(self, death_rate=None, rate_units=1, **kwargs):
-#         super().__init__(**kwargs)
-#         self.name = "deathsextended"
-#         self.death_rate = death_rate
-#         self.rate_units = rate_units
-
-#     def step(self):
-#         ppl = self.sim.people
-#         death_uids = ppl.step_die()  # Finalize all requested deaths
-#         if len(death_uids):
-#             pass
-
-#     def finalize(self):
-#         super().finalize()
-
-#     def finalize_results(self):
-#         super().finalize_results()

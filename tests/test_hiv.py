@@ -1,5 +1,5 @@
 """
-Test MIGHTI / STIsim HIV module under Starsim 3.x
+Test the STIsim HIV module as MIGHTI uses it
 """
 
 import starsim as ss
@@ -14,14 +14,12 @@ def test_hiv_basic(n_agents=5000, start=2000, stop=2020, do_plot=False):
 
     # --- Initialize HIV disease properly ---
     hiv = sti.HIV(
-        init_prev=ss.bernoulli(p=0.05),  # FIXED: must be a Starsim distribution
-        beta={"structuredsexual": [0.02, 0.02]},
+        init_prev=0.05,
+        beta_m2f=0.02,
+        rel_beta_f2m=1.0,
+        p_aids_death=1.0,
+        effective_art_efficacy=0.0,
     )
-
-    hiv.pars.include_aids_deaths = True
-    hiv.pars.include_care = False
-    hiv.pars.art_efficacy = 0.0
-    hiv.pars.p_hiv_death = ss.bernoulli(p=0.0005)
 
     net = sti.StructuredSexual()
 
@@ -31,14 +29,13 @@ def test_hiv_basic(n_agents=5000, start=2000, stop=2020, do_plot=False):
         stop=stop,
         networks=[net],
         diseases=[hiv],
-        dt=1,
-        copy_inputs=False,
+        dt=ss.years(1),
         label="HIV Mortality Test",
     )
 
     # Explicitly initialize before running
     sim.init()
-    n_init_inf = hiv.infected.sum()
+    n_init_inf = sim.diseases.hiv.infected.sum()
     print(f"Initial infections after init_post: {n_init_inf:,} ({n_init_inf/n_agents:.2%})")
 
     sim.run()

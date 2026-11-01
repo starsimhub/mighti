@@ -28,7 +28,7 @@ def _run_sdoh_once(seed):
     extra_states = [ss.BoolArr("neighbourhood_situation")]
     people = ss.People(n_agents=800, age_data=pd.read_csv(age_path), extra_states=extra_states)
     maternal = ss.MaternalNet()
-    ns = mi.NeighbourhoodSituation(csv_path=str(param_path))
+    ns = mi.sdoh.NeighbourhoodSituation(csv_path=str(param_path))
 
     sim = ss.Sim(
         rand_seed=int(seed),
@@ -39,10 +39,9 @@ def _run_sdoh_once(seed):
         networks=maternal,
         demographics=[pregnancy],
         connectors=[ns],
-        copy_inputs=False,
     )
     sim.run()
-    return np.asarray(sim.people.neighbourhood_situation, dtype=bool).copy()
+    return np.asarray(sim.people.neighbourhood_situation.raw, dtype=bool).copy()
 
 
 def test_rand_seed_is_deterministic_for_sdoh():

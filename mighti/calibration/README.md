@@ -1,6 +1,6 @@
-# Calibration Diagnostics
+# Calibration diagnostics
 
-`calibration_diseases.py` now saves Optuna diagnostics for each calibrated disease.
+`calibration_diseases.py` fits each condition's annual probability of acquisition by sex (and, with cause-specific death rates, its annual probability of death) with `sim.fit()` (Optuna), and saves Optuna diagnostics for each calibrated disease. `calibration_hiv.py` fits HIV's transmission parameters the same way. The parameters to fit are given bounds with `ss.par(value, bounds=[low, high])`; the goodness of fit is a function of the sim.
 
 ## Output location
 
