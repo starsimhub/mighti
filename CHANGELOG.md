@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.1.1] - 2026-11-01
+
+### Changed
+- Require Starsim below 4 (`starsim<4`), since this version does not run on Starsim 4.
+
 ## [0.1.0] - 2026-03-17
 
 ### Changed
