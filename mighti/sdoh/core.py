@@ -62,9 +62,6 @@ class BaseSDoH(ss.Module):
     def init_pre(self, sim):
         super().init_pre(sim)
         self.state = sim.people.add_state(ss.BoolArr(self.state_attr))
-        preg = sim.get_module(ss.Pregnancy, die=False)
-        if preg is not None:
-            preg.add_callback(preg.birth, self.on_birth)
         return
 
     def init_post(self):
@@ -78,7 +75,7 @@ class BaseSDoH(ss.Module):
         self.state[self.pars.p_init.filter(uids)] = True
         return
 
-    def on_birth(self, uids):
+    def on_birth(self, parents, uids):
         """ Newborns inherit their mother's value, or draw their own """
         inherit, own = self.pars.inherit_prob.filter(uids, both=True)
         mothers = self.sim.people.parent[inherit]

@@ -280,9 +280,6 @@ class NonAcquiredDisease(ss.Disease):
 
     def init_pre(self, sim):
         super().init_pre(sim)
-        preg = sim.get_module(ss.Pregnancy, die=False)
-        if preg is not None:
-            preg.add_callback(preg.birth, self.on_birth)
         return
 
     def init_post(self):
@@ -290,10 +287,15 @@ class NonAcquiredDisease(ss.Disease):
         uids = self.sim.people.auids
         if self.is_neonatal:
             uids = uids[self.sim.people.age[uids] < 28/365]
-        self.on_birth(uids)
+        self.set_affected(uids)
         return
 
-    def on_birth(self, uids):
+    def on_birth(self, parents, children):
+        """ Each newborn has the condition with probability init_prev """
+        self.set_affected(children)
+        return
+
+    def set_affected(self, uids):
         """ Each newborn (or person at the start) has the condition with probability init_prev """
         affected = self.pars.init_prev.filter(ss.uids(uids))
         self.affected[affected] = True
