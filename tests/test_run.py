@@ -24,7 +24,7 @@ def test_basic_mighti_run():
             'Sex': ['Male'] * 5 + ['Female'] * 5,
             'mx': [0.01] * 10,
         }),
-        'rate_units': 1,
+        'rate_per': 1,
     }
 
     deaths = ss.Deaths(death_rates)

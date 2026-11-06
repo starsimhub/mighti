@@ -98,7 +98,7 @@ class BaseSDoH(ss.Module):
         self.define_results(ss.Result('prop_stable', dtype=float, scale=False, label=f'Share with {self.state_attr}'))
         return
 
-    def update_results(self):
-        super().update_results()
+    def record_stocks(self, names=None):
+        super().record_stocks(names)
         self.results.prop_stable[self.ti] = self.state.mean()
         return

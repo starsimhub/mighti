@@ -153,7 +153,7 @@ prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(
 # ---------------------------------------------------------------------
 # Demographics & networks
 # ---------------------------------------------------------------------
-death_rates = {"death_rate": pd.read_csv(csv_path_death), "rate_units": 1}
+death_rates = {"death_rate": pd.read_csv(csv_path_death), "rate_per": 1}
 death = ss.Deaths(death_rates)
 
 fertility_rate = {"fertility_rate": pd.read_csv(csv_path_fertility)}
@@ -168,7 +168,7 @@ ppl = mi.people_extend.make_people_with_age_sex(
     out_dir=None,
 )
 
-maternal = ss.MaternalNet()
+maternal = ss.PrenatalNet()
 structuredsexual = sti.StructuredSexual()
 networks = [maternal, structuredsexual]
 

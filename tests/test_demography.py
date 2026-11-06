@@ -55,7 +55,7 @@ def test_people_extend_with_demography():
     thisdir = os.path.dirname(__file__)
     death_csv = os.path.join(thisdir, "test_data", "eswatini_mortality_rates.csv")
     fert_csv = os.path.join(thisdir, "test_data", "eswatini_asfr.csv")
-    death_rates = {"death_rate": pd.read_csv(death_csv), "rate_units": 1}
+    death_rates = {"death_rate": pd.read_csv(death_csv), "rate_per": 1}
     fertility_rate = {"fertility_rate": pd.read_csv(fert_csv)}
 
     death = ss.Deaths(death_rates)

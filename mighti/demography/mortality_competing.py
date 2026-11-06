@@ -32,9 +32,9 @@ def death_hazard(disease, uids):
     if graph is None: # A disease written as code with no death_hazard(): none modeled
         return h
     for tr in graph.transitions.values():
-        if (tr.outflow or tr.dies) and tr.rate is not None:
+        if (tr.dies or (tr.dest is not None and not tr.dest and not tr.stays)) and tr.rate is not None: # Its deaths: to no state (an outflow), or to ss.null as one of several destinations
             inside = np.zeros(len(uids), dtype=bool)
-            for state in tr.src:
+            for state in tr.source:
                 inside |= np.asarray(disease[state.name][uids], dtype=bool)
             h[inside] += tr.hazard(uids[inside])
     return h/disease.sim.unit_base.years # Per unit of the sim's time, to per year
@@ -47,16 +47,16 @@ class CompetingRisksDeaths(ss.Deaths):
     Args:
         death_rate: the all-cause death rates, as for `ss.Deaths` (typically UN/WPP mx by year, sex, and age)
         rel_death (float): multiplier on the all-cause rates
-        rate_units (float): as for `ss.Deaths` (1 if the rates are per person)
-        metadata (dict): as for `ss.Deaths`; sexes may be given as 'Female'/'Male' or 'f'/'m'
+        rate_per (float): as for `ss.Deaths` (1 if the rates are per person)
+        columns (dict): as for `ss.Deaths`; sexes may be given as 'Female'/'Male' or 'f'/'m'
         name (str): the name of the module, which is the cause of the deaths it causes (default 'residual')
 
     Unlike MIGHTI's Starsim 3 version, a modeled cause whose hazard is above the all-cause hazard for someone
     is not scaled down to it: the residual is then 0, and that person's mortality is the modeled cause's.
     """
-    def __init__(self, death_rate=None, *, rel_death=1.0, rate_units=1e-3, metadata=None, name='residual', **kwargs):
-        metadata = sc.mergedicts(dict(sex_keys={'Female':'f', 'Male':'m', 'f':'f', 'm':'m'}), metadata)
-        super().__init__(death_rate=death_rate, rel_death=rel_death, rate_units=rate_units, metadata=metadata, name=name, **kwargs)
+    def __init__(self, death_rate=None, *, rel_death=1.0, rate_per=1000, columns=None, name='residual', **kwargs):
+        columns = sc.mergedicts(dict(sex_keys={'Female':'f', 'Male':'m', 'f':'f', 'm':'m'}), columns)
+        super().__init__(death_rate=death_rate, rel_death=rel_death, rate_per=rate_per, columns=columns, name=name, **kwargs)
         return
 
     def modeled_hazard(self, uids):
@@ -82,7 +82,7 @@ class CompetingRisksDeaths(ss.Deaths):
         self.define_results(ss.Result('residual_share', dtype=float, scale=False, label='Mean residual share of the death hazard', auto_plot=False))
         return
 
-    def update_results(self):
-        super().update_results()
+    def record_flows(self):
+        super().record_flows()
         self.results.residual_share[self.ti] = getattr(self, 'residual_share', np.nan)
         return

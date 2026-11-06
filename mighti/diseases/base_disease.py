@@ -133,10 +133,10 @@ class Condition(ss.Disease):
         """ The annual hazard of death from the condition of each of these agents (0 for those it cannot kill now), with the modifiers of its deaths (e.g. a treatment's efficacy), for `mi.mortality_competing.CompetingRisksDeaths` """
         h = np.zeros(len(uids))
         for tr in self.transitions.values():
-            if tr.outflow and not tr.migration: # Its deaths: death, and death_treated for AcuteSurgicalDisease
-                at_risk = np.logical_or.reduce([self[state.name][uids] for state in tr.src])
+            if tr.dest is not None and not tr.dest and not tr.stays and not tr.dies and not tr.migration: # Its deaths (outflows): death, and death_treated for AcuteSurgicalDisease
+                at_risk = np.logical_or.reduce([self[state.name][uids] for state in tr.source])
                 h += np.where(at_risk, tr.hazard(uids), 0.0)
-        return h/ss.dur(1, self.sim.unit).years # Per unit of the sim's time (e.g. months, with STIsim's HIV) to per year
+        return h/ss.Duration(1, self.sim.unit).years # Per unit of the sim's time (e.g. months, with STIsim's HIV) to per year
 
     @property
     def duration(self):
@@ -319,11 +319,14 @@ class NonAcquiredDisease(ss.Disease):
         )
         return
 
-    def update_results(self):
-        super().update_results()
-        ti = self.ti
-        self.results.death[ti] = len(self.sim.people.died_of(self)) # Once each death has one cause
-        self.results.prevalence[ti] = np.count_nonzero(self.affected)/max(self.sim.people.n_alive, 1)
+    def record_stocks(self, names=None):
+        super().record_stocks(names)
+        self.results.prevalence[self.ti] = np.count_nonzero(self.affected)/max(self.sim.people.n_alive, 1)
+        return
+
+    def record_flows(self):
+        super().record_flows()
+        self.results.death[self.ti] = len(self.sim.people.died_of(self)) # Once each death has one cause
         return
 
     @property

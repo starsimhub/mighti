@@ -182,4 +182,4 @@ class MajorDepressiveDisorder(RemittingDisease):
     """
     remission_mult = ss.par(1.0, doc='Multiplier on remission, e.g. for care')
     housing_protect = ss.par(0.5, doc='Relative increase in remission for people who are housed')
-    remission = ss.Transition(RemittingDisease.affected, RemittingDisease.susceptible, rate=remission_mult*RemittingDisease.remission_rate*(1 + housing_protect*ss.ppl.get('neighbourhood_situation', 0))) # Nobody is housed unless a module adds the property
+    remission = ss.Transition(RemittingDisease.affected, RemittingDisease.susceptible, rate=remission_mult*RemittingDisease.remission_rate*(1 + housing_protect*ss.person.get('neighbourhood_situation', 0))) # Nobody is housed unless a module adds the property

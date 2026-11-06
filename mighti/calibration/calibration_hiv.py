@@ -73,7 +73,7 @@ def make_sim(cfg):
         init_prev = float(cfg.init_prev),
     )
     pregnancy = ss.Pregnancy(fertility_rate=pd.read_csv(cfg.asfr_csv))
-    death = ss.Deaths(death_rate=pd.read_csv(cfg.mortality_csv), rate_units=1)
+    death = ss.Deaths(death_rate=pd.read_csv(cfg.mortality_csv), rate_per=1)
     prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(diseases=["HIV"]) # The results calibrated to
 
     sim = ss.Sim(
@@ -83,7 +83,7 @@ def make_sim(cfg):
         start=int(cfg.start),
         stop=int(cfg.stop),
         diseases=hiv,
-        networks=[sti.StructuredSexual(), ss.MaternalNet()],
+        networks=[sti.StructuredSexual(), ss.PrenatalNet()],
         demographics=[pregnancy, death],
         analyzers=[prevalence_analyzer],
         rand_seed=cfg.sampler_seed,

@@ -52,7 +52,7 @@ def test_full_mighti_simulation():
 
     # --- HIV module
     hiv = sti.HIV(
-        init_prev=ss.bernoulli(p=get_prev_fn("HIV")),
+        init_prev=get_prev_fn("HIV"),
         beta_m2f=0.01,
         rel_beta_f2m=1.0,
         beta_m2c=0.01,
@@ -90,10 +90,10 @@ def test_full_mighti_simulation():
     fert_path = os.path.join(thisdir, "test_data", "eswatini_asfr.csv")
     age_path = os.path.join(thisdir, "test_data", "eswatini_age_distribution_2007.csv")
 
-    deaths = ss.Deaths({"death_rate": pd.read_csv(death_path), "rate_units": 1})
+    deaths = ss.Deaths({"death_rate": pd.read_csv(death_path), "rate_per": 1})
     pregnancy = ss.Pregnancy({"fertility_rate": pd.read_csv(fert_path)})
     ppl = ss.People(n_agents, age_data=pd.read_csv(age_path))
-    networks = [ss.MaternalNet(), sti.StructuredSexual()]
+    networks = [ss.PrenatalNet(), sti.StructuredSexual()]
 
     # --- Analyzers
     analyzers = [

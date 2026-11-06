@@ -26,7 +26,7 @@ def test_neighbourhood_situation_inheritance():
     pregnancy = ss.Pregnancy(pars=fertility_rate)
     extra_states = [ss.BoolArr('neighbourhood_situation')]
     people = ss.People(n_agents=1000, age_data=pd.read_csv(age_path), extra_states=extra_states)
-    maternal = ss.MaternalNet()
+    maternal = ss.PrenatalNet()
     ns = mi.sdoh.NeighbourhoodSituation(csv_path=param_path)
 
     sim = ss.Sim(

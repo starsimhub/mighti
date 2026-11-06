@@ -25,13 +25,13 @@ class AdditiveHazardDeaths(ss.Deaths):
         background_rate: the background death rates, as for `ss.Deaths(death_rate=...)` (typically UN/WPP mx by year, sex, and age)
         background_multiplier (float): multiplier on the background hazard (not the probability)
         multiplier_min_age (float): the age from which the multiplier applies; younger people have the unscaled schedule (e.g. to keep the infant rates as observed)
-        rate_units (float): as for `ss.Deaths` (1 if the rates are per person)
-        metadata (dict): as for `ss.Deaths`; sexes may be given as 'Female'/'Male' or 'f'/'m'
+        rate_per (float): as for `ss.Deaths` (1 if the rates are per person)
+        columns (dict): as for `ss.Deaths`; sexes may be given as 'Female'/'Male' or 'f'/'m'
         name (str): the name of the module, which is the cause of the deaths it causes (default 'background')
     """
-    def __init__(self, background_rate=None, *, background_multiplier=1.0, multiplier_min_age=0.0, rate_units=1e-3, metadata=None, name='background', **kwargs):
-        metadata = sc.mergedicts(dict(sex_keys={'Female':'f', 'Male':'m', 'f':'f', 'm':'m'}), metadata)
-        super().__init__(death_rate=background_rate, rate_units=rate_units, metadata=metadata, name=name, **kwargs)
+    def __init__(self, background_rate=None, *, background_multiplier=1.0, multiplier_min_age=0.0, rate_per=1000, columns=None, name='background', **kwargs):
+        columns = sc.mergedicts(dict(sex_keys={'Female':'f', 'Male':'m', 'f':'f', 'm':'m'}), columns)
+        super().__init__(death_rate=background_rate, rate_per=rate_per, columns=columns, name=name, **kwargs)
         self.define_pars(
             background_multiplier = float(background_multiplier),
             multiplier_min_age = float(multiplier_min_age),

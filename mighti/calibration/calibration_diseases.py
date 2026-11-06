@@ -621,7 +621,7 @@ def make_sim(disease_name, DiseaseClass, fit_pdeath=False):
     hiv = sti.HIV(
         beta_m2f=HIV_BETA_M2F,
         beta_m2c=HIV_BETA_M2C,
-        init_prev=ss.bernoulli(p=get_prevalence_function("HIV")),
+        init_prev=get_prevalence_function("HIV"),
         p_aids_death=1.0,
         effective_art_efficacy=0.9,
     )
@@ -637,9 +637,9 @@ def make_sim(disease_name, DiseaseClass, fit_pdeath=False):
     health_condition = DiseaseClass(csv_path=path_parameters, pars=pars)
 
     # Demographics
-    death = ss.Deaths(death_rate=pd.read_csv(path_mortality), rate_units=1)
+    death = ss.Deaths(death_rate=pd.read_csv(path_mortality), rate_per=1)
     pregnancy = ss.Pregnancy(fertility_rate=pd.read_csv(path_fertility))
-    networks = [ss.MaternalNet(), sti.StructuredSexual()]
+    networks = [ss.PrenatalNet(), sti.StructuredSexual()]
 
     # Prevalence analyzer (HIV-stratified to match calibration_original)
     prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(prevalence_data=prevalence_data, diseases=["HIV", disease_name])

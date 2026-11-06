@@ -20,18 +20,19 @@ def test_annual_probability_conversion():
 
 
 def test_main_disease_auto_converts_annual_probabilities_for_monthly_dt(tmp_path):
-    """ The share who acquire a condition in 5 years, with no remission or death, is 1 - (1 - p)^5 at yearly and monthly steps """
+    """ The share who acquire a condition over the years of the steps taken (a step from each time point, 2020 to 2025 inclusive), with no remission or death, is 1 - (1 - p)^years at yearly and monthly steps """
     param_path = tmp_path / "params.csv"
     p_f, p_m = 0.2, 0.1
     pd.DataFrame([dict(condition="Type2Diabetes", p_death=0.0, remission_rate=0.0, p_acquire_female=p_f, p_acquire_male=p_m, affected_sex="both")]).to_csv(param_path, index=False)
 
     for dt in [ss.years(1), ss.months(1)]:
         t2d = mi.diseases.Type2Diabetes(csv_path=str(param_path), pars={"init_prev": 0.0})
-        sim = ss.Sim(n_agents=20_000, diseases=t2d, start=2020, stop=2025, dt=dt, use_aging=False)
+        sim = ss.Sim(n_agents=20_000, diseases=t2d, start=2020, stop=2025, dt=dt, aging=False)
         sim.run(verbose=0)
         dis = sim.diseases.type2diabetes
         female = sim.people.female
+        years = sim.t.npts*sim.t.dt_year # The people are as after the last step, which starts at the stop
         for sex, p in [(female, p_f), (~female, p_m)]:
             share = dis.affected[sex.uids].mean()
-            expected = 1 - (1 - p)**5
+            expected = 1 - (1 - p)**years
             assert abs(share - expected) < 0.015, f'At dt={dt}, {share=:.3f} acquired, but {expected=:.3f}'

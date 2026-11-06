@@ -34,7 +34,7 @@ def _simple_bg_rate():
 def _run_sim(with_cause):
     bg = mi.mortality_additive.AdditiveHazardDeaths(
         _simple_bg_rate(),
-        rate_units=1,
+        rate_per=1,
         background_multiplier=1.0,
     )
     diseases = [DummyCause(p=0.02)] if with_cause else []

@@ -58,7 +58,7 @@ def get_prev_func(disease):
 # ---------------------------------------------------------------------
 hiv_prev = get_prev_func("HIV")
 hiv = sti.HIV(
-    init_prev=ss.bernoulli(p=hiv_prev),
+    init_prev=hiv_prev,
     beta_m2f=0.03,
     rel_beta_f2m=1.0,
     p_aids_death=1.0,
@@ -72,7 +72,7 @@ aud = mi.diseases.AlcoholUseDisorder(csv_path=param_path, init_prev=0.10)
 # Networks, demographics, connectors
 # ---------------------------------------------------------------------
 networks = sti.StructuredSexual()
-# death = ss.Deaths({"death_rate": pd.DataFrame({"year": [2007], "death_rate": [0.01]}), "rate_units": 1})
+# death = ss.Deaths({"death_rate": pd.DataFrame({"year": [2007], "death_rate": [0.01]}), "rate_per": 1})
 # pregnancy = ss.Pregnancy(pars={"fertility_rate": pd.DataFrame({"year": [2007], "fertility_rate": [0.02]})})
 ppl = ss.People(n_agents=n_agents)  # minimal, avoids external CSVs
 

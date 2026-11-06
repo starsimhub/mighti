@@ -29,7 +29,7 @@ def test_reference_ex_from_mx_and_yll_analyzers():
     assert ex_lookup("Male", 0) > ex_lookup("Male", 50) >= 0
 
     # Run a tiny sim just to ensure analyzers accept a DataFrame reference ex table
-    death = ss.Deaths({"death_rate": 0.5, "rate_units": 1})  # high death prob for test stability
+    death = ss.Deaths({"death_rate": 0.5, "rate_per": 1})  # high death prob for test stability
 
     cond_an = mi.analyzers.ConditionAtDeathAnalyzer(conditions=[], ex_life_expectancy=df_ex)
     cod_an = mi.analyzers.CauseOfDeathYLLAnalyzer(df_ex)
