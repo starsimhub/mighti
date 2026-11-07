@@ -133,7 +133,7 @@ class Condition(ss.Disease):
         """ The annual hazard of death from the condition of each of these agents (0 for those it cannot kill now), with the modifiers of its deaths (e.g. a treatment's efficacy), for `mi.mortality_competing.CompetingRisksDeaths` """
         h = np.zeros(len(uids))
         for tr in self.transitions.values():
-            if tr.dest is not None and not tr.dest and not tr.stays and not tr.dies and not tr.migration: # Its deaths (outflows): death, and death_treated for AcuteSurgicalDisease
+            if tr.dies: # Its deaths (outflows): death, and death_treated for AcuteSurgicalDisease
                 at_risk = np.logical_or.reduce([self[state.name][uids] for state in tr.source])
                 h += np.where(at_risk, tr.hazard(uids), 0.0)
         return h/ss.Duration(1, self.sim.unit).years # Per unit of the sim's time (e.g. months, with STIsim's HIV) to per year

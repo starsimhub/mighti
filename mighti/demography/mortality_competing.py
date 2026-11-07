@@ -32,7 +32,7 @@ def death_hazard(disease, uids):
     if graph is None: # A disease written as code with no death_hazard(): none modeled
         return h
     for tr in graph.transitions.values():
-        if (tr.dies or (tr.dest is not None and not tr.dest and not tr.stays)) and tr.rate is not None: # Its deaths: to no state (an outflow), or to ss.null as one of several destinations
+        if (tr.dies or tr.may_die) and tr.rate is not None: # Its deaths: to no state (an outflow), or to ss.dead as one of several destinations
             inside = np.zeros(len(uids), dtype=bool)
             for state in tr.source:
                 inside |= np.asarray(disease[state.name][uids], dtype=bool)
