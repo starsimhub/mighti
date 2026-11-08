@@ -77,7 +77,7 @@ class PrevalenceAnalyzer(ss.Analyzer):
                         key = f"{disease}_{suffix}_{sex}_{i}"
                         if key not in existing:
                             dtype = float if suffix == "prev" else int
-                            new_results.append(ss.Result(key, dtype=dtype, scale=False))
+                            new_results.append(ss.Result(key, dtype=dtype, scale=False, kind="ratio" if "prev" in key else "stock"))
                             existing.add(key)
 
             # Total-level results
@@ -85,7 +85,7 @@ class PrevalenceAnalyzer(ss.Analyzer):
                 key = f"{disease}_{suffix}"
                 if key not in existing:
                     dtype = float if "prev" in key else int
-                    new_results.append(ss.Result(key, dtype=dtype, scale=False))
+                    new_results.append(ss.Result(key, dtype=dtype, scale=False, kind="ratio" if "prev" in key else "stock"))
                     existing.add(key)
 
         if new_results:
@@ -143,7 +143,7 @@ def _add_summary_results(analyzer, disease, existing, new_results, suffixes):
         key = f"{disease}_{suffix}"
         if key not in existing:
             dtype = float if "prev" in suffix else int
-            new_results.append(ss.Result(key, dtype=dtype, scale=False))
+            new_results.append(ss.Result(key, dtype=dtype, scale=False, kind="ratio" if "prev" in key else "stock"))
             existing.add(key)
     return existing, new_results
 
@@ -186,7 +186,7 @@ class CauseDeathRateAnalyzer(ss.Analyzer):
                     for suffix, dtype in [("deaths", int), ("expo", float)]:
                         key = f"{disease}_{suffix}_{sex}_{i}"
                         if key not in existing:
-                            new_results.append(ss.Result(key, dtype=dtype, scale=False))
+                            new_results.append(ss.Result(key, dtype=dtype, scale=False, kind="flow"))
                             existing.add(key)
 
         if new_results:
@@ -266,7 +266,7 @@ class PrevalenceAnalyzer_HIV(ss.Analyzer):
                     ]:
                         if key not in existing:
                             dtype = float if "prev" in key else int
-                            new_results.append(ss.Result(key, dtype=dtype, scale=False))
+                            new_results.append(ss.Result(key, dtype=dtype, scale=False, kind="ratio" if "prev" in key else "stock"))
                             existing.add(key)
 
             # Add summary-level results (fix for Fig2)
@@ -368,7 +368,7 @@ class PrevalenceAnalyzer_SDoH(ss.Analyzer):
         new_results = []
 
         if "sdoh_prop_adults" not in existing:
-            new_results.append(ss.Result("sdoh_prop_adults", dtype=float, scale=False))
+            new_results.append(ss.Result("sdoh_prop_adults", dtype=float, kind="ratio"))
 
         for disease in self.diseases:
             for i, _ in enumerate(self.age_bins):
@@ -380,7 +380,7 @@ class PrevalenceAnalyzer_SDoH(ss.Analyzer):
                     ]:
                         if key not in existing:
                             dtype = float if "prev" in key else int
-                            new_results.append(ss.Result(key, dtype=dtype, scale=False))
+                            new_results.append(ss.Result(key, dtype=dtype, scale=False, kind="ratio" if "prev" in key else "stock"))
                             existing.add(key)
 
             # Add summary-level results (same idea as HIV analyzer)
@@ -445,8 +445,8 @@ class OnARTByConditionAnalyzer(ss.Analyzer):
         if self.results_defined:
             return
         results = [
-            ss.Result("onart_with_condition", dtype=float),
-            ss.Result("onart_without_condition", dtype=float),
+            ss.Result("onart_with_condition", dtype=float, kind="ratio"),
+            ss.Result("onart_without_condition", dtype=float, kind="ratio"),
         ]
         self.define_results(*results)
         self.results_defined = True
@@ -508,10 +508,10 @@ class OnARTByConditionAndSexAnalyzer(ss.Analyzer):
         if self.results_defined:
             return
         results = [
-            ss.Result("onart_cond_male", dtype=float),
-            ss.Result("onart_nocond_male", dtype=float),
-            ss.Result("onart_cond_female", dtype=float),
-            ss.Result("onart_nocond_female", dtype=float),
+            ss.Result("onart_cond_male", dtype=float, kind="ratio"),
+            ss.Result("onart_nocond_male", dtype=float, kind="ratio"),
+            ss.Result("onart_cond_female", dtype=float, kind="ratio"),
+            ss.Result("onart_nocond_female", dtype=float, kind="ratio"),
         ]
         self.define_results(*results)
         self.results_defined = True

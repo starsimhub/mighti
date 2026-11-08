@@ -77,8 +77,8 @@ class AdherenceAnalyzer(ss.Analyzer):
     def init_results(self):
         super().init_results()
         self.define_results(
-            ss.Result("on_with_condition", dtype=float, scale=False, label="On treatment, with the condition"),
-            ss.Result("on_without_condition", dtype=float, scale=False, label="On treatment, without the condition"),
+            ss.Result("on_with_condition", dtype=float, kind="ratio", label="On treatment, with the condition"),
+            ss.Result("on_without_condition", dtype=float, kind="ratio", label="On treatment, without the condition"),
         )
         return
 

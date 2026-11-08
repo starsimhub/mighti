@@ -43,9 +43,9 @@ class DeathsByAgeSexAnalyzer(ss.Analyzer):
     def init_results(self):
         super().init_results()
         self.define_results(
-            ss.Result("infant_deaths", label="Cumulative infant deaths", dtype=int),
-            ss.Result("male_deaths_by_age", label="Male deaths by age", dtype=int, shape=self.max_age + 1),
-            ss.Result("female_deaths_by_age", label="Female deaths by age", dtype=int, shape=self.max_age + 1),
+            ss.Result("infant_deaths", label="Cumulative infant deaths", dtype=int, kind="stock"),
+            ss.Result("male_deaths_by_age", label="Male deaths by age", dtype=int, shape=self.max_age + 1, kind=None),
+            ss.Result("female_deaths_by_age", label="Female deaths by age", dtype=int, shape=self.max_age + 1, kind=None),
         )
         return
 
@@ -88,10 +88,10 @@ class AgeSexMxAnalyzer(ss.Analyzer):
         super().init_results()
         shape = (self.t.npts, self.max_age + 1)
         self.define_results(
-            ss.Result("exposure_male", dtype=float, shape=shape, label="Exposure (male) by age"),
-            ss.Result("exposure_female", dtype=float, shape=shape, label="Exposure (female) by age"),
-            ss.Result("deaths_male", dtype=int, shape=shape, label="Deaths (male) by age"),
-            ss.Result("deaths_female", dtype=int, shape=shape, label="Deaths (female) by age"),
+            ss.Result("exposure_male", dtype=float, shape=shape, kind="stock", label="Exposure (male) by age"),
+            ss.Result("exposure_female", dtype=float, shape=shape, kind="stock", label="Exposure (female) by age"),
+            ss.Result("deaths_male", dtype=int, shape=shape, kind="flow", label="Deaths (male) by age"),
+            ss.Result("deaths_female", dtype=int, shape=shape, kind="flow", label="Deaths (female) by age"),
         )
         return
 
@@ -145,8 +145,8 @@ class SurvivorshipAnalyzer(ss.Analyzer):
     def init_results(self):
         super().init_results()
         self.define_results(
-            ss.Result("lx_male", shape=self.max_age + 1, dtype=float, label="Male survivorship l(x)"),
-            ss.Result("lx_female", shape=self.max_age + 1, dtype=float, label="Female survivorship l(x)"),
+            ss.Result("lx_male", shape=self.max_age + 1, dtype=float, kind=None, label="Male survivorship l(x)"),
+            ss.Result("lx_female", shape=self.max_age + 1, dtype=float, kind=None, label="Female survivorship l(x)"),
         )
         return
 

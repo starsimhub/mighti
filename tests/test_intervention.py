@@ -30,7 +30,7 @@ def test_reduce_mortality_tx_runs():
         interventions = []
         if treat: # Everyone with T2D is treated, which halves their mortality from it while they hold the treatment
             tx = ss.Treatment(efficacy=dict(death=0.5), name='t2d_tx')
-            interventions = ss.treat(tx, where=t2d.affected, every=ss.years(1), label='T2D mortality reduction')
+            interventions = ss.treat(tx, who=t2d.affected, when=ss.schedule(every=ss.years(1)), label='T2D mortality reduction')
         return ss.Sim(start=2000, stop=2050, dt=1, n_agents=10000, diseases=t2d, interventions=interventions)
 
     sim0 = make_sim().run()

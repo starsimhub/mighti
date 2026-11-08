@@ -314,8 +314,8 @@ class NonAcquiredDisease(ss.Disease):
     def init_results(self):
         super().init_results()
         self.define_results(
-            ss.Result('prevalence', dtype=float, scale=False, label='Prevalence'),
-            ss.Result('death', dtype=int, scale=True, label='Deaths'),
+            ss.Result('prevalence', dtype=float, label='Prevalence'),
+            ss.Result('death', dtype=int, kind='flow', label='Deaths'),
         )
         return
 

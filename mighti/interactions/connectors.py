@@ -34,7 +34,7 @@ def NCDHIVConnector(rel_sus, diseases=None):
     Returns:
         A list of `ss.modify()`, one per condition, to pass as `connectors`
     """
-    return [ss.modify(f'{key(cond)}.rel_sus', multiply=float(rr), where=ss.ref('hiv.infected'), name=f'ncd_hiv_{key(cond)}')
+    return [ss.modify(f'{key(cond)}.rel_sus', multiply=float(rr), who=ss.ref('hiv.infected'), name=f'ncd_hiv_{key(cond)}')
             for cond, rr in rel_sus.items() if key(cond) != 'hiv' and pd.notna(rr) and in_sim(cond, diseases)]
 
 
@@ -75,8 +75,8 @@ def create_dynamic_connector(condition1, condition2, rel_sus, state1='affected')
         An `ss.modify()`, to pass as one of the `connectors`
     """
     c1, c2 = key(condition1), key(condition2)
-    where = ss.ref(f'{c1}.infected' if c1 == 'hiv' or is_infection(condition1) else f'{c1}.{state1}')
-    return ss.modify(f'{c2}.rel_sus', multiply=float(rel_sus), where=where, name=f'{c1}_{c2}')
+    who = ss.ref(f'{c1}.infected' if c1 == 'hiv' or is_infection(condition1) else f'{c1}.{state1}')
+    return ss.modify(f'{c2}.rel_sus', multiply=float(rel_sus), who=who, name=f'{c1}_{c2}')
 
 
 def is_infection(condition):

@@ -108,7 +108,7 @@ sim_conn = ss.Sim(
 def test_hiv_aud_connector_msim():
     msim = ss.MultiSim([sim_base, sim_conn])
     # Run serially to avoid multiprocessing restrictions in some environments (e.g. CI/sandboxes).
-    msim.run(parallel=False)
+    msim.run(workers=1)
 
     # Extract mean AUD prevalence
     prev_base = msim.sims[0].results.alcoholusedisorder.prevalence.mean()

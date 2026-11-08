@@ -95,7 +95,7 @@ class BaseSDoH(ss.Module):
 
     def init_results(self):
         super().init_results()
-        self.define_results(ss.Result('prop_stable', dtype=float, scale=False, label=f'Share with {self.state_attr}'))
+        self.define_results(ss.Result('prop_stable', dtype=float, kind='ratio', label=f'Share with {self.state_attr}'))
         return
 
     def record_stocks(self, names=None):

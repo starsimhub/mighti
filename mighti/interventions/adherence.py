@@ -124,7 +124,7 @@ class ARTAdherenceDisruptor(ss.modify):
         min_time_on_art (dur): the time on ART before people can stop
     """
     def __init__(self, base_dropout=0.10, base_dropout_noaud=0.001, min_time_on_art=ss.months(6), name='adherence_art_dropout', **kwargs):
-        super().__init__('hiv.pars.rate_art_dropout', set=self.dropout_rate, where=self.eligible, name=name, **kwargs)
+        super().__init__('hiv.pars.rate_art_dropout', set=self.dropout_rate, who=self.eligible, name=name, **kwargs)
         self.define_pars(
             base_dropout = float(base_dropout),
             base_dropout_noaud = float(base_dropout_noaud),
