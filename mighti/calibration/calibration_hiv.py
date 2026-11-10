@@ -132,7 +132,7 @@ def make_gof(obs):
 
 
 def run_calib(cfg):
-    """ Fit HIV's betas to the observed HIV prevalence by age and sex (with Optuna, since the sim is stochastic); returns an `ss.fit.Fit` """
+    """ Fit HIV's betas to the observed HIV prevalence by age and sex (with Optuna, since the sim is stochastic); returns an `ss.fitting.Fit` """
     sim = make_sim(cfg)
     gof = make_gof(load_observed(cfg))
     kwargs = dict(storage=f'calib_hiv_{cfg.region}.log') if cfg.keep_db else {}
