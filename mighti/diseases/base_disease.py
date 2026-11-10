@@ -321,7 +321,7 @@ class NonAcquiredDisease(ss.Disease):
 
     def record_stocks(self, names=None):
         super().record_stocks(names)
-        self.results.prevalence[self.ti] = np.count_nonzero(self.affected)/max(self.sim.people.n_alive, 1)
+        self.results.prevalence[self.ti] = np.count_nonzero(self.affected)/max(self.sim.people.alive.count(), 1)
         return
 
     def record_flows(self):
