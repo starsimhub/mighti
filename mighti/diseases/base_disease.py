@@ -319,13 +319,13 @@ class NonAcquiredDisease(ss.Disease):
         )
         return
 
-    def record_stocks(self, names=None):
-        super().record_stocks(names)
+    def record_states(self, names=None):
+        super().record_states(names)
         self.results.prevalence[self.ti] = np.count_nonzero(self.affected)/max(self.sim.people.alive.count(), 1)
         return
 
-    def record_flows(self):
-        super().record_flows()
+    def record_events(self):
+        super().record_events()
         self.results.death[self.ti] = len(self.sim.people.died_of(self)) # Once each death has one cause
         return
 

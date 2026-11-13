@@ -82,7 +82,7 @@ class CompetingRisksDeaths(ss.Deaths):
         self.define_results(ss.Result('residual_share', dtype=float, kind='ratio', label='Mean residual share of the death hazard', auto_plot=False))
         return
 
-    def record_flows(self):
-        super().record_flows()
+    def record_events(self):
+        super().record_events()
         self.results.residual_share[self.ti] = getattr(self, 'residual_share', np.nan)
         return

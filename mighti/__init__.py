@@ -5,7 +5,7 @@ Use the namespaces, e.g. `mi.diseases.Type2Diabetes`, `mi.analyzers.PrevalenceAn
 `mi.interactions.NCDHIVConnector`, `mi.sdoh.NeighbourhoodSituation`, `mi.interventions.ARTwithCASM`.
 Plotting is not imported with MIGHTI: `from mighti.analysis.plotting import plot_mean_prevalence`.
 """
-# Last verified on: Starsim 4.0.0rc4 (34266c4c4)
+# Last verified on: Starsim 4.0.0rc4 (009927777)
 
 from .util.version import __version__, __versiondate__, __license__
 
