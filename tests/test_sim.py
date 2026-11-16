@@ -91,7 +91,7 @@ def test_full_mighti_simulation():
     age_path = os.path.join(thisdir, "test_data", "eswatini_age_distribution_2007.csv")
 
     deaths = ss.Deaths({"death_rate": pd.read_csv(death_path), "rate_per": 1})
-    pregnancy = ss.Pregnancy({"fertility_rate": pd.read_csv(fert_path)})
+    pregnancy = ss.Pregnancy({"fertility_rate": pd.read_csv(fert_path), "rate_per": 1000})
     ppl = ss.People(n_agents, age_data=pd.read_csv(age_path))
     networks = [ss.PrenatalNet(), sti.StructuredSexual()]
 

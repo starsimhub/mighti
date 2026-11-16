@@ -22,7 +22,7 @@ def test_neighbourhood_situation_inheritance():
     age_path = os.path.join(thisdir, 'test_data', 'eswatini_age_distribution_2007.csv')
     fertility_path = os.path.join(thisdir, 'test_data', 'eswatini_asfr.csv')
 
-    fertility_rate = {'fertility_rate': pd.read_csv(fertility_path)}
+    fertility_rate = {'fertility_rate': pd.read_csv(fertility_path), 'rate_per': 1000}
     pregnancy = ss.Pregnancy(pars=fertility_rate)
     extra_states = [ss.BoolArr('neighbourhood_situation')]
     people = ss.People(n_agents=1000, age_data=pd.read_csv(age_path), extra_states=extra_states)

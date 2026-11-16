@@ -56,7 +56,7 @@ def test_people_extend_with_demography():
     death_csv = os.path.join(thisdir, "test_data", "eswatini_mortality_rates.csv")
     fert_csv = os.path.join(thisdir, "test_data", "eswatini_asfr.csv")
     death_rates = {"death_rate": pd.read_csv(death_csv), "rate_per": 1}
-    fertility_rate = {"fertility_rate": pd.read_csv(fert_csv)}
+    fertility_rate = {"fertility_rate": pd.read_csv(fert_csv), "rate_per": 1000}
 
     death = ss.Deaths(death_rates)
     pregnancy = ss.Pregnancy(pars=fertility_rate)
@@ -87,7 +87,7 @@ def test_people_extend_with_demography():
     # Check basic mortality tracking
     total_deaths = len(sim.people.dead)
     assert total_deaths >= 0
-    assert hasattr(sim.results, "died")
+    assert hasattr(sim.results, "death")
     print(f"[✓] Simulation completed; total deaths recorded: {total_deaths}")
     print("[✓] people_extend integration test passed.")
 

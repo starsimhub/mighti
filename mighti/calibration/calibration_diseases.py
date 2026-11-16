@@ -638,7 +638,7 @@ def make_sim(disease_name, DiseaseClass, fit_pdeath=False):
 
     # Demographics
     death = ss.Deaths(death_rate=pd.read_csv(path_mortality), rate_per=1)
-    pregnancy = ss.Pregnancy(fertility_rate=pd.read_csv(path_fertility))
+    pregnancy = ss.Pregnancy(fertility_rate=pd.read_csv(path_fertility), rate_per=1000)
     networks = [ss.PrenatalNet(), sti.StructuredSexual()]
 
     # Prevalence analyzer (HIV-stratified to match calibration_original)

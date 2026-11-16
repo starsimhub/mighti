@@ -72,7 +72,7 @@ def make_sim(cfg):
         beta_m2c = ss.par(0.001, bounds=[0.0001, 0.1]), # Mother-to-child transmission
         init_prev = float(cfg.init_prev),
     )
-    pregnancy = ss.Pregnancy(fertility_rate=pd.read_csv(cfg.asfr_csv))
+    pregnancy = ss.Pregnancy(fertility_rate=pd.read_csv(cfg.asfr_csv), rate_per=1000)
     death = ss.Deaths(death_rate=pd.read_csv(cfg.mortality_csv), rate_per=1)
     prevalence_analyzer = mi.analyzers.PrevalenceAnalyzer_HIV(diseases=["HIV"]) # The results calibrated to
 

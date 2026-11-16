@@ -26,7 +26,7 @@ def test_life_expectancy():
     # Prepare input
     death_rates = {'death_rate': pd.read_csv(csv_path_death), 'rate_per': 1}
     death = ss.Deaths(death_rates)
-    fertility_rate = {'fertility_rate': pd.read_csv(csv_path_fertility)}
+    fertility_rate = {'fertility_rate': pd.read_csv(csv_path_fertility), 'rate_per': 1000}
     pregnancy = ss.Pregnancy(pars=fertility_rate)
 
     # Initialize the PrevalenceAnalyzer

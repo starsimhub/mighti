@@ -22,7 +22,7 @@ def _run_sdoh_once(seed):
     age_path = data_dir / "eswatini_age_distribution_2007.csv"
     fertility_path = data_dir / "eswatini_asfr.csv"
 
-    fertility_rate = {"fertility_rate": pd.read_csv(fertility_path)}
+    fertility_rate = {"fertility_rate": pd.read_csv(fertility_path), "rate_per": 1000}
     pregnancy = ss.Pregnancy(pars=fertility_rate)
 
     extra_states = [ss.BoolArr("neighbourhood_situation")]
